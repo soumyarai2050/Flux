@@ -1,0 +1,8 @@
+#template_file_name should be 'None' if no template is required in plugin
+template_file_name: 'None'
+main_message_option_name: "FluxMsgJsonRoot"
+output_file_name_suffix: "slice.js"
+insertion_import_file_name: "insertion_imports.py"
+plugin_file_name: "js_slice_file_gen_plugin.py"
+pb2_import_generator_path: "jsx_pb2_import_generator.py"
+case_style: "snake" # snake or camel supported

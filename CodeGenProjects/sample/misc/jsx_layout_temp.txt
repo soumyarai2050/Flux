@@ -1,0 +1,118 @@
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import _ from 'lodash';
+import { makeStyles } from '@mui/styles';
+import {
+    getAllUILayout, getUILayout, createUILayout, updateUILayout,
+    resetUILayout, setModifiedUILayout, setSelectedUILayoutId, resetSelectedUILayoutId, resetError
+} from '../features/uiLayoutSlice';
+import { getLayout } from '../utils';
+import { Responsive, WidthProvider } from "react-grid-layout";
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+import { Paper, Box } from '@mui/material';
+import { Widgets } from '@mui/icons-material';
+# @@protoc_insertion_point(add_imports)
+import SideDrawer from './SideDrawer';
+import ToggleIcon from '../components/ToggleIcon';
+import { DB_ID } from '../constants';
+
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
+const useStyles = makeStyles({
+    layout: {
+        display: 'flex'
+    },
+    grid: {
+        flex: 1,
+        overflow: 'auto'
+    },
+    widget: {
+        background: 'whitesmoke !important',
+    },
+    icon: {
+        color: 'inherit !important',
+    }
+})
+
+const Layout = (props) => {
+    const { uiLayoutArray, uiLayout, modifiedUILayout, selectedUILayoutId, loading, error } = useSelector(state => state.uiLayout);
+    const [layouts, setLayouts] = useState(getLayout());
+    const [draggable, setDraggable] = useState(false);
+    const [show, setShow] = useState({
+        # @@protoc_insertion_point(add_widget_list)
+    });
+
+    const classes = useStyles();
+    const dispatch = useDispatch();
+
+    const defaultProps = {
+        layouts: {
+            lg: getLayout()
+        },
+        breakpoints: { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 },
+        cols: { lg: 18, md: 12, sm: 6, xs: 4, xxs: 2 },
+        className: 'layout',
+        rowHeight: 50,
+        margin: { lg: [8, 8], md: [5, 5] },
+        preventCollision: true,
+        allowOverlap: false,
+        autoSize: false,
+        isBounded: false,
+        compactType: null,
+        useCSSTransforms: true,
+        resizeHandles: ['ne', 'se']
+    }
+
+    useEffect(() => {
+        dispatch(getAllUILayout());
+    }, [])
+
+    useEffect(() => {
+        if (uiLayout.widget_ui_data) {
+            setLayouts(uiLayout.widget_ui_data);
+        }
+    }, [uiLayout])
+
+    const onToggleDrag = () => {
+        setDraggable(!draggable);
+    }
+
+    const onSave = () => {
+        dispatch(updateUILayout(layouts));
+    }
+
+    const onToggleWidget = (name) => {
+        setShow({ ...show, [name]: !show[name] });
+        setLayouts(getLayout());
+    }
+
+    const onLayoutChange = (layout) => {
+        setLayouts(layout);
+    }
+
+    const getLayoutById = (id) => {
+        let layout = layouts.filter(layout => layout.i === id)[0];
+        return layout ? layout : { i: id, x: 0, y: 0, w: 4, h: 4 };
+    }
+
+    return (
+        <Box className={classes.layout}>
+            <SideDrawer draggable={draggable} onToggleDrag={onToggleDrag} onSave={onSave}>
+                # @@protoc_insertion_point(add_root_in_jsx_layout)
+            </SideDrawer>
+            <ResponsiveGridLayout
+                {...defaultProps}
+                className={classes.grid}
+                isDraggable={draggable}
+                isResizable={draggable}
+                onLayoutChange={onLayoutChange}>
+
+                # @@protoc_insertion_point(add_show_widget)
+            </ResponsiveGridLayout>
+        </Box>
+    )
+}
+
+export default Layout;
