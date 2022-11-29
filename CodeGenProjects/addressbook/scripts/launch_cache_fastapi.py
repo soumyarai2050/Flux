@@ -10,8 +10,8 @@ env_dict = {
     "RELOAD": "false",
     "DEBUG_SLEEP_TIME": "0"
 }
-code_gen_engine_env_manager.init_env_and_update_sys_path("sample_project", "_", "_", env_dict)
+code_gen_engine_env_manager.init_env_and_update_sys_path("addressbook", "_", "_", env_dict)
 
 project_dir: PurePath = PurePath(__file__).parent.parent
-script_path = project_dir / "output" / "strat_manager_service_beanie_fastapi.py"
+script_path = project_dir / "output" / "strat_manager_service_cache_fastapi.py"
 code_gen_engine_env_manager.execute_python_script(str(script_path))

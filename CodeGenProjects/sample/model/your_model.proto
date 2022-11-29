@@ -1,5 +1,0 @@
-syntax = "proto2";
-import "flux_options.proto";
-import "ui_core.proto";
-
-// add your model definitions as appropriate
