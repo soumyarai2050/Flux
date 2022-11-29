@@ -2,15 +2,14 @@ import sys
 from pathlib import PurePath
 home_dir_path = PurePath(__file__).parent.parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
-from FluxCodeGenEngine.code_gen_engine_env import CodeGenEngineEnvManager
-
+from Flux.code_gen_engine_env import CodeGenEngineEnvManager
 
 code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
 env_dict = {
     "DEBUG_SLEEP_TIME": "0"
 }
-code_gen_engine_env_manager.init_env_and_update_sys_path("pair_strat_engine", "beanie_class_gen_config.yaml",
-                                                         "PluginPydentic", env_dict)
+code_gen_engine_env_manager.init_env_and_update_sys_path("sample_project", "fastapi_class_gen_config.yaml",
+                                                         "PluginFastApi", env_dict)
 
 params_list = [
     str(code_gen_engine_env_manager.project_dir),

@@ -1,0 +1,15 @@
+#template_file_name should be 'None' if no template is required in plugin
+template_file_name: 'None'
+main_message_option_name: "FluxMsgJsonRoot"
+output_file_name_suffix: "json_sample.json"
+insertion_import_file_name: "insertion_imports.py"
+plugin_file_name: "json_sample_gen_plugin.py"
+pb2_import_generator_path: "json_sample_pb2_import_gen.py"
+case_style: "snake" # snake or camel supported
+proto_type_to_json_type_dict:
+  int32: "number"
+  int64: "number"
+  string: "string"
+  bool: "boolean"
+  enum: "enum"
+  float: "number"

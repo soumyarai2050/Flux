@@ -6,12 +6,11 @@ from Flux.code_gen_engine_env import CodeGenEngineEnvManager
 
 
 code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
-custom_env = {
-    "AUTOCOMPLETE_FILE_PATH": str(PurePath(__file__).parent.parent / "misc" / "autocomplete.json"),
+env_dict = {
     "DEBUG_SLEEP_TIME": "0"
 }
-code_gen_engine_env_manager.init_env_and_update_sys_path("sample_project", "json_schema_gen_config.yaml",
-                                                         "PluginJSONSchema", custom_env)
+code_gen_engine_env_manager.init_env_and_update_sys_path("sample_project", "pydantic_class_gen_config.yaml",
+                                                         "PluginPydentic", env_dict)
 
 params_list = [
     str(code_gen_engine_env_manager.project_dir),

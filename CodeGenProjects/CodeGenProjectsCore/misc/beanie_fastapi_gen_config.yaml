@@ -1,10 +1,10 @@
 #template_file_name should be 'None' if no template is required in plugin
 template_file_name: 'None'
 main_message_option_name: "FluxMsgJsonRoot"
-output_file_name_suffix: "cache_model.py"
+output_file_name_suffix: "beanie_fastapi.py"
 insertion_import_file_name: "insertion_imports.py"
-plugin_file_name: "pydantic_class_gen_plugin.py"
-pb2_import_generator_path: "pydantic_pb2_import_generator.py"
+plugin_file_name: "beanie_fast_api_class_gen_plugin.py"
+pb2_import_generator_path: "fastapi_pb2_import_generator.py"
 enum_type: "str_enum"
 response_type: "snake" # snake or camel supported
 proto_type_to_py_type_dict:
