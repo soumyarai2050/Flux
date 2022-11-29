@@ -3,9 +3,15 @@ import json
 import logging
 import os
 from typing import List, Callable, Dict
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 import time
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 
 # Required for accessing custom options from schema
 import insertion_imports
@@ -502,10 +508,6 @@ if __name__ == "__main__":
     def main():
         project_dir_path = os.getenv("PROJECT_DIR")
         config_path = os.getenv("CONFIG_PATH")
-        if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-                isinstance(debug_sleep_time := int(debug_sleep_time), int):
-            time.sleep(debug_sleep_time)
-        # else not required: Avoid if env var is not set or if value cant be type-cased to int
         json_schema_convert_plugin = JsonSchemaConvertPlugin(project_dir_path, config_path)
         json_schema_convert_plugin.process()
 

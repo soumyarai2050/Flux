@@ -1,5 +1,5 @@
 import sys
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
+from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
 
 if __name__ == "__main__":
     def main():

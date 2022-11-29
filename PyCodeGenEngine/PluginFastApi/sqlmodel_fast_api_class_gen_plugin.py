@@ -2,9 +2,15 @@
 import logging
 import os
 from typing import List, Dict
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.PluginFastApi.fast_api_class_gen_plugin import FastApiClassGenPlugin
 import time
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.PluginFastApi.fast_api_class_gen_plugin import FastApiClassGenPlugin
 
 
 class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
@@ -331,10 +337,6 @@ if __name__ == "__main__":
     def main():
         project_dir_path = os.getenv("PROJECT_PATH")
         config_path = os.getenv("CONFIG_PATH")
-        if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-                isinstance(debug_sleep_time := int(debug_sleep_time), int):
-            time.sleep(debug_sleep_time)
-        # else not required: Avoid if env var is not set or if value cant be type-cased to int
         pydantic_class_gen_plugin = SQLModelFastApiClassGenPlugin(project_dir_path, config_path)
         pydantic_class_gen_plugin.process()
 

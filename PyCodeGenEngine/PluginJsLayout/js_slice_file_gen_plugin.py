@@ -2,9 +2,15 @@
 import logging
 import os
 from typing import List, Callable, Dict
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin
 import time
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin
 
 # Required for accessing custom options from schema
 import insertion_imports
@@ -138,15 +144,16 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"        [getAll{message_name}.fulfilled]: (state, action) => " + "{\n"
         output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
         if not self.current_message_is_dependent:
-            output_str += "            if (action.payload.length === 0) {\n"
-            output_str += f"                state.{message_name_camel_cased} = initialState.{message_name_camel_cased};\n"
-            output_str += f"                state.modified{message_name} = initialState.modified{message_name};\n"
-            output_str += f"                state.selected{message_name}Id = initialState.selected{message_name}Id;\n"
-            output_str += "            } else if (action.payload.length === 1) {\n"
-            output_str += f"                state.{message_name_camel_cased} = action.payload[0];\n"
-            output_str += f"                state.modified{message_name} = action.payload[0];\n"
-            output_str += f"                state.selected{message_name}Id = state.{message_name_camel_cased}[DB_ID];\n"
-            output_str += "            }\n"
+            if message_name != os.getenv("UILAYOUT_MESSSAGE_NAME"):
+                output_str += "            if (action.payload.length === 0) {\n"
+                output_str += f"                state.{message_name_camel_cased} = initialState.{message_name_camel_cased};\n"
+                output_str += f"                state.modified{message_name} = initialState.modified{message_name};\n"
+                output_str += f"                state.selected{message_name}Id = initialState.selected{message_name}Id;\n"
+                output_str += "            } else if (action.payload.length === 1) {\n"
+                output_str += f"                state.{message_name_camel_cased} = action.payload[0];\n"
+                output_str += f"                state.modified{message_name} = action.payload[0];\n"
+                output_str += f"                state.selected{message_name}Id = state.{message_name_camel_cased}[DB_ID];\n"
+                output_str += "            }\n"
         else:
             output_str += f"            state.{message_name_camel_cased} = initialState.{message_name_camel_cased};\n"
             output_str += f"            state.modified{message_name} = initialState.modified{message_name};\n"
@@ -307,10 +314,6 @@ if __name__ == "__main__":
     def main():
         project_dir_path = os.getenv("PROJECT_DIR")
         config_path = os.getenv("JS_SLICE_CONFIG_PATH")
-        if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-                isinstance(debug_sleep_time := int(debug_sleep_time), int):
-            time.sleep(debug_sleep_time)
-        # else not required: Avoid if env var is not set or if value cant be type-cased to int
         js_slice_file_gen_plugin = JsSliceFileGenPlugin(project_dir_path, config_path)
         js_slice_file_gen_plugin.process()
 

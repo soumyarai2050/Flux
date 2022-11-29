@@ -2,9 +2,15 @@
 import logging
 import os
 from typing import List, Callable
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 import time
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 
 # Required for accessing custom options from schema
 import insertion_imports
@@ -45,6 +51,7 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
         self.ordered_message_list: List[protogen.Message] = []
         self.enum_type = self.config_yaml["enum_type"]
         self.enum_type_validator()
+        self.response_type: str = self.config_yaml["response_type"]
 
     def enum_type_validator(self):
         match self.enum_type:
@@ -164,11 +171,23 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
     def handle_message_output(self, message: protogen.Message) -> str:
         output_str = ""
         is_msg_root = False
-        if message in self.root_message_list:
-            is_msg_root = True
-            output_str += f"class {message.proto.name}(IncrementalIdCamelBaseModel):\n"
+
+        if self.response_type.lower() == "snake":
+            if message in self.root_message_list:
+                is_msg_root = True
+                output_str = f"class {message.proto.name}(IncrementalIdCacheBaseModel):\n"
+            else:
+                output_str = f"class {message.proto.name}(BaseModel):\n"
+        elif self.response_type.lower() == "camel":
+            if message in self.root_message_list:
+                is_msg_root = True
+                output_str = f"class {message.proto.name}(IncrementalIdCamelCacheBaseModel):\n"
+            else:
+                output_str = f"class {message.proto.name}(CamelCacheBaseModel):\n"
         else:
-            output_str += f"class {message.proto.name}(CamelBaseModel):\n"
+            err_str = f"{self.response_type} is not supported response type"
+            logging.exception(err_str)
+            raise Exception(err_str)
 
         # Adding docstring if message lvl comment available
         if leading_comments := message.location.leading_comments:
@@ -178,9 +197,10 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
             for comments_line in comments_multiline:
                 output_str += f"        {comments_line}\n"
 
-            output_str += '    """\n\n'
-
-        output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[Any, '{message.proto.name}']] = " + "{}\n"
+            output_str += '    """\n'
+        if is_msg_root:
+            output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[Any, '{message.proto.name}']] = " + "{}\n"
+        # else not required: Avoid cache override if message is not root
         for field in message.fields:
             if is_msg_root and field.proto.name == PydanticClassGenPlugin.default_id_field_name and \
                     "int" == self.proto_to_py_datatype(field):
@@ -196,7 +216,7 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
         return output_str
 
     def handle_imports(self) -> str:
-        output_str = "from pydantic import Field\n"
+        output_str = "from pydantic import Field, BaseModel\n"
         output_str += "import datetime\n"
         output_str += "from typing import Dict, List, ClassVar, Any\n"
         output_str += "from threading import Lock\n"
@@ -210,8 +230,15 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
 
         incremental_id_camel_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
                                                                              "incremental_id_basemodel")
-        output_str += f'from {incremental_id_camel_base_model_path} import IncrementalIdCamelBaseModel, ' \
-                      f'CamelBaseModel\n'
+        if self.response_type.lower() == "snake":
+            output_str += f'from {incremental_id_camel_base_model_path} import IncrementalIdCacheBaseModel\n'
+        elif self.response_type.lower() == "camel":
+            output_str += f'from {incremental_id_camel_base_model_path} import IncrementalIdCamelCacheBaseModel, ' \
+                          f'CamelCacheBaseModel\n'
+        else:
+            err_str = f"{self.response_type} is not supported response type"
+            logging.exception(err_str)
+            raise Exception(err_str)
         output_str += "from typing import List\n\n\n"
         return output_str
 
@@ -235,10 +262,6 @@ if __name__ == "__main__":
     def main():
         project_dir_path = os.getenv("PROJECT_PATH")
         config_path = os.getenv("CONFIG_PATH")
-        if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-                isinstance(debug_sleep_time := int(debug_sleep_time), int):
-            time.sleep(debug_sleep_time)
-        # else not required: Avoid if env var is not set or if value cant be type-cased to int
         pydantic_class_gen_plugin = PydanticClassGenPlugin(project_dir_path, config_path)
         pydantic_class_gen_plugin.process()
 

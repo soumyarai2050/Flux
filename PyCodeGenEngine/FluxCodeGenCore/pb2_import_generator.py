@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os
 import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 from typing import List, Callable
 
 

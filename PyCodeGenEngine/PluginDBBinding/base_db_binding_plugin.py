@@ -1,11 +1,17 @@
 #!/usr/bin/env python
 import os
 import textwrap
-
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
+import time
 from typing import List, Tuple
 import logging
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 
 # Required for accessing custom options from schema
 import insertion_imports

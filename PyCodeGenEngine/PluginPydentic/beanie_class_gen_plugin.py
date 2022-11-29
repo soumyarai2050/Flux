@@ -1,9 +1,15 @@
 #!/usr/bin/env python
 import logging
 import os
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.PluginPydentic.pydantic_class_gen_plugin import PydanticClassGenPlugin
 import time
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.PluginPydentic.pydantic_class_gen_plugin import PydanticClassGenPlugin
 
 
 class BeanieClassGenPlugin(PydanticClassGenPlugin):
@@ -16,7 +22,6 @@ class BeanieClassGenPlugin(PydanticClassGenPlugin):
 
     def __init__(self, base_dir_path: str, config_path: str | None = None):
         super().__init__(base_dir_path, config_path)
-        self.response_type: str = self.config_yaml["response_type"]
 
     def handle_field_output(self, field: protogen.Field) -> str:
         field_type = self.proto_to_py_datatype(field)
@@ -169,10 +174,6 @@ if __name__ == "__main__":
     def main():
         project_dir_path = os.getenv("PROJECT_PATH")
         config_path = os.getenv("CONFIG_PATH")
-        if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-                isinstance(debug_sleep_time := int(debug_sleep_time), int):
-            time.sleep(debug_sleep_time)
-        # else not required: Avoid if env var is not set or if value cant be type-cased to int
         beanie_class_gen_plugin = BeanieClassGenPlugin(project_dir_path, config_path)
         beanie_class_gen_plugin.process()
 

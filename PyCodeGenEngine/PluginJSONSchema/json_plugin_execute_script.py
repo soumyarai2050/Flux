@@ -1,6 +1,6 @@
 from typing import List
 import os
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
+from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
 
 
 class JsonPluginExecuteScript(PluginExecuteScript):

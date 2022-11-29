@@ -2,9 +2,15 @@
 import logging
 import os
 from typing import List, Callable, Dict
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin
 import time
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin
 
 # Required for accessing custom options from schema
 import insertion_imports
@@ -639,10 +645,6 @@ if __name__ == "__main__":
     def main():
         project_dir_path = os.getenv("PROJECT_DIR")
         config_path = os.getenv("JSX_FILE_CONFIG_PATH")
-        if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-                isinstance(debug_sleep_time := int(debug_sleep_time), int):
-            time.sleep(debug_sleep_time)
-        # else not required: Avoid if env var is not set or if value cant be type-cased to int
         jsx_file_gen_plugin = JsxFileGenPlugin(project_dir_path, config_path)
         jsx_file_gen_plugin.process()
 

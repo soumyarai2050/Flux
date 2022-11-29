@@ -2,7 +2,7 @@ import sys
 from pathlib import PurePath
 home_dir_path = PurePath(__file__).parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
-from FluxCodeGenEngine.code_gen_engine_env import CodeGenEngineEnvManager
+from Flux.code_gen_engine_env import CodeGenEngineEnvManager
 
 
 code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()

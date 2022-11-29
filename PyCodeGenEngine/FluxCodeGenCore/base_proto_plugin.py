@@ -2,9 +2,9 @@
 import os
 import re
 import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
-from PythonCore.scripts.utility_functions import file_exist, load_yaml_configurations
+from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
+from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
+from FluxPythonUtils.scripts.utility_functions import file_exist, load_yaml_configurations
 from typing import List, Callable, Dict
 import logging
 from abc import ABC

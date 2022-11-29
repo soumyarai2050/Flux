@@ -1,9 +1,9 @@
 import logging
 import time
 from typing import List
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.execute import Execute
+from Flux.PyCodeGenEngine.FluxCodeGenCore.execute import Execute
 import os
-from PythonCore.scripts.utility_functions import load_yaml_configurations
+from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations
 
 
 class PluginExecuteScript:

@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 import os
 from typing import List, Callable, Dict
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 import time
 
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 
 # Required for accessing custom options from schema
 import insertion_imports
@@ -332,7 +337,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             output_str += f"    await init_max_id_handler({message_name})\n"
         output_str += "\n"
         output_str += f'{self.fastapi_app_name}.include_router({self.api_router_app_name}, ' \
-                      f'prefix="/{self.proto_file_name}")\n'
+                      f'prefix="/{self.proto_file_package}")\n'
 
         return output_str
 
@@ -396,10 +401,6 @@ if __name__ == "__main__":
     def main():
         project_dir_path = os.getenv("PROJECT_PATH")
         config_path = os.getenv("CONFIG_PATH")
-        if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-                isinstance(debug_sleep_time := int(debug_sleep_time), int):
-            time.sleep(debug_sleep_time)
-        # else not required: Avoid if env var is not set or if value cant be type-cased to int
         pydantic_class_gen_plugin = FastApiClassGenPlugin(project_dir_path, config_path)
         pydantic_class_gen_plugin.process()
 

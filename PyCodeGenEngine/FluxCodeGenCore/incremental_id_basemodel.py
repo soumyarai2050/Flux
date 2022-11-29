@@ -12,6 +12,7 @@ def to_camel(value):
 
 class CacheBaseModel(BaseModel):
     _cache_obj_id_to_obj_dict: ClassVar[Dict[Any, Any]] = {}
+    _mutex: ClassVar[Lock] = Lock()
 
     @classmethod
     def get_all_cached_obj(cls) -> Dict[Any, Any]:
@@ -19,34 +20,38 @@ class CacheBaseModel(BaseModel):
 
     @classmethod
     def add_data_in_cache(cls, obj_id: Any, obj: Any) -> bool:
-        if obj_id in cls._cache_obj_id_to_obj_dict:
-            return False
-        else:
-            cls._cache_obj_id_to_obj_dict[obj_id] = obj
-            return True
+        with cls._mutex:
+            if obj_id in cls._cache_obj_id_to_obj_dict:
+                return False
+            else:
+                cls._cache_obj_id_to_obj_dict[obj_id] = obj
+                return True
 
     @classmethod
     def get_data_from_cache(cls, obj_id: Any) -> Any | None:
-        if obj_id not in cls._cache_obj_id_to_obj_dict:
-            return None
-        else:
-            return cls._cache_obj_id_to_obj_dict[obj_id]
+        with cls._mutex:
+            if obj_id not in cls._cache_obj_id_to_obj_dict:
+                return None
+            else:
+                return cls._cache_obj_id_to_obj_dict[obj_id]
 
     @classmethod
     def replace_data_in_cache(cls, obj_id: Any, obj: Any) -> bool:
-        if obj_id not in cls._cache_obj_id_to_obj_dict:
-            return False
-        else:
-            cls._cache_obj_id_to_obj_dict[obj_id] = obj
-            return True
+        with cls._mutex:
+            if obj_id not in cls._cache_obj_id_to_obj_dict:
+                return False
+            else:
+                cls._cache_obj_id_to_obj_dict[obj_id] = obj
+                return True
 
     @classmethod
     def delete_data_in_cache(cls, obj_id: Any) -> bool:
-        if obj_id not in cls._cache_obj_id_to_obj_dict:
-            return False
-        else:
-            del cls._cache_obj_id_to_obj_dict[obj_id]
-            return True
+        with cls._mutex:
+            if obj_id not in cls._cache_obj_id_to_obj_dict:
+                return False
+            else:
+                del cls._cache_obj_id_to_obj_dict[obj_id]
+                return True
 
 
 class CamelCacheBaseModel(CacheBaseModel):

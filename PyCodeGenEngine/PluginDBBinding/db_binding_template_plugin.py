@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from FluxCodeGenEngine.PyCodeGenEngine.PluginDBBinding.base_db_binding_plugin import BaseDbBindingPlugin
+from Flux.PyCodeGenEngine.PluginDBBinding.base_db_binding_plugin import BaseDbBindingPlugin
 from typing import List, Callable
 
 

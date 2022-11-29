@@ -22,9 +22,9 @@ class CodeGenEngineEnvManager:
         self.plugin_dir: PurePath | None = None
         self.python_path: str = os.getenv("PYTHONPATH") if os.getenv("PYTHONPATH") is not None else ""
 
-        if self.code_gen_root.name != "FluxCodeGenEngine":
+        if self.code_gen_root.name != "Flux":
             raise Exception(f"Code Gen Env Constraint failed! Unable to proceed. "
-                            f"Expected CodeGenEngineEnvManager class defined in FluxCodeGenEngine dir, "
+                            f"Expected CodeGenEngineEnvManager class defined in Flux dir, "
                             f"found in: {str(self.code_gen_root)}")
         else:
             os.environ["PROJECT_ROOT"] = str(self.code_gen_root.parent)

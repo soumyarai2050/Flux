@@ -2,7 +2,7 @@
 import logging
 from typing import List, Callable
 import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 
 # Required for accessing custom options from schema
 import insertion_imports

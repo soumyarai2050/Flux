@@ -1,9 +1,14 @@
 #!/usr/bin/env python
 import os
-from typing import Optional, List, Callable
-import protogen
-from FluxCodeGenEngine.PyCodeGenEngine.PluginPydentic.pydantic_class_gen_plugin import PydanticClassGenPlugin
 import time
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
+        isinstance(debug_sleep_time := int(debug_sleep_time), int):
+    time.sleep(debug_sleep_time)
+# else not required: Avoid if env var is not set or if value cant be type-cased to int
+
+import protogen
+from Flux.PyCodeGenEngine.PluginPydentic.pydantic_class_gen_plugin import PydanticClassGenPlugin
 
 
 class SQLModelClassGenPlugin(PydanticClassGenPlugin):
@@ -104,10 +109,6 @@ if __name__ == "__main__":
     def main():
         project_dir_path = os.getenv("PROJECT_PATH")
         config_path = os.getenv("CONFIG_PATH")
-        if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-                isinstance(debug_sleep_time := int(debug_sleep_time), int):
-            time.sleep(debug_sleep_time)
-        # else not required: Avoid if env var is not set or if value cant be type-cased to int
         sqlmodel_class_gen_plugin = SQLModelClassGenPlugin(project_dir_path, config_path)
         sqlmodel_class_gen_plugin.process()
 

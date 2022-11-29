@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from FluxCodeGenEngine.PyCodeGenEngine.FluxCodeGenCore.pb2_import_generator import Pb2ImportGenerator
+from Flux.PyCodeGenEngine.FluxCodeGenCore.pb2_import_generator import Pb2ImportGenerator
 
 
 if __name__ == "__main__":
