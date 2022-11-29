@@ -43,6 +43,7 @@ const useStyles = makeStyles({
         }
     },
     settings: {
+        width: 0,
         display: 'inherit',
         '& .MuiSelect-outlined': {
             padding: 0
@@ -259,9 +260,10 @@ const TableWidget = (props) => {
     const onUpdate = (updatedData, type) => {
         if (type === 'add' || type === 'remove') {
             setOpen(false);
+            props.onUpdate(updatedData);
+        } else {
+            setData(updatedData);
         }
-        props.onUpdate(updatedData);
-
     }
 
     const onSettingsItemChange = (e, key) => {

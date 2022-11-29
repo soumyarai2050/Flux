@@ -129,7 +129,7 @@ const Layout = (props) => {
 
     const onToggleWidget = (name) => {
         setShow({ ...show, [name]: !show[name] });
-        setLayouts(uiLayout.widget_ui_data);
+        setLayouts(uiLayout.widget_ui_data ? uiLayout.widget_ui_data : getLayout());
     }
 
     const onLayoutChange = (layout) => {

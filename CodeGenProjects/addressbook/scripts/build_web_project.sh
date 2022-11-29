@@ -6,13 +6,13 @@ python gen_js_layouts.py
 python gen_json_schema.py
 cd ../../
 "$PWD"/generate_web_project.sh addressbook
-cd -
-cd ../web-ui
-npm install
-npm install @mui/styles react-json-view  -f
-cd -
-mkdir static
-mkdir templates
+#cd -
+#cd ../web-ui
+#npm install
+#npm install @mui/styles react-json-view  -f
+#cd -
+#mkdir static
+#mkdir templates
 
 # additional install for prod mode, run following:
 # - export PUBLIC_URL=http://127.0.0.1:8000/static
