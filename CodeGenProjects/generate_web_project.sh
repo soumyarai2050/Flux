@@ -93,4 +93,5 @@ echo "Updated/Created web-ui Project of $1"
 
 # additional run notes when running UI in Dev/Debug mode Only
 # go inside web-ui directory and run:
+# - export DEBUG=1
 # - npm start
