@@ -10,7 +10,7 @@ custom_env = {
     "AUTOCOMPLETE_FILE_PATH": str(PurePath(__file__).parent.parent / "misc" / "autocomplete.json"),
     "DEBUG_SLEEP_TIME": "0"
 }
-code_gen_engine_env_manager.init_env_and_update_sys_path("sample_project", "json_schema_gen_config.yaml",
+code_gen_engine_env_manager.init_env_and_update_sys_path("sample", "json_schema_gen_config.yaml",
                                                          "PluginJSONSchema", custom_env)
 
 params_list = [

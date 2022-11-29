@@ -8,7 +8,7 @@ code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
 env_dict = {
     "DEBUG_SLEEP_TIME": "0"
 }
-code_gen_engine_env_manager.init_env_and_update_sys_path("sample_project", "fastapi_class_gen_config.yaml",
+code_gen_engine_env_manager.init_env_and_update_sys_path("sample", "fastapi_class_gen_config.yaml",
                                                          "PluginFastApi", env_dict)
 
 params_list = [

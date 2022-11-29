@@ -9,7 +9,7 @@ code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
 env_dict = {
     "DEBUG_SLEEP_TIME": "0"
 }
-code_gen_engine_env_manager.init_env_and_update_sys_path("sample_project", "beanie_class_gen_config.yaml",
+code_gen_engine_env_manager.init_env_and_update_sys_path("sample", "beanie_class_gen_config.yaml",
                                                          "PluginPydentic", env_dict)
 
 params_list = [

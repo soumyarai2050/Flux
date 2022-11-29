@@ -14,7 +14,7 @@ custom_env_dict = {
     "DEBUG_SLEEP_TIME": "0",
     "UILAYOUT_MESSSAGE_NAME": "UILayout"
 }
-code_gen_engine_env_manager.init_env_and_update_sys_path("sample_project", "jsx_file_gen_config.yaml",
+code_gen_engine_env_manager.init_env_and_update_sys_path("sample", "jsx_file_gen_config.yaml",
                                                          "PluginJsLayout", custom_env_dict)
 
 project_dir_path = str(code_gen_engine_env_manager.project_dir)
