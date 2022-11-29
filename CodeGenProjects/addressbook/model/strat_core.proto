@@ -1,7 +1,7 @@
 syntax = "proto2";
 import "flux_options.proto";
 
-package sample;
+package addressbook;
 
 enum SecurityType{
   SEC_TYPE_UNSPECIFIED = 0;

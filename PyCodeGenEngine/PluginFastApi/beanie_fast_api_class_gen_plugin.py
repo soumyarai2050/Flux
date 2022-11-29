@@ -286,7 +286,8 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         return output_str
 
     def handle_main_file_gen(self) -> str:
-        output_str = "from fastapi import FastAPI\n"
+        output_str = "import os\n"
+        output_str += "from fastapi import FastAPI\n"
         output_str += f"from {self.routes_file_name} import {self.api_router_app_name}\n"
         output_str += f"from {self.model_file_name} import "
         for message in self.custom_id_primary_key_messages:
@@ -306,14 +307,26 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         for message in self.custom_id_primary_key_messages:
             message_name = message.proto.name
             output_str += f"    await init_max_id_handler({message_name})\n"
-        output_str += "\n"
+        output_str += "\n\n"
+        output_str += "if os.getenv('DEBUG'):\n"
+        output_str += "    from fastapi.middleware.cors import CORSMiddleware\n\n"
+        output_str += "    origins = ['*']\n"
+        output_str += f"    {self.fastapi_app_name}.add_middleware(\n"
+        output_str += f"        CORSMiddleware,\n"
+        output_str += f"        allow_origins=origins,\n"
+        output_str += f"        allow_credentials=True,\n"
+        output_str += f"        allow_methods=['*'],\n"
+        output_str += f"        allow_headers=['*'],\n"
+        output_str += f"    )\n\n"
         output_str += f'{self.fastapi_app_name}.include_router({self.api_router_app_name}, ' \
                       f'prefix="/{self.proto_file_package}")\n'
-
+        output_str += f"from fastapi.staticfiles import StaticFiles\n\n"
+        output_str += f"{self.fastapi_app_name}.mount('/static', StaticFiles(directory='static'), name='static')\n\n"
         return output_str
 
     def handle_routes_file_gen(self) -> str:
-        output_str = "from fastapi import APIRouter, HTTPException\n"
+        output_str = "from fastapi import APIRouter, HTTPException, Request\n"
+        output_str += "from fastapi.templating import Jinja2Templates\n"
         output_str += "import logging\n"
         output_str += "from typing import List\n"
         output_str += f"from {self.model_file_name} import "
@@ -333,6 +346,10 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         output_str += self.handle_web_response_inits()+"\n"
         output_str += f"{self.api_router_app_name} = APIRouter()\n\n\n"
         output_str += self.handle_CRUD_task()
+        output_str += "\n\ntemplates = Jinja2Templates(directory='templates')\n\n"
+        output_str += f"@{self.api_router_app_name}.get('/')\n"
+        output_str += "async def serve_spa(request: Request):\n"
+        output_str += "    return templates.TemplateResponse('static/index.html', {'request': request})\n"
         return output_str
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:

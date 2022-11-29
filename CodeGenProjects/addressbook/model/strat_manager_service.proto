@@ -2,7 +2,7 @@ syntax = "proto2";
 import "flux_options.proto";
 import "strat_core.proto";
 import "ui_core.proto";
-package sample;
+package addressbook;
 
 // Widget-2
 // BOILER PLATE - don't add fields by changing sequence numbers in model: even in dev
