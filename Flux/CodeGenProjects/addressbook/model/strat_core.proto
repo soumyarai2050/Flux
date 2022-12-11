@@ -1,0 +1,155 @@
+syntax = "proto2";
+import "flux_options.proto";
+
+package addressbook;
+
+enum SecurityType{
+  SEC_TYPE_UNSPECIFIED = 0;
+  RIC = 1;
+  SEDOL = 2;
+  EXCHANGE = 3;
+}
+
+enum Side{
+    SIDE_UNSPECIFIED = 0;
+    BUY = 1;
+    SELL = 3;
+    BTC = 2;  // Buy to Cover - Use Buy, set this only if downstream need's BTC awareness
+    SS = 4;  // Short Sell - Use Sell, set this only if downstream need's Short Sell awareness
+}
+
+enum PositionType{
+  POS_TYPE_UNSPECIFIED = 0;
+  PTH = 1; // Pay to hold driven
+  LOCATE = 2; // Borrow driven
+  LONG = 3; // past trades driven
+}
+
+enum ReferencePxType{
+  OPEN_PX = 1;
+  CLOSE_PX = 2;
+  LAST_PX = 3;
+  BB_PX = 4;
+  BO_PX = 5;
+  FILL_PX = 6;
+}
+
+// , ERROR, WARNING, INFO, DEBUG, UNSPECIFIED
+enum Severity{
+  Severity_UNSPECIFIED = 0;  // GRAY
+  Severity_CRITICAL = 1; // RED FLASHING
+  Severity_ERROR = 2; // RED
+  Severity_WARNING = 3; // AMBER
+  Severity_INFO = 4; // BLUE
+  Severity_DEBUG = 5; // BLACK
+}
+
+enum StratState{
+  //set this state for strats just created by user
+  UNSPECIFIED = 0;
+  // set this state post required constraint validation of strat - such as system checked all required strat params are
+  // present and are as expected, do this for:
+  // 1. new strats before moving them to ready state upon user explicit save request
+  // 2. existing strats when loading them from store (if validation fails - raise alert and put them in ERROR state)
+  READY = 1;
+  // set StratStatus.ACTIVE state upon explicit user request, check:
+  // 1. all required strats and portfolio level limit checks are passing else reject user's request
+  // 2. strat is in StratStatus.READY state (user triggers a strat)
+  // 3. strat is in StratStatus.PAUSED state (resume paused strat)
+  ACTIVE = 2;
+  // set StratStatus.PAUSED state upon explicit user request, check strat is currently in StratStatus.READY state
+  PAUSED = 3;
+  // this is set in any exception scenario - dev/support/business involvement is needed to find the gap and bridge
+  // for future handling of similar scenario, day-1 block strat (only engine restart can allow strat to be restarted)
+  ERROR = 4;
+  // set StratStatus.PAUSED state when strat has completed its set target
+  DONE = 5;
+}
+
+message ReferencePx{
+  required float price = 1;
+  required ReferencePxType reference_price_type = 2;
+}
+
+message Quote{
+  required float price = 1;
+  required int64 quantity = 2;
+}
+
+// stores all position types from all sources for optimal selection, usage and clearance
+// one can design to make entry with cheapest option first and clear the most expensive used position first
+message Position{
+  required PositionType position_type = 2;
+  // available size for consumption
+  required int64 available_position_size = 3;
+  // committed but not consumed (portfolio to strat; day-2: maybe strat to open order)
+  required int64 allocated_position_size = 4;
+  // actual consumption
+  required int64 consumed_position_size = 5;
+  optional float carry_cost = 6;  // @@@ TODO: borrow cost is pre-trading - not needed ?
+}
+
+message SecPosition{
+  required Security security = 1;
+  // Open price OR Close Price OR Last Price
+  optional ReferencePx reference_px = 2;
+  // per position type (PTH, LOCATE, LONG)
+  repeated Position positions = 3;
+}
+
+message Broker{
+  required bool enabled = 1;
+  // per security positions
+  repeated SecPosition sec_positions = 2;
+}
+
+// Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
+message Security{
+    required string sec_id = 1 [(FluxFldUIPlaceholder) = "SelectSecurity", (FluxFldSticky) = true];
+    optional SecurityType sec_type = 2 [default = SEC_TYPE_UNSPECIFIED];
+}
+
+message ResidualRestriction{
+  required float max_residual = 1;
+  required int32 residual_mark_seconds = 2;
+}
+
+message OrderBrief{
+  required string order_brief_id = 1;
+  required Security security = 2;
+  required Side side = 3;
+  required float px = 4;
+  required int64 qty = 5;
+  required string underlying_broker = 6;
+}
+
+message CumulativeOrderBrief{
+  repeated OrderBrief order_brief = 1;
+  optional float overall_buy_notional = 5;
+  optional float overall_sell_notional = 6;
+}
+
+message Alert{
+  required Severity severity = 1 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
+  required string alert_brief = 2 [(FluxFldSizeMax) = 32];
+  // must prefix strat:<strat-name> for strat alerts
+  optional string alert_details = 3;
+  // populated only if this alert is for one or more orders
+  repeated OrderBrief impacted_order = 4;
+}
+
+message Residual{
+  required Security security = 1;
+  required float notional = 2;
+}
+
+message MarketParticipation{
+    required float participation_rate = 1 [(FluxFldHelp) = "max % participation allowed compared to market"];
+    required int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement"];
+}
+
+message CancelRate{
+  required int32 allowed_order_rate = 1 [default = 30, (FluxFldSequenceNumber) = 1, (FluxFldHelp) = "Allowed Cancel Orders as % of New-Orders "];
+  required int32 allowed_size_rate = 2 [default = 50, (FluxFldSequenceNumber) = 2, (FluxFldHelp) = "% of total size sent to market [BUY+SELL]"];
+  required int32 applicable_period_seconds = 3 [default = 60, (FluxFldSequenceNumber) = 3, (FluxFldHelp) = "sliding window interval of above rate enforcement"];
+}
