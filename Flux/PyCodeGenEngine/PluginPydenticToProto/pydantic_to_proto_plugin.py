@@ -19,8 +19,9 @@ class PydanticToProtoPlugin:
     }
     flux_fld_val_is_date_time: str = "FluxFldValIsDateTime"
 
-    def __init__(self, pydantic_model_list: List[Type[BaseModel]], package_name: str):
+    def __init__(self, pydantic_model_list: List[Type[BaseModel]], imports_list: List[str], package_name: str):
         self._pydantic_model_list: List[Type[BaseModel]] = pydantic_model_list
+        self._imports_list: List[str] = imports_list
         self._package_name: Final[str] = package_name
         self.message_name_cache_list: List[str] = []
 
@@ -107,7 +108,8 @@ class PydanticToProtoPlugin:
 
     def _generate_file_content(self):
         output_str = 'syntax = "proto2";\n'
-        output_str += 'import "flux_options.proto";\n\n'
+        for import_proto in self._imports_list:
+            output_str += f'import "{import_proto}";\n\n'
         output_str += f'package {self._package_name};\n\n'
         for basemodel_cls in self._pydantic_model_list:
             output_str += self._parse_to_proto_text(basemodel_cls)
@@ -119,9 +121,3 @@ class PydanticToProtoPlugin:
         file_content = self._generate_file_content()
         with open(file_name, "w") as fl:
             fl.write(file_content)
-
-
-if __name__ == "__main__":
-    list_of_pydantic_classes = [PairStrat, OrderLimits, PortfolioLimits, StratCollection]
-    pydantic_to_proto_plugin = PydanticToProtoPlugin(list_of_pydantic_classes, "test_package")
-    pydantic_to_proto_plugin.run("test.proto")

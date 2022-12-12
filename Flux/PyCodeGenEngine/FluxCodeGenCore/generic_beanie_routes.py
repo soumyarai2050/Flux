@@ -65,7 +65,10 @@ async def generic_beanie_delete_http(Document, DocumentBaseModel, document_obj_i
         raise HTTPException(status_code=404, detail=id_not_found.format_msg(Document.__name__, document_obj_id))
     else:
         await stored_obj.delete()
-        document_base_model: DocumentBaseModel = DocumentBaseModel(id=stored_obj.id)
+        try:
+            document_base_model: DocumentBaseModel = DocumentBaseModel(_id=stored_obj.id)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=str(e))
         if Document.read_ws_path_ws_connection_manager is not None:
             json_data = jsonable_encoder(document_base_model, by_alias=True, exclude_unset=True, exclude_none=True)
             json_str = json.dumps(json_data)

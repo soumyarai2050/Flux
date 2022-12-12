@@ -192,8 +192,8 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
                     if BaseDbBindingPlugin.foreign_key_fld_option_name in str(field.proto.options):
                         temp_list.append(True)
 
-                        field_option_fk_tuple_list = BaseProtoPlugin.get_complex_fld_option_values_as_list_of_tuple(
-                            field, BaseDbBindingPlugin.foreign_key_fld_option_name)
+                        field_option_fk_tuple_list = BaseProtoPlugin._get_complex_option_value_as_list_of_dict(
+                            str(field.proto.options), BaseDbBindingPlugin.foreign_key_fld_option_name)
                         for field_fk_option_tuple in field_option_fk_tuple_list:
                             self.foreign_keys_list_of_tuples.append((field.proto.name, *field_fk_option_tuple))
 

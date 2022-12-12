@@ -199,19 +199,11 @@ class BaseProtoPlugin(ABC):
     def get_complex_msg_option_values_as_list_of_tuple(message: protogen.Message, option_name: str) -> List[Dict]:
         message_options_temp_str = str(message.proto.options)
         option_value_list_of_tuples = \
-            BaseProtoPlugin.__get_complex_option_value_as_list_of_dict(message_options_temp_str, option_name)
+            BaseProtoPlugin._get_complex_option_value_as_list_of_dict(message_options_temp_str, option_name)
         return option_value_list_of_tuples
 
     @staticmethod
-    def get_complex_fld_option_values_as_list_of_tuple(field: protogen.Field, option_name: str) -> List[Dict]:
-        fld_options_temp_str = str(field.proto.options)
-        option_value_list_of_tuples = \
-            BaseProtoPlugin.__get_complex_option_value_as_list_of_dict(fld_options_temp_str, option_name)
-        return option_value_list_of_tuples
-
-    # Todo: Change use of above tuple based methods by below dict based methods
-    @staticmethod
-    def __get_complex_option_value_as_list_of_dict(option_string: str, option_name: str) -> List[Dict]:
+    def _get_complex_option_value_as_list_of_dict(option_string: str, option_name: str) -> List[Dict]:
         option_value_list_of_dict: List[Dict] = []
         for option_str_line in str(option_string).split("\n"):
             temp_dict = {}
@@ -241,14 +233,14 @@ class BaseProtoPlugin(ABC):
     def get_complex_msg_option_values_as_list_of_dict(message: protogen.Message, option_name: str) -> List[Dict]:
         message_options_temp_str = str(message.proto.options)
         option_value_list_of_dict = \
-            BaseProtoPlugin.__get_complex_option_value_as_list_of_dict(message_options_temp_str, option_name)
+            BaseProtoPlugin._get_complex_option_value_as_list_of_dict(message_options_temp_str, option_name)
         return option_value_list_of_dict
 
     @staticmethod
     def get_complex_fld_option_values_as_list_of_dict(field: protogen.Field, option_name: str) -> List[Dict]:
         fld_options_temp_str = str(field.proto.options)
         option_value_list_of_dict = \
-            BaseProtoPlugin.__get_complex_option_value_as_list_of_dict(fld_options_temp_str, option_name)
+            BaseProtoPlugin._get_complex_option_value_as_list_of_dict(fld_options_temp_str, option_name)
         return option_value_list_of_dict
 
     def get_flux_msg_cmt_option_value(self, message: protogen.Message) -> str:

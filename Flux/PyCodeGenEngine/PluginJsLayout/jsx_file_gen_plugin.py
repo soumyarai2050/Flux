@@ -394,6 +394,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onUnload={onUnload}\n"
         output_str += "                    abbreviated={abbreviated}\n"
         output_str += "                    itemsMetadata={"f"{dependent_msg_name_camel_cased}"+"Array}\n"
+        output_str += "                    itemSchema={dependentSchema}\n"
+        output_str += "                    itemCollections={dependentCollections}\n"
         output_str += "                    dependentName={dependentName}\n"
         output_str += "                    alertBubbleSource={alertBubbleSource}\n"
         output_str += "                    alertBubbleColorSource={alertBubbleColorSource}\n"

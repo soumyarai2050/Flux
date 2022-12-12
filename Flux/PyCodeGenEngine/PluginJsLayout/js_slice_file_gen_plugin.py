@@ -61,11 +61,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if not self.current_message_is_dependent:
             output_str = "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
             output_str += "import axios from 'axios';\n"
-            if message.proto.name in self.dependent_message_relation_dict.values() or \
-                    message.proto.name == os.getenv("UILAYOUT_MESSSAGE_NAME"):
-                output_str += "import { API_ROOT_URL, DB_ID, Messages } from '../constants';\n"
-            else:
-                output_str += "import { API_ROOT_URL, DB_ID } from '../constants';\n"
+            output_str += "import { API_ROOT_URL, DB_ID } from '../constants';\n"
+            if message.proto.name != os.getenv("UILAYOUT_MESSSAGE_NAME"):
+                output_str += "import { getObjectWithLeastId } from '../utils';\n"
             output_str += "\n"
         else:
             dependent_message_name: str | None = None
@@ -157,19 +155,13 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"                state.modified{message_name} = initialState.modified{message_name};\n"
                 output_str += f"                state.selected{message_name}Id = initialState.selected{message_name}Id;\n"
                 output_str += "            } else if (action.payload.length > 0) {\n"
-                if message_name in self.dependent_message_relation_dict.values():
-                    output_str += f"                state.selected{message_name}Id = action.payload[0][DB_ID];\n"
-                else:
-                    output_str += f"                state.selected{message_name}Id = action.payload[0][DB_ID];\n"
+                output_str += f"                let object = getObjectWithLeastId(action.payload);\n"
+                output_str += f"                state.selected{message_name}Id = object[DB_ID];\n"
                 output_str += "            }\n"
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [getAll{message_name}.rejected]: (state, action) => " + "{\n"
-        if message_name in self.dependent_message_relation_dict.values() or \
-                message_name == os.getenv("UILAYOUT_MESSSAGE_NAME"):
-            output_str += f"            state.error = action.payload ? action.payload : Messages.ERROR_GET;\n"
-        else:
-            output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
+        output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         return output_str
@@ -186,11 +178,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [get{message_name}.rejected]: (state, action) => " + "{\n"
-        if message_name in self.dependent_message_relation_dict.values() or \
-                message_name == os.getenv("UILAYOUT_MESSSAGE_NAME"):
-            output_str += f"            state.error = action.payload ? action.payload : Messages.ERROR_GET;\n"
-        else:
-            output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
+        output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
         output_str += "            state.loading = false;\n"
         output_str += "        },\n"
         return output_str
@@ -206,11 +194,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [create{message_name}.rejected]: (state, action) => " + "{\n"
-        if message_name in self.dependent_message_relation_dict.values() or \
-                message_name == os.getenv("UILAYOUT_MESSSAGE_NAME"):
-            output_str += f"            state.error = action.payload;\n"
-        else:
-            output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
+        output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
         output_str += "            state.loading = false;\n"
         output_str += "        },\n"
         return output_str
@@ -226,11 +210,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [update{message_name}.rejected]: (state, action) => " + "{\n"
-        if message_name in self.dependent_message_relation_dict.values() or \
-                message_name == os.getenv("UILAYOUT_MESSSAGE_NAME"):
-            output_str += f"            state.error = action.payload;\n"
-        else:
-            output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
+        output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
         output_str += f"            state.loading = false;\n"
         output_str += "        }\n"
         return output_str
