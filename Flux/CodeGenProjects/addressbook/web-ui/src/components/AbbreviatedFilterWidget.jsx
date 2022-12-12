@@ -6,8 +6,9 @@ import { Download, Delete } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import Icon from './Icon';
 import _ from 'lodash';
-import { ColorTypes, DB_ID } from '../constants';
+import { DB_ID } from '../constants';
 import Alert from './Alert';
+import { getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey } from '../utils';
 
 const useStyles = makeStyles({
     autocompleteDropdownContainer: {
@@ -61,21 +62,13 @@ const AbbreviatedFilterWidget = (props) => {
             <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
             <List>
                 {props.items && props.items.map((item, i) => {
-                    let index = props.abbreviated.split('-').length - 1;
-                    let id = item.split('-')[index] * 1;
+                    let id = getIdFromAbbreviatedKey(props.abbreviated, item);
                     let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
-                    let alertCount = 0;
-                    let bubbleColor = ColorTypes.UNSPECIFIED;
-                    if (_.get(metadata, props.alertBubbleSource)) {
-                        alertCount = _.get(metadata, props.alertBubbleSource).length;
-                    }
-                    if (alertCount > 0) {
-                        let xpath = props.alertBubbleColorSource.substring(0, props.alertBubbleColorSource.lastIndexOf('.')) + '[0].' + props.alertBubbleColorSource.split('.').pop();
-                        bubbleColor = ColorTypes[_.get(metadata, xpath).split('_')[1]]
-                    }
+                    let alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
+                    let alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
                     return (
                         <ListItem key={i} className={classes.listItem} selected={props.selected === id} disablePadding>
-                            {alertCount > 0 && <Badge className={classes.badge} badgeContent={alertCount} color={bubbleColor} />}
+                            {alertBubbleCount > 0 && <Badge className={classes.badge} badgeContent={alertBubbleCount} color={alertBubbleColor} />}
                             <ListItemButton onClick={() => props.onSelect(id)}>
                                 <ListItemText>
                                     {item}

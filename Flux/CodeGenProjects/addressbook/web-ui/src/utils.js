@@ -1,7 +1,7 @@
 import _, { cloneDeep } from 'lodash';
 import Node from './components/Node';
 import HeaderField from './components/HeaderField';
-import { DataTypes, Modes, NEW_ITEM_ID } from './constants';
+import { ColorPriority, ColorTypes, DataTypes, DB_ID, Modes, NEW_ITEM_ID } from './constants';
 
 const treeState = {};
 
@@ -768,4 +768,86 @@ export function getNewItem(collections, abbreviated) {
     }
     newItem += NEW_ITEM_ID;
     return newItem;
+}
+
+export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
+    let abbreviatedSplit = abbreviated.split('-');
+    let idIndex = -1;
+    abbreviatedSplit.map((text, index) => {
+        if (text.indexOf(DB_ID) > 0) {
+            idIndex = index;
+        }
+    })
+    if (idIndex !== -1) {
+        let abbreviatedKeySplit = abbreviatedKey.split('-');
+        let abbreviatedKeyId = parseInt(abbreviatedKeySplit[idIndex]);
+        return abbreviatedKeyId;
+    } else {
+        // abbreviated key id not found. returning -1
+        return idIndex;
+    }
+}
+
+export function getAlertBubbleCount(data, alertBubbleSourceXpath) {
+    let alertBubbleCount = 0;
+    if (_.get(data, alertBubbleSourceXpath)) {
+        alertBubbleCount = _.get(data, alertBubbleSourceXpath).length;
+    }
+    return alertBubbleCount;
+}
+
+export function getColorTypeFromValue(collection, value) {
+    let color = ColorTypes.UNSPECIFIED;
+    if (collection && collection.color) {
+        let colorSplit = collection.color.split(',');
+        for (let i = 0; i < colorSplit.length; i++) {
+            let valueColorSet = colorSplit[i].trim();
+            let [val, colorType] = valueColorSet.split('=');
+            if (val === value) {
+                color = ColorTypes[colorType];
+                break;
+            }
+        }
+    }
+    return color;
+}
+
+export function getPriorityColorType(colorTypesSet) {
+    let colorTypesArray = Array.from(colorTypesSet);
+    if (colorTypesArray.length > 0) {
+        colorTypesArray.sort(function (a, b) {
+            if (ColorPriority[a] > ColorPriority[b]) {
+                return -1;
+            }
+            return 1;
+        })
+        return colorTypesArray[0];
+    } else {
+        return ColorTypes.UNSPECIFIED;
+    }
+}
+
+export function getAlertBubbleColor(data, collections, alertBubbleSourceXpath, alertBubbleColorXpath) {
+    let alertBubbleColorKey = alertBubbleColorXpath.split('.').pop();
+    let collection = collections.filter(col => col.key === alertBubbleColorKey)[0];
+    let alertBubbleColorRelativePath = alertBubbleColorXpath.replace(alertBubbleSourceXpath, '');
+    let alertBubbleColorTypes = new Set();
+    if (_.get(data, alertBubbleSourceXpath) && _.get(data, alertBubbleSourceXpath).length > 0) {
+        for (let i = 0; i < _.get(data, alertBubbleSourceXpath).length; i++) {
+            let value = _.get(data, alertBubbleSourceXpath + '[' + i + ']' + alertBubbleColorRelativePath);
+            let colorType = getColorTypeFromValue(collection, value);
+            alertBubbleColorTypes.add(colorType);
+        }
+    }
+    return getPriorityColorType(alertBubbleColorTypes);
+}
+
+export function getObjectWithLeastId(objectArray) {
+    objectArray.sort(function (a, b) {
+        if (a[DB_ID] > b[DB_ID]) {
+            return 1;
+        }
+        return -1;
+    });
+    return objectArray[0];
 }

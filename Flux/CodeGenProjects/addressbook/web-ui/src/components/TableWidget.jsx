@@ -6,7 +6,7 @@ import {
     DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog
 } from '@mui/material';
 import { generateRowTrees, generateRowsFromTree, addxpath, clearxpath } from '../utils';
-import { MoreHoriz, Settings, Close } from '@mui/icons-material';
+import { Settings, Close, Visibility, VisibilityOff } from '@mui/icons-material';
 import { DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
@@ -43,6 +43,7 @@ const useStyles = makeStyles({
         }
     },
     settings: {
+        width: 0,
         display: 'inherit',
         '& .MuiSelect-outlined': {
             padding: 0
@@ -61,7 +62,7 @@ const TableWidget = (props) => {
     const [rowTrees, setRowTrees] = useState([]);
     const [rows, setRows] = useState([]);
     const [headCells, setHeadCells] = useState([]);
-    const [commonkeys, setCommonkeys] = useState({});
+    const [commonkeys, setCommonkeys] = useState([]);
     const [selectedRow, setSelectedRow] = useState();
     const [selectedRows, setSelectedRows] = useState([]);
     const [data, setData] = useState(props.data);
@@ -69,7 +70,7 @@ const TableWidget = (props) => {
     const [showSettings, setShowSettings] = useState(false);
     const [abbreviatedJson, setAbbreviatedJson] = useState({});
     const [showAbbreviatedJson, setShowAbbreviatedJson] = useState(false);
-    const [selectedCellXpath, setSelectedCellXpath] = useState();
+    const [hide, setHide] = useState(true);
 
     const [order, setOrder] = React.useState('asc');
     const [orderBy, setOrderBy] = React.useState('');
@@ -113,7 +114,7 @@ const TableWidget = (props) => {
     }, [props.collections, data])
 
     useEffect(() => {
-        let updatedCells = props.collections.filter((col) => {
+        let updatedCells = props.collections.map(col => Object.assign({}, col)).filter((col) => {
             if ([DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.STRING, DataTypes.ENUM].includes(col.type)) {
                 return true;
             } else if (col.abbreviated && col.abbreviated === "JSON") {
@@ -121,12 +122,22 @@ const TableWidget = (props) => {
             }
             return false;
         })
-        let common = {};
+        if (!hide) {
+            updatedCells = updatedCells.map(cell => {
+                cell.hide = false;
+                return cell;
+            })
+        }
+
+        setHeadCells(updatedCells);
+    }, [props.collections, props.mode, rows, hide])
+
+    useEffect(() => {
+        let commons = [];
         if (rows.length > 0 && props.mode !== Modes.EDIT_MODE) {
-            updatedCells = updatedCells.map((cell) => {
-                // if (cell.type === DataTypes.OBJECT || cell.type === DataTypes.ARRAY) {
-                //     return cell;
-                // }
+            headCells.map((cell) => {
+                if (cell.hide) return;
+
                 let found = true;
                 for (let i = 0; i < rows.length - 1; i++) {
                     if (rows[i][cell.tableTitle] !== rows[i + 1][cell.tableTitle]) {
@@ -134,21 +145,30 @@ const TableWidget = (props) => {
                     }
                 }
                 if (found) {
-                    if(cell.abbreviated && cell.abbreviated === "JSON") {
-                        common[cell.tableTitle] = "JSON";
+                    let commonkey = cell;
+                    if (cell.abbreviated && cell.abbreviated === "JSON") {
+                        commonkey.value = "JSON"
                     } else {
-                        common[cell.tableTitle] = String(rows[0][cell.tableTitle]);
+                        commonkey.value = String(rows[0][cell.tableTitle]);
                     }
-                    cell.hide = true;
+                    commons.push(commonkey);
                 }
-                setCommonkeys(common);
                 return cell;
             })
-        } else if(rows.length === 0) {
-            setCommonkeys({});
         }
-        setHeadCells(updatedCells);
-    }, [props.collections, props.mode, rows])
+        setCommonkeys(commons);
+    }, [headCells, rows, props.mode])
+
+    function getFilteredCells() {
+        let updatedCells = headCells.filter(cell => !cell.hide);
+        updatedCells = updatedCells.filter(cell => {
+            if (commonkeys.filter(commonkey => commonkey.key === cell.key).length > 0) {
+                return false;
+            }
+            return true;
+        })
+        return updatedCells;
+    }
 
     function getComparator(order, orderBy) {
         return order === 'desc'
@@ -202,14 +222,7 @@ const TableWidget = (props) => {
                     selectedIndex = i;
                 }
             })
-            // rows.forEach((row, i) => {
-            //     if(row['data-id'] === index) {
-            //         selectedIndex = i;
-            //     }
-            // })
-            console.log({index, xpath, selectedIndex, rows, updatedRows});
             setSelectedRow(selectedIndex);
-            setSelectedCellXpath(xpath);
             setTimeout(() => {
                 document.getElementById(`${props.name}${props.xpath}`).querySelectorAll("[data-xpath='" + xpath + "']").forEach(el => {
                     el.classList.add(classes.nodeContainerHighlighted)
@@ -337,6 +350,11 @@ const TableWidget = (props) => {
     let menu = (
         <Fragment>
             {props.headerProps.menu}
+            {hide ? (
+                <Icon className={classes.icon} title='Show hidden fields' onClick={() => setHide(false)}><Visibility fontSize='small' /></Icon>
+            ) : (
+                <Icon className={classes.icon} title='Hide hidden fields' onClick={() => setHide(true)}><VisibilityOff fontSize='small' /></Icon>
+            )}
             <Icon className={classes.icon} title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
             <Select
                 className={classes.settings}
@@ -380,13 +398,13 @@ const TableWidget = (props) => {
             onSave={props.headerProps.onSave}
             commonkeys={commonkeys}>
 
-            {headCells.filter(cell => !cell.hide).length > 0 && rows.length > 0 &&
+            {getFilteredCells().length > 0 && rows.length > 0 &&
                 <TableContainer className={classes.tableContainer}>
                     <Table
                         className={classes.table}
                         size='medium'>
                         <TableHead
-                            headCells={headCells}
+                            headCells={getFilteredCells()}
                             mode={props.mode}
                             order={order}
                             orderBy={orderBy}
@@ -436,7 +454,7 @@ const TableWidget = (props) => {
                                             </TableCell>
                                         } */}
 
-                                        {headCells.map((cell, i) => {
+                                        {getFilteredCells().map((cell, i) => {
                                             // don't show cells that are hidden
                                             if (cell.hide) return;
                                             return (

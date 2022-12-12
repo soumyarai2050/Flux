@@ -26,10 +26,13 @@ export const ColorTypes = {
     UNSPECIFIED: 'default'
 }
 
-export const Messages = {
-    ERROR_GET: 'Error while fetching data',
-    CREATE_SUCCESS: 'Created',
-    UPDATE_SUCCESS: 'Updated'
+export const ColorPriority = {
+    [ColorTypes.CRITICAL]: 5,
+    [ColorTypes.ERROR]: 4,
+    [ColorTypes.WARNING]: 3,
+    [ColorTypes.INFO]: 2,
+    [ColorTypes.DEBUG]: 1,
+    [ColorTypes.UNSPECIFIED]: 0
 }
 
 export const DataTypes = {
