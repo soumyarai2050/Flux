@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import { API_PUBLIC_URL, Messages } from '../constants';
+import { API_PUBLIC_URL } from '../constants';
 
 const initialState = {
     schema: {},
@@ -27,7 +27,7 @@ const schemaSlice = createSlice({
             state.loading = false;
         },
         [getSchema.rejected]: (state, action) => {
-            state.error = action.payload ? action.payload : Messages.ERROR_GET;
+            state.error = action.error.code + ': ' + action.error.message;
             state.loading = false;
         }
     }

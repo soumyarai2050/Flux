@@ -86,7 +86,7 @@ message Position{
   required int64 allocated_position_size = 4;
   // actual consumption
   required int64 consumed_position_size = 5;
-  optional float carry_cost = 6;  // @@@ TODO: borrow cost is pre-trading - not needed ?
+  optional float carry_cost = 6;
 }
 
 message SecPosition{
