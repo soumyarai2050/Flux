@@ -172,6 +172,26 @@ export function generateObjectFromSchema(schema, currentSchema) {
 
         if (metadata.type === DataTypes.STRING) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : '';
+            if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
+                let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
+                let autocompleteFields = autocomplete.split(',').map((field) => field.trim());
+                let autocompleteFieldDict = {};
+
+                autocompleteFields.map((field) => {
+                    if (field.indexOf(':') > 0) {
+                        let [k, v] = field.split(':');
+                        autocompleteFieldDict[k] = v;
+                    } else {
+                        let [k, v] = field.split('=');
+                        autocompleteFieldDict[k] = v;
+                    }
+                })
+                if (autocompleteFieldDict.hasOwnProperty(propname)) {
+                    if (!schema.autocomplete.hasOwnProperty(autocompleteFieldDict[propname])) {
+                        object[propname] = autocompleteFieldDict[propname];
+                    }
+                }
+            }
         } else if (metadata.type === DataTypes.NUMBER) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : 0;
         } else if (metadata.type === DataTypes.BOOLEAN) {
@@ -180,6 +200,27 @@ export function generateObjectFromSchema(schema, currentSchema) {
             let ref = metadata.items.$ref.split('/')
             let enumdata = getAutoCompleteData(schema, ref, metadata.type)
             object[propname] = enumdata ? enumdata[0] : '';
+            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : '';
+            if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
+                let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
+                let autocompleteFields = autocomplete.split(',').map((field) => field.trim());
+                let autocompleteFieldDict = {};
+
+                autocompleteFields.map((field) => {
+                    if (field.indexOf(':') > 0) {
+                        let [k, v] = field.split(':');
+                        autocompleteFieldDict[k] = v;
+                    } else {
+                        let [k, v] = field.split('=');
+                        autocompleteFieldDict[k] = v;
+                    }
+                })
+                if (autocompleteFieldDict.hasOwnProperty(propname)) {
+                    if (!schema.autocomplete.hasOwnProperty(autocompleteFieldDict[propname])) {
+                        object[propname] = autocompleteFieldDict[propname];
+                    }
+                }
+            }
         } else if (metadata.type === DataTypes.ARRAY) {
             if (!metadata.hasOwnProperty('items')) {
                 // for handling the cases where array are of simple type
@@ -197,6 +238,10 @@ export function generateObjectFromSchema(schema, currentSchema) {
         } else if (metadata.type === DataTypes.OBJECT) {
             let ref = metadata.items.$ref.split('/');
             let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
+            childSchema = cloneDeep(childSchema);
+            if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
+                childSchema.auto_complete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
+            }
             if (!childSchema.server_populate) {
                 object[propname] = generateObjectFromSchema(schema, childSchema);
             }

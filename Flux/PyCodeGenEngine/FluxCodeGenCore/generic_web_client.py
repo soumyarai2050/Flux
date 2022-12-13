@@ -1,12 +1,13 @@
 import requests
-from pydantic import BaseModel
-from typing import Dict, Any, Callable
+from pydantic import BaseModel, Field
+from typing import Dict, Any, Callable, List
 import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, ConnectionClosed
 import asyncio
 from asyncio.exceptions import TimeoutError
 import json
+from fastapi.encoders import jsonable_encoder
 
 
 def log_n_except(original_function):
@@ -25,29 +26,15 @@ def log_n_except(original_function):
 def generic_http_get_all_client(url: str, pydantic_type):
     result = requests.get(url)
     result_json = result.json()
-    for json_obj in result_json:
-        try:
-            json_obj["id"] = json_obj["_id"]
-            del json_obj["_id"]
-        except KeyError as e:
-            err_str = f"Key _id not found in received response body: {result_json}, url: {url}, error: {e}"
-            logging.exception(err_str)
-            raise Exception(err_str)
     pydantic_obj_list = [pydantic_type(**json_obj) for json_obj in result_json]
     return pydantic_obj_list
 
 
 @log_n_except
-def generic_http_post_client(url: str, json_response: Dict, pydantic_type):
-    result = requests.post(url, json=json_response)
+def generic_http_post_client(url: str, pydantic_obj, pydantic_type):
+    json_data = jsonable_encoder(pydantic_obj, by_alias=True)
+    result = requests.post(url, json=json_data)
     result_json = result.json()
-    try:
-        result_json["id"] = result_json["_id"]
-        del result_json["_id"]
-    except KeyError as e:
-        err_str = f"Key _id not found in received response body: {result_json}, url: {url}, error: {e}"
-        logging.exception(err_str)
-        raise Exception(err_str)
     return pydantic_type(**result_json)
 
 
@@ -59,41 +46,22 @@ def generic_http_get_client(url: str, query_param: Any, pydantic_type):
         url = f"{url}/{query_param}"
     result = requests.get(url)
     result_json = result.json()
-    try:
-        result_json["id"] = result_json["_id"]
-        del result_json["_id"]
-    except KeyError as e:
-        err_str = f"Key _id not found in received response body: {result_json}, url: {url}, error: {e}"
-        logging.exception(err_str)
-        raise Exception(err_str)
     return pydantic_type(**result_json)
 
 
 @log_n_except
-def generic_http_put_client(url: str, json_response: Dict, pydantic_type):
-    result = requests.put(url, json=json_response)
+def generic_http_put_client(url: str, pydantic_obj, pydantic_type):
+    json_data = jsonable_encoder(pydantic_obj, by_alias=True)
+    result = requests.put(url, json=json_data)
     result_json = result.json()
-    try:
-        result_json["id"] = result_json["_id"]
-        del result_json["_id"]
-    except KeyError as e:
-        err_str = f"Key _id not found in received response body: {result_json}, url: {url}, error: {e}"
-        logging.exception(err_str)
-        raise Exception(err_str)
     return pydantic_type(**result_json)
 
 
 @log_n_except
-def generic_http_patch_client(url: str, json_response: Dict, pydantic_type):
-    result = requests.patch(url, json=json_response)
+def generic_http_patch_client(url: str, pydantic_obj, pydantic_type):
+    json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+    result = requests.patch(url, json=json_data)
     result_json = result.json()
-    try:
-        result_json["id"] = result_json["_id"]
-        del result_json["_id"]
-    except KeyError as e:
-        err_str = f"Key _id not found in received response body: {result_json}, url: {url}, error: {e}"
-        logging.exception(err_str)
-        raise Exception(err_str)
     return pydantic_type(**result_json)
 
 
@@ -106,6 +74,43 @@ def generic_http_delete_client(url: str, query_param: Any):
     result = requests.delete(url)
     result_json = result.json()
     return result_json
+
+
+async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Callable):
+    class PydanticClassTypeList(BaseModel):
+        __root__: List[pydantic_type]
+
+    async with websockets.connect(url, ping_timeout=None) as ws:
+        while True:
+            try:
+                data = await asyncio.wait_for(ws.recv(), timeout=10.0)
+                user_callback(data)
+            except TimeoutError:
+                logging.debug('timeout!')
+            except ConnectionClosedOK as e:
+                logging.info(f"web socket connection closed gracefully within while loop: {e}")
+                break
+            except ConnectionClosedError as e:
+                logging.exception(f"web socket connection closed with error within while loop: {e}")
+                break
+            except ConnectionClosed as e:
+                logging.exception('\n', f"web socket connection closed within while loop: {e}")
+                break
+            except RuntimeError as e:
+                logging.exception(f"web socket raised runtime error within while loop: {e}")
+                break
+            except Exception as e:
+                logging.exception(f"web socket raised runtime error within while loop: {e}")
+                break
+            if data is not None:
+                data = json.loads(data)
+                pydantic_obj_list: PydanticClassTypeList = PydanticClassTypeList(__root__=data)
+                data = None
+                try:
+                    for pydantic_obj in pydantic_obj_list.__root__:
+                        print(pydantic_obj)
+                except KeyError:
+                    continue
 
 
 async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_callback: Callable):
@@ -149,11 +154,11 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
 #     """
 #         Widget - 5
 #     """
-#     id: int
-#     max_price_levels: int
-#     max_basis_points: int
-#     max_cb_order_notional: int
-#     max_px_deviation: float
+#     id: int | None = Field(alias="_id")
+#     max_price_levels: int | None = None
+#     max_basis_points: int | None = None
+#     max_cb_order_notional: int | None = None
+#     max_px_deviation: float | None = None
 
 
 # js = {'id': 1, 'max_price_levels': 40, 'max_basis_points': 0, 'max_cb_order_notional': 1, 'max_px_deviation': 0.0}
@@ -165,9 +170,9 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
 
 
 # Post
-# js = {'id': 3, 'max_price_levels': 40, 'max_basis_points': 0, 'max_cb_order_notional': 1, 'max_px_deviation': 0.0}
+# js = {'_id': 3, 'max_price_levels': 40, 'max_basis_points': 0, 'max_cb_order_notional': 1, 'max_px_deviation': 0.0}
 # URL = "http://127.0.0.1:8000/pair_strat_engine/create-order_limits"
-# print(generic_http_post_client(URL, js, OrderLimitsOptional))
+# print(generic_http_post_client(URL, OrderLimitsOptional(**js), OrderLimitsOptional))
 
 
 # Get

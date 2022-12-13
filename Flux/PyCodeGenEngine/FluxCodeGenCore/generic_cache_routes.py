@@ -1,24 +1,15 @@
 import logging
-from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
 from fastapi import HTTPException, WebSocketDisconnect, WebSocket
 import json
+import sys
+from pathlib import PurePath
+from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
+repo_dir = PurePath(__file__).parent.parent.parent.parent.parent
+sys.path.append(str(repo_dir))
+from FluxPythonUtils.FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
 
 id_not_found = DefaultWebResponse(msg="Id not Found")
 del_success = DefaultWebResponse(msg="Deletion Successful")
-
-
-# Decorator function to http try except along with logging the exception
-def http_except_n_log_error(status_code: int = 500):  # 500 - internal server error
-    def decorator_function(original_function):
-        def wrapper_function(*args, **kwargs):
-            try:
-                result = original_function(*args, **kwargs)
-            except Exception as e:
-                logging.exception(e)
-                raise HTTPException(status_code=status_code, detail=str(e))
-            return result
-        return wrapper_function
-    return decorator_function
 
 
 @http_except_n_log_error(status_code=500)

@@ -70,6 +70,8 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.routes_file_name: str = ""
         self.client_file_name: str = ""
         self.int_id_message_list: List[protogen.Message] = []
+        self.host: str = "127.0.0.1"
+        self.port: int = 8000
 
     def load_dependency_messages_and_enums_in_dicts(self, message: protogen.Message):
         for field in message.fields:
@@ -349,40 +351,50 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
     def handle_POST_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def create_{message_name_snake_cased}_client(url: str, json_response) -> " \
+        output_str = f"def create_{message_name_snake_cased}_client(pydantic_obj: {message_name}BaseModel) -> " \
                      f"{message_name}:\n"
-        output_str += f"    return generic_http_post_client(url, json_response, {message_name}BaseModel)\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}/" \
+                      f"create-{message_name_snake_cased}'\n"
+        output_str += f"    return generic_http_post_client(url, pydantic_obj, {message_name}BaseModel)\n"
         return output_str
 
     def handle_GET_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def get_{message_name_snake_cased}_client(url: str, {message_name_snake_cased}_id: " \
+        output_str = f"def get_{message_name_snake_cased}_client({message_name_snake_cased}_id: " \
                      f"{field_type}) -> {message_name}:\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}/" \
+                      f"get-{message_name_snake_cased}'\n"
         output_str += f"    return generic_http_get_client(url, {message_name_snake_cased}_id, {message_name}BaseModel)\n"
         return output_str
 
     def handle_PUT_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def put_{message_name_snake_cased}_client(url: str, json_response) -> " \
+        output_str = f"def put_{message_name_snake_cased}_client(pydantic_obj: {message_name}BaseModel) -> " \
                      f"{message_name}:\n"
-        output_str += f"    return generic_http_put_client(url, json_response, {message_name}BaseModel)\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}" \
+                      f"/put-{message_name_snake_cased}'\n"
+        output_str += f"    return generic_http_put_client(url, pydantic_obj, {message_name}BaseModel)\n"
         return output_str
 
     def handle_PATCH_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def patch_{message_name_snake_cased}_client(url: str, json_response) -> " \
+        output_str = f"def patch_{message_name_snake_cased}_client(pydantic_obj: {message_name}BaseModel) -> " \
                      f"{message_name}:\n"
-        output_str += f"    return generic_http_patch_client(url, json_response, {message_name}BaseModel)\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}" \
+                      f"/patch-{message_name_snake_cased}'\n"
+        output_str += f"    return generic_http_patch_client(url, pydantic_obj, {message_name}BaseModel)\n"
         return output_str
 
     def handle_DELETE_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def delete_{message_name_snake_cased}_client(url: str, {message_name_snake_cased}_id: " \
+        output_str = f"def delete_{message_name_snake_cased}_client({message_name_snake_cased}_id: " \
                      f"{field_type}) -> Dict:\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}" \
+                      f"/delete-{message_name_snake_cased}'\n"
         output_str += f"    return generic_http_delete_client(url, {message_name_snake_cased}_id)\n"
         return output_str
 
@@ -391,30 +403,39 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         field_name = field.proto.name
         field_type = self.proto_to_py_datatype(field)
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def get_{message_name_snake_cased}_from_{field_name}_client(url: str, {field_name}: " \
+        output_str = f"def get_{message_name_snake_cased}_from_{field_name}_client({field_name}: " \
                      f"{field_type}) -> {message_name}:\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}" \
+                      f"/get-{message_name_snake_cased}-from-" \
+                      f"{field_name}'\n"
         output_str += f"    return generic_http_get_client(url, {field_name}, {message_name}BaseModel)\n"
         return output_str
 
     def handle_get_all_message_http_client(self, message: protogen.Message):
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def get_all_{message_name_snake_cased}_client(url: str) -> List[{message_name}]:\n"
+        output_str = f"def get_all_{message_name_snake_cased}_client() -> List[{message_name}]:\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}" \
+                      f"/get-all-{message_name_snake_cased}'\n"
         output_str += f"    return generic_http_get_all_client(url, {message_name}BaseModel)\n\n\n"
         return output_str
 
     def handle_get_all_message_ws_client(self, message: protogen.Message):
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"async def get_all_{message_name_snake_cased}_client_ws(url: str, user_callable: Callable):\n"
+        output_str = f"async def get_all_{message_name_snake_cased}_client_ws(user_callable: Callable):\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}" \
+                      f"/get-all-{message_name_snake_cased}-ws'\n"
         output_str += f"    await generic_ws_get_all_client(url, {message_name}BaseModel, user_callable)\n\n\n"
         return output_str
 
     def handle_read_by_id_WEBSOCKET_client_gen(self, message: protogen.Message, id_field_type):
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"async def get_{message_name_snake_cased}_client_ws(url: str, {message_name_snake_cased}_id: " \
+        output_str = f"async def get_{message_name_snake_cased}_client_ws({message_name_snake_cased}_id: " \
                      f"{id_field_type}, user_callable: Callable):\n"
+        output_str += f"    url: str = 'http://{self.host}:{self.port}/{self.proto_file_package}" \
+                      f"/get-{message_name_snake_cased}-ws'\n"
         output_str += f"    await generic_ws_get_client(url, {message_name_snake_cased}_id, " \
                       f"{message_name}BaseModel, user_callable)\n"
         return output_str
@@ -498,8 +519,11 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str += f'    # WARNING: 30\n'
         output_str += f'    # ERROR: 40\n'
         output_str += f'    # CRITICAL: 50\n'
-        output_str += f'    uvicorn.run(reload=reload_status, app="{self.main_file_name}:{self.fastapi_app_name}", ' \
-                      f'log_level=20)\n'
+        output_str += f'    uvicorn.run(reload=reload_status, \n'
+        output_str += f'                host="{self.host}", \n'
+        output_str += f'                port={self.port}, \n'
+        output_str += f'                app="{self.main_file_name}:{self.fastapi_app_name}", \n'
+        output_str += f'                log_level=20)\n'
         return output_str
 
     def set_req_data_members(self, file: protogen.File):
@@ -512,6 +536,12 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.model_file_name = f'{self.proto_file_name}_cache_model'
         self.routes_file_name = f'{self.proto_file_name}_cache_routes'
         self.client_file_name = f"{self.proto_file_name}_pydantic_web_client"
+        if (host := os.getenv("HOST")) is not None:
+            self.host = host
+        # else not required: If host not set by env variable then using default as set in init
+        if (port := os.getenv("PORT")) is not None:
+            self.port = port
+        # else not required: If port not set by env variable then using default as set in init
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
         # Pre-code generation initializations

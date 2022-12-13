@@ -181,9 +181,10 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
         for field in message.fields:
             if field.proto.name == PydanticClassGenPlugin.default_id_field_name:
                 if auto_gen_id:
-                    output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} = Field(alias='_id')\n"
+                    output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = " \
+                                  f"Field(alias='_id')\n"
                 else:
-                    output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)}\n"
+                    output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = None\n"
                 continue
             if field.cardinality.name.lower() == "repeated":
                 output_str += f"    {field.proto.name}: List[{self.proto_to_py_datatype(field)}] | None = None\n"

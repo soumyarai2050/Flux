@@ -36,7 +36,10 @@ class BeanieClassGenPlugin(PydanticClassGenPlugin):
                 if BeanieClassGenPlugin.flux_fld_index in str(field.proto.options):
                     output_str = f"{field.proto.name}: Indexed(List[{field_type}])"
                 else:
-                    output_str = f"{field.proto.name}: List[{field_type}]"
+                    if self.flux_fld_is_required in str(field.proto.options):
+                        output_str = f"{field.proto.name}: List[{field_type}]"
+                    else:
+                        output_str = f"{field.proto.name}: List[{field_type}] | None"
             case other:
                 if BeanieClassGenPlugin.flux_fld_index in str(field.proto.options):
                     output_str = f"{field.proto.name}: Indexed({field_type})"

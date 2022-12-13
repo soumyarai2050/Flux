@@ -2,19 +2,18 @@ import json
 from fastapi.encoders import jsonable_encoder
 import logging
 import websockets
-from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, ConnectionClosed, WebSocketException
-from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
+from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
-from generic_cache_routes import http_except_n_log_error
+import sys
+from pathlib import PurePath
+from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
+repo_dir = PurePath(__file__).parent.parent.parent.parent.parent
+sys.path.append(str(repo_dir))
+from FluxPythonUtils.FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
+
 
 id_not_found = DefaultWebResponse(msg="Id not Found")
 del_success = DefaultWebResponse(msg="Deletion Successful")
-
-
-def underscore_id_to_id_in_json(json_reponse):
-    json_reponse["_id"] = json_reponse["id"]
-    del json_reponse["id"]
-    return json_reponse
 
 
 @http_except_n_log_error(status_code=500)

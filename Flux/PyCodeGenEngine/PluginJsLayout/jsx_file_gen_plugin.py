@@ -49,13 +49,17 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           "API_ROOT_URL, NEW_ITEM_ID } from " \
                           "'../constants';\n"
         message_name_camel_cased = message_name[0].lower() + message_name[1:]
-        output_str += "import {\n"
-        output_str += f"    getAll{message_name}, get{message_name}, create{message_name}, update{message_name},\n"
-        output_str += f"    set{message_name}, reset{message_name}, setModified{message_name}, " \
-                      f"setSelected{message_name}Id, resetSelected{message_name}Id, resetError"
         if layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += "import {\n"
+            output_str += f"    getAll{message_name}, get{message_name}, create{message_name}, update{message_name},\n"
+            output_str += f"    set{message_name}, reset{message_name}, setModified{message_name}, " \
+                          f"setSelected{message_name}Id, resetSelected{message_name}Id, resetError"
             output_str += ", setUserChanges, setDiscardedChanges\n"
         else:
+            output_str += "import {\n"
+            output_str += f"    getAll{message_name}, get{message_name}, create{message_name}, update{message_name},\n"
+            output_str += f"    set{message_name}Array, set{message_name}, reset{message_name}, setModified{message_name}, " \
+                          f"setSelected{message_name}Id, resetSelected{message_name}Id, resetError"
             output_str += "\n"
         output_str += "}" + f" from '../features/{message_name_camel_cased}Slice';\n"
         if layout_type == JsxFileGenPlugin.abbreviated_type:
@@ -70,7 +74,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           f"setUserChanges, setDiscardedChanges\n"
             output_str += "}"+f" from '../features/{dependent_message_name_camel_cased}Slice';\n"
             output_str += "import { createCollections, generateObjectFromSchema, addxpath, clearxpath, " \
-                          "lowerFirstLetter, getNewItem, compareObjects } from '../utils';\n"
+                          "lowerFirstLetter, getNewItem, compareObjects, getObjectWithLeastId, getIdFromAbbreviatedKey } from '../utils';\n"
             output_str += "import SkeletonField from '../components/SkeletonField';\n"
             output_str += "import WidgetContainer from '../components/WidgetContainer';\n"
             output_str += "import AbbreviatedFilterWidget from '../components/AbbreviatedFilterWidget';\n"
@@ -81,7 +85,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "\n"
         else:
             output_str += "import { createCollections, generateObjectFromSchema, addxpath, clearxpath, " \
-                          "lowerFirstLetter, generateRowTrees, compareObjects } from '../utils';\n"
+                          "lowerFirstLetter, generateRowTrees, compareObjects, getObjectWithLeastId } from '../utils';\n"
             output_str += "import SkeletonField from '../components/SkeletonField';\n"
             output_str += "import TreeWidget from '../components/TreeWidget';\n"
             output_str += "import TableWidget from '../components/TableWidget';\n"
@@ -260,6 +264,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
                 output_str += "    const [layout, setLayout] = useState(Layouts.UNSPECIFIED);\n"
                 output_str += "    const [websocket, setWebsocket] = useState();\n"
+                output_str += "    const [getAllWebsocket, setGetAllWebsocket] = useState();\n"
                 output_str += "    const [userChanges, setUserChanges] = useState({});\n"
                 output_str += "    const [discardedChanges, setDiscardedChanges] = useState({})\n"
                 output_str += "    const [openPopup, setOpenPopup] = useState(false);\n"
@@ -289,6 +294,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [layout, setLayout] = useState(Layouts.UNSPECIFIED);\n"
                 output_str += "    const [searchValue, setSearchValue] = useState('');\n"
                 output_str += "    const [websocket, setWebsocket] = useState();\n"
+                output_str += "    const [getAllWebsocket, setGetAllWebsocket] = useState();\n"
                 output_str += f"    const [{dependent_mesaage_camel_cased}GetAllWebsocket, " \
                               f"set{dependent_message}GetAllWebsocket] = useState();\n"
                 output_str += "    const [openPopup, setOpenPopup] = useState(false);\n\n"
@@ -349,7 +355,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    <List>\n"
         output_str += "                        {_.get(modified"+f"{message_name}"+", loadedKeyName) && _.get(" \
                       "modified"+f"{message_name}"+", loadedKeyName).map((item, index) => {\n"
-        output_str += "                            let id = getId(item) * 1;\n"
+        output_str += "                            let id = getIdFromAbbreviatedKey(abbreviated, item);\n"
         output_str += "                            if (id !== NEW_ITEM_ID) return;\n"
         output_str += "                            return (\n"
         output_str += "                                <ListItem key={index} className={classes.listItem} " \
@@ -484,17 +490,51 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    let dependentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, dependentName]);\n\n"
             output_str += "    let dependentCollections = [];\n"
             output_str += "    if (dependentSchema) {\n"
-            output_str += "        dependentCollections = createCollections(schema, dependentSchema, { mode: mode });\n"
-            output_str += "    }\n\n"
-            output_str += "    const getId = (text) => {\n"
-            output_str += "        let index = abbreviated.split('-').length - 1;\n"
-            output_str += "        let id = text.split('-')[index] * 1;\n"
-            output_str += "        return id;\n"
+            output_str += "        dependentCollections = createCollections(schema, dependentSchema, { mode: Modes.READ_MODE });\n"
             output_str += "    }\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += f"        dispatch(getAll{message_name}());\n"
             output_str += f"        dispatch(getAll{self.abbreviated_dependent_message_name}());\n"
             output_str += "    }, []);\n\n"
+        if layout_type != JsxFileGenPlugin.non_root_type:
+            output_str += "    useEffect(() => {\n"
+            output_str += f"        if ({message_name_camel_cased}Array.length > 0 && !selected{message_name}Id) "+"{\n"
+            output_str += f"            let object = getObjectWithLeastId({message_name_camel_cased}Array);\n"
+            output_str += f"            dispatch(setSelected{message_name}Id(object[DB_ID]));\n"
+            output_str += "        }\n"
+            output_str += "    }, "+f"[{message_name_camel_cased}Array])\n\n"
+            output_str += "    useEffect(() => {\n"
+            output_str += "        let socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
+                          "'ws')}/get-all-"+f"{message_name_snake_cased}"+"-ws/`);\n"
+            output_str += "        setGetAllWebsocket(socket);\n"
+            output_str += "        // close the websocket on re-render\n"
+            output_str += "        return () => socket.close();\n"
+            output_str += "    }, [])\n\n"
+            output_str += "    useEffect(() => {\n"
+            output_str += "        if (getAllWebsocket) {\n"
+            output_str += "            getAllWebsocket.onmessage = (event) => {\n"
+            output_str += "                let updatedData = JSON.parse(event.data);\n"
+            output_str += "                if (Array.isArray(updatedData)) {\n"
+            output_str += "                    if (updatedData.length === 0) {\n"
+            output_str += f"                        dispatch(resetSelected{message_name}Id());\n"
+            output_str += "                    }\n"
+            output_str += f"                    dispatch(set{message_name}Array(updatedData));\n"
+            output_str += "                } else if (_.isObject(updatedData)) {\n"
+            output_str += f"                    let updatedArray = {message_name_camel_cased}Array.filter" \
+                          f"({message_name_camel_cased} => {message_name_camel_cased}[DB_ID] !== updatedData[DB_ID]);\n"
+            output_str += "                    if (_.keys(updatedData).length !== 1) {\n"
+            output_str += "                        updatedArray = [...updatedArray, updatedData];\n"
+            output_str += "                    } else if (_.keys(updatedData).length === 1 && " \
+                          f"selected{message_name}Id === updatedData[DB_ID]) "+"{\n"
+            output_str += f"                        dispatch(resetSelected{message_name}Id());\n"
+            output_str += f"                        dispatch(reset{message_name}());\n"
+            output_str += "                    }\n"
+            output_str += f"                    dispatch(set{message_name}Array(updatedArray));\n"
+            output_str += "                }\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "    }, [getAllWebsocket])\n\n"
+
         output_str += "    useEffect(() => {\n"
         output_str += "        if (currentSchema) {\n"
         output_str += "            setLayout(currentSchema.layout);\n"
@@ -506,7 +546,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
             output_str += f"        if (_.get({message_name_camel_cased}, loadedKeyName) && " \
                           f"_.get({message_name_camel_cased}, loadedKeyName).length > 0) "+"{\n"
-            output_str += f"            let id = getId(_.get({message_name_camel_cased}, loadedKeyName)[0]);\n"
+            output_str += f"            let id = getIdFromAbbreviatedKey(abbreviated, _.get(" \
+                          f"{message_name_camel_cased}, loadedKeyName)[0]);\n"
             output_str += f"            dispatch(setSelected{self.abbreviated_dependent_message_name}Id(id));\n"
             output_str += "        }\n"
             output_str += "    }"+f", [{message_name_camel_cased}])\n\n\n"
@@ -581,7 +622,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                let diff = compareObjects(updatedData, " \
                           f"{message_name_camel_cased}, {message_name_camel_cased});\n"
             output_str += "                for (let i = 0; i < diff.length; i++) {\n"
-            output_str += f"                    let id = getId(_.get({message_name_camel_cased}, diff[i]));\n"
+            output_str += f"                    let id = getIdFromAbbreviatedKey(abbreviated, " \
+                          f"_.get({message_name_camel_cased}, diff[i]));\n"
             output_str += f"                    if (id === selected{self.abbreviated_dependent_message_name}Id" \
                           " && mode === Modes.EDIT_MODE) {\n"
             output_str += "                        setOpenPopup(true);\n"
@@ -768,7 +810,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            dispatch(setCreateMode(false));\n"
             output_str += f"            let updatedData = cloneDeep(modified{message_name});\n"
             output_str += "            let updatedLoaded = _.get(updatedData, loadedKeyName).filter((item) => {\n"
-            output_str += "                let id = getId(item) * 1;\n"
+            output_str += "                let id = getIdFromAbbreviatedKey(abbreviated, item);\n"
             output_str += "                return id !== NEW_ITEM_ID;\n"
             output_str += "            })\n"
             output_str += "            _.set(updatedData, loadedKeyName, updatedLoaded);\n"
@@ -836,7 +878,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        _.get(updatedData, bufferedKeyName).splice(index, 1);\n"
             output_str += "        _.get(updatedData, loadedKeyName).push(searchValue);\n"
             output_str += f"        dispatch(update{message_name}(updatedData));\n"
-            output_str += "        let id = getId(searchValue) * 1;\n"
+            output_str += "        let id = getIdFromAbbreviatedKey(abbreviated, searchValue);\n"
             output_str += f"        setSelected{self.abbreviated_dependent_message_name}Id(id);\n"
             output_str += "        setSearchValue('');\n"
             output_str += "    }\n"

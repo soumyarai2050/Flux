@@ -426,6 +426,12 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         self.routes_file_name = f'{self.proto_file_name}_beanie_routes'
         self.websocket_client_file_name = f'{self.proto_file_name}_websocket_client'
         self.client_file_name = f"{self.proto_file_name}_pydantic_web_client"
+        if (host := os.getenv("HOST")) is not None:
+            self.host = host
+        # else not required: If host not set by env variable then using default as set in init
+        if (port := os.getenv("PORT")) is not None:
+            self.port = port
+        # else not required: If port not set by env variable then using default as set in init
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
         # Pre-code generation initializations

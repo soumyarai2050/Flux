@@ -42,9 +42,14 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
 
     const classes = useStyles();
 
+    let commonkeys = props.commonkeys.sort(function (a, b) {
+        if (a.sequenceNumber < b.sequenceNumber) return -1;
+        return 1;
+    })
+
     return (
         <Box ref={ref} className={classes.widgetContainer}>
-            {props.commonkeys.map((commonkey, i) => {
+            {commonkeys.map((commonkey, i) => {
                 let color = getColorTypeFromValue(commonkey, commonkey.value);
                 let commonkeyColorClass = '';
                 if (color === ColorTypes.CRITICAL) commonkeyColorClass = classes.commonkeyCritical;
