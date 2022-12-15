@@ -7,7 +7,7 @@ enum SecurityType{
   SEC_TYPE_UNSPECIFIED = 0;
   RIC = 1;
   SEDOL = 2;
-  EXCHANGE = 3;
+  TICKER = 3;
 }
 
 enum Side{
@@ -46,24 +46,24 @@ enum Severity{
 
 enum StratState{
   //set this state for strats just created by user
-  UNSPECIFIED = 0;
+  StratState_UNSPECIFIED = 0;
   // set this state post required constraint validation of strat - such as system checked all required strat params are
   // present and are as expected, do this for:
   // 1. new strats before moving them to ready state upon user explicit save request
   // 2. existing strats when loading them from store (if validation fails - raise alert and put them in ERROR state)
-  READY = 1;
+  StratState_READY = 1;
   // set StratStatus.ACTIVE state upon explicit user request, check:
   // 1. all required strats and portfolio level limit checks are passing else reject user's request
   // 2. strat is in StratStatus.READY state (user triggers a strat)
   // 3. strat is in StratStatus.PAUSED state (resume paused strat)
-  ACTIVE = 2;
+  StratState_ACTIVE = 2;
   // set StratStatus.PAUSED state upon explicit user request, check strat is currently in StratStatus.READY state
-  PAUSED = 3;
+  StratState_PAUSED = 3;
   // this is set in any exception scenario - dev/support/business involvement is needed to find the gap and bridge
   // for future handling of similar scenario, day-1 block strat (only engine restart can allow strat to be restarted)
-  ERROR = 4;
+  StratState_ERROR = 4;
   // set StratStatus.PAUSED state when strat has completed its set target
-  DONE = 5;
+  StratState_DONE = 5;
 }
 
 message ReferencePx{
@@ -86,11 +86,16 @@ message Position{
   required int64 allocated_position_size = 4;
   // actual consumption
   required int64 consumed_position_size = 5;
-  optional float carry_cost = 6;
+  // cost of using this position type
+  optional float acquire_cost = 6;
+  // un-avoidable charge due to this position type (irrespective of use / no-use)
+  optional float incurred_cost = 7;
+  // T+1 and onwards recurring daily cost
+  optional float carry_cost = 8;
 }
 
 message SecPosition{
-  required Security security = 1;
+  required Security security = 1[(FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER", (FluxFldHelp) = "EQT Tickers"];
   // Open price OR Close Price OR Last Price
   optional ReferencePx reference_px = 2;
   // per position type (PTH, LOCATE, LONG)
@@ -101,6 +106,8 @@ message Broker{
   required bool enabled = 1;
   // per security positions
   repeated SecPosition sec_positions = 2;
+  // broker identifier
+  required string broker_code = 3;
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly

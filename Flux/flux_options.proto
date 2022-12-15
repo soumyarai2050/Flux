@@ -152,13 +152,15 @@ extend google.protobuf.FieldOptions
   optional string FluxFldAbbreviated = 55251; // Use this to "Abbreviate" msg and show compressed single val
   optional bool FluxFldSticky = 55252; // Use this to show messages with "same this field value" together
   optional bool FluxFldSwitch = 55253; // Use this to generate toggle button on UI
-  optional string FluxFldAutoComplete = 55254; // Value should be name of auto complete list
-  optional bool FluxFldServerPopulate = 55255; // Use this to signal field not to populate from UI, populate from server
-  optional string FluxFldColor = 55256;
-  optional int32 FluxFldSequenceNumber = 55257;
-  optional string FluxFldAlertBubbleSource = 55258; //x-path to any repeated field: bubble shows if repeat field is non 0
-  optional string FluxFldAlertBubbleColor = 55259; //x-path to any field with values bound to either of [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]. If this field is in a repeat group, the highest severity in order as defined in this comment of all in collection applies
-  optional string FluxFldUIPlaceholder = 55260; //placeholder for UI to display in grayed out font as user action hint
+  optional UIButton FluxFldButton = 55254; // Use this to generate normal button on UI
+  optional string FluxFldAutoComplete = 55255; // Value should be name of auto complete list
+  optional bool FluxFldServerPopulate = 55256; // Use this to signal field not to populate from UI, populate from server
+  optional bool FluxFldUIUpdateOnly = 55257; // Use this to signal field not to allow create from UI, update okay
+  optional string FluxFldColor = 55258;
+  optional int32 FluxFldSequenceNumber = 55259;
+  optional string FluxFldAlertBubbleSource = 55260; //x-path to any repeated field: bubble shows if repeat field is non 0
+  optional string FluxFldAlertBubbleColor = 55261; //x-path to any field with values bound to either of [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]. If this field is in a repeat group, the highest severity in order as defined in this comment of all in collection applies
+  optional string FluxFldUIPlaceholder = 55262; //placeholder for UI to display in grayed out font as user action hint
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

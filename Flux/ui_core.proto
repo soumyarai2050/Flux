@@ -1,10 +1,23 @@
 syntax = "proto2";
 
 
+enum ButtonType{
+  BUTTON_TYPE_UNSPECIFIED = 0;
+  BUTTON_TYPE_ROUND = 1;
+  BUTTON_TYPE_RECTANGLE = 2;
+}
+
+enum ButtonSize{
+  BUTTON_SIZE_UNSPECIFIED = 0;
+  BUTTON_SIZE_SMALL = 1;
+  BUTTON_SIZE_MEDIUM = 2;
+  BUTTON_SIZE_LARGE = 3;
+}
+
 enum Theme{
     THEME_UNSPECIFIED = 0;
-    DARK = 1;
-    LIGHT = 3;
+    THEME_DARK = 1;
+    THEME_LIGHT = 3;
 }
 
 message WidgetUIData{
@@ -20,4 +33,15 @@ message WidgetUIData{
   optional int32 h = 5;
 }
 
+message UIButton{
+  optional string unpressed_color = 1;
+  optional string pressed_color = 2;
+  optional string unpressed_caption = 3;
+  optional string pressed_caption = 4;
+  optional ButtonType button_type = 5;
+  optional ButtonSize button_size = 6;
+  optional string value_color_map = 7;  // coma separated list of key=value
+  optional string action = 8;
+  required string pressed_value_as_text = 9;
+}
 

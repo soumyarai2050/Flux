@@ -316,7 +316,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        dispatch(setCreateMode(false));\n"
         output_str += f"        dispatch(setModified{message_name}({message_name_camel_cased}));\n"
         output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
-        output_str += "        // TODO: again select the first strat in the loaded keys if avialable\n"
+        output_str += "        dispatch(setUserChanges({}));\n"
+        output_str += "        dispatch(setDiscardedChanges({}));\n"
         output_str += "    }\n\n"
         output_str += "    const onSelect = (id) => {\n"
         output_str += "        id = id * 1;\n"
@@ -521,7 +522,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"                    dispatch(set{message_name}Array(updatedData));\n"
             output_str += "                } else if (_.isObject(updatedData)) {\n"
             output_str += f"                    let updatedArray = {message_name_camel_cased}Array.filter" \
-                          f"({message_name_camel_cased} => {message_name_camel_cased}[DB_ID] !== updatedData[DB_ID]);\n"
+                          f"(object => object[DB_ID] !== updatedData[DB_ID]);\n"
             output_str += "                    if (_.keys(updatedData).length !== 1) {\n"
             output_str += "                        updatedArray = [...updatedArray, updatedData];\n"
             output_str += "                    } else if (_.keys(updatedData).length === 1 && " \
@@ -619,6 +620,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        if (websocket) {\n"
             output_str += "            websocket.onmessage = (event) => {\n"
             output_str += "                let updatedData = JSON.parse(event.data);\n"
+            output_str += "                if (_.keys(updatedData).length === 1) {\n"
+            output_str += f"                    dispatch(resetSelected{message_name}Id());\n"
+            output_str += f"                    dispatch(reset{message_name}());\n"
+            output_str += "                } else {\n"
+            output_str += f"                    dispatch(set{message_name}(updatedData));\n"
+            output_str += "                }\n"
             output_str += "                let diff = compareObjects(updatedData, " \
                           f"{message_name_camel_cased}, {message_name_camel_cased});\n"
             output_str += "                for (let i = 0; i < diff.length; i++) {\n"
@@ -629,7 +636,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                        setOpenPopup(true);\n"
             output_str += "                    }\n"
             output_str += "                }\n"
-            output_str += f"                dispatch(set{message_name}(updatedData));\n"
             output_str += "            }\n"
             output_str += "        }\n"
             output_str += "    }, [websocket, "+f"{message_name_camel_cased}, " \
@@ -679,7 +685,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             if layout_type == JsxFileGenPlugin.root_type:
                 output_str += "                let diff = compareObjects(updatedData, " \
                               f"{message_name_camel_cased}, {message_name_camel_cased});\n"
-                output_str += f"                dispatch(set{message_name}(updatedData));\n"
+                output_str += "                if (_.keys(updatedData).length === 1) {\n"
+                output_str += f"                    dispatch(resetSelected{message_name}Id());\n"
+                output_str += f"                    dispatch(reset{message_name}());\n"
+                output_str += "                } else {\n"
+                output_str += f"                    dispatch(set{message_name}(updatedData));\n"
+                output_str += "                }\n"
                 output_str += f"                let trees = generateRowTrees(cloneDeep(updatedData), collections);\n"
                 output_str += f"                let modifiedTrees = generateRowTrees(cloneDeep" \
                               f"(modified{message_name}), collections);\n"

@@ -32,7 +32,8 @@ def generic_http_get_all_client(url: str, pydantic_type):
 
 @log_n_except
 def generic_http_post_client(url: str, pydantic_obj, pydantic_type):
-    json_data = jsonable_encoder(pydantic_obj, by_alias=True)
+    # create doesn't need to delete any field - model default should handle that, so: exclude_unset=True, exclude_none=True)
+    json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
     result = requests.post(url, json=json_data)
     result_json = result.json()
     return pydantic_type(**result_json)

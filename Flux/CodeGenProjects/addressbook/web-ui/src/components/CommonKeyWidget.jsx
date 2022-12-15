@@ -50,6 +50,8 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
     return (
         <Box ref={ref} className={classes.widgetContainer}>
             {commonkeys.map((commonkey, i) => {
+                if(commonkey.value === undefined) return;
+                
                 let color = getColorTypeFromValue(commonkey, commonkey.value);
                 let commonkeyColorClass = '';
                 if (color === ColorTypes.CRITICAL) commonkeyColorClass = classes.commonkeyCritical;
@@ -61,7 +63,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
                 return (
                     <Box key={i} className={classes.commonkey}>
                         <span className={classes.commonkeyTitle}>{commonkey.tableTitle}:</span>
-                        <span className={commonkeyColorClass}>{commonkey.value}</span>
+                        <span className={commonkeyColorClass}>{String(commonkey.value)}</span>
                     </Box>
                 )
             })}

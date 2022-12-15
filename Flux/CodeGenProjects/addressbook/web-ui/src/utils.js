@@ -200,7 +200,7 @@ export function generateObjectFromSchema(schema, currentSchema) {
             let ref = metadata.items.$ref.split('/')
             let enumdata = getAutoCompleteData(schema, ref, metadata.type)
             object[propname] = enumdata ? enumdata[0] : '';
-            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : '';
+            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : enumdata ? enumdata[0] : '';
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
                 let autocompleteFields = autocomplete.split(',').map((field) => field.trim());
@@ -488,7 +488,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
 
         if (currentSchema.hasOwnProperty('server_populate') || metadata.hasOwnProperty('server_populate')) {
             metadata.server_populate = metadata.server_populate ? metadata.server_populate : currentSchema.server_populate;
-            return;
+            if(callerProps.mode === Modes.EDIT_MODE) return;
         }
 
         if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {

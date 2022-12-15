@@ -246,7 +246,6 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"    name: '{message_name_camel_cased}',\n"
         output_str += "    initialState: initialState,\n"
         output_str += "    reducers: {\n"
-        # if self.current_message_is_dependent or message.proto.name == os.getenv("UILAYOUT_MESSSAGE_NAME"):
         output_str += f"        set{message_name}Array: (state, action) => "+"{\n"
         output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
         output_str += "        },\n"
@@ -292,7 +291,6 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "    }\n"
         output_str += "})\n\n"
         output_str += f"export default {message_name_camel_cased}Slice.reducer;\n\n"
-        # if self.current_message_is_dependent or message.proto.name == os.getenv("UILAYOUT_MESSSAGE_NAME"):
         output_str += "export const { " + f"set{message_name}Array, set{message_name}, reset{message_name}, " \
                                           f"setModified{message_name}, setSelected{message_name}Id, " \
                                           f"resetSelected{message_name}Id, resetError"
@@ -305,11 +303,6 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f", setMode, setCreateMode" + \
                               ", setUserChanges, setDiscardedChanges }" + \
                               f" = {message_name_camel_cased}Slice.actions;\n"
-        # else:
-        #     output_str += "export const { " + f"set{message_name}, reset{message_name}, setModified{message_name}, " \
-        #                                       f"setSelected{message_name}Id, resetSelected{message_name}Id, " \
-        #                                       f"resetError " + \
-        #                   "}" + f" = {message_name_camel_cased}Slice.actions;\n"
         return output_str
 
     def handle_jsx_file_convert(self, file: protogen.File) -> Dict[str, str]:

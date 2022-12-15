@@ -221,8 +221,11 @@ class BaseProtoPlugin(ABC):
                                     sliced_option_str_line.split(":")[1]:
                                 temp_dict[sliced_option_str_line.split(":")[0][2:]] = True if sliced_option_str_line.split(":")[1] == ' true' else False
                             else:
-                                # For int value
-                                temp_dict[sliced_option_str_line.split(":")[0][2:]] = int(sliced_option_str_line.split(":")[1])
+                                if sliced_option_str_line.split(":")[1].isdigit():
+                                    temp_dict[sliced_option_str_line.split(":")[0][2:]] = int(sliced_option_str_line.split(":")[1])
+                                else:
+                                    temp_dict[sliced_option_str_line.split(":")[0][2:]] = sliced_option_str_line.split(":")[1]
+
                     elif "}" in sliced_option_str_line:
                         option_value_list_of_dict.append(temp_dict)
                         break

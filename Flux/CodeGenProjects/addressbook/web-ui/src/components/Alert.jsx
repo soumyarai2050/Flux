@@ -14,7 +14,7 @@ const Alert = (props) => {
     const classes = useStyles();
 
     return (
-        <Snackbar open={props.open} autoHideDuration={4000} onClose={props.onClose}>
+        <Snackbar open={props.open} onClose={props.onClose}>
             <AlertComponent
                 className={classes.alert}
                 variant='filled'

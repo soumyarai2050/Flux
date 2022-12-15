@@ -4,12 +4,8 @@ import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
-import sys
-from pathlib import PurePath
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
-repo_dir = PurePath(__file__).parent.parent.parent.parent.parent
-sys.path.append(str(repo_dir))
-from FluxPythonUtils.FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
+from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
 
 
 id_not_found = DefaultWebResponse(msg="Id not Found")
@@ -65,7 +61,7 @@ async def generic_beanie_delete_http(Document, DocumentBaseModel, document_obj_i
     else:
         await stored_obj.delete()
         try:
-            document_base_model: DocumentBaseModel = DocumentBaseModel(_id=stored_obj.id)
+            document_base_model: DocumentBaseModel = DocumentBaseModel(id=stored_obj.id)
         except Exception as e:
             raise HTTPException(status_code=404, detail=str(e))
         if Document.read_ws_path_ws_connection_manager is not None:

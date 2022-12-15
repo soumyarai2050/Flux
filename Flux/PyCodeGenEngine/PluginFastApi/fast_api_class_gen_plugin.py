@@ -29,15 +29,6 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
     flux_json_root_read_websocket_field: str = "ReadWebSocketDesc"
     flux_json_root_update_websocket_field: str = "UpdateWebSocketDesc"
     flux_fld_is_required: str = "FluxFldIsRequired"
-    flx_fld_attribute_options: List[str] = [
-        "FluxFldHelp",
-        "FluxFldValMax",
-        "FluxFldHide",
-        "FluxFldValSortWeight",
-        "FluxFldAbbreviated",
-        "FluxFldSticky",
-        "FluxFldSizeMax"
-    ]
     flux_fld_cmnt: str = "FluxFldCmnt"
     flux_msg_cmnt: str = "FluxMsgCmnt"
     flux_fld_index: str = "FluxFldIndex"
@@ -69,6 +60,8 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.model_file_name: str = ""
         self.routes_file_name: str = ""
         self.client_file_name: str = ""
+        self.routes_wrapper_class_name: str = ""
+        self.routes_wrapper_class_name_capital_camel_cased: str = ""
         self.int_id_message_list: List[protogen.Message] = []
         self.host: str = "127.0.0.1"
         self.port: int = 8000
@@ -526,6 +519,133 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str += f'                log_level=20)\n'
         return output_str
 
+    def handle_POST_wrapper_methods_gen(self, message: protogen.Message) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def create_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def create_{message_name_snake_cased}_post(self, obj):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_GET_wrapper_methods_gen(self, message: protogen.Message) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def read_by_id_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def read_by_id_{message_name_snake_cased}_post(self, obj):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_PUT_wrapper_methods_gen(self, message: protogen.Message) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def update_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def update_{message_name_snake_cased}_post(self, obj):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_PATCH_wrapper_methods_gen(self, message: protogen.Message) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def partial_update_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def partial_update_{message_name_snake_cased}_post(self, obj):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_DELETE_wrapper_methods_gen(self, message: protogen.Message) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def delete_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def delete_{message_name_snake_cased}_post(self, obj):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_read_by_id_WEBSOCKET_wrapper_methods_gen(self, message: protogen.Message) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def read_by_id_ws_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def read_by_id_ws_{message_name_snake_cased}_post(self):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_get_all_message_http_wrapper_methods(self, message: protogen.Message) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def read_all_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def read_all_{message_name_snake_cased}_post(self, obj):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_get_all_message_ws_wrapper_methods(self, message: protogen.Message) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def read_all_ws_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def read_all_ws_{message_name_snake_cased}_post(self):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_index_wrapper_methods_gen(self, message: protogen.Message, field: protogen.Field) -> str:
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    def index_of_{field.proto.name}_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    def index_of_{field.proto.name}_{message_name_snake_cased}_post(self, obj):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_wrapper_class_file_gen(self) -> str:
+        output_str = "import threading\n"
+        output_str += "from typing import Optional\n\n\n"
+        wrapper_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_wrapper_class_name)
+        wrapper_class_name_capital_camel_cased: str = \
+            wrapper_class_name_camel_cased[0].upper() + wrapper_class_name_camel_cased[1:]
+        output_str += f"class {wrapper_class_name_capital_camel_cased}:\n"
+        output_str += f"    get_instance_mutex: threading.Lock = threading.Lock()\n"
+        output_str += f"    {self.routes_wrapper_class_name}_instance: " \
+                      f"Optional['{wrapper_class_name_capital_camel_cased}'] = None\n\n"
+        output_str += f"    def __init__(self):\n"
+        output_str += f"        pass\n\n"
+
+        output_str += f"    @classmethod\n"
+        output_str += f"    def get_instance(cls) -> '{wrapper_class_name_capital_camel_cased}':\n"
+        output_str += f"        with cls.get_instance_mutex:\n"
+        output_str += f"            if cls.{self.routes_wrapper_class_name}_instance is None:\n"
+        output_str += f"                cls.{self.routes_wrapper_class_name}_instance = {wrapper_class_name_capital_camel_cased}()\n"
+        output_str += f"                return cls.{self.routes_wrapper_class_name}_instance\n"
+        output_str += f"            else:\n"
+        output_str += f"                return cls.{self.routes_wrapper_class_name}_instance\n\n"
+
+        for message in self.root_message_list:
+            options_list_of_dict = \
+                self.get_complex_msg_option_values_as_list_of_dict(message,
+                                                                   FastApiClassGenPlugin.flux_msg_json_root)
+
+            # Since json_root option is of non-repeated type
+            option_dict = options_list_of_dict[0]
+
+            crud_field_name_to_method_call_dict = {
+                FastApiClassGenPlugin.flux_json_root_create_field: self.handle_POST_wrapper_methods_gen,
+                FastApiClassGenPlugin.flux_json_root_read_field: self.handle_GET_wrapper_methods_gen,
+                FastApiClassGenPlugin.flux_json_root_update_field: self.handle_PUT_wrapper_methods_gen,
+                FastApiClassGenPlugin.flux_json_root_patch_field: self.handle_PATCH_wrapper_methods_gen,
+                FastApiClassGenPlugin.flux_json_root_delete_field: self.handle_DELETE_wrapper_methods_gen,
+                FastApiClassGenPlugin.flux_json_root_read_websocket_field: self.handle_read_by_id_WEBSOCKET_wrapper_methods_gen
+            }
+
+            output_str += self.handle_get_all_message_http_wrapper_methods(message)
+            output_str += self.handle_get_all_message_ws_wrapper_methods(message)
+
+            for crud_option_field_name, crud_operation_method in crud_field_name_to_method_call_dict.items():
+                if crud_option_field_name in option_dict:
+                    output_str += crud_operation_method(message)
+                    # output_str += "\n\n"
+                # else not required: Avoiding method creation if desc not provided in option
+
+            for field in message.fields:
+                if FastApiClassGenPlugin.flux_fld_index in str(field.proto.options):
+                    output_str += self.handle_index_wrapper_methods_gen(message, field)
+                # else not required: Avoiding field if index option is not enabled
+
+        return output_str
+
     def set_req_data_members(self, file: protogen.File):
         self.proto_file_name = str(file.proto.name).split('.')[0]
         self.proto_file_package = str(file.proto.package)
@@ -536,6 +656,10 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.model_file_name = f'{self.proto_file_name}_cache_model'
         self.routes_file_name = f'{self.proto_file_name}_cache_routes'
         self.client_file_name = f"{self.proto_file_name}_pydantic_web_client"
+        self.routes_wrapper_class_name = f"{self.proto_file_name}_routes_wrapper"
+        routes_wrapper_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_wrapper_class_name)
+        self.routes_wrapper_class_name_capital_camel_cased: str = \
+            routes_wrapper_class_name_camel_cased[0].upper() + routes_wrapper_class_name_camel_cased[1:]
         if (host := os.getenv("HOST")) is not None:
             self.host = host
         # else not required: If host not set by env variable then using default as set in init
@@ -552,6 +676,9 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
 
             # Adding project´s main.py
             self.main_file_name + ".py": self.handle_main_file_gen(),
+
+            # Adding route's wrapper class
+            self.routes_wrapper_class_name + ".py": self.handle_wrapper_class_file_gen(),
 
             # Adding project's routes.py
             self.routes_file_name + ".py": self.handle_routes_file_gen(),

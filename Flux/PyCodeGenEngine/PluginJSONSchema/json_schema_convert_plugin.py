@@ -27,7 +27,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     flux_msg_json_layout: str = "FluxMsgLayout"
     flux_msg_json_root: str = "FluxMsgJsonRoot"
     flux_fld_is_required: str = "FluxFldIsRequired"
-    flx_fld_attribute_options: List[str] = [
+    flx_fld_simple_attribute_options: List[str] = [
         "FluxFldHelp",
         "FluxFldValMax",
         "FluxFldHide",
@@ -43,7 +43,11 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         "FluxFldAlertBubbleSource",
         "FluxFldAlertBubbleColor",
         "FluxFldDefaultValuePlaceholderString",
-        "FluxFldUIPlaceholder"
+        "FluxFldUIPlaceholder",
+        "FluxFldUIUpdateOnly"
+    ]
+    flx_fld_complex_attribute_options: List[str] = [
+        "FluxFldButton"
     ]
     options_having_msg_fld_names: List[str] = [
         "FluxFldAbbreviated",
@@ -58,6 +62,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     flux_msg_cmnt: str = "FluxMsgCmnt"
     flux_fld_sequence_number: str = "FluxFldSequenceNumber"
     flux_fld_val_is_datetime: str = "FluxFldValIsDateTime"
+    flux_fld_button: str = "FluxFldButton"
     # Below field name 'id' must only be used intentionally in beanie pydentic models to make custom type
     # of primary key in that model
     default_id_field_name: str = "id"
@@ -251,9 +256,20 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         else:
             return option_value
 
-    def __handle_proto_option_attributes(self, options_list: List[str],
-                                         field_or_message_obj: protogen.Field | protogen.Message,
-                                         init_space_count: int) -> str:
+    def __convert_option_name_to_json_attribute_name(self, option_name) -> str:
+        if (fld_standard_prefix := JsonSchemaConvertPlugin.fld_options_standard_prefix) in option_name:
+            flux_prefix_removed_option_name = option_name.removeprefix(fld_standard_prefix)
+        elif (msg_standard_prefix := JsonSchemaConvertPlugin.msg_options_standard_prefix) in option_name:
+            flux_prefix_removed_option_name = option_name.removeprefix(msg_standard_prefix)
+        else:
+            err_str = f"No Standard option prefix found in option {option_name} from option_list"
+            logging.exception(err_str)
+            raise Exception(err_str)
+        return flux_prefix_removed_option_name
+
+    def __handle_simple_proto_option_attributes(self, options_list: List[str],
+                                                field_or_message_obj: protogen.Field | protogen.Message,
+                                                init_space_count: int) -> str:
         json_msg_str = ""
         for option in options_list:
             if option in str(field_or_message_obj.proto.options):
@@ -270,18 +286,41 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 # else not required: if option is not in options_having_msg_fld_names then avoid
 
                 # converting flux_option into json attribute name
-                if (fld_standard_prefix := JsonSchemaConvertPlugin.fld_options_standard_prefix) in option:
-                    flux_prefix_removed_option_name = option.lstrip(fld_standard_prefix)
-                elif (msg_standard_prefix := JsonSchemaConvertPlugin.msg_options_standard_prefix) in option:
-                    flux_prefix_removed_option_name = option.lstrip(msg_standard_prefix)
-                else:
-                    err_str = f"No Standard option prefix found in option {option} from option_list"
-                    logging.exception(err_str)
-                    raise Exception(err_str)
+                flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
                 flux_prefix_removed_option_name_case_styled = \
                     self.__case_style_convert_method(flux_prefix_removed_option_name)
                 json_msg_str += ' '*init_space_count + \
                                 f'"{flux_prefix_removed_option_name_case_styled}": {option_value},\n'
+
+        return json_msg_str
+
+    def __handle_complex_proto_option_attributes(self, options_list: List[str],
+                                                 field_or_message_obj: protogen.Field | protogen.Message,
+                                                 init_space_count: int) -> str:
+        json_msg_str = ""
+        for option in options_list:
+            if option in str(field_or_message_obj.proto.options):
+                option_value_list_of_dict = \
+                    self.get_complex_fld_option_values_as_list_of_dict(field_or_message_obj, option)
+                # converting flux_option into json attribute name
+                flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
+                flux_prefix_removed_option_name_case_styled = \
+                    self.__case_style_convert_method(flux_prefix_removed_option_name)
+                json_msg_str += ' ' * init_space_count + \
+                                f'"{flux_prefix_removed_option_name_case_styled}": ' + '{\n'
+                for key, value in option_value_list_of_dict[0].items():
+                    value = self.__parse_other_than_string_value(value)
+                    if option == JsonSchemaConvertPlugin.flux_fld_button and '"' not in value:
+                        value = f'"{value}"'
+                    # else not required: if option is not flux_fld_button then avoid as only this option
+                    # has dependency to keep every option field as str
+                    json_msg_str += ' '*(init_space_count + 2) + \
+                                    f'"{key}": {value}'
+                    if key != list(option_value_list_of_dict[0])[-1]:
+                        json_msg_str += ',\n'
+                    else:
+                        json_msg_str += '\n'
+                json_msg_str += ' ' * init_space_count + '},\n'
 
         return json_msg_str
 
@@ -326,8 +365,14 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         json_msg_str = ' '*init_space_count + f'"{field_name_case_styled}": ' + '{\n'
         underlying_type, json_type = self.__proto_data_type_to_json(field)
-        json_msg_str += self.__handle_proto_option_attributes(JsonSchemaConvertPlugin.flx_fld_attribute_options,
-                                                              field, init_space_count + 2)
+        # Adding simple type options as attributes
+        json_msg_str += \
+            self.__handle_simple_proto_option_attributes(JsonSchemaConvertPlugin.flx_fld_simple_attribute_options,
+                                                         field, init_space_count + 2)
+        # Adding complex type options as attributes
+        json_msg_str += \
+            self.__handle_complex_proto_option_attributes(JsonSchemaConvertPlugin.flx_fld_complex_attribute_options,
+                                                          field, init_space_count + 2)
         # Adding default value as attribute if present
         json_msg_str += self.__handle_fld_default_value(field, init_space_count + 2)
 
@@ -382,8 +427,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return json_msg_str
 
     def __handle_underlying_message_part(self, message: protogen.Message, indent_space_count: int):
-        json_msg_str = self.__handle_proto_option_attributes(JsonSchemaConvertPlugin.flx_msg_attribute_options,
-                                                             message, indent_space_count)
+        json_msg_str = self.__handle_simple_proto_option_attributes(JsonSchemaConvertPlugin.flx_msg_attribute_options,
+                                                                    message, indent_space_count)
         json_msg_str += self.__handle_msg_leading_comment_as_attribute(message, indent_space_count)
         # Handling json root attribute
         if JsonSchemaConvertPlugin.flux_msg_json_root in str(message.proto.options):

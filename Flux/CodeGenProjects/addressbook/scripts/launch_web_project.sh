@@ -132,7 +132,7 @@ fi
 
 # run notes All:
 # - run mongo
-# - export DEBUG=1   # only in debug mode
+# - export DEBUG=1   # only in debug mode (Windows: set DEBUG=1)
 # - run launch fast api script
 
 # prod only:

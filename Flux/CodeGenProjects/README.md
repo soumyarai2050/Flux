@@ -67,3 +67,45 @@ Launches generated beanie-fastapi api
 ### 11. launch_cached_beanie_fastapi.py
 Launches generated cached-beanie-fastapi api
 #### run: `python launch_cached_beanie_fastapi.py`
+
+## Environment variable
+#### 1. ENUM_TYPE: 
+Supported types: "str_enum" and "int_enum" <br>
+*Usage*: Use to set which type of enums should be generated
+in pydantic model by plugin
+
+#### 2. OUTPUT_FILE_NAME_SUFFIX:
+*Usage*: Suffix to be added in generated files of plugins.
+Input proto file's name is suffixed with the value of this
+variable as default approach in plugins
+
+#### 3. PLUGIN_FILE_NAME:
+*Usage*: Name of the plugin to be used to generate output
+
+#### 4. INSERTION_IMPORT_FILE_NAME:
+*Usage*: Name of the file having insertion point for imports
+required in plugin to generate output
+
+#### 5. PB2_IMPORT_GENERATOR_PATH:
+*Usage*: Name of the sub-plugin used to add required imports 
+in insertion import file used to generate output using plugin
+
+#### 6. RESPONSE_FIELD_CASE_STYLE
+snake or camel supported
+*Usage*: Used by pydantic model generator to set model depending 
+on the required response case style of the model, snake case
+or camel case
+
+#### 7. DEBUG_SLEEP_TIME:
+takes number of seconds
+*Usage*: Required to set timer of sleep before running plugin
+to attach debugger to the plugin process
+
+#### 8. RELOAD:
+*Usage*: bool to add reload attribute to uvicorn fastapi launch
+
+#### 9. HOST: 
+*Usage*: 
+
+#### 10. PORT:
+*Usage*: 

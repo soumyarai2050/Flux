@@ -25,15 +25,6 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
     flux_json_root_read_websocket_field: str = "ReadWebSocketDesc"
     flux_json_root_update_websocket_field: str = "UpdateWebSocketDesc"
     flux_fld_is_required: str = "FluxFldIsRequired"
-    flx_fld_attribute_options: List[str] = [
-        "FluxFldHelp",
-        "FluxFldValMax",
-        "FluxFldHide",
-        "FluxFldValSortWeight",
-        "FluxFldAbbreviated",
-        "FluxFldSticky",
-        "FluxFldSizeMax"
-    ]
     flux_fld_cmnt: str = "FluxFldCmnt"
     flux_msg_cmnt: str = "FluxMsgCmnt"
     flux_fld_index: str = "FluxFldIndex"
@@ -190,19 +181,24 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
                 output_str += f"    {field.proto.name}: List[{self.proto_to_py_datatype(field)}] | None = None\n"
             else:
                 output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = None\n"
-        output_str += "\n\n"
         return output_str
 
     def handle_message_all_optional_field(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         output_str = f"class {message_name}Optional({message_name}):\n"
         output_str += self._underlying_handle_none_default_fields(message)
+        output_str += "\n\n"
         return output_str
 
     def handle_dummy_message_gen(self, message: protogen.Message, auto_gen_id: bool = False) -> str:
         message_name = message.proto.name
         output_str = f"class {message_name}BaseModel(BaseModel):\n"
         output_str += self._underlying_handle_none_default_fields(message, auto_gen_id)
+        if auto_gen_id:
+            output_str += "\n"
+            output_str += "    class Config:\n"
+            output_str += "        allow_population_by_field_name = True\n"
+        output_str += "\n\n"
         return output_str
 
     def handle_message_output(self, message: protogen.Message) -> str:
