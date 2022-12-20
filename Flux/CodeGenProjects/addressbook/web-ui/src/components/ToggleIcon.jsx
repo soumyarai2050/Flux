@@ -14,8 +14,8 @@ const useStyles = makeStyles({
     },
     avatar: {
         color: 'inherit !important',
-        height: '30px!important',
-        width: '30px !important',
+        // height: '30px!important',
+        // width: '30px !important',
         '&:hover': {
             background: 'white'
         }

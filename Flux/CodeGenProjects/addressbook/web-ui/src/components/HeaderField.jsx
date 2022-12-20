@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { makeStyles } from "@mui/styles";
 import { Typography, Box } from "@mui/material";
 import { IndeterminateCheckBox, AddBox, AddCircle, RemoveCircle, Menu, LiveHelp } from "@mui/icons-material";
-import { Modes } from '../constants';
+import { DataTypes, Modes } from '../constants';
 import Icon from './Icon';
 import PropTypes from 'prop-types';
 
@@ -47,6 +47,13 @@ const HeaderField = (props) => {
         props.onClick(e);
     }
 
+    let allowCreate = false;
+    if (props.data.mode === Modes.EDIT_MODE) {
+        if (props.data.type === DataTypes.ARRAY && !props.data['data-remove'] && !props.data.uiUpdateOnly) {
+            allowCreate = true;
+        }
+    }
+
     return (
         <Box className={classes.headerContainer} data-xpath={props.data.xpath}>
             <Typography variant="subtitle1" >
@@ -58,7 +65,7 @@ const HeaderField = (props) => {
                     <span>{props.data.title ? props.data.title : props.name}</span>
                 </div>
             </Typography>
-            {props.data.type ? props.data.type === 'array' && props.data.mode === Modes.EDIT_MODE && !props.data['data-remove'] ? showOptions ? (
+            {allowCreate ? showOptions ? (
                 <div className={classes.options}>
                     <AddCircle data-add={props.data.xpath} data-ref={props.data.ref} onClick={onClick} />
                     <RemoveCircle data-remove={props.data.xpath} onClick={onClick} />
@@ -67,7 +74,7 @@ const HeaderField = (props) => {
                 <Icon title="More Options" onClick={() => setShowOptions(!showOptions)}>
                     <Menu />
                 </Icon>
-            ) : null : null}
+            ) : null}
             {props.data.help &&
                 <Icon title={props.data.help}>
                     <LiveHelp color='primary' />

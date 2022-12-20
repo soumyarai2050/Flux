@@ -228,7 +228,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         elif value.isdigit():
             return int(value)
         else:
-            return '"' + value + '"'
+            return '"' + value.strip() + '"'
 
     def __handle_options_value_case_having_msg_fld_name(self, option_value: str):
         if "-" in option_value or "." in option_value:

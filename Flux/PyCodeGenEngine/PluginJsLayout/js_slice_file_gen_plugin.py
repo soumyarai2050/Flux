@@ -72,10 +72,11 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_message_name = self.dependent_message_relation_dict[message_name]
             output_str = "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
             output_str += "import axios from 'axios';\n"
-            output_str += "import { cloneDeep } from 'lodash';\n"
+            output_str += "import _, { cloneDeep } from 'lodash';\n"
             output_str += "import { API_ROOT_URL, DB_ID, Modes, NEW_ITEM_ID } from '../constants';\n"
+            output_str += "import { addxpath } from '../utils';\n"
             if dependent_message_name is not None:
-                output_str += "import { update"+f"{dependent_message_name}"+" } from './"+\
+                output_str += "import { setModified"+f"{dependent_message_name}, "+"update"+f"{dependent_message_name}"+" } from './"+\
                               f"{self.capitalized_to_camel_case(dependent_message_name)}Slice';\n"
             output_str += "\n"
 
@@ -110,21 +111,18 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_message_name = self.dependent_message_relation_dict[message_name]
                 dependent_message_name_camel_cased = self.capitalized_to_camel_case(dependent_message_name)
                 output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', (payload, "+"{ dispatch, getState }) => " + "{\n"
-                output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + "`, payload)\n"
+                output_str += "    const { data, abbreviated, loadedKeyName } = payload;\n"
+                output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + "`, data)\n"
                 output_str += "        .then(res => {\n"
                 output_str += "            let state = getState();\n"
                 output_str += f"            let updatedData = cloneDeep(state.{dependent_message_name_camel_cased}" \
-                              f".modified{dependent_message_name});\n"
+                              f".{dependent_message_name_camel_cased});\n"
                 loaded_strat_keys_style_cased = self.case_style_convert_method("loaded_strat_keys")
-                output_str += f"            let updatedLoaded = updatedData.{loaded_strat_keys_style_cased}.map((key) => "+"{\n"
-                output_str += "                let id = key.split('-').pop() * 1;\n"
-                output_str += "                if (id !== NEW_ITEM_ID) return key;\n"
-                output_str += "                else {\n"
-                output_str += "                    key = key.replace(id, res.data[DB_ID]);\n"
-                output_str += "                    return key;\n"
-                output_str += "                }\n"
-                output_str += "            })\n"
-                output_str += f"            updatedData.{loaded_strat_keys_style_cased} = updatedLoaded;\n"
+                output_str += f"            let newStrat = res.data;\n"
+                output_str += "            let newStratKey = abbreviated.split('-').map(xpath => _.get(newStrat, " \
+                              "xpath.substring(xpath.indexOf('.') + 1)));\n"
+                output_str += "            newStratKey = newStratKey.join('-');\n"
+                output_str += "            _.get(updatedData, loadedKeyName).push(newStratKey);\n"
                 output_str += f"            dispatch(update{dependent_message_name}("+"updatedData));\n"
                 output_str += "            return res.data;\n"
                 output_str += "        });\n"

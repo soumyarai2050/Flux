@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto2',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\rui_core.proto\"E\n\x0cWidgetUIData\x12\t\n\x01i\x18\x01 \x02(\t\x12\t\n\x01x\x18\x02 \x01(\x05\x12\t\n\x01y\x18\x03 \x01(\x05\x12\t\n\x01w\x18\x04 \x01(\x05\x12\t\n\x01h\x18\x05 \x01(\x05\"\xfa\x01\n\x08UIButton\x12\x17\n\x0funpressed_color\x18\x01 \x01(\t\x12\x15\n\rpressed_color\x18\x02 \x01(\t\x12\x19\n\x11unpressed_caption\x18\x03 \x01(\t\x12\x17\n\x0fpressed_caption\x18\x04 \x01(\t\x12 \n\x0b\x62utton_type\x18\x05 \x01(\x0e\x32\x0b.ButtonType\x12 \n\x0b\x62utton_size\x18\x06 \x01(\x0e\x32\x0b.ButtonSize\x12\x17\n\x0fvalue_color_map\x18\x07 \x01(\t\x12\x0e\n\x06\x61\x63tion\x18\x08 \x01(\t\x12\x1d\n\x15pressed_value_as_text\x18\t \x02(\t*[\n\nButtonType\x12\x1b\n\x17\x42UTTON_TYPE_UNSPECIFIED\x10\x00\x12\x15\n\x11\x42UTTON_TYPE_ROUND\x10\x01\x12\x19\n\x15\x42UTTON_TYPE_RECTANGLE\x10\x02*o\n\nButtonSize\x12\x1b\n\x17\x42UTTON_SIZE_UNSPECIFIED\x10\x00\x12\x15\n\x11\x42UTTON_SIZE_SMALL\x10\x01\x12\x16\n\x12\x42UTTON_SIZE_MEDIUM\x10\x02\x12\x15\n\x11\x42UTTON_SIZE_LARGE\x10\x03*?\n\x05Theme\x12\x15\n\x11THEME_UNSPECIFIED\x10\x00\x12\x0e\n\nTHEME_DARK\x10\x01\x12\x0f\n\x0bTHEME_LIGHT\x10\x03'
+  serialized_pb=b'\n\rui_core.proto\"E\n\x0cWidgetUIData\x12\t\n\x01i\x18\x01 \x02(\t\x12\t\n\x01x\x18\x02 \x01(\x05\x12\t\n\x01y\x18\x03 \x01(\x05\x12\t\n\x01w\x18\x04 \x01(\x05\x12\t\n\x01h\x18\x05 \x01(\x05\"\xca\x01\n\x08UIButton\x12\x19\n\x11unpressed_caption\x18\x01 \x01(\t\x12\x17\n\x0fpressed_caption\x18\x02 \x01(\t\x12 \n\x0b\x62utton_type\x18\x03 \x01(\x0e\x32\x0b.ButtonType\x12 \n\x0b\x62utton_size\x18\x04 \x01(\x0e\x32\x0b.ButtonSize\x12\x17\n\x0fvalue_color_map\x18\x05 \x01(\t\x12\x0e\n\x06\x61\x63tion\x18\x06 \x01(\t\x12\x1d\n\x15pressed_value_as_text\x18\x07 \x02(\t*[\n\nButtonType\x12\x1b\n\x17\x42UTTON_TYPE_UNSPECIFIED\x10\x00\x12\x15\n\x11\x42UTTON_TYPE_ROUND\x10\x01\x12\x19\n\x15\x42UTTON_TYPE_RECTANGLE\x10\x02*o\n\nButtonSize\x12\x1b\n\x17\x42UTTON_SIZE_UNSPECIFIED\x10\x00\x12\x15\n\x11\x42UTTON_SIZE_SMALL\x10\x01\x12\x16\n\x12\x42UTTON_SIZE_MEDIUM\x10\x02\x12\x15\n\x11\x42UTTON_SIZE_LARGE\x10\x03*?\n\x05Theme\x12\x15\n\x11THEME_UNSPECIFIED\x10\x00\x12\x0e\n\nTHEME_DARK\x10\x01\x12\x0f\n\x0bTHEME_LIGHT\x10\x03'
 )
 
 _BUTTONTYPE = _descriptor.EnumDescriptor(
@@ -48,8 +48,8 @@ _BUTTONTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=341,
-  serialized_end=432,
+  serialized_start=293,
+  serialized_end=384,
 )
 _sym_db.RegisterEnumDescriptor(_BUTTONTYPE)
 
@@ -84,8 +84,8 @@ _BUTTONSIZE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=434,
-  serialized_end=545,
+  serialized_start=386,
+  serialized_end=497,
 )
 _sym_db.RegisterEnumDescriptor(_BUTTONSIZE)
 
@@ -115,8 +115,8 @@ _THEME = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=547,
-  serialized_end=610,
+  serialized_start=499,
+  serialized_end=562,
 )
 _sym_db.RegisterEnumDescriptor(_THEME)
 
@@ -203,64 +203,50 @@ _UIBUTTON = _descriptor.Descriptor(
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='unpressed_color', full_name='UIButton.unpressed_color', index=0,
+      name='unpressed_caption', full_name='UIButton.unpressed_caption', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='pressed_color', full_name='UIButton.pressed_color', index=1,
+      name='pressed_caption', full_name='UIButton.pressed_caption', index=1,
       number=2, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='unpressed_caption', full_name='UIButton.unpressed_caption', index=2,
-      number=3, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='pressed_caption', full_name='UIButton.pressed_caption', index=3,
-      number=4, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='button_type', full_name='UIButton.button_type', index=4,
-      number=5, type=14, cpp_type=8, label=1,
+      name='button_type', full_name='UIButton.button_type', index=2,
+      number=3, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='button_size', full_name='UIButton.button_size', index=5,
-      number=6, type=14, cpp_type=8, label=1,
+      name='button_size', full_name='UIButton.button_size', index=3,
+      number=4, type=14, cpp_type=8, label=1,
       has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='value_color_map', full_name='UIButton.value_color_map', index=6,
-      number=7, type=9, cpp_type=9, label=1,
+      name='value_color_map', full_name='UIButton.value_color_map', index=4,
+      number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='action', full_name='UIButton.action', index=7,
-      number=8, type=9, cpp_type=9, label=1,
+      name='action', full_name='UIButton.action', index=5,
+      number=6, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='pressed_value_as_text', full_name='UIButton.pressed_value_as_text', index=8,
-      number=9, type=9, cpp_type=9, label=2,
+      name='pressed_value_as_text', full_name='UIButton.pressed_value_as_text', index=6,
+      number=7, type=9, cpp_type=9, label=2,
       has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -278,7 +264,7 @@ _UIBUTTON = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=89,
-  serialized_end=339,
+  serialized_end=291,
 )
 
 _UIBUTTON.fields_by_name['button_type'].enum_type = _BUTTONTYPE

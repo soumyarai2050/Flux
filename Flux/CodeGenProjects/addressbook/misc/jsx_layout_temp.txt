@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogActions, DialogContentText, TextField, But
 import Icon from './Icon';
 import { DashboardCustomize, SaveAs } from '@mui/icons-material';
 import Cookie from 'universal-cookie';
+import { getIconText } from '../utils';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -112,7 +113,7 @@ const Layout = (props) => {
             cookie = parseInt(cookie);
             dispatch(setSelectedUILayoutId(cookie));
             let layout = uiLayoutArray.filter(uiLayout => uiLayout[DB_ID] === cookie)[0];
-            if(layout) {
+            if (layout) {
                 dispatch(setUILayout(layout));
             }
         }
@@ -193,6 +194,24 @@ const Layout = (props) => {
         setSearchValue('');
     }
 
+    const onResetLayout = () => {
+        let defaultLayouts = getLayout();
+        setLayouts(defaultLayouts);
+        let cookie = new Cookie();
+        cookie.remove(COOKIE_NAME, { path: '/' });
+        setProfileId('');
+        setOpenLoadLayout(false);
+        let updatedShow = cloneDeep(show);
+        Object.keys(updatedShow).map(key => {
+            if (defaultLayouts.filter(widgetLayout => widgetLayout.i === key).length > 0) {
+                updatedShow[key] = true;
+            } else {
+                updatedShow[key] = false;
+            }
+        })
+        setShow(updatedShow);
+    }
+
     const getLayoutById = (id) => {
         let layout = layouts.filter(layout => layout.i === id)[0];
         let defaultLayout = getLayout().filter(widgetLayout => widgetLayout.i === id)[0];
@@ -253,7 +272,7 @@ const Layout = (props) => {
                 <DialogTitle>Load Layout</DialogTitle>
                 <DialogContent>
                     <DialogContentText className={classes.dialogContentText}>
-                        To load the layout, select the profile id.
+                        To load the layout, select the profile id, or <Button color='error' onClick={onResetLayout}>Reset Layout</Button>
                     </DialogContentText>
                     <Autocomplete
                         options={uiLayoutArray}
@@ -265,6 +284,9 @@ const Layout = (props) => {
                         onChange={onSearchValueChange}
                         renderInput={(params) => <TextField {...params} label="Profile id" />}
                     />
+                    <DialogContentText className={classes.dialogContentText}>
+
+                    </DialogContentText>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={onCloseLoadLayout} autoFocus>Discard</Button>

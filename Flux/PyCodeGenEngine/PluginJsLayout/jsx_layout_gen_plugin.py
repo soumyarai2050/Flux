@@ -60,7 +60,8 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             message_name_case_styled = self.case_style_convert_method(message_name)
             output_str += f"<ToggleIcon title='{message_name_space_sep}' name='{message_name_case_styled}' selected=" + \
                           "{show."+f"{message_name_case_styled}"+"} onClick={onToggleWidget}>\n"
-            output_str += "    <Widgets className={classes.icon} fontSize='large' />\n"
+            output_str += "    {getIconText('"+f"{message_name_case_styled}"+"')}\n"
+            output_str += "    {/* <Widgets className={classes.icon} fontSize='large' /> */}\n"
             output_str += "</ToggleIcon>\n"
         return output_str
 

@@ -1,88 +1,56 @@
 import React from 'react';
-import { Switch, FormControlLabel } from '@mui/material';
 import { makeStyles } from '@mui/styles';
-import { ColorTypes } from '../constants'
 import _ from 'lodash';
 import PropTypes from 'prop-types';
+import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue } from '../utils';
+import ValueBasedToggleButton from './ValueBasedToggleButton';
+import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 
-const useStyles = makeStyles({
-    label: {
-        textTransform: 'uppercase',
-        '& .MuiFormControlLabel-label': {
-            fontWeight: 'bold'
-        }
-    },
-    labelCritical: {
-        color: '#9C0006 !important',
-        '& .Mui-disabled': {
-            color: '#9C0006 !important'
-        },
-        '& .MuiSwitch-thumb': {
-            color: '#9C0006 !important'
-        }
-    },
-    labelError: {
-        color: '#9C0006 !important',
-        '& .Mui-disabled': {
-            color: '#9C0006 !important'
-        },
-        '& .MuiSwitch-thumb': {
-            color: '#9C0006 !important'
-        }
-    },
-    labelWarning: {
-        color: '#9c6500 !important',
-        '& .Mui-disabled': {
-            color: '#9c6500 !important'
-        },
-        '& .MuiSwitch-thumb': {
-            color: '#9c6500 !important'
-        }
-    },
-    labelInfo: {
-        color: 'blue !important',
-        '& .Mui-disabled': {
-            color: 'blue !important'
-        },
-        '& .MuiSwitch-thumb': {
-            color: 'blue !important'
-        }
-    },
-    labelDebug: {
-        color: 'black !important',
-        '& .Mui-disabled': {
-            color: 'black !important'
-        },
-        '& .MuiSwitch-thumb': {
-            color: 'black !important'
-        }
-    }
-})
+const useStyles = makeStyles({})
 
 const DynamicMenu = (props) => {
     const classes = useStyles();
 
+    const onClick = (e, action, xpath, value) => {
+        if (action === 'flux_toggle') {
+            let updatedData = flux_toggle(value);
+            props.onButtonToggle(e, xpath, updatedData);
+        } else if (action === 'flux_trigger_strat') {
+            let updatedData = flux_trigger_strat(value);
+            if (updatedData) {
+                props.onButtonToggle(e, xpath, updatedData);
+            }
+        }
+    }
+
     return (
         <>
-            {props.collections.filter(c => c.type === 'switch').map((c, index) => {
-                let checked = _.get(props.data, c.key) ? _.get(props.data, c.key) : false;
-                let xpath = _.get(props.data, `xpath_${c.key}`) ? _.get(props.data, `xpath_${c.key}`) : false;
-                let color = c.color ? ColorTypes[c.color.split(',')[0].split('=')[1]] : ColorTypes.UNSPECIFIED;
+            {props.collections.filter(collection => collection.type === 'button').map((collection, index) => {
+                if (_.get(props.data, collection.key) === undefined) return;
+                let checked = String(_.get(props.data, collection.key)) === collection.button.pressed_value_as_text;
+                let xpath = _.get(props.data, `xpath_${collection.key}`) ? _.get(props.data, `xpath_${collection.key}`) : '';
+                let color = getColorTypeFromValue(collection, String(_.get(props.data, collection.key)));
+                let size = getSizeFromValue(collection.button.button_size);
+                let shape = getShapeFromValue(collection.button.button_type);
+                let caption = String(_.get(props.data, collection.key));
 
-                let labelClass = '';
-                if (color === ColorTypes.CRITICAL) labelClass = classes.labelCritical;
-                else if (color === ColorTypes.ERROR) labelClass = classes.labelError;
-                else if (color === ColorTypes.WARNING) labelClass = classes.labelWarning;
-                else if (color === ColorTypes.INFO) labelClass = classes.labelInfo;
-                else if (color === ColorTypes.DEBUG) labelClass = classes.labelDebug;
+                if (checked && collection.button.pressed_caption) {
+                    caption = collection.button.pressed_caption;
+                } else if (!checked && collection.button.unpressed_caption) {
+                    caption = collection.button.unpressed_caption;
+                }
 
                 return (
-                    <FormControlLabel
-                        key={index}
-                        className={`${classes.label} ${labelClass}`}
-                        disabled={props.disabled}
-                        control={<Switch checked={checked} color={color} onChange={(e) => props.onSwitchToggle(e, c.key, xpath)} />}
-                        label={c.title}
+                    <ValueBasedToggleButton
+                        key={collection.key}
+                        size={size}
+                        shape={shape}
+                        color={color}
+                        value={_.get(props.data, collection.key)}
+                        caption={caption}
+                        xpath={xpath}
+                        action={collection.button.action}
+                        onClick={onClick}
                     />
                 )
             })}

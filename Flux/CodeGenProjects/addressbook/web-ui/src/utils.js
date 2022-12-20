@@ -1,163 +1,223 @@
 import _, { cloneDeep } from 'lodash';
 import Node from './components/Node';
 import HeaderField from './components/HeaderField';
-import { ColorPriority, ColorTypes, DataTypes, DB_ID, Modes, NEW_ITEM_ID } from './constants';
+import { ColorPriority, ColorTypes, DataTypes, DB_ID, Modes, NEW_ITEM_ID, ShapeType, SizeType } from './constants';
 
 const treeState = {};
+
+const complexFieldProps = [
+    { propertyName: "server_populate", usageName: "serverPopulate" },
+    { propertyName: "ui_update_only", usageName: "uiUpdateOnly" },
+    { propertyName: "orm_no_update", usageName: "ormNoUpdate" },
+    { propertyName: "auto_complete", usageName: "autocomplete" }
+]
+
+const fieldProps = [
+    { propertyName: "type", usageName: "type" },
+    { propertyName: "title", usageName: "title" },
+    { propertyName: "hide", usageName: "hide" },
+    { propertyName: "help", usageName: "help" },
+    { propertyName: "cmnt", usageName: "description" },
+    { propertyName: "default", usageName: "default" },
+    { propertyName: "underlying_type", usageName: "underlyingtype" },
+    { propertyName: "ui_placeholder", usageName: "placeholder" },
+    { propertyName: "color", usageName: "color" },
+    { propertyName: "button", usageName: "button" },
+    { propertyName: "abbreviated", usageName: "abbreviated" },
+    { propertyName: "val_max", usageName: "max" },
+    { propertyName: "default_value_placeholder_string", usageName: "defaultValuePlaceholderString" },
+    { propertyName: "val_sort_weight", usageName: "sortWeight" },
+    { propertyName: "val_is_date_time", usageName: "dateTime" },
+    { propertyName: "index", usageName: "index" },
+    { propertyName: "sticky", usageName: "sticky" },
+    { propertyName: "size_max", usageName: "sizeMax" }
+]
+
+const arrayFieldProps = [
+    { propertyName: "alert_bubble_source", usageName: "alertBubbleSource" },
+    { propertyName: "alert_bubble_color", usageName: "alertBubbleColor" }
+]
 
 export function setTreeState(xpath, state) {
     treeState[xpath] = state;
 }
 
+function getAutocompleteDict(autocompleteValue) {
+    let autocompleteFieldSet = autocompleteValue.split(',').map((field) => field.trim());
+    let autocompleteDict = {};
+
+    autocompleteFieldSet.map((fieldSet) => {
+        if (fieldSet.indexOf(':') > 0) {
+            let [key, value] = fieldSet.split(':');
+            autocompleteDict[key] = value;
+        } else {
+            let [key, value] = fieldSet.split('=');
+            autocompleteDict[key] = value;
+        }
+    })
+    return autocompleteDict;
+}
+
+function setAutocompleteValue(schema, object, autocompleteDict, propname, usageName) {
+    if (autocompleteDict.hasOwnProperty(propname)) {
+        object[usageName] = autocompleteDict[propname];
+        let autocomplete = autocompleteDict[propname];
+        if (schema.autocomplete.hasOwnProperty(object[usageName])) {
+            object.options = schema.autocomplete[autocomplete];
+        } else {
+            object.options = [autocomplete];
+        }
+    }
+}
+
 export function createCollections(schema, currentSchema, callerProps, collections = [], sequence = { sequence: 1 }, parentxpath) {
     currentSchema = cloneDeep(currentSchema);
+
+    if (callerProps.xpath) {
+        // let parentSchema = _.get(schema, callerProps.xpath);
+        let currentSchemaMetadata = callerProps.parentSchema.properties[callerProps.xpath];
+
+        complexFieldProps.map(({ propertyName }) => {
+            if (currentSchemaMetadata.hasOwnProperty(propertyName)) {
+                currentSchema[propertyName] = currentSchemaMetadata[propertyName];
+            }
+        })
+        callerProps.xpath = null;
+    }
     currentSchema.properties = sortSchemaProperties(currentSchema.properties);
-    // if (currentSchema.hasOwnProperty('server_populate') && currentSchema.server_populate) {
-    //     Object.entries(currentSchema.properties).map(([k, v]) => {
-    //         currentSchema.properties[k].server_populate = true;
-    //     })
-    // }
+
     Object.entries(currentSchema.properties).map(([k, v]) => {
         let collection = {};
         if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM].includes(v.type)) {
             collection.key = k;
-            collection.type = v.type;
-            collection.title = v.title;
-            collection.hide = v.hasOwnProperty('hide') ? v.hide : false;
             collection.tableTitle = parentxpath ? parentxpath + '.' + k : k;
             collection.sequenceNumber = sequence.sequence;
-
-            if (v.hasOwnProperty('default')) {
-                collection.default = v.default;
-            }
+            sequence.sequence += 1;
 
             if (v.type === DataTypes.ENUM) {
                 let ref = v.items.$ref.split('/');
-                collection.autocomplete_list = getAutoCompleteData(schema, ref, v.type);
+                collection.autocomplete_list = getEnumValues(schema, ref, v.type);
             }
 
-            if (v.hasOwnProperty('underlying_type')) {
-                collection.underlyingtype = v.underlying_type;
-            }
+            fieldProps.map(({ propertyName, usageName }) => {
+                if (v.hasOwnProperty(propertyName)) {
+                    collection[usageName] = v[propertyName];
 
-            if (v.hasOwnProperty('ui_placeholder')) {
-                collection.placeholder = v.ui_placeholder;
-            }
-
-            if (v.switch) {
-                collection.type = 'switch';
-            }
-
-            if (v.hasOwnProperty('color')) {
-                collection.color = v.color;
-            }
-
-            if (currentSchema.hasOwnProperty('orm_no_update') || v.hasOwnProperty('orm_no_update')) {
-                collection.ormNoUpdate = v.orm_no_update ? v.orm_no_update : currentSchema.orm_no_update;
-            }
-
-            if (currentSchema.hasOwnProperty('server_populate') || v.hasOwnProperty('server_populate')) {
-                collection.serverPopulate = v.server_populate ? v.server_populate : currentSchema.server_populate;
-            }
-
-            if (currentSchema.hasOwnProperty('auto_complete') || v.hasOwnProperty('auto_complete')) {
-                let autocomplete = v.auto_complete ? v.auto_complete : currentSchema.auto_complete;
-                let autocompleteFields = autocomplete.split(',').map((field) => field.trim());
-                let autocompleteFieldDict = {};
-
-                autocompleteFields.map((field) => {
-                    if (field.indexOf(':') > 0) {
-                        let [k, v] = field.split(':');
-                        autocompleteFieldDict[k] = v;
-                    } else {
-                        let [k, v] = field.split('=');
-                        autocompleteFieldDict[k] = v;
-                    }
-                })
-                if (autocompleteFieldDict.hasOwnProperty(k)) {
-                    collection.autocomplete = autocompleteFieldDict[k];
-                    if (schema.autocomplete.hasOwnProperty(collection.autocomplete)) {
-                        collection.options = schema.autocomplete[collection.autocomplete];
-                    } else {
-                        collection.options = [collection.autocomplete];
-                        // collection.value = collection.autocomplete;
+                    if (propertyName === "button") {
+                        collection.type = "button";
+                        collection.color = v.button.value_color_map;
                     }
                 }
-            }
+            })
 
-            if (collections.filter(c => c.tableTitle === collection.tableTitle).length === 0) {
+            complexFieldProps.map(({ propertyName, usageName }) => {
+                if (currentSchema.hasOwnProperty(propertyName) || v.hasOwnProperty(propertyName)) {
+                    collection[usageName] = v[propertyName] ? v[propertyName] : currentSchema[propertyName];
+
+                    if (propertyName === 'auto_complete') {
+                        let autocompleteDict = getAutocompleteDict(collection[usageName]);
+                        setAutocompleteValue(schema, collection, autocompleteDict, k, usageName);
+                    }
+                }
+            })
+
+            let isRedundant = true;
+            if (collections.filter(col => col.tableTitle === collection.tableTitle).length === 0) {
                 if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
-                    sequence.sequence += 1;
-                    collections.push(collection);
+                    isRedundant = false;
                 }
             }
+
+            if (!isRedundant) {
+                collections.push(collection);
+            }
+
         } else if (v.type === DataTypes.ARRAY) {
             collection.key = k;
-            collection.title = v.title;
             collection.tableTitle = parentxpath ? parentxpath + '.' + k : k;
-            collection.type = v.type;
-            collection.abbreviated = v.abbreviated;
+            collection.sequenceNumber = sequence.sequence;
+            sequence.sequence += 1;
 
-            if (currentSchema.hasOwnProperty('server_populate') || v.hasOwnProperty('server_populate')) {
-                collection.serverPopulate = v.server_populate ? v.server_populate : currentSchema.server_populate;
-            }
+            fieldProps.map(({ propertyName, usageName }) => {
+                if (v.hasOwnProperty(propertyName)) {
+                    collection[usageName] = v[propertyName];
+                }
+            })
 
-            if (v.hasOwnProperty('alert_bubble_source')) {
-                collection.alertBubbleSource = v.alert_bubble_source;
-                collection.alertBubbleColor = v.alert_bubble_color;
-            }
+            arrayFieldProps.map(({ propertyName, usageName }) => {
+                if (v.hasOwnProperty(propertyName)) {
+                    collection[usageName] = v[propertyName];
+                }
+            })
+
+            // for array of primitive data types
             if (!v.hasOwnProperty('items')) {
                 collections.push(collection);
                 return;
             }
-            let ref = v.items.$ref.split('/')
-            let record = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
-            collection.properties = record.properties;
-            if (collection.abbreviated === "JSON") {
-                collection.sequenceNumber = sequence.sequence;
-                sequence.sequence += 1;
-            }
-            if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
-                collections.push(collection);
-                if (collection.abbreviated !== "JSON") {
-                    createCollections(schema, record, callerProps, collections, sequence);
-                }
-            }
-        } else if (v.type === DataTypes.OBJECT) {
 
             let ref = v.items.$ref.split('/')
             let record = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
             record = cloneDeep(record);
-            collection.key = k;
-            collection.title = v.title;
-            collection.tableTitle = parentxpath ? parentxpath + '.' + k : k;
-            collection.type = v.type;
+
+            complexFieldProps.map(({ propertyName, usageName }) => {
+                if (currentSchema.hasOwnProperty(propertyName) || v.hasOwnProperty(propertyName)) {
+                    record[propertyName] = v[propertyName] ? v[propertyName] : currentSchema[propertyName];
+                }
+            })
             collection.properties = record.properties;
-            collection.abbreviated = v.abbreviated;
 
-            if (currentSchema.hasOwnProperty('server_populate') || v.hasOwnProperty('server_populate')) {
-                collection.serverPopulate = v.server_populate ? v.server_populate : currentSchema.server_populate;
-                record.server_populate = v.server_populate ? v.server_populate : currentSchema.server_populate;
+            let isRedundant = true;
+            if (collections.filter(col => col.tableTitle === collection.tableTitle).length === 0) {
+                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE) && collection.abbreviated === "JSON") {
+                    isRedundant = false;
+                }
+            }
+            if (!isRedundant) {
+                collections.push(collection);
             }
 
-            if (currentSchema.hasOwnProperty('orm_no_update') || v.hasOwnProperty('orm_no_update')) {
-                record.orm_no_update = v.orm_no_update ? v.orm_no_update : currentSchema.orm_no_update;
+            if (collection.abbreviated !== "JSON") {
+                createCollections(schema, record, callerProps, collections, sequence);
             }
+        } else if (v.type === DataTypes.OBJECT) {
+            collection.key = k;
+            collection.tableTitle = parentxpath ? parentxpath + '.' + k : k;
+            collection.sequenceNumber = sequence.sequence;
+            sequence.sequence += 1;
 
-            if (currentSchema.hasOwnProperty('auto_complete') || v.hasOwnProperty('auto_complete')) {
-                record.auto_complete = v.auto_complete ? v.auto_complete : currentSchema.auto_complete;
-            }
+            fieldProps.map(({ propertyName, usageName }) => {
+                if (v.hasOwnProperty(propertyName)) {
+                    collection[usageName] = v[propertyName];
+                }
+            })
 
-            if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
-                if (collection.abbreviated !== "JSON") {
-                    createCollections(schema, record, callerProps, collections, sequence, k);
-                } else {
-                    collection.sequenceNumber = sequence.sequence;
-                    sequence.sequence += 1;
-                    collections.push(collection);
+            let ref = v.items.$ref.split('/')
+            let record = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
+            record = cloneDeep(record);
+
+            complexFieldProps.map(({ propertyName, usageName }) => {
+                if (currentSchema.hasOwnProperty(propertyName) || v.hasOwnProperty(propertyName)) {
+                    collection[usageName] = v[propertyName] ? v[propertyName] : currentSchema[propertyName];
+                    record[propertyName] = v[propertyName] ? v[propertyName] : currentSchema[propertyName];
+                }
+            })
+            collection.properties = record.properties;
+
+            let isRedundant = true;
+            if (collections.filter(col => col.tableTitle === collection.tableTitle).length === 0) {
+                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE) && collection.abbreviated === "JSON") {
+                    isRedundant = false;
                 }
             }
 
+            if (!isRedundant) {
+                collections.push(collection);
+            }
+
+            if (collection.abbreviated !== "JSON") {
+                createCollections(schema, record, callerProps, collections, sequence, k);
+            }
         }
     });
     return collections;
@@ -167,28 +227,19 @@ export function generateObjectFromSchema(schema, currentSchema) {
     let object = {};
     Object.keys(currentSchema.properties).map((propname) => {
         let metadata = currentSchema.properties[propname];
-        // do not add field if populated from server.
-        if (metadata.server_populate) return;
+
+        // do not create fields if populated from server or creation is not allowed on the fields.
+        if (metadata.server_populate || metadata.ui_update_only) return;
 
         if (metadata.type === DataTypes.STRING) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : '';
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
-                let autocompleteFields = autocomplete.split(',').map((field) => field.trim());
-                let autocompleteFieldDict = {};
+                let autocompleteDict = getAutocompleteDict(autocomplete);
 
-                autocompleteFields.map((field) => {
-                    if (field.indexOf(':') > 0) {
-                        let [k, v] = field.split(':');
-                        autocompleteFieldDict[k] = v;
-                    } else {
-                        let [k, v] = field.split('=');
-                        autocompleteFieldDict[k] = v;
-                    }
-                })
-                if (autocompleteFieldDict.hasOwnProperty(propname)) {
-                    if (!schema.autocomplete.hasOwnProperty(autocompleteFieldDict[propname])) {
-                        object[propname] = autocompleteFieldDict[propname];
+                if (autocompleteDict.hasOwnProperty(propname)) {
+                    if (!schema.autocomplete.hasOwnProperty(autocompleteDict[propname])) {
+                        object[propname] = autocompleteDict[propname];
                     }
                 }
             }
@@ -198,32 +249,22 @@ export function generateObjectFromSchema(schema, currentSchema) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : false;
         } else if (metadata.type === DataTypes.ENUM) {
             let ref = metadata.items.$ref.split('/')
-            let enumdata = getAutoCompleteData(schema, ref, metadata.type)
-            object[propname] = enumdata ? enumdata[0] : '';
+            let enumdata = getEnumValues(schema, ref, metadata.type)
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : enumdata ? enumdata[0] : '';
+
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
-                let autocompleteFields = autocomplete.split(',').map((field) => field.trim());
-                let autocompleteFieldDict = {};
+                let autocompleteDict = getAutocompleteDict(autocomplete);
 
-                autocompleteFields.map((field) => {
-                    if (field.indexOf(':') > 0) {
-                        let [k, v] = field.split(':');
-                        autocompleteFieldDict[k] = v;
-                    } else {
-                        let [k, v] = field.split('=');
-                        autocompleteFieldDict[k] = v;
-                    }
-                })
-                if (autocompleteFieldDict.hasOwnProperty(propname)) {
-                    if (!schema.autocomplete.hasOwnProperty(autocompleteFieldDict[propname])) {
-                        object[propname] = autocompleteFieldDict[propname];
+                if (autocompleteDict.hasOwnProperty(propname)) {
+                    if (!schema.autocomplete.hasOwnProperty(autocompleteDict[propname])) {
+                        object[propname] = autocompleteDict[propname];
                     }
                 }
             }
         } else if (metadata.type === DataTypes.ARRAY) {
+            // for arrays of primitive data types
             if (!metadata.hasOwnProperty('items')) {
-                // for handling the cases where array are of simple type
                 object[propname] = [];
             } else {
                 let ref = metadata.items.$ref.split('/');
@@ -239,10 +280,12 @@ export function generateObjectFromSchema(schema, currentSchema) {
             let ref = metadata.items.$ref.split('/');
             let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
             childSchema = cloneDeep(childSchema);
+
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 childSchema.auto_complete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
             }
-            if (!childSchema.server_populate) {
+
+            if (!(childSchema.server_populate || childSchema.ui_update_only)) {
                 object[propname] = generateObjectFromSchema(schema, childSchema);
             }
         }
@@ -250,7 +293,7 @@ export function generateObjectFromSchema(schema, currentSchema) {
     return object;
 }
 
-function getAutoCompleteData(schema, ref, type) {
+function getEnumValues(schema, ref, type) {
     if (type == DataTypes.ENUM) {
         return schema[ref[1]][ref[2]]['enum'];
     }
@@ -330,22 +373,21 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     if (attributes.hasOwnProperty('type') && [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM].includes(attributes.type)) {
         node.id = propname;
         node.key = propname;
-        node.name = propname;
-        node.title = attributes.title;
-        node.type = attributes.type;
-        node.mode = callerProps.mode;
-        node.hide = attributes.hasOwnProperty('hide') ? attributes.hide : false;
-        node.help = attributes.help;
         node.required = currentSchema.required.filter(p => p === propname) ? true : false;
-        node.default = attributes.default;
-        node.value = dataxpath && _.get(data, dataxpath) && (_.get(data, dataxpath)[propname] || (!_.get(data, dataxpath)[propname] && _.get(data, dataxpath)[propname] === 0)) ?
-            _.get(data, dataxpath)[propname] : data[propname];
         node.xpath = xpath ? xpath + '.' + propname : propname;
         node.dataxpath = dataxpath ? dataxpath + '.' + propname : propname;
         node.parentcollection = currentSchema.title;
         node.customComponent = Node;
         node.onTextChange = callerProps.onTextChange;
-        node.onKeyDown = callerProps.onKeyDown;
+
+        fieldProps.map(({ propertyName, usageName }) => {
+            if (attributes.hasOwnProperty(propertyName)) {
+                node[usageName] = attributes[propertyName];
+            }
+        })
+
+        node.value = dataxpath && _.get(data, dataxpath) && (_.get(data, dataxpath)[propname] || (!_.get(data, dataxpath)[propname] && _.get(data, dataxpath)[propname] === 0)) ?
+            _.get(data, dataxpath)[propname] : data[propname];
 
         if (attributes.type === DataTypes.BOOLEAN) {
             node.onCheckboxChange = callerProps.onCheckboxChange;
@@ -353,59 +395,34 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
 
         if (attributes.type === DataTypes.ENUM) {
             let ref = attributes.items.$ref.split('/')
-            let enumdata = getAutoCompleteData(schema, ref, attributes.type);
+            let enumdata = getEnumValues(schema, ref, attributes.type);
             node.dropdowndataset = enumdata;
             node.onSelectItemChange = callerProps.onSelectItemChange;
         }
 
-        if (attributes.hasOwnProperty('underlying_type')) {
-            node.underlyingtype = attributes.underlying_type;
-        }
+        complexFieldProps.map(({ propertyName, usageName }) => {
+            if (currentSchema.hasOwnProperty(propertyName) || attributes.hasOwnProperty(propertyName)) {
+                node[usageName] = attributes[propertyName] ? attributes[propertyName] : currentSchema[propertyName];
 
-        if (attributes.hasOwnProperty('ui_placeholder')) {
-            node.placeholder = attributes.ui_placeholder;
-        }
-
-        if (currentSchema.hasOwnProperty('server_populate') || attributes.hasOwnProperty('server_populate')) {
-            node.serverPopulate = attributes.server_populate ? attributes.server_populate : currentSchema.server_populate;
-        }
-
-        if (currentSchema.hasOwnProperty('orm_no_update') || attributes.hasOwnProperty('orm_no_update')) {
-            node.ormNoUpdate = attributes.orm_no_update ? attributes.orm_no_update : currentSchema.orm_no_update;
-        }
-
-        if (currentSchema.hasOwnProperty('auto_complete') || attributes.hasOwnProperty('auto_complete')) {
-            let autocomplete = attributes.auto_complete ? attributes.auto_complete : currentSchema.auto_complete;
-            let autocompleteFields = autocomplete.split(',').map((field) => field.trim());
-            let autocompleteFieldDict = {};
-
-            autocompleteFields.map((field) => {
-                if (field.indexOf(':') > 0) {
-                    let [k, v] = field.split(':');
-                    autocompleteFieldDict[k] = v;
-                } else {
-                    let [k, v] = field.split('=');
-                    autocompleteFieldDict[k] = v;
+                if (propertyName === 'auto_complete') {
+                    let autocompleteDict = getAutocompleteDict(node[usageName]);
+                    setAutocompleteValue(schema, node, autocompleteDict, propname, usageName);
+                    node.customComponentType = 'autocomplete';
+                    node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
                 }
-            })
-            if (autocompleteFieldDict.hasOwnProperty(propname)) {
-                node.autocomplete = autocompleteFieldDict[propname];
-                node.customComponentType = 'autocomplete';
-                if (schema.autocomplete.hasOwnProperty(node.autocomplete)) {
-                    node.options = schema.autocomplete[node.autocomplete];
-                } else {
-                    node.options = [node.autocomplete];
-                    // node.value = node.autocomplete;
-                }
-                node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
             }
-        }
+        })
 
         let newprop = compareNodes(originalData, data, dataxpath, propname, xpath);
         node = { ...node, ...newprop };
 
-        if ((!node.serverPopulate || callerProps.mode !== Modes.EDIT_MODE) && (!node.hide || !callerProps.hide)) {
-            tree.push({ ...node });
+        let isRedundant = true;
+        if((!node.serverPopulate || callerProps.mode !== Modes.EDIT_MODE) && (!node.hide || !callerProps.hide)) {
+            isRedundant = false;
+        }
+
+        if(!isRedundant) {
+            tree.push({...node});
         }
     }
 }
@@ -422,6 +439,7 @@ function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpa
     headerNode.mode = callerProps.mode;
     headerNode.customComponent = HeaderField;
     headerNode.xpath = xpath;
+    headerNode.uiUpdateOnly = currentSchema.ui_update_only;
 
     if (!dataxpath) {
         headerNode['data-remove'] = true;
@@ -488,7 +506,11 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
 
         if (currentSchema.hasOwnProperty('server_populate') || metadata.hasOwnProperty('server_populate')) {
             metadata.server_populate = metadata.server_populate ? metadata.server_populate : currentSchema.server_populate;
-            if(callerProps.mode === Modes.EDIT_MODE) return;
+            if (callerProps.mode === Modes.EDIT_MODE) return;
+        }
+
+        if (currentSchema.hasOwnProperty('ui_update_only') || metadata.hasOwnProperty('ui_update_only')) {
+            metadata.ui_update_only = metadata.ui_update_only ? metadata.ui_update_only : currentSchema.ui_update_only;
         }
 
         if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
@@ -498,26 +520,18 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
         if (metadata.hasOwnProperty('properties')) {
             Object.keys(metadata.properties).forEach((prop) => {
                 let metadataProp = metadata.properties[prop];
-                // if (currentSchema.hasOwnProperty('orm_no_update')) {
-                //     metadataProp['orm_no_update'] = currentSchema.orm_no_update;
-                // }
-                // if (currentSchema.hasOwnProperty('auto_complete')) {
-                //     let autocompleteFields = currentSchema.auto_complete.split(',').map((field) => field.trim());
-                //     let autocompleteFieldDict = {};
-
-                //     autocompleteFields.map((field) => {
-                //         if (field.indexOf(':') > 0) {
-                //             let [k, v] = field.split(':');
-                //             autocompleteFieldDict[k] = v;
-                //         } else {
-                //             let [k, v] = field.split('=');
-                //             autocompleteFieldDict[k] = v;
-                //         }
-                //     })
-                //     if (autocompleteFieldDict.hasOwnProperty(prop)) {
-                //         metadataProp.auto_complete = autocompleteFieldDict[prop];
-                //     }
-                // }
+                if (metadata.hasOwnProperty('ui_update_only')) {
+                    metadataProp.ui_update_only = metadata.ui_update_only;
+                }
+                if (metadata.hasOwnProperty('server_populate')) {
+                    metadataProp.ui_update_only = metadata.server_populate;
+                }
+                if (metadata.hasOwnProperty('orm_no_update')) {
+                    metadataProp.orm_no_update = metadata.orm_no_update;
+                }
+                if (metadata.hasOwnProperty('auto_complete')) {
+                    metadataProp.auto_complete = metadata.auto_complete;
+                }
                 if (metadataProp.hasOwnProperty('type') && (metadataProp.type === DataTypes.OBJECT)) {
                     let childxpath = dataxpath;
                     if (childxpath) {
@@ -896,3 +910,30 @@ export function getObjectWithLeastId(objectArray) {
     });
     return objectArray[0];
 }
+
+export function getIconText(text) {
+    let textSplit = text.split('_');
+    let iconText = '';
+    for (let i = 0; i < textSplit.length; i++) {
+        iconText += textSplit[i][0].toUpperCase();
+    }
+    return iconText;
+}
+
+export function getSizeFromValue(value) {
+    let size = value.split('_').pop();
+    if (SizeType.hasOwnProperty(size)) {
+        return SizeType[size];
+    }
+    return SizeType.UNSPECIFIED;
+
+}
+
+export function getShapeFromValue(value) {
+    let shape = value.split('_').pop();
+    if (ShapeType.hasOwnProperty(shape)) {
+        return ShapeType[shape];
+    }
+    return ShapeType.UNSPECIFIED;
+}
+

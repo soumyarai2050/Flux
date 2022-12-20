@@ -46,7 +46,9 @@ class BeanieClassGenPlugin(PydanticClassGenPlugin):
                 else:
                     output_str = f"{field.proto.name}: {field_type}"
 
+        has_alias = False
         if (is_id_field := (field.proto.name == BeanieClassGenPlugin.default_id_field_name)) or \
+                (has_alias := (BeanieClassGenPlugin.flux_fld_alias in str(field.proto.options))) or \
                 field.location.leading_comments:
             output_str += f' = Field('
 
@@ -56,8 +58,16 @@ class BeanieClassGenPlugin(PydanticClassGenPlugin):
                 output_str += f"default_factory={parent_message_name_snake_cased}_id_auto_increment"
             # else not required: If not is_id_field then avoiding text to be added
 
-            if leading_comments := field.location.leading_comments:
+            if has_alias:
                 if is_id_field:
+                    output_str += ", "
+                # else not required: If default_factory attribute not set in field then avoid
+                alias_name = self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                                                                              BeanieClassGenPlugin.flux_fld_alias)
+                output_str += f'alias={alias_name}'
+
+            if leading_comments := field.location.leading_comments:
+                if is_id_field or has_alias:
                     output_str += ", "
                 # else not required: If already not id related text not added then no need to append comma
                 if '"' in str(leading_comments):

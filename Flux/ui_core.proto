@@ -34,14 +34,12 @@ message WidgetUIData{
 }
 
 message UIButton{
-  optional string unpressed_color = 1;
-  optional string pressed_color = 2;
-  optional string unpressed_caption = 3;
-  optional string pressed_caption = 4;
-  optional ButtonType button_type = 5;
-  optional ButtonSize button_size = 6;
-  optional string value_color_map = 7;  // coma separated list of key=value
-  optional string action = 8;
-  required string pressed_value_as_text = 9;
+  optional string unpressed_caption = 1;
+  optional string pressed_caption = 2;
+  optional ButtonType button_type = 3;
+  optional ButtonSize button_size = 4;
+  optional string value_color_map = 5;  // coma separated list of key=value
+  optional string action = 6;
+  required string pressed_value_as_text = 7;
 }
 

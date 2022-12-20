@@ -30,6 +30,7 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
     flux_fld_index: str = "FluxFldIndex"
     flux_fld_val_is_datetime: str = "FluxFldValIsDateTime"
     default_id_field_name: str = "id"
+    flux_fld_alias: str = "FluxFldAlias"
     proto_type_to_py_type_dict: Dict[str, str] = {
         "int32": "int",
         "int64": "int",
@@ -247,6 +248,7 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
 
         if is_msg_root:
             output_str += self.handle_message_all_optional_field(message)
+            output_str += self.handle_dummy_message_gen(message, is_msg_root)
         # else not required: If message is not root then no need to add message with optional fields
 
         return output_str

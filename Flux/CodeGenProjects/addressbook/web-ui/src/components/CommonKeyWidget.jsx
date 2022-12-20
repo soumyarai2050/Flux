@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Box } from '@mui/material';
 import { makeStyles } from '@mui/styles';
 import PropTypes from 'prop-types';
-import { getColorTypeFromValue } from '../utils';
+import { clearxpath, getColorTypeFromValue } from '../utils';
 import { ColorTypes } from '../constants';
+import AbbreviatedJsonWidget from './AbbreviatedJsonWidget';
+import { cloneDeep } from 'lodash';
 
 const useStyles = makeStyles({
     widgetContainer: {
@@ -36,11 +38,31 @@ const useStyles = makeStyles({
     commonkeyDebug: {
         color: 'black !important'
     },
+    abbreviatedJsonClass: {
+        maxWidth: 150,
+        display: 'inline-flex',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
+        textDecoration: 'underline'
+    }
 })
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
+    const [showAbbreviatedJson, setShowAbbreviatedJson] = useState(false);
+    const [abbreviatedJson, setAbbreviatedJson] = useState({});
 
     const classes = useStyles();
+
+    const onAbbreviatedFieldOpen = (json) => {
+        setAbbreviatedJson(clearxpath(cloneDeep(json)));
+        setShowAbbreviatedJson(true);
+    }
+
+    const onAbbreviatedFieldClose = () => {
+        setAbbreviatedJson({});
+        setShowAbbreviatedJson(false);
+    }
 
     let commonkeys = props.commonkeys.sort(function (a, b) {
         if (a.sequenceNumber < b.sequenceNumber) return -1;
@@ -49,11 +71,19 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
 
     return (
         <Box ref={ref} className={classes.widgetContainer}>
-            {commonkeys.map((commonkey, i) => {
-                if(commonkey.value === undefined) return;
-                
-                let color = getColorTypeFromValue(commonkey, commonkey.value);
+            {commonkeys.map((collection, i) => {
+                if (collection.value === undefined) return;
+
+                let abbreviatedJsonClass = '';
+                if (collection.abbreviated && collection.abbreviated === "JSON") {
+                    abbreviatedJsonClass = classes.abbreviatedJsonClass;
+                }
+
+                let color = '';
                 let commonkeyColorClass = '';
+                if (collection.color) {
+                    color = getColorTypeFromValue(collection, collection.value);
+                }
                 if (color === ColorTypes.CRITICAL) commonkeyColorClass = classes.commonkeyCritical;
                 else if (color === ColorTypes.ERROR) commonkeyColorClass = classes.commonkeyError;
                 else if (color === ColorTypes.WARNING) commonkeyColorClass = classes.commonkeyWarning;
@@ -62,11 +92,18 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
 
                 return (
                     <Box key={i} className={classes.commonkey}>
-                        <span className={classes.commonkeyTitle}>{commonkey.tableTitle}:</span>
-                        <span className={commonkeyColorClass}>{String(commonkey.value)}</span>
+                        <span className={classes.commonkeyTitle}>{collection.tableTitle}:</span>
+                        {collection.abbreviated && collection.abbreviated === "JSON" ? (
+                            <span className={abbreviatedJsonClass} onClick={() => onAbbreviatedFieldOpen(collection.value)}>
+                                {JSON.stringify(collection.value)}
+                            </span>
+                        ) : (
+                            <span className={commonkeyColorClass}>{String(collection.value)}</span>
+                        )}
                     </Box>
                 )
             })}
+            <AbbreviatedJsonWidget open={showAbbreviatedJson} onClose={onAbbreviatedFieldClose} json={abbreviatedJson} />
         </Box>
     )
 })

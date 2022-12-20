@@ -12,9 +12,13 @@ pip install -r requirements.txt
 Also, Flux used protoc compiler to make use of proto models.
 Please install that as well. Test is done in version *libprotoc 3.12.4*
 
-Note: Any Generated file when needs to be moved to other directory,
+Note: 
+1. Any Generated file when needs to be moved to other directory,
 if contains fully qualified import path of any other file, needs to 
 be changed according to new location.
+2. Before using beanie one must install mongo in his environment
+3. Ubuntu 22.04 doesn't have official MongoDB packages yet, so the 
+best option now is to have Ubuntu 20.04, where official MongoDB packages are available.
 
 ## JSON Generators
 ### 1. gen_json_schema.py

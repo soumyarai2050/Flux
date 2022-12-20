@@ -38,7 +38,7 @@ const TreeWidget = (props) => {
             'mode': props.mode,
             'xpath': props.xpath,
             'onTextChange': props.onTextChange ? props.onTextChange : onTextChange,
-            'onKeyDown': props.onKeyDown ? props.onKeyDown : onKeyDown,
+            // 'onKeyDown': props.onKeyDown ? props.onKeyDown : onKeyDown,
             'onSelectItemChange': props.onSelectItemChange ? props.onSelectItemChange : onSelectItemChange,
             'onCheckboxChange': props.onCheckboxChange ? props.onCheckboxChange : onCheckboxChange,
             'onAutocompleteOptionChange': props.onAutocompleteOptionChange ? props.onAutocompleteOptionChange : onAutocompleteOptionChange
@@ -51,26 +51,26 @@ const TreeWidget = (props) => {
         setIsOpen(value);
     }
 
-    const onTextChange = (e, type, xpath) => {
+    const onTextChange = (e, type, xpath, value) => {
         let updatedData = cloneDeep(props.data);
         let dataxpath = e.target.getAttribute('dataxpath');
-        let value = e.target.value;
-        if (type === DataTypes.NUMBER) {
+        if(type === DataTypes.NUMBER) {
             value = value * 1;
         }
+
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);
     }
 
-    const onKeyDown = (e, type) => {
-        let underlyingtype = e.target.getAttribute('underlyingtype');
-        if (type === DataTypes.NUMBER && underlyingtype === DataTypes.INT32) {
-            if (e.keyCode === 110) {
-                e.preventDefault();
-            }
-        }
-    }
+    // const onKeyDown = (e, type) => {
+    //     let underlyingtype = e.target.getAttribute('underlyingtype');
+    //     if (type === DataTypes.NUMBER && underlyingtype === DataTypes.INT32) {
+    //         if (e.keyCode === 110) {
+    //             e.preventDefault();
+    //         }
+    //     }
+    // }
 
     const onSelectItemChange = (e, dataxpath, xpath) => {
         let updatedData = cloneDeep(props.data);

@@ -6,8 +6,9 @@ import { Download, Delete } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import Icon from './Icon';
 import _ from 'lodash';
-import { DB_ID } from '../constants';
+import { DB_ID, Modes } from '../constants';
 import Alert from './Alert';
+import AlertBubble from './AlertBubble';
 import { getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey } from '../utils';
 
 const useStyles = makeStyles({
@@ -63,18 +64,19 @@ const AbbreviatedFilterWidget = (props) => {
             <List>
                 {props.items && props.items.map((item, i) => {
                     let id = getIdFromAbbreviatedKey(props.abbreviated, item);
+                    let disabled = props.mode === Modes.EDIT_MODE && props.selected !== id ? true : false;
                     let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
                     let alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
                     let alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
                     return (
-                        <ListItem key={i} className={classes.listItem} selected={props.selected === id} disablePadding>
-                            {alertBubbleCount > 0 && <Badge className={classes.badge} badgeContent={alertBubbleCount} color={alertBubbleColor} />}
-                            <ListItemButton onClick={() => props.onSelect(id)}>
+                        <ListItem key={i} className={classes.listItem} selected={props.selected === id} disablePadding >
+                            {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
+                            <ListItemButton disabled={disabled} onClick={() => props.onSelect(id)}>
                                 <ListItemText>
                                     {item}
                                 </ListItemText>
                             </ListItemButton>
-                            <Icon title='Unload' onClick={() => props.onUnload(item)}>
+                            <Icon title='Unload' disabled={disabled} onClick={() => props.onUnload(item)}>
                                 <Delete fontSize='small' />
                             </Icon>
                         </ListItem>

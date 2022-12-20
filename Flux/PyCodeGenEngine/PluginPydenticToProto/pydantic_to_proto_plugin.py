@@ -1,9 +1,7 @@
 import json
-
+import logging
 from pydantic import BaseModel
 from typing import List, Type, Dict, Final
-from Flux.CodeGenProjects.pair_strat_engine.output.strat_manager_service_cache_model import StratCollection, \
-    OrderLimits, PortfolioLimits, PairStrat
 
 
 class PydanticToProtoPlugin:
@@ -18,8 +16,15 @@ class PydanticToProtoPlugin:
         "boolean": "bool"
     }
     flux_fld_val_is_date_time: str = "FluxFldValIsDateTime"
+    revision_id_str: str = "revision_id"
+    defualt_id: str = "_id"
 
     def __init__(self, pydantic_model_list: List[Type[BaseModel]], imports_list: List[str], package_name: str):
+        """
+        :param pydantic_model_list: List of Pydantic List of classes needed to be converted into proto message
+        :param imports_list: List of porto imports to be added in generated proto file
+        :param package_name: package name to be added in generated proto file
+        """
         self._pydantic_model_list: List[Type[BaseModel]] = pydantic_model_list
         self._imports_list: List[str] = imports_list
         self._package_name: Final[str] = package_name
@@ -36,35 +41,48 @@ class PydanticToProtoPlugin:
                 output_str += f'// {cmnt}\n'
         output_str += f"message {json_body['title']}" + " {\n"
         for index, field in enumerate(json_body["properties"]):
-            is_date_time = False
-            if field not in json_body["required"]:
-                cardinality = "optional"
-            else:
-                if "type" in json_body["properties"][field] and "array" == json_body["properties"][field]["type"]:
-                    cardinality = "repeated"
-                else:
-                    cardinality = "required"
-            if "$ref" in json_body["properties"][field]:
-                kind = json_body["properties"][field]["$ref"].split("/")[-1]
-            elif "allOf" in json_body["properties"][field]:
-                kind = json_body["properties"][field]["allOf"][0]["$ref"].split("/")[-1]
-            elif "array" == json_body["properties"][field]["type"]:
-                if "$ref" in json_body["properties"][field]["items"]:
-                    kind = json_body["properties"][field]["items"]["$ref"].split("/")[-1]
-                else:
-                    kind = PydanticToProtoPlugin.pydantic_to_proto_type[json_body["properties"][field]["items"]["type"]]
-            else:
-                if "format" in json_body["properties"][field] and "date-time":
-                    is_date_time = True
-                    kind = "int64"
-                else:
-                    kind = PydanticToProtoPlugin.pydantic_to_proto_type[json_body["properties"][field]["type"]]
+            try:
+                if field == PydanticToProtoPlugin.revision_id_str:
+                    continue
+                # else not required: If field is other than revision_id then adding it to proto output str
 
-            if "description" in json_body["properties"][field]:
-                new_line_sep_cmnt: List[str] = json_body['properties'][field]['description'].split("\n")
-                for cmnt in new_line_sep_cmnt:
-                    output_str += f"    // {cmnt}\n"
-            # else not required: avoiding if description is not present
+                is_date_time = False
+                if "required" in json_body and field not in json_body["required"]:
+                    cardinality = "optional"
+                else:
+                    if "type" in json_body["properties"][field] and "array" == json_body["properties"][field]["type"]:
+                        cardinality = "repeated"
+                    else:
+                        cardinality = "required"
+                if "$ref" in json_body["properties"][field]:
+                    kind = json_body["properties"][field]["$ref"].split("/")[-1]
+                elif "allOf" in json_body["properties"][field]:
+                    kind = json_body["properties"][field]["allOf"][0]["$ref"].split("/")[-1]
+                elif "array" == json_body["properties"][field]["type"]:
+                    if "$ref" in json_body["properties"][field]["items"]:
+                        kind = json_body["properties"][field]["items"]["$ref"].split("/")[-1]
+                    else:
+                        kind = PydanticToProtoPlugin.pydantic_to_proto_type[json_body["properties"][field]["items"]["type"]]
+                else:
+                    if "format" in json_body["properties"][field] and "date-time":
+                        is_date_time = True
+                        kind = "int64"
+                    else:
+                        kind = PydanticToProtoPlugin.pydantic_to_proto_type[json_body["properties"][field]["type"]]
+
+                if "description" in json_body["properties"][field]:
+                    new_line_sep_cmnt: List[str] = json_body['properties'][field]['description'].split("\n")
+                    for cmnt in new_line_sep_cmnt:
+                        output_str += f"    // {cmnt}\n"
+                # else not required: avoiding if description is not present
+            except Exception as e:
+                err_str = f"Error while generating proto message for {json_body['title']} in field {field}, {e}"
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            if field == PydanticToProtoPlugin.defualt_id:
+                field = "id"
+            # else not required: if field other than _id then no need to modify
 
             output_str += f"    {cardinality} {kind} {field} = {index+1}"
 
@@ -116,6 +134,9 @@ class PydanticToProtoPlugin:
         return output_str
 
     def run(self, file_name: str, file_path: str | None = None):
+        """
+        Main Function: creates the output proto file
+        """
         if file_path is not None:
             file_name = file_path + file_name if file_path.endswith("/") else file_path + "/" + file_name
         file_content = self._generate_file_content()

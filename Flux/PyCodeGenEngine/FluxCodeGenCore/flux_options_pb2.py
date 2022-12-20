@@ -21,7 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto2',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x12\x66lux_options.proto\x1a google/protobuf/descriptor.proto\x1a\rui_core.proto\"\x81\x01\n\x10\x46oreignKeyOption\x12\x18\n\x10JoiningTableName\x18\x01 \x02(\t\x12\x16\n\x0eTableFieldName\x18\x02 \x02(\t\x12\x11\n\tFieldType\x18\x03 \x02(\t\x12\x14\n\x0cIsPrimaryKey\x18\x04 \x02(\x08\x12\x12\n\nIsRequired\x18\x05 \x02(\x08\"\x81\x01\n\x11\x44\x42OnlyFieldOption\x12\x11\n\tFieldName\x18\x01 \x02(\t\x12\x12\n\nDbDataType\x18\x02 \x02(\t\x12\x1b\n\x13\x46ieldSequenceNumber\x18\x03 \x02(\x05\x12\x14\n\x0cIsPrimaryKey\x18\x04 \x02(\x08\x12\x12\n\nIsRequired\x18\x05 \x02(\x08\"J\n\x14UsageParamNameOption\x12\x16\n\x0eUsageParamName\x18\x01 \x02(\t\x12\x1a\n\x12UsageParamDataType\x18\x02 \x02(\t\"\xaa\x01\n\x0fMessageJsonRoot\x12\x12\n\nCreateDesc\x18\x01 \x01(\t\x12\x10\n\x08ReadDesc\x18\x02 \x01(\t\x12\x12\n\nUpdateDesc\x18\x03 \x01(\t\x12\x11\n\tPatchDesc\x18\x04 \x01(\t\x12\x12\n\nDeleteDesc\x18\x05 \x01(\t\x12\x19\n\x11ReadWebSocketDesc\x18\x06 \x01(\t\x12\x1b\n\x13UpdateWebSocketDesc\x18\x07 \x01(\t:4\n\x0c\x46luxFileCmnt\x12\x1c.google.protobuf.FileOptions\x18\xcf\x8f\x03 \x01(\t:9\n\x11\x46luxFileModelType\x12\x1c.google.protobuf.FileOptions\x18\xd0\x8f\x03 \x01(\t:6\n\x0b\x46luxMsgCmnt\x12\x1f.google.protobuf.MessageOptions\x18\xcf\x8f\x03 \x01(\t:8\n\rFluxMsgRootId\x12\x1f.google.protobuf.MessageOptions\x18\xd0\x8f\x03 \x01(\t:?\n\x14\x46luxMsgPrefixPrepend\x12\x1f.google.protobuf.MessageOptions\x18\xd1\x8f\x03 \x01(\t:5\n\nFluxMsgTbl\x12\x1f.google.protobuf.MessageOptions\x18\xb7\x97\x03 \x01(\t:;\n\x10\x46luxMsgTblShared\x12\x1f.google.protobuf.MessageOptions\x18\xb8\x97\x03 \x01(\t:7\n\x0c\x46luxMsgFkTbl\x12\x1f.google.protobuf.MessageOptions\x18\xb9\x97\x03 \x01(\t:7\n\x0c\x46luxMsgFkCol\x12\x1f.google.protobuf.MessageOptions\x18\xba\x97\x03 \x01(\t:G\n\tFluxMsgFk\x12\x1f.google.protobuf.MessageOptions\x18\xbb\x97\x03 \x03(\x0b\x32\x11.ForeignKeyOption:N\n\x0f\x46luxDbOnlyField\x12\x1f.google.protobuf.MessageOptions\x18\xbc\x97\x03 \x03(\x0b\x32\x12.DBOnlyFieldOption:V\n\x14\x46luxMsgOrmUsageParam\x12\x1f.google.protobuf.MessageOptions\x18\xbd\x97\x03 \x03(\x0b\x32\x15.UsageParamNameOption:8\n\rFluxMsgOpName\x12\x1f.google.protobuf.MessageOptions\x18\x9f\x9f\x03 \x01(\t:5\n\nFluxMsgRsp\x12\x1f.google.protobuf.MessageOptions\x18\xa0\x9f\x03 \x01(\t:8\n\rFluxMsgNotify\x12\x1f.google.protobuf.MessageOptions\x18\xa1\x9f\x03 \x01(\t:?\n\x14\x46luxMsgDaoAccessType\x12\x1f.google.protobuf.MessageOptions\x18\x87\xa7\x03 \x01(\t::\n\x0f\x46luxMsgNoExpand\x12\x1f.google.protobuf.MessageOptions\x18\x88\xa7\x03 \x01(\t:9\n\x0e\x46luxMsgOrmRoot\x12\x1f.google.protobuf.MessageOptions\x18\xef\xae\x03 \x01(\t:P\n%FluxMsgOrmCreateUpdateOrDeleteClasses\x12\x1f.google.protobuf.MessageOptions\x18\xf0\xae\x03 \x01(\t:D\n\x19\x46luxMsgOrmReadRespClasses\x12\x1f.google.protobuf.MessageOptions\x18\xf1\xae\x03 \x01(\t:L\n\x0f\x46luxMsgJsonRoot\x12\x1f.google.protobuf.MessageOptions\x18\xd3\xaf\x03 \x01(\x0b\x32\x10.MessageJsonRoot:=\n\x12\x46luxMsgAbbreviated\x12\x1f.google.protobuf.MessageOptions\x18\xd4\xaf\x03 \x01(\t:8\n\rFluxMsgLayout\x12\x1f.google.protobuf.MessageOptions\x18\xd5\xaf\x03 \x01(\t:M\n\x13\x46luxMsgWidgetUIData\x12\x1f.google.protobuf.MessageOptions\x18\xd6\xaf\x03 \x01(\x0b\x32\r.WidgetUIData:;\n\x10\x46luxMsgCmplxHigh\x12\x1f.google.protobuf.MessageOptions\x18\xd7\xb6\x03 \x01(\t::\n\x0f\x46luxMsgCmplxMed\x12\x1f.google.protobuf.MessageOptions\x18\xd8\xb6\x03 \x01(\t::\n\x0f\x46luxMsgCmplxLow\x12\x1f.google.protobuf.MessageOptions\x18\xd9\xb6\x03 \x01(\t:4\n\x0b\x46luxFldCmnt\x12\x1d.google.protobuf.FieldOptions\x18\xcf\x8f\x03 \x01(\t:4\n\x0b\x46luxFldHide\x12\x1d.google.protobuf.FieldOptions\x18\xd0\x8f\x03 \x01(\t:4\n\x0b\x46luxFldHelp\x12\x1d.google.protobuf.FieldOptions\x18\xd1\x8f\x03 \x01(\t:M\n$FluxFldDefaultValuePlaceholderString\x12\x1d.google.protobuf.FieldOptions\x18\xd2\x8f\x03 \x01(\t::\n\x11\x46luxFldIsRequired\x12\x1d.google.protobuf.FieldOptions\x18\xd3\x8f\x03 \x01(\x08:5\n\x0c\x46luxFldAlias\x12\x1d.google.protobuf.FieldOptions\x18\xd4\x8f\x03 \x01(\t:3\n\nFluxFldTbl\x12\x1d.google.protobuf.FieldOptions\x18\xb7\x97\x03 \x01(\t:3\n\nFluxFldCol\x12\x1d.google.protobuf.FieldOptions\x18\xb8\x97\x03 \x01(\t:2\n\tFluxFldPk\x12\x1d.google.protobuf.FieldOptions\x18\xb9\x97\x03 \x01(\t:9\n\x0c\x46luxFldFkTbl\x12\x1d.google.protobuf.FieldOptions\x18\xba\x97\x03 \x01(\tB\x02\x18\x01:9\n\x0c\x46luxFldFkCol\x12\x1d.google.protobuf.FieldOptions\x18\xbb\x97\x03 \x01(\tB\x02\x18\x01:E\n\tFluxFldFk\x12\x1d.google.protobuf.FieldOptions\x18\xbc\x97\x03 \x01(\x0b\x32\x11.ForeignKeyOption:5\n\x0c\x46luxFldIndex\x12\x1d.google.protobuf.FieldOptions\x18\xbd\x97\x03 \x01(\x08:9\n\x10\x46luxFldWebSocket\x12\x1d.google.protobuf.FieldOptions\x18\xbe\x97\x03 \x01(\x08:;\n\x12\x46luxFldOrmNoUpdate\x12\x1d.google.protobuf.FieldOptions\x18\xef\xae\x03 \x01(\x08:;\n\x12\x46luxFldAbbreviated\x12\x1d.google.protobuf.FieldOptions\x18\xd3\xaf\x03 \x01(\t:6\n\rFluxFldSticky\x12\x1d.google.protobuf.FieldOptions\x18\xd4\xaf\x03 \x01(\x08:6\n\rFluxFldSwitch\x12\x1d.google.protobuf.FieldOptions\x18\xd5\xaf\x03 \x01(\x08:A\n\rFluxFldButton\x12\x1d.google.protobuf.FieldOptions\x18\xd6\xaf\x03 \x01(\x0b\x32\t.UIButton:<\n\x13\x46luxFldAutoComplete\x12\x1d.google.protobuf.FieldOptions\x18\xd7\xaf\x03 \x01(\t:>\n\x15\x46luxFldServerPopulate\x12\x1d.google.protobuf.FieldOptions\x18\xd8\xaf\x03 \x01(\x08:<\n\x13\x46luxFldUIUpdateOnly\x12\x1d.google.protobuf.FieldOptions\x18\xd9\xaf\x03 \x01(\x08:5\n\x0c\x46luxFldColor\x12\x1d.google.protobuf.FieldOptions\x18\xda\xaf\x03 \x01(\t:>\n\x15\x46luxFldSequenceNumber\x12\x1d.google.protobuf.FieldOptions\x18\xdb\xaf\x03 \x01(\x05:A\n\x18\x46luxFldAlertBubbleSource\x12\x1d.google.protobuf.FieldOptions\x18\xdc\xaf\x03 \x01(\t:@\n\x17\x46luxFldAlertBubbleColor\x12\x1d.google.protobuf.FieldOptions\x18\xdd\xaf\x03 \x01(\t:=\n\x14\x46luxFldUIPlaceholder\x12\x1d.google.protobuf.FieldOptions\x18\xde\xaf\x03 \x01(\t:9\n\x10\x46luxFldCmplxHigh\x12\x1d.google.protobuf.FieldOptions\x18\xd7\xb6\x03 \x01(\t:8\n\x0f\x46luxFldCmplxMed\x12\x1d.google.protobuf.FieldOptions\x18\xd8\xb6\x03 \x01(\t:8\n\x0f\x46luxFldCmplxLow\x12\x1d.google.protobuf.FieldOptions\x18\xd9\xb6\x03 \x01(\t:6\n\rFluxFldValMin\x12\x1d.google.protobuf.FieldOptions\x18\x8f\xce\x03 \x01(\t:6\n\rFluxFldValMax\x12\x1d.google.protobuf.FieldOptions\x18\x90\xce\x03 \x01(\t:7\n\x0e\x46luxFldValList\x12\x1d.google.protobuf.FieldOptions\x18\x91\xce\x03 \x01(\t:7\n\x0e\x46luxFldTestVal\x12\x1d.google.protobuf.FieldOptions\x18\x92\xce\x03 \x01(\t:?\n\x12\x46luxFldValDateTime\x12\x1d.google.protobuf.FieldOptions\x18\x93\xce\x03 \x01(\tB\x02\x18\x01:=\n\x14\x46luxFldValSortWeight\x12\x1d.google.protobuf.FieldOptions\x18\x94\xce\x03 \x01(\x05:7\n\x0e\x46luxFldSizeMax\x12\x1d.google.protobuf.FieldOptions\x18\x95\xce\x03 \x01(\x05:=\n\x14\x46luxFldValIsDateTime\x12\x1d.google.protobuf.FieldOptions\x18\x96\xce\x03 \x01(\x08:>\n\x15\x46luxFldMappingSrcType\x12\x1d.google.protobuf.FieldOptions\x18\xf7\xd5\x03 \x01(\t'
+  serialized_pb=b'\n\x12\x66lux_options.proto\x1a google/protobuf/descriptor.proto\x1a\rui_core.proto\"\x81\x01\n\x10\x46oreignKeyOption\x12\x18\n\x10JoiningTableName\x18\x01 \x02(\t\x12\x16\n\x0eTableFieldName\x18\x02 \x02(\t\x12\x11\n\tFieldType\x18\x03 \x02(\t\x12\x14\n\x0cIsPrimaryKey\x18\x04 \x02(\x08\x12\x12\n\nIsRequired\x18\x05 \x02(\x08\"\x81\x01\n\x11\x44\x42OnlyFieldOption\x12\x11\n\tFieldName\x18\x01 \x02(\t\x12\x12\n\nDbDataType\x18\x02 \x02(\t\x12\x1b\n\x13\x46ieldSequenceNumber\x18\x03 \x02(\x05\x12\x14\n\x0cIsPrimaryKey\x18\x04 \x02(\x08\x12\x12\n\nIsRequired\x18\x05 \x02(\x08\"J\n\x14UsageParamNameOption\x12\x16\n\x0eUsageParamName\x18\x01 \x02(\t\x12\x1a\n\x12UsageParamDataType\x18\x02 \x02(\t\"\xaa\x01\n\x0fMessageJsonRoot\x12\x12\n\nCreateDesc\x18\x01 \x01(\t\x12\x10\n\x08ReadDesc\x18\x02 \x01(\t\x12\x12\n\nUpdateDesc\x18\x03 \x01(\t\x12\x11\n\tPatchDesc\x18\x04 \x01(\t\x12\x12\n\nDeleteDesc\x18\x05 \x01(\t\x12\x19\n\x11ReadWebSocketDesc\x18\x06 \x01(\t\x12\x1b\n\x13UpdateWebSocketDesc\x18\x07 \x01(\t:4\n\x0c\x46luxFileCmnt\x12\x1c.google.protobuf.FileOptions\x18\xcf\x8f\x03 \x01(\t:9\n\x11\x46luxFileModelType\x12\x1c.google.protobuf.FileOptions\x18\xd0\x8f\x03 \x01(\t:6\n\x0b\x46luxMsgCmnt\x12\x1f.google.protobuf.MessageOptions\x18\xcf\x8f\x03 \x01(\t:8\n\rFluxMsgRootId\x12\x1f.google.protobuf.MessageOptions\x18\xd0\x8f\x03 \x01(\t:?\n\x14\x46luxMsgPrefixPrepend\x12\x1f.google.protobuf.MessageOptions\x18\xd1\x8f\x03 \x01(\t:5\n\nFluxMsgTbl\x12\x1f.google.protobuf.MessageOptions\x18\xb7\x97\x03 \x01(\t:;\n\x10\x46luxMsgTblShared\x12\x1f.google.protobuf.MessageOptions\x18\xb8\x97\x03 \x01(\t:7\n\x0c\x46luxMsgFkTbl\x12\x1f.google.protobuf.MessageOptions\x18\xb9\x97\x03 \x01(\t:7\n\x0c\x46luxMsgFkCol\x12\x1f.google.protobuf.MessageOptions\x18\xba\x97\x03 \x01(\t:G\n\tFluxMsgFk\x12\x1f.google.protobuf.MessageOptions\x18\xbb\x97\x03 \x03(\x0b\x32\x11.ForeignKeyOption:N\n\x0f\x46luxDbOnlyField\x12\x1f.google.protobuf.MessageOptions\x18\xbc\x97\x03 \x03(\x0b\x32\x12.DBOnlyFieldOption:V\n\x14\x46luxMsgOrmUsageParam\x12\x1f.google.protobuf.MessageOptions\x18\xbd\x97\x03 \x03(\x0b\x32\x15.UsageParamNameOption:8\n\rFluxMsgOpName\x12\x1f.google.protobuf.MessageOptions\x18\x9f\x9f\x03 \x01(\t:5\n\nFluxMsgRsp\x12\x1f.google.protobuf.MessageOptions\x18\xa0\x9f\x03 \x01(\t:8\n\rFluxMsgNotify\x12\x1f.google.protobuf.MessageOptions\x18\xa1\x9f\x03 \x01(\t:?\n\x14\x46luxMsgDaoAccessType\x12\x1f.google.protobuf.MessageOptions\x18\x87\xa7\x03 \x01(\t::\n\x0f\x46luxMsgNoExpand\x12\x1f.google.protobuf.MessageOptions\x18\x88\xa7\x03 \x01(\t:9\n\x0e\x46luxMsgOrmRoot\x12\x1f.google.protobuf.MessageOptions\x18\xef\xae\x03 \x01(\t:P\n%FluxMsgOrmCreateUpdateOrDeleteClasses\x12\x1f.google.protobuf.MessageOptions\x18\xf0\xae\x03 \x01(\t:D\n\x19\x46luxMsgOrmReadRespClasses\x12\x1f.google.protobuf.MessageOptions\x18\xf1\xae\x03 \x01(\t:L\n\x0f\x46luxMsgJsonRoot\x12\x1f.google.protobuf.MessageOptions\x18\xd3\xaf\x03 \x01(\x0b\x32\x10.MessageJsonRoot:=\n\x12\x46luxMsgAbbreviated\x12\x1f.google.protobuf.MessageOptions\x18\xd4\xaf\x03 \x01(\t:8\n\rFluxMsgLayout\x12\x1f.google.protobuf.MessageOptions\x18\xd5\xaf\x03 \x01(\t:@\n\x15\x46luxMsgServerPopulate\x12\x1f.google.protobuf.MessageOptions\x18\xd6\xaf\x03 \x01(\x08:M\n\x13\x46luxMsgWidgetUIData\x12\x1f.google.protobuf.MessageOptions\x18\xd7\xaf\x03 \x01(\x0b\x32\r.WidgetUIData:;\n\x10\x46luxMsgCmplxHigh\x12\x1f.google.protobuf.MessageOptions\x18\xd7\xb6\x03 \x01(\t::\n\x0f\x46luxMsgCmplxMed\x12\x1f.google.protobuf.MessageOptions\x18\xd8\xb6\x03 \x01(\t::\n\x0f\x46luxMsgCmplxLow\x12\x1f.google.protobuf.MessageOptions\x18\xd9\xb6\x03 \x01(\t:4\n\x0b\x46luxFldCmnt\x12\x1d.google.protobuf.FieldOptions\x18\xcf\x8f\x03 \x01(\t:4\n\x0b\x46luxFldHide\x12\x1d.google.protobuf.FieldOptions\x18\xd0\x8f\x03 \x01(\t:4\n\x0b\x46luxFldHelp\x12\x1d.google.protobuf.FieldOptions\x18\xd1\x8f\x03 \x01(\t:M\n$FluxFldDefaultValuePlaceholderString\x12\x1d.google.protobuf.FieldOptions\x18\xd2\x8f\x03 \x01(\t::\n\x11\x46luxFldIsRequired\x12\x1d.google.protobuf.FieldOptions\x18\xd3\x8f\x03 \x01(\x08:5\n\x0c\x46luxFldAlias\x12\x1d.google.protobuf.FieldOptions\x18\xd4\x8f\x03 \x01(\t:3\n\nFluxFldTbl\x12\x1d.google.protobuf.FieldOptions\x18\xb7\x97\x03 \x01(\t:3\n\nFluxFldCol\x12\x1d.google.protobuf.FieldOptions\x18\xb8\x97\x03 \x01(\t:2\n\tFluxFldPk\x12\x1d.google.protobuf.FieldOptions\x18\xb9\x97\x03 \x01(\t:9\n\x0c\x46luxFldFkTbl\x12\x1d.google.protobuf.FieldOptions\x18\xba\x97\x03 \x01(\tB\x02\x18\x01:9\n\x0c\x46luxFldFkCol\x12\x1d.google.protobuf.FieldOptions\x18\xbb\x97\x03 \x01(\tB\x02\x18\x01:E\n\tFluxFldFk\x12\x1d.google.protobuf.FieldOptions\x18\xbc\x97\x03 \x01(\x0b\x32\x11.ForeignKeyOption:5\n\x0c\x46luxFldIndex\x12\x1d.google.protobuf.FieldOptions\x18\xbd\x97\x03 \x01(\x08:9\n\x10\x46luxFldWebSocket\x12\x1d.google.protobuf.FieldOptions\x18\xbe\x97\x03 \x01(\x08:;\n\x12\x46luxFldOrmNoUpdate\x12\x1d.google.protobuf.FieldOptions\x18\xef\xae\x03 \x01(\x08:;\n\x12\x46luxFldAbbreviated\x12\x1d.google.protobuf.FieldOptions\x18\xd3\xaf\x03 \x01(\t:6\n\rFluxFldSticky\x12\x1d.google.protobuf.FieldOptions\x18\xd4\xaf\x03 \x01(\x08:6\n\rFluxFldSwitch\x12\x1d.google.protobuf.FieldOptions\x18\xd5\xaf\x03 \x01(\x08:A\n\rFluxFldButton\x12\x1d.google.protobuf.FieldOptions\x18\xd6\xaf\x03 \x01(\x0b\x32\t.UIButton:<\n\x13\x46luxFldAutoComplete\x12\x1d.google.protobuf.FieldOptions\x18\xd7\xaf\x03 \x01(\t:>\n\x15\x46luxFldServerPopulate\x12\x1d.google.protobuf.FieldOptions\x18\xd8\xaf\x03 \x01(\x08:<\n\x13\x46luxFldUIUpdateOnly\x12\x1d.google.protobuf.FieldOptions\x18\xd9\xaf\x03 \x01(\x08:5\n\x0c\x46luxFldColor\x12\x1d.google.protobuf.FieldOptions\x18\xda\xaf\x03 \x01(\t:>\n\x15\x46luxFldSequenceNumber\x12\x1d.google.protobuf.FieldOptions\x18\xdb\xaf\x03 \x01(\x05:A\n\x18\x46luxFldAlertBubbleSource\x12\x1d.google.protobuf.FieldOptions\x18\xdc\xaf\x03 \x01(\t:@\n\x17\x46luxFldAlertBubbleColor\x12\x1d.google.protobuf.FieldOptions\x18\xdd\xaf\x03 \x01(\t:=\n\x14\x46luxFldUIPlaceholder\x12\x1d.google.protobuf.FieldOptions\x18\xde\xaf\x03 \x01(\t:9\n\x10\x46luxFldCmplxHigh\x12\x1d.google.protobuf.FieldOptions\x18\xd7\xb6\x03 \x01(\t:8\n\x0f\x46luxFldCmplxMed\x12\x1d.google.protobuf.FieldOptions\x18\xd8\xb6\x03 \x01(\t:8\n\x0f\x46luxFldCmplxLow\x12\x1d.google.protobuf.FieldOptions\x18\xd9\xb6\x03 \x01(\t:6\n\rFluxFldValMin\x12\x1d.google.protobuf.FieldOptions\x18\x8f\xce\x03 \x01(\t:6\n\rFluxFldValMax\x12\x1d.google.protobuf.FieldOptions\x18\x90\xce\x03 \x01(\t:7\n\x0e\x46luxFldValList\x12\x1d.google.protobuf.FieldOptions\x18\x91\xce\x03 \x01(\t:7\n\x0e\x46luxFldTestVal\x12\x1d.google.protobuf.FieldOptions\x18\x92\xce\x03 \x01(\t:?\n\x12\x46luxFldValDateTime\x12\x1d.google.protobuf.FieldOptions\x18\x93\xce\x03 \x01(\tB\x02\x18\x01:=\n\x14\x46luxFldValSortWeight\x12\x1d.google.protobuf.FieldOptions\x18\x94\xce\x03 \x01(\x05:7\n\x0e\x46luxFldSizeMax\x12\x1d.google.protobuf.FieldOptions\x18\x95\xce\x03 \x01(\x05:=\n\x14\x46luxFldValIsDateTime\x12\x1d.google.protobuf.FieldOptions\x18\x96\xce\x03 \x01(\x08:>\n\x15\x46luxFldMappingSrcType\x12\x1d.google.protobuf.FieldOptions\x18\xf7\xd5\x03 \x01(\t'
   ,
   dependencies=[google_dot_protobuf_dot_descriptor__pb2.DESCRIPTOR,ui__core__pb2.DESCRIPTOR,])
 
@@ -210,17 +210,25 @@ FluxMsgLayout = _descriptor.FieldDescriptor(
   message_type=None, enum_type=None, containing_type=None,
   is_extension=True, extension_scope=None,
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
-FLUXMSGWIDGETUIDATA_FIELD_NUMBER = 55254
+FLUXMSGSERVERPOPULATE_FIELD_NUMBER = 55254
+FluxMsgServerPopulate = _descriptor.FieldDescriptor(
+  name='FluxMsgServerPopulate', full_name='FluxMsgServerPopulate', index=23,
+  number=55254, type=8, cpp_type=7, label=1,
+  has_default_value=False, default_value=False,
+  message_type=None, enum_type=None, containing_type=None,
+  is_extension=True, extension_scope=None,
+  serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
+FLUXMSGWIDGETUIDATA_FIELD_NUMBER = 55255
 FluxMsgWidgetUIData = _descriptor.FieldDescriptor(
-  name='FluxMsgWidgetUIData', full_name='FluxMsgWidgetUIData', index=23,
-  number=55254, type=11, cpp_type=10, label=1,
+  name='FluxMsgWidgetUIData', full_name='FluxMsgWidgetUIData', index=24,
+  number=55255, type=11, cpp_type=10, label=1,
   has_default_value=False, default_value=None,
   message_type=None, enum_type=None, containing_type=None,
   is_extension=True, extension_scope=None,
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXMSGCMPLXHIGH_FIELD_NUMBER = 56151
 FluxMsgCmplxHigh = _descriptor.FieldDescriptor(
-  name='FluxMsgCmplxHigh', full_name='FluxMsgCmplxHigh', index=24,
+  name='FluxMsgCmplxHigh', full_name='FluxMsgCmplxHigh', index=25,
   number=56151, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -228,7 +236,7 @@ FluxMsgCmplxHigh = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXMSGCMPLXMED_FIELD_NUMBER = 56152
 FluxMsgCmplxMed = _descriptor.FieldDescriptor(
-  name='FluxMsgCmplxMed', full_name='FluxMsgCmplxMed', index=25,
+  name='FluxMsgCmplxMed', full_name='FluxMsgCmplxMed', index=26,
   number=56152, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -236,7 +244,7 @@ FluxMsgCmplxMed = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXMSGCMPLXLOW_FIELD_NUMBER = 56153
 FluxMsgCmplxLow = _descriptor.FieldDescriptor(
-  name='FluxMsgCmplxLow', full_name='FluxMsgCmplxLow', index=26,
+  name='FluxMsgCmplxLow', full_name='FluxMsgCmplxLow', index=27,
   number=56153, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -244,7 +252,7 @@ FluxMsgCmplxLow = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDCMNT_FIELD_NUMBER = 51151
 FluxFldCmnt = _descriptor.FieldDescriptor(
-  name='FluxFldCmnt', full_name='FluxFldCmnt', index=27,
+  name='FluxFldCmnt', full_name='FluxFldCmnt', index=28,
   number=51151, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -252,7 +260,7 @@ FluxFldCmnt = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDHIDE_FIELD_NUMBER = 51152
 FluxFldHide = _descriptor.FieldDescriptor(
-  name='FluxFldHide', full_name='FluxFldHide', index=28,
+  name='FluxFldHide', full_name='FluxFldHide', index=29,
   number=51152, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -260,7 +268,7 @@ FluxFldHide = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDHELP_FIELD_NUMBER = 51153
 FluxFldHelp = _descriptor.FieldDescriptor(
-  name='FluxFldHelp', full_name='FluxFldHelp', index=29,
+  name='FluxFldHelp', full_name='FluxFldHelp', index=30,
   number=51153, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -268,7 +276,7 @@ FluxFldHelp = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDDEFAULTVALUEPLACEHOLDERSTRING_FIELD_NUMBER = 51154
 FluxFldDefaultValuePlaceholderString = _descriptor.FieldDescriptor(
-  name='FluxFldDefaultValuePlaceholderString', full_name='FluxFldDefaultValuePlaceholderString', index=30,
+  name='FluxFldDefaultValuePlaceholderString', full_name='FluxFldDefaultValuePlaceholderString', index=31,
   number=51154, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -276,7 +284,7 @@ FluxFldDefaultValuePlaceholderString = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDISREQUIRED_FIELD_NUMBER = 51155
 FluxFldIsRequired = _descriptor.FieldDescriptor(
-  name='FluxFldIsRequired', full_name='FluxFldIsRequired', index=31,
+  name='FluxFldIsRequired', full_name='FluxFldIsRequired', index=32,
   number=51155, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -284,7 +292,7 @@ FluxFldIsRequired = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDALIAS_FIELD_NUMBER = 51156
 FluxFldAlias = _descriptor.FieldDescriptor(
-  name='FluxFldAlias', full_name='FluxFldAlias', index=32,
+  name='FluxFldAlias', full_name='FluxFldAlias', index=33,
   number=51156, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -292,7 +300,7 @@ FluxFldAlias = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDTBL_FIELD_NUMBER = 52151
 FluxFldTbl = _descriptor.FieldDescriptor(
-  name='FluxFldTbl', full_name='FluxFldTbl', index=33,
+  name='FluxFldTbl', full_name='FluxFldTbl', index=34,
   number=52151, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -300,7 +308,7 @@ FluxFldTbl = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDCOL_FIELD_NUMBER = 52152
 FluxFldCol = _descriptor.FieldDescriptor(
-  name='FluxFldCol', full_name='FluxFldCol', index=34,
+  name='FluxFldCol', full_name='FluxFldCol', index=35,
   number=52152, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -308,7 +316,7 @@ FluxFldCol = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDPK_FIELD_NUMBER = 52153
 FluxFldPk = _descriptor.FieldDescriptor(
-  name='FluxFldPk', full_name='FluxFldPk', index=35,
+  name='FluxFldPk', full_name='FluxFldPk', index=36,
   number=52153, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -316,7 +324,7 @@ FluxFldPk = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDFKTBL_FIELD_NUMBER = 52154
 FluxFldFkTbl = _descriptor.FieldDescriptor(
-  name='FluxFldFkTbl', full_name='FluxFldFkTbl', index=36,
+  name='FluxFldFkTbl', full_name='FluxFldFkTbl', index=37,
   number=52154, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -324,7 +332,7 @@ FluxFldFkTbl = _descriptor.FieldDescriptor(
   serialized_options=b'\030\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDFKCOL_FIELD_NUMBER = 52155
 FluxFldFkCol = _descriptor.FieldDescriptor(
-  name='FluxFldFkCol', full_name='FluxFldFkCol', index=37,
+  name='FluxFldFkCol', full_name='FluxFldFkCol', index=38,
   number=52155, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -332,7 +340,7 @@ FluxFldFkCol = _descriptor.FieldDescriptor(
   serialized_options=b'\030\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDFK_FIELD_NUMBER = 52156
 FluxFldFk = _descriptor.FieldDescriptor(
-  name='FluxFldFk', full_name='FluxFldFk', index=38,
+  name='FluxFldFk', full_name='FluxFldFk', index=39,
   number=52156, type=11, cpp_type=10, label=1,
   has_default_value=False, default_value=None,
   message_type=None, enum_type=None, containing_type=None,
@@ -340,7 +348,7 @@ FluxFldFk = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDINDEX_FIELD_NUMBER = 52157
 FluxFldIndex = _descriptor.FieldDescriptor(
-  name='FluxFldIndex', full_name='FluxFldIndex', index=39,
+  name='FluxFldIndex', full_name='FluxFldIndex', index=40,
   number=52157, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -348,7 +356,7 @@ FluxFldIndex = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDWEBSOCKET_FIELD_NUMBER = 52158
 FluxFldWebSocket = _descriptor.FieldDescriptor(
-  name='FluxFldWebSocket', full_name='FluxFldWebSocket', index=40,
+  name='FluxFldWebSocket', full_name='FluxFldWebSocket', index=41,
   number=52158, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -356,7 +364,7 @@ FluxFldWebSocket = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDORMNOUPDATE_FIELD_NUMBER = 55151
 FluxFldOrmNoUpdate = _descriptor.FieldDescriptor(
-  name='FluxFldOrmNoUpdate', full_name='FluxFldOrmNoUpdate', index=41,
+  name='FluxFldOrmNoUpdate', full_name='FluxFldOrmNoUpdate', index=42,
   number=55151, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -364,7 +372,7 @@ FluxFldOrmNoUpdate = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDABBREVIATED_FIELD_NUMBER = 55251
 FluxFldAbbreviated = _descriptor.FieldDescriptor(
-  name='FluxFldAbbreviated', full_name='FluxFldAbbreviated', index=42,
+  name='FluxFldAbbreviated', full_name='FluxFldAbbreviated', index=43,
   number=55251, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -372,7 +380,7 @@ FluxFldAbbreviated = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDSTICKY_FIELD_NUMBER = 55252
 FluxFldSticky = _descriptor.FieldDescriptor(
-  name='FluxFldSticky', full_name='FluxFldSticky', index=43,
+  name='FluxFldSticky', full_name='FluxFldSticky', index=44,
   number=55252, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -380,7 +388,7 @@ FluxFldSticky = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDSWITCH_FIELD_NUMBER = 55253
 FluxFldSwitch = _descriptor.FieldDescriptor(
-  name='FluxFldSwitch', full_name='FluxFldSwitch', index=44,
+  name='FluxFldSwitch', full_name='FluxFldSwitch', index=45,
   number=55253, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -388,7 +396,7 @@ FluxFldSwitch = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDBUTTON_FIELD_NUMBER = 55254
 FluxFldButton = _descriptor.FieldDescriptor(
-  name='FluxFldButton', full_name='FluxFldButton', index=45,
+  name='FluxFldButton', full_name='FluxFldButton', index=46,
   number=55254, type=11, cpp_type=10, label=1,
   has_default_value=False, default_value=None,
   message_type=None, enum_type=None, containing_type=None,
@@ -396,7 +404,7 @@ FluxFldButton = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDAUTOCOMPLETE_FIELD_NUMBER = 55255
 FluxFldAutoComplete = _descriptor.FieldDescriptor(
-  name='FluxFldAutoComplete', full_name='FluxFldAutoComplete', index=46,
+  name='FluxFldAutoComplete', full_name='FluxFldAutoComplete', index=47,
   number=55255, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -404,7 +412,7 @@ FluxFldAutoComplete = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDSERVERPOPULATE_FIELD_NUMBER = 55256
 FluxFldServerPopulate = _descriptor.FieldDescriptor(
-  name='FluxFldServerPopulate', full_name='FluxFldServerPopulate', index=47,
+  name='FluxFldServerPopulate', full_name='FluxFldServerPopulate', index=48,
   number=55256, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -412,7 +420,7 @@ FluxFldServerPopulate = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDUIUPDATEONLY_FIELD_NUMBER = 55257
 FluxFldUIUpdateOnly = _descriptor.FieldDescriptor(
-  name='FluxFldUIUpdateOnly', full_name='FluxFldUIUpdateOnly', index=48,
+  name='FluxFldUIUpdateOnly', full_name='FluxFldUIUpdateOnly', index=49,
   number=55257, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -420,7 +428,7 @@ FluxFldUIUpdateOnly = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDCOLOR_FIELD_NUMBER = 55258
 FluxFldColor = _descriptor.FieldDescriptor(
-  name='FluxFldColor', full_name='FluxFldColor', index=49,
+  name='FluxFldColor', full_name='FluxFldColor', index=50,
   number=55258, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -428,7 +436,7 @@ FluxFldColor = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDSEQUENCENUMBER_FIELD_NUMBER = 55259
 FluxFldSequenceNumber = _descriptor.FieldDescriptor(
-  name='FluxFldSequenceNumber', full_name='FluxFldSequenceNumber', index=50,
+  name='FluxFldSequenceNumber', full_name='FluxFldSequenceNumber', index=51,
   number=55259, type=5, cpp_type=1, label=1,
   has_default_value=False, default_value=0,
   message_type=None, enum_type=None, containing_type=None,
@@ -436,7 +444,7 @@ FluxFldSequenceNumber = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDALERTBUBBLESOURCE_FIELD_NUMBER = 55260
 FluxFldAlertBubbleSource = _descriptor.FieldDescriptor(
-  name='FluxFldAlertBubbleSource', full_name='FluxFldAlertBubbleSource', index=51,
+  name='FluxFldAlertBubbleSource', full_name='FluxFldAlertBubbleSource', index=52,
   number=55260, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -444,7 +452,7 @@ FluxFldAlertBubbleSource = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDALERTBUBBLECOLOR_FIELD_NUMBER = 55261
 FluxFldAlertBubbleColor = _descriptor.FieldDescriptor(
-  name='FluxFldAlertBubbleColor', full_name='FluxFldAlertBubbleColor', index=52,
+  name='FluxFldAlertBubbleColor', full_name='FluxFldAlertBubbleColor', index=53,
   number=55261, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -452,7 +460,7 @@ FluxFldAlertBubbleColor = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDUIPLACEHOLDER_FIELD_NUMBER = 55262
 FluxFldUIPlaceholder = _descriptor.FieldDescriptor(
-  name='FluxFldUIPlaceholder', full_name='FluxFldUIPlaceholder', index=53,
+  name='FluxFldUIPlaceholder', full_name='FluxFldUIPlaceholder', index=54,
   number=55262, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -460,7 +468,7 @@ FluxFldUIPlaceholder = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDCMPLXHIGH_FIELD_NUMBER = 56151
 FluxFldCmplxHigh = _descriptor.FieldDescriptor(
-  name='FluxFldCmplxHigh', full_name='FluxFldCmplxHigh', index=54,
+  name='FluxFldCmplxHigh', full_name='FluxFldCmplxHigh', index=55,
   number=56151, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -468,7 +476,7 @@ FluxFldCmplxHigh = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDCMPLXMED_FIELD_NUMBER = 56152
 FluxFldCmplxMed = _descriptor.FieldDescriptor(
-  name='FluxFldCmplxMed', full_name='FluxFldCmplxMed', index=55,
+  name='FluxFldCmplxMed', full_name='FluxFldCmplxMed', index=56,
   number=56152, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -476,7 +484,7 @@ FluxFldCmplxMed = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDCMPLXLOW_FIELD_NUMBER = 56153
 FluxFldCmplxLow = _descriptor.FieldDescriptor(
-  name='FluxFldCmplxLow', full_name='FluxFldCmplxLow', index=56,
+  name='FluxFldCmplxLow', full_name='FluxFldCmplxLow', index=57,
   number=56153, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -484,7 +492,7 @@ FluxFldCmplxLow = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDVALMIN_FIELD_NUMBER = 59151
 FluxFldValMin = _descriptor.FieldDescriptor(
-  name='FluxFldValMin', full_name='FluxFldValMin', index=57,
+  name='FluxFldValMin', full_name='FluxFldValMin', index=58,
   number=59151, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -492,7 +500,7 @@ FluxFldValMin = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDVALMAX_FIELD_NUMBER = 59152
 FluxFldValMax = _descriptor.FieldDescriptor(
-  name='FluxFldValMax', full_name='FluxFldValMax', index=58,
+  name='FluxFldValMax', full_name='FluxFldValMax', index=59,
   number=59152, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -500,7 +508,7 @@ FluxFldValMax = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDVALLIST_FIELD_NUMBER = 59153
 FluxFldValList = _descriptor.FieldDescriptor(
-  name='FluxFldValList', full_name='FluxFldValList', index=59,
+  name='FluxFldValList', full_name='FluxFldValList', index=60,
   number=59153, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -508,7 +516,7 @@ FluxFldValList = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDTESTVAL_FIELD_NUMBER = 59154
 FluxFldTestVal = _descriptor.FieldDescriptor(
-  name='FluxFldTestVal', full_name='FluxFldTestVal', index=60,
+  name='FluxFldTestVal', full_name='FluxFldTestVal', index=61,
   number=59154, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -516,7 +524,7 @@ FluxFldTestVal = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDVALDATETIME_FIELD_NUMBER = 59155
 FluxFldValDateTime = _descriptor.FieldDescriptor(
-  name='FluxFldValDateTime', full_name='FluxFldValDateTime', index=61,
+  name='FluxFldValDateTime', full_name='FluxFldValDateTime', index=62,
   number=59155, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -524,7 +532,7 @@ FluxFldValDateTime = _descriptor.FieldDescriptor(
   serialized_options=b'\030\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDVALSORTWEIGHT_FIELD_NUMBER = 59156
 FluxFldValSortWeight = _descriptor.FieldDescriptor(
-  name='FluxFldValSortWeight', full_name='FluxFldValSortWeight', index=62,
+  name='FluxFldValSortWeight', full_name='FluxFldValSortWeight', index=63,
   number=59156, type=5, cpp_type=1, label=1,
   has_default_value=False, default_value=0,
   message_type=None, enum_type=None, containing_type=None,
@@ -532,7 +540,7 @@ FluxFldValSortWeight = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDSIZEMAX_FIELD_NUMBER = 59157
 FluxFldSizeMax = _descriptor.FieldDescriptor(
-  name='FluxFldSizeMax', full_name='FluxFldSizeMax', index=63,
+  name='FluxFldSizeMax', full_name='FluxFldSizeMax', index=64,
   number=59157, type=5, cpp_type=1, label=1,
   has_default_value=False, default_value=0,
   message_type=None, enum_type=None, containing_type=None,
@@ -540,7 +548,7 @@ FluxFldSizeMax = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDVALISDATETIME_FIELD_NUMBER = 59158
 FluxFldValIsDateTime = _descriptor.FieldDescriptor(
-  name='FluxFldValIsDateTime', full_name='FluxFldValIsDateTime', index=64,
+  name='FluxFldValIsDateTime', full_name='FluxFldValIsDateTime', index=65,
   number=59158, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
@@ -548,7 +556,7 @@ FluxFldValIsDateTime = _descriptor.FieldDescriptor(
   serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 FLUXFLDMAPPINGSRCTYPE_FIELD_NUMBER = 60151
 FluxFldMappingSrcType = _descriptor.FieldDescriptor(
-  name='FluxFldMappingSrcType', full_name='FluxFldMappingSrcType', index=65,
+  name='FluxFldMappingSrcType', full_name='FluxFldMappingSrcType', index=66,
   number=60151, type=9, cpp_type=9, label=1,
   has_default_value=False, default_value=b"".decode('utf-8'),
   message_type=None, enum_type=None, containing_type=None,
@@ -815,6 +823,7 @@ DESCRIPTOR.extensions_by_name['FluxMsgOrmReadRespClasses'] = FluxMsgOrmReadRespC
 DESCRIPTOR.extensions_by_name['FluxMsgJsonRoot'] = FluxMsgJsonRoot
 DESCRIPTOR.extensions_by_name['FluxMsgAbbreviated'] = FluxMsgAbbreviated
 DESCRIPTOR.extensions_by_name['FluxMsgLayout'] = FluxMsgLayout
+DESCRIPTOR.extensions_by_name['FluxMsgServerPopulate'] = FluxMsgServerPopulate
 DESCRIPTOR.extensions_by_name['FluxMsgWidgetUIData'] = FluxMsgWidgetUIData
 DESCRIPTOR.extensions_by_name['FluxMsgCmplxHigh'] = FluxMsgCmplxHigh
 DESCRIPTOR.extensions_by_name['FluxMsgCmplxMed'] = FluxMsgCmplxMed
@@ -915,6 +924,7 @@ FluxMsgJsonRoot.message_type = _MESSAGEJSONROOT
 google_dot_protobuf_dot_descriptor__pb2.MessageOptions.RegisterExtension(FluxMsgJsonRoot)
 google_dot_protobuf_dot_descriptor__pb2.MessageOptions.RegisterExtension(FluxMsgAbbreviated)
 google_dot_protobuf_dot_descriptor__pb2.MessageOptions.RegisterExtension(FluxMsgLayout)
+google_dot_protobuf_dot_descriptor__pb2.MessageOptions.RegisterExtension(FluxMsgServerPopulate)
 FluxMsgWidgetUIData.message_type = ui__core__pb2._WIDGETUIDATA
 google_dot_protobuf_dot_descriptor__pb2.MessageOptions.RegisterExtension(FluxMsgWidgetUIData)
 google_dot_protobuf_dot_descriptor__pb2.MessageOptions.RegisterExtension(FluxMsgCmplxHigh)

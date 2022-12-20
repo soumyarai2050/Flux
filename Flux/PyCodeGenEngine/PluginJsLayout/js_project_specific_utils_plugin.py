@@ -36,7 +36,6 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
                 widget_ui_data_options_value_list_of_dict = \
                     self.get_complex_msg_option_values_as_list_of_dict(message,
                                                                        JsProjectSpecificUtilsPlugin.flx_msg_widget_ui_data)
-
                 # since widget_ui_data option is non-repeated type
                 widget_ui_data_options_value = widget_ui_data_options_value_list_of_dict[0]
 
@@ -47,6 +46,16 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
                                             f'h: {widget_ui_data_options_value["h"]}'+'},\n'
         output_str += "    ]\n"
         output_str += "    return layout;\n"
+        output_str += "}\n\n"
+        output_str += "export function flux_toggle(value) {\n"
+        output_str += "    return !value;\n"
+        output_str += "}\n\n"
+        output_str += "export function flux_trigger_strat(value) {\n"
+        output_str += "    if (['StratState_READY', 'StratState_PAUSED', 'StratState_ERROR'].includes(value)) {\n"
+        output_str += "        return 'StratState_ACTIVE';\n"
+        output_str += "    } else if ('StratState_ACTIVE' === value) {\n"
+        output_str += "        return 'StratState_PAUSED';\n"
+        output_str += "    }\n"
         output_str += "}\n"
 
         return output_str

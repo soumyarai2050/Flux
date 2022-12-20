@@ -16,7 +16,9 @@ class CodeGenEngineEnvManager:
         "INSERTION_IMPORT_FILE_NAME": "insertion_imports.py",
         "PB2_IMPORT_GENERATOR_PATH": "",
         "RESPONSE_FIELD_CASE_STYLE": "snake",  # snake or camel supported
-        "DEBUG_SLEEP_TIME": "0"
+        "DEBUG_SLEEP_TIME": "0",
+        "HOST": "127.0.0.1",
+        "PORT": "8080"
     }
 
     def __init__(self):

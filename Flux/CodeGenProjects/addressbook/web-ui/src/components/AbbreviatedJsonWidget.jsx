@@ -13,7 +13,7 @@ const AbbreviatedJsonWidget = (props) => {
     return (
         <Dialog open={props.open} onClose={props.onClose}>
             <ReactJson
-                style={{minHeight: 500, minWidth: 450}}
+                style={{minHeight: 500, minWidth: 450, width: 'max-content'}}
                 theme='tube'
                 displayDataTypes={false}
                 displayObjectSize={false}
@@ -34,8 +34,7 @@ AbbreviatedJsonWidget.defaultProps = {
 
 AbbreviatedJsonWidget.propTypes = {
     open: PropTypes.bool.isRequired,
-    onClose: PropTypes.func.isRequired,
-    json: PropTypes.object
+    onClose: PropTypes.func.isRequired
 }
 
 export default AbbreviatedJsonWidget;

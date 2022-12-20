@@ -18,11 +18,12 @@ export const Layouts = {
 }
 
 export const ColorTypes = {
-    CRITICAL: 'error',
+    CRITICAL: 'critical',
     ERROR: 'error',
     WARNING: 'warning',
     INFO: 'info',
-    DEBUG: 'info',
+    DEBUG: 'debug',
+    SUCCESS: 'success',
     UNSPECIFIED: 'default'
 }
 
@@ -42,5 +43,19 @@ export const DataTypes = {
     ENUM: 'enum',
     OBJECT: 'object',
     ARRAY: 'array',
-    INT32: 'int32'
+    INT32: 'int32',
+    FLOAT: 'float'
+}
+
+export const SizeType = {
+    SMALL: 'small',
+    MEDIUM: 'medium',
+    LARGE: 'large',
+    UNSPECIFIED: 'small'
+}
+
+export const ShapeType = {
+    RECTANGLE: 'rectangle',
+    ROUND: 'round',
+    UNSPECIFIED: 'rectangle'
 }

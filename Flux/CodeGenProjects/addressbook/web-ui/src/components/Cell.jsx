@@ -5,6 +5,7 @@ import { makeStyles } from '@mui/styles';
 import { clearxpath, getDataxpath } from '../utils';
 import { ColorTypes, DataTypes, Modes } from '../constants';
 import PropTypes from 'prop-types';
+import { NumericFormat } from 'react-number-format';
 
 const useStyles = makeStyles({
     previousValue: {
@@ -42,9 +43,10 @@ const useStyles = makeStyles({
         background: '#ccc'
     },
     tableCellRemove: {
-        textDecoration: 'line-through'
+        textDecoration: 'line-through',
+        background: '#ffc7ce !important'
     },
-    tableCellOrmNoUpdate: {
+    tableCellDisabled: {
         background: '#ccc'
     },
     select: {
@@ -75,8 +77,7 @@ const Cell = (props) => {
         setActive(false);
     }
 
-    const onTextChange = (e, type, xpath) => {
-        let value = e.target.value;
+    const onTextChange = (e, type, xpath, value) => {
         if (type === DataTypes.NUMBER) {
             value = value * 1;
         }
@@ -85,15 +86,6 @@ const Cell = (props) => {
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);
-    }
-
-    const onKeyDown = (e, type) => {
-        let underlyingtype = e.target.getAttribute('underlyingtype');
-        if (type === DataTypes.NUMBER && underlyingtype === DataTypes.INT32) {
-            if (e.keyCode === 110) {
-                e.preventDefault();
-            }
-        }
     }
 
     const onSelectItemChange = (e, dataxpath, xpath) => {
@@ -123,19 +115,32 @@ const Cell = (props) => {
     let xpath = proptitle ? proptitle.indexOf('.') > 0 ? row[proptitle.split('.')[0] + '.xpath_' + propname] : row['xpath_' + propname] : row['xpath_' + propname];
     let dataxpath = getDataxpath(data, xpath)
     let disabled = true;
-    if (mode === Modes.EDIT_MODE) {
-        if (collection && collection.ormNoUpdate && !row['data-add']) {
-            disabled = true;
-        } else if (row['data-remove']) {
-            disabled = true;
-        } else {
-            disabled = false;
-        }
-    }
 
     if (collection) {
         type = collection.type;
         enumValues = collection.autocomplete_list;
+    }
+
+    if (mode === Modes.EDIT_MODE) {
+        if (collection && collection.ormNoUpdate && !row['data-add']) {
+            disabled = true;
+        } else if (collection.uiUpdateOnly && row['data-add']) {
+            disabled = true;
+        } else if (row['data-remove']) {
+            disabled = true;
+        } else if (type === DataTypes.STRING && row[proptitle] === undefined) {
+            disabled = true;
+        } else if (type === DataTypes.BOOLEAN && (row[proptitle] === undefined)) {
+            disabled = true;
+        } else if (type === DataTypes.NUMBER && row[proptitle] === undefined) {
+            disabled = true;
+        } else if (type === DataTypes.ENUM && !row[proptitle]) {
+            disabled = true;
+        } else {
+            disabled = false;
+        }
+    } else {
+        disabled = false;
     }
 
     if (active && mode === Modes.EDIT_MODE && !disabled) {
@@ -201,7 +206,34 @@ const Cell = (props) => {
                     />
                 </TableCell >
             )
+        } else if (type === DataTypes.NUMBER) {
+            let decimalScale = 2;
+            if (props.data.underlyingtype === DataTypes.INT32) {
+                decimalScale = 0;
+            }
+            let value = row[proptitle] ? row[proptitle] : 0;
+            return (
+                <TableCell align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
+                    <NumericFormat
+                        className={classes.textField}
+                        customInput={TextField}
+                        autoFocus
+                        size='small'
+                        disabled={disabled}
+                        onValueChange={(values, sourceInfo) => onTextChange(sourceInfo.event, type, xpath, values.value)}
+                        // onChange={(e) => onTextChange(e, type, xpath)}
+                        // onKeyDown={(e) => onKeyDown(e, type)}
+                        inputProps={{ style: { padding: '6px 10px' }, dataxpath: dataxpath, underlyingtype: collection.underlyingtype }}
+                        value={value}
+                        // type={type}
+                        placeholder={collection.placeholder}
+                        thousandSeparator=','
+                        decimalScale={decimalScale}
+                    />
+                </TableCell>
+            )
         } else {
+            let value = row[proptitle];
             return (
                 <TableCell align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
                     <TextField
@@ -209,11 +241,11 @@ const Cell = (props) => {
                         autoFocus
                         size='small'
                         disabled={disabled}
-                        onChange={(e) => onTextChange(e, type, xpath)}
-                        onKeyDown={(e) => onKeyDown(e, type)}
+                        onChange={(e) => onTextChange(e, type, xpath, e.target.value)}
+                        // onKeyDown={(e) => onKeyDown(e, type)}
                         inputProps={{ style: { padding: '6px 10px' }, dataxpath: dataxpath, underlyingtype: collection.underlyingtype }}
-                        value={row[proptitle]}
-                        type={type}
+                        value={value}
+                        // type={type}
                         placeholder={collection.placeholder}
                     />
                 </TableCell>
@@ -266,21 +298,21 @@ const Cell = (props) => {
 
     let dataModified = _.get(originalData, xpath) !== row[proptitle];
     let tableCellRemove = row['data-remove'] ? classes.tableCellRemove : '';
-    let tableCellOrmNoUpdateClass = '';
-    if(collection && collection.ormNoUpdate && !row['data-add']) {
-        tableCellOrmNoUpdateClass = classes.tableCellOrmNoUpdate;
-    }
+    let disabledClass = disabled ? classes.tableCellDisabled : '';
+
+    let currentValue = row[proptitle] !== undefined ? row[proptitle].toLocaleString() : '';
     if (dataModified) {
+        let originalValue = _.get(originalData, xpath) !== undefined ? _.get(originalData, xpath).toLocaleString() : '';
         return (
-            <TableCell className={`${classes.td} ${tableCellColorClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                <span className={classes.previousValue}>{_.get(originalData, xpath)}</span>
-                <span className={classes.modifiedValue}>{row[proptitle]}</span>
+            <TableCell className={`${tableCellColorClass} ${disabledClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
+                <span className={classes.previousValue}>{originalValue}</span>
+                <span className={classes.modifiedValue}>{currentValue}</span>
             </TableCell>
         )
     } else {
         return (
-            <TableCell className={`${classes.td} ${tableCellColorClass} ${tableCellRemove} ${tableCellOrmNoUpdateClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                <span>{row[proptitle]}</span>
+            <TableCell className={`${disabledClass} ${tableCellColorClass} ${tableCellRemove}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
+                <span>{currentValue}</span>
             </TableCell>
         )
     }

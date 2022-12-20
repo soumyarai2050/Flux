@@ -32,9 +32,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         self.model_file_name: str = ""
         self.routes_file_name: str = ""
         self.custom_id_primary_key_messages: List[protogen.Message] = []
-        self.response_field_case_style: str = os.getenv("RESPONSE_FIELD_CASE_STYLE")
         self.websocket_client_file_name: str = ""
-        self.routes_wrapper_class_name: str = ""
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
@@ -63,8 +61,8 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
-        output_str += f"    wrapper_class.create_{message_name_snake_cased}_pre()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class.create_{message_name_snake_cased}_pre({message_name_snake_cased})\n"
         output_str += f"    {message_name_snake_cased}_obj = await generic_beanie_post_http({message.proto.name}, {message_name_snake_cased})\n"
         output_str += f"    wrapper_class.create_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
         output_str += f"    return {message_name_snake_cased}_obj\n"
@@ -86,7 +84,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
         output_str += f"    wrapper_class.read_by_id_{message_name_snake_cased}_pre()\n"
         output_str += f"    {message_name_snake_cased}_obj = await generic_beanie_read_by_id_http({message.proto.name}, {message_name_snake_cased}_id)\n"
         output_str += f"    wrapper_class.read_by_id_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
@@ -102,8 +100,8 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
-        output_str += f"    wrapper_class.update_{message_name_snake_cased}_pre()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class.update_{message_name_snake_cased}_pre({message_name_snake_cased}_updated)\n"
         output_str += f"    {message_name_snake_cased}_obj = await generic_beanie_put_http({message.proto.name}, {message_name_snake_cased}_updated)\n"
         output_str += f"    wrapper_class.update_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
         output_str += f"    return {message_name_snake_cased}_obj\n"
@@ -118,8 +116,8 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
-        output_str += f"    wrapper_class.partial_update_{message_name_snake_cased}_pre()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class.partial_update_{message_name_snake_cased}_pre({message_name_snake_cased}_updated)\n"
         output_str += f"    {message_name_snake_cased}_obj =  await generic_beanie_patch_http({message.proto.name}, " \
                       f"{message_name_snake_cased}_updated)\n"
         output_str += f"    wrapper_class.partial_update_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
@@ -142,7 +140,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
         output_str += f"    wrapper_class.delete_{message_name_snake_cased}_pre()\n"
         output_str += f"    delete_web_resp = await generic_beanie_delete_http({message.proto.name}, " \
                       f"{message.proto.name}BaseModel, {message_name_snake_cased}_id)\n"
@@ -159,7 +157,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         output_str += f"async def get_{message_name_snake_cased}_from_{field_name}_http({field_name}: {field_type}) -> " \
                       f"List[{message.proto.name}]:\n"
         output_str += f'    """ Index for {field_name} field of {message.proto.name} """\n'
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
         output_str += f"    wrapper_class.index_of_{field_name}_{message_name_snake_cased}_pre()\n"
         output_str += f"    {message_name_snake_cased}_obj = await generic_beanie_index_http({message.proto.name}, " \
                       f"{message.proto.name}.{field_name}, {field_name})\n"
@@ -180,7 +178,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
                           f"{message_name_snake_cased}_id: PydanticObjectId) -> None:\n"
         if method_desc:
             output_str += f'    """ {method_desc } """\n'
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
         output_str += f"    wrapper_class.read_by_id_ws_{message_name_snake_cased}_pre()\n"
         output_str += f"    await generic_beanie_read_by_id_ws(websocket, " \
                       f"{message_name}, {message_name_snake_cased}_id)\n"
@@ -193,7 +191,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         output_str = f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws/")\n'
         output_str += f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket) -> None:\n"
         output_str += f'    """ Get All {message_name} using websocket """\n'
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
         output_str += f"    wrapper_class.read_all_ws_{message_name_snake_cased}_pre()\n"
         output_str += f"    await generic_beanie_read_ws(websocket, {message_name})\n"
         output_str += f"    wrapper_class.read_all_ws_{message_name_snake_cased}_post()\n\n\n"
@@ -232,7 +230,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         output_str += f'    """\n'
         output_str += f'    Get All {message.proto.name}\n'
         output_str += f'    """\n'
-        output_str += f"    wrapper_class = {self.routes_wrapper_class_name_capital_camel_cased}.get_instance()\n"
+        output_str += f"    wrapper_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n"
         output_str += f"    wrapper_class.read_all_{message_name_snake_cased}_pre()\n"
         output_str += f"    obj_list =  await generic_beanie_read_http({message.proto.name})\n\n\n"
         output_str += f"    wrapper_class.read_all_{message_name_snake_cased}_post(obj_list)\n"
@@ -360,38 +358,6 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
                      f'generic_beanie_read_by_id_ws, generic_beanie_read_ws\n'
         return output_str
 
-    def handle_routes_file_gen(self) -> str:
-        output_str = "from fastapi import APIRouter, Request, WebSocket\n"
-        output_str += "from fastapi.templating import Jinja2Templates\n"
-        output_str += "from typing import List\n"
-        output_str += f"from {self.routes_wrapper_class_name} import {self.routes_wrapper_class_name_capital_camel_cased}\n"
-        output_str += f"from {self.model_file_name} import "
-        for message in self.root_message_list:
-            output_str += message.proto.name
-            output_str += ", "
-            output_str += f"{message.proto.name}Optional, "
-            output_str += f"{message.proto.name}BaseModel"
-            if message != self.root_message_list[-1]:
-                output_str += ", "
-            else:
-                output_str += "\n"
-        output_str += self._underlying_handle_generic_imports()
-        incremental_id_basemodel_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                                      "incremental_id_basemodel")
-        if self.response_field_case_style.lower() == "camel":
-            output_str += f'from {incremental_id_basemodel_path} import to_camel\n'
-        # else not required: if response type is not camel type then avoid import
-        default_web_response_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "default_web_response")
-        output_str += f'from {default_web_response_file_path} import DefaultWebResponse\n'
-        output_str += f"from beanie import PydanticObjectId\n\n\n"
-        output_str += f"{self.api_router_app_name} = APIRouter()\n\n\n"
-        output_str += self.handle_CRUD_task()
-        output_str += "\n\ntemplates = Jinja2Templates(directory='templates')\n\n"
-        output_str += f"@{self.api_router_app_name}.get('/')\n"
-        output_str += "async def serve_spa(request: Request):\n"
-        output_str += "    return templates.TemplateResponse('index.html', {'request': request})\n"
-        return output_str
-
     def handle_client_methods(self, message: protogen.Message) -> str:
         options_list_of_dict = \
             self.get_complex_msg_option_values_as_list_of_dict(message,
@@ -412,7 +378,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         output_str = self.handle_get_all_message_http_client(message)
         output_str += self.handle_get_all_message_ws_client(message)
 
-        id_field_type: str | None = None
+        id_field_type: str = "PydanticObjectId"
         if message in self.custom_id_primary_key_messages:
             for field in message.fields:
                 if field.proto.name == BeanieFastApiClassGenPlugin.default_id_field_name:
@@ -434,26 +400,17 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
 
         return output_str
 
-    def handle_client_file_gen(self) -> str:
-        generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
-        output_str = f'from {generic_web_client_path} import generic_http_get_all_client, ' + "\\\n" \
-                     f'\tgeneric_http_post_client, generic_http_get_client, generic_http_put_client, ' \
-                     f'generic_http_patch_client, \\\n\tgeneric_http_delete_client, generic_ws_get_client, ' \
-                     f'generic_ws_get_all_client\n'
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str += f"from {model_file_path} import "
+    def _handle_model_imports(self) -> str:
+        output_str = f"from {self.model_file_name} import "
         for message in self.root_message_list:
             output_str += message.proto.name
             output_str += ", "
+            output_str += f"{message.proto.name}Optional, "
             output_str += f"{message.proto.name}BaseModel"
             if message != self.root_message_list[-1]:
                 output_str += ", "
             else:
                 output_str += "\n"
-        output_str += f'from typing import Dict, List, Callable\n'
-        output_str += "\n\n"
-        for message in self.root_message_list:
-            output_str += self.handle_client_methods(message)
         return output_str
 
     def set_req_data_members(self, file: protogen.File):
@@ -465,18 +422,13 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         self.main_file_name = f"{self.proto_file_name}_beanie_main"
         self.model_file_name = f'{self.proto_file_name}_beanie_model'
         self.routes_file_name = f'{self.proto_file_name}_beanie_routes'
+        self.client_file_name = f"{self.proto_file_name}_beanie_web_client"
         self.websocket_client_file_name = f'{self.proto_file_name}_websocket_client'
-        self.client_file_name = f"{self.proto_file_name}_pydantic_web_client"
-        self.routes_wrapper_class_name = f"{self.proto_file_name}_routes_wrapper"
-        routes_wrapper_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_wrapper_class_name)
-        self.routes_wrapper_class_name_capital_camel_cased: str = \
-            routes_wrapper_class_name_camel_cased[0].upper() + routes_wrapper_class_name_camel_cased[1:]
-        if (host := os.getenv("HOST")) is not None:
-            self.host = host
-        # else not required: If host not set by env variable then using default as set in init
-        if (port := os.getenv("PORT")) is not None:
-            self.port = port
-        # else not required: If port not set by env variable then using default as set in init
+        self.routes_callback_class_name = f"{self.proto_file_name}_routes_callback"
+        routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
+        self.routes_callback_class_name_capital_camel_cased: str = \
+            routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
+        self.callback_override_set_instance_file_name = "callback_override_set_instance"
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
         # Pre-code generation initializations
@@ -491,7 +443,10 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
             self.main_file_name+".py": self.handle_main_file_gen(),
 
             # Adding route's wrapper class
-            self.routes_wrapper_class_name + ".py": self.handle_wrapper_class_file_gen(),
+            self.routes_callback_class_name + ".py": self.handle_callback_class_file_gen(),
+
+            # Adding empty callback override set_instance file
+            self.callback_override_set_instance_file_name + ".py": self.handle_callback_override_set_instance_file_gen(),
 
             # Adding project's routes.py
             self.routes_file_name+".py": self.handle_routes_file_gen(),

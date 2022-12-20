@@ -146,11 +146,12 @@ const TableWidget = (props) => {
                 }
                 if (found) {
                     let commonkey = cell;
-                    if (cell.abbreviated && cell.abbreviated === "JSON") {
-                        commonkey.value = "JSON"
-                    } else {
-                        commonkey.value = String(rows[0][cell.tableTitle]);
-                    }
+                    commonkey.value = rows[0][cell.tableTitle];
+                    // if (cell.abbreviated && cell.abbreviated === "JSON") {
+                    //     commonkey.value = "JSON"
+                    // } else {
+                    //     commonkey.value = rows[0][cell.tableTitle];
+                    // }
                     commons.push(commonkey);
                 }
                 return cell;
@@ -284,7 +285,7 @@ const TableWidget = (props) => {
     }
 
     const onAbbreviatedFieldOpen = (jsonData) => {
-        setAbbreviatedJson(jsonData);
+        setAbbreviatedJson(clearxpath(cloneDeep(jsonData)));
         setShowAbbreviatedJson(true);
     }
 
