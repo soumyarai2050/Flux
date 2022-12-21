@@ -1,10 +1,11 @@
+import sys
+from typing import BinaryIO, List, Dict
+
+import google.protobuf.compiler.plugin_pb2
 from protogen import Callable, PyImportPath, default_py_import_func, File, Options
 
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_registry import ExtendedRegistry
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
-import google.protobuf.compiler.plugin_pb2
-import sys
-from typing import BinaryIO, List, Dict
 
 
 class ExtendedProtogenOptions(Options):

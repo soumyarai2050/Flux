@@ -13,7 +13,7 @@ import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 
 # Required for accessing custom options from schema
-import insertion_imports
+from Flux.PyCodeGenEngine.PluginPydentic import insertion_imports
 
 
 class PydanticClassGenPlugin(BaseProtoPlugin):

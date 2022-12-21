@@ -47,13 +47,28 @@ class PydanticToProtoPlugin:
                 # else not required: If field is other than revision_id then adding it to proto output str
 
                 is_date_time = False
-                if "required" in json_body and field not in json_body["required"]:
-                    cardinality = "optional"
-                else:
-                    if "type" in json_body["properties"][field] and "array" == json_body["properties"][field]["type"]:
+                """
+                Different cases of required:
+                1. no required attribute: Denotes all fields are optional or combination of optional or repeated 
+                (repeated is considered as optional in pydantic)
+                2. required attribute exists: Denotes at least one field is required (at least one field is 
+                non-optional and non-repeated)
+                """
+                if "required" not in json_body:
+                    if "type" in json_body["properties"][field] and \
+                            "array" == json_body["properties"][field]["type"]:
                         cardinality = "repeated"
                     else:
-                        cardinality = "required"
+                        cardinality = "optional"
+                else:
+                    if field not in json_body["required"]:
+                        cardinality = "optional"
+                    else:
+                        if "type" in json_body["properties"][field] and \
+                                "array" == json_body["properties"][field]["type"]:
+                            cardinality = "repeated"
+                        else:
+                            cardinality = "required"
                 if "$ref" in json_body["properties"][field]:
                     kind = json_body["properties"][field]["$ref"].split("/")[-1]
                 elif "allOf" in json_body["properties"][field]:
@@ -119,7 +134,7 @@ class PydanticToProtoPlugin:
                         output_str += self._parse_to_proto_message(basemodel_json["definitions"][message_or_enum])
                     output_str += "\n\n"
                     self.message_name_cache_list.append(message_or_enum)
-                # else not required: Avoiding repeatition
+                # else not required: Avoiding repetition
         # else not required: If definitions not in basemodel then no more message/enum to iterate
 
         return output_str
