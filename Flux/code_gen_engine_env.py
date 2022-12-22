@@ -19,7 +19,8 @@ class CodeGenEngineEnvManager:
         "DEBUG_SLEEP_TIME": "0",
         "HOST": "127.0.0.1",
         "PORT": "8080",
-        "MONGO_SERVER": "mongodb://localhost:27017"
+        "MONGO_SERVER": "mongodb://localhost:27017",
+        "LOG_LEVEL": "debug"
     }
 
     def __init__(self):

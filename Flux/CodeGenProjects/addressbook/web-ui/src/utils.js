@@ -379,6 +379,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
         node.parentcollection = currentSchema.title;
         node.customComponent = Node;
         node.onTextChange = callerProps.onTextChange;
+        node.mode = callerProps.mode;
 
         fieldProps.map(({ propertyName, usageName }) => {
             if (attributes.hasOwnProperty(propertyName)) {

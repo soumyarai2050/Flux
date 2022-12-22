@@ -418,13 +418,14 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         self.main_file_name = f"{self.proto_file_name}_beanie_main"
         self.model_file_name = f'{self.proto_file_name}_beanie_model'
         self.routes_file_name = f'{self.proto_file_name}_beanie_routes'
+        self.launch_file_name = self.proto_file_name + "_" + self.output_file_name_suffix
         self.client_file_name = f"{self.proto_file_name}_beanie_web_client"
         self.websocket_client_file_name = f'{self.proto_file_name}_websocket_client'
-        self.routes_callback_class_name = f"{self.proto_file_name}_routes_callback"
+        self.routes_callback_class_name = f"{self.proto_file_name}_beanie_routes_callback"
         routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
         self.routes_callback_class_name_capital_camel_cased: str = \
             routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
-        self.callback_override_set_instance_file_name = "callback_override_set_instance"
+        self.callback_override_set_instance_file_name = "beanie_callback_override_set_instance"
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
         # Pre-code generation initializations
@@ -448,7 +449,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
             self.routes_file_name+".py": self.handle_routes_file_gen(),
 
             # Adding project's run file
-            self.proto_file_name+"_"+self.output_file_name_suffix: self.handle_run_file_gen(),
+            self.launch_file_name: self.handle_run_file_gen(),
 
             # Adding client file
             self.client_file_name + ".py": self.handle_client_file_gen()

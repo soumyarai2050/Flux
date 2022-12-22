@@ -1,24 +1,39 @@
 # Scripts Document
 
-## First Step: 
-In order to run below scripts, you need the required python modules
-to be installed in your environment. To install them go to
-root directory and run below cmd:
+## Windows build / execute Requirements:
+1. Install WSL2 if using windows with ubuntu distribution
+2. Install protoc-compiler using below command in ubuntu<br>
+    `sudo apt install protobuf-compiler` <br>
+Note: Test is done in version *libprotoc 3.12.4*
+3. Install mongodb, steps available in 
+https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-ubuntu/#install-mongodb-community-edition-on-ubuntu <br>
+If you face - Depends on libssl1.1 but it is not installable, please follow first answer 
+on this link: https://askubuntu.com/questions/1403619/mongodb-install-fails-on-ubuntu-22-04-depends-on-libssl1-1-but-it-is-not-insta <br>
+- To run mongo first create mongo-dir directory(with any name) 
+somewhere and 2 more directories in mongo-dir, data and logs. 
+Add mongo.logs file in logs dir (with any name). Now run this cmd 
+in dir where mongo-dir exists, `mongod --logpath=mongo-dir/logs/mongo.log --dbpath=mongo-dir/data &`
+4. Check if python is installed in wsl. If python3 is present and python is not working then run:
+    `sudo ln -s /usr/bin/pyhton3.x /usr/bin/python`
+5. Clone FluxCodeGenEngine and PythonCore parallely.
+6. If you are in windows you need to run below commands in your
+FluxCodeGenEngine/Flux dir, <br>
+    `find . -name "*.py" | xargs dos2unix` <br>
+    `find . -name "*.sh" | xargs dos2unix` <br>
+Note: If dos2unix is not installed, use `sudo apt install dos2unix` 
+to install it.
+7. Now install required python modules by runnig below cmd in 
+FluxCodeGenEngine/Flux dir, <br>
+    `pip install -r requirements.txt` <br>
+Note: If pip is not installed, run `sudo apt install python3-pip`
+8. Now go to FluxCodeGenEngine/Flux/CodeGenProjects/pair_strat_engine/scripts
+dir and run `./build_web_project.sh` to generate server and UI files.
+9. To launch fastapi server, run `python launch_beanie_fastapi.py`
 
-`
-pip install -r requirements.txt
-`
-
-Also, Flux used protoc compiler to make use of proto models.
-Please install that as well. Test is done in version *libprotoc 3.12.4*
-
-Note: 
+### Key Note: 
 1. Any Generated file when needs to be moved to other directory,
 if contains fully qualified import path of any other file, needs to 
 be changed according to new location.
-2. Before using beanie one must install mongo in his environment
-3. Ubuntu 22.04 doesn't have official MongoDB packages yet, so the 
-best option now is to have Ubuntu 20.04, where official MongoDB packages are available.
 
 ## JSON Generators
 ### 1. gen_json_schema.py
@@ -109,7 +124,17 @@ to attach debugger to the plugin process
 *Usage*: bool to add reload attribute to uvicorn fastapi launch
 
 #### 9. HOST: 
-*Usage*: 
+*Usage*: Host will be used across the server and client for 
+CRUD operations
 
 #### 10. PORT:
-*Usage*: 
+*Usage*: Like Host, Port will also be used across the 
+server and client for CRUD operations
+
+
+## Common Errors
+1. If flux_options.proto file or it's pb2 file raises some
+option pertaining error, regenerating pb2 file of 
+flux_option.proto can solve it.
+2. Endpoint should end with /
+3. If behind proxy, set no proxy to make request to APIs

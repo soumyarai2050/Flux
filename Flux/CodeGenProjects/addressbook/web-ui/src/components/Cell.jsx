@@ -24,7 +24,8 @@ const useStyles = makeStyles({
     },
     tableCellCritical: {
         color: '#9C0006 !important',
-        background: '#ffc7ce'
+        background: '#ffc7ce',
+        animation: `$blink 0.5s step-start infinite`
     },
     tableCellError: {
         color: '#9C0006 !important',
@@ -61,6 +62,17 @@ const useStyles = makeStyles({
     textField: {
         background: 'white',
         minWidth: '50px !important'
+    },
+    "@keyframes blink": {
+        "from": {
+            opacity: 1
+        },
+        "50%": {
+            opacity: 0.8
+        },
+        "to": {
+            opacity: 1
+        }
     }
 })
 

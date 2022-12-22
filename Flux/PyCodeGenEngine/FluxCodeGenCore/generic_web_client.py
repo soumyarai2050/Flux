@@ -120,6 +120,7 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
     else:
         url = f"{url}/{query_param}"
     async with websockets.connect(url, ping_timeout=None) as ws:
+        data = None
         while True:
             try:
                 data = await asyncio.wait_for(ws.recv(), timeout=10.0)

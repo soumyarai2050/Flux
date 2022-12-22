@@ -61,6 +61,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.model_file_name: str = ""
         self.routes_file_name: str = ""
         self.client_file_name: str = ""
+        self.launch_file_name: str = ""
         self.routes_callback_class_name: str = ""
         self.routes_callback_class_name_capital_camel_cased: str = ""
         self.int_id_message_list: List[protogen.Message] = []
@@ -509,13 +510,13 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
                                                                "f'http://{host}:{port}/"+f"{self.proto_file_package}/"
                                                                f"delete-{message_name_snake_cased}'",
             FastApiClassGenPlugin.flux_json_root_read_websocket_field: f"get_{message_name_snake_cased}_client_ws_url: "
-                                                                       "str = f'http://{host}:{port}/" +
+                                                                       "str = f'ws://{host}:{port}/" +
                                                                        f"{self.proto_file_package}/get-"
                                                                        f"{message_name_snake_cased}-ws'"
         }
         output_str = "get_all_"+f"{message_name_snake_cased}"+"_client_url: str = f'http://{host}:{port}/" + \
                      f"{self.proto_file_package}/get-all-{message_name_snake_cased}'\n"
-        output_str += "get_all_"+f"{message_name_snake_cased}"+"_client_ws_url: str = f'http://{host}:{port}/" + \
+        output_str += "get_all_"+f"{message_name_snake_cased}"+"_client_ws_url: str = f'ws://{host}:{port}/" + \
                       f"{self.proto_file_package}/get-all-{message_name_snake_cased}-ws'\n"
 
         for crud_option_field_name, url in crud_field_name_to_url_dict.items():
@@ -574,9 +575,9 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str += f"from {callback_override_set_instamce_file_path} import " \
                       f"{self.callback_override_set_instance_file_name}\n"
         output_str += f"from FluxPythonUtils.scripts.utility_functions import configure_logger\n\n"
-        output_str += f'configure_logger("debug", log_file_name=os.getenv("LOG_FILE_PATH"))\n'
+        output_str += f'configure_logger(os.getenv("LOG_LEVEL"), log_file_name=os.getenv("LOG_FILE_PATH"))\n'
         output_str += "\n\n"
-        output_str += 'if __name__ == "__main__":\n'
+        output_str += f'def launch_{self.launch_file_name.split(".")[0]}():\n'
         output_str += f'    if reload_env := os.getenv("RELOAD"):\n'
         output_str += f'        reload_status: bool = True if reload_env.lower() == "true" else False\n'
         output_str += f'    else:\n'
@@ -600,10 +601,10 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
     def handle_POST_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
         output_str = f"    def create_{message_name_snake_cased}_pre(self, " \
-                     f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                     f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         output_str += f"    def create_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
 
@@ -615,27 +616,27 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             output_str = f"    def read_by_id_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
         output_str += "        pass\n\n"
         output_str += f"    def read_by_id_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
 
     def handle_PUT_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
         output_str = f"    def update_{message_name_snake_cased}_pre(self, " \
-                     f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                     f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         output_str += f"    def update_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
 
     def handle_PATCH_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
         output_str = f"    def partial_update_{message_name_snake_cased}_pre(self, " \
-                     f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                     f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         output_str += f"    def partial_update_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
 
@@ -647,7 +648,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             output_str = f"    def delete_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
         output_str += "        pass\n\n"
         output_str += f"    def delete_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
 
@@ -668,7 +669,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str = f"    def read_all_{message_name_snake_cased}_pre(self):\n"
         output_str += "        pass\n\n"
         output_str += f"    def read_all_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
 
@@ -685,26 +686,25 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str = f"    def index_of_{field.proto.name}_{message_name_snake_cased}_pre(self):\n"
         output_str += "        pass\n\n"
         output_str += f"    def index_of_{field.proto.name}_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}Type):\n"
+                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
-        return output_str
-
-    def _handle_class_type_hint(self) -> str:
-        output_str = ""
-        for message in self.root_message_list:
-            message_name = message.proto.name
-            output_str += f'{message_name}Type = TypeVar("{message_name}Type", bound="{message_name}")\n'
-        output_str += "\n\n"
         return output_str
 
     def handle_callback_class_file_gen(self) -> str:
         output_str = "import threading\n"
         output_str += "import logging\n"
-        output_str += "from typing import Optional, TypeVar\n\n"
+        output_str += "from typing import Optional, TypeVar\n"
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
+        output_str += f"from {model_file_path} import "
+        for message in self.root_message_list:
+            output_str += message.proto.name
+            if message != self.root_message_list[-1]:
+                output_str += ", "
+            else:
+                output_str += "\n\n\n"
         output_str += f"{self.routes_callback_class_name_capital_camel_cased}DerivedType = " \
                       f"TypeVar('{self.routes_callback_class_name_capital_camel_cased}DerivedType', " \
-                      f"bound='{self.routes_callback_class_name_capital_camel_cased}')\n"
-        output_str += self._handle_class_type_hint()
+                      f"bound='{self.routes_callback_class_name_capital_camel_cased}')\n\n\n"
         output_str += f"class {self.routes_callback_class_name_capital_camel_cased}:\n"
         output_str += f"    get_instance_mutex: threading.Lock = threading.Lock()\n"
         output_str += f"    {self.routes_callback_class_name}_instance: " \
@@ -782,8 +782,22 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
 
         return output_str
 
-    def handle_callback_override_set_instance_file_gen(self):
-        return "# File to contain injection of override callback instance using set instance"
+    def handle_callback_override_set_instance_file_gen(self) -> str:
+        output_str = "# File to contain injection of override callback instance using set instance\n\n"
+        output_str += "import logging\n"
+        # todo make changes to generic once override file is also added to generator
+        callback_override_path = self.import_path_from_os_path("OUTPUT_DIR",
+                                                               "strat_manager_service_beanie_routes_callback_override")
+        output_str += f"from {callback_override_path} import StratManagerServiceBeanieRoutesCallback, " \
+                      f"StratManagerServiceRoutesBeanieCallbackOverride\n\n\n"
+        output_str += "if StratManagerServiceBeanieRoutesCallback.strat_manager_service_beanie_routes_callback_instance is None:\n"
+        output_str += "    callback_override = StratManagerServiceRoutesBeanieCallbackOverride()\n"
+        output_str += "    StratManagerServiceBeanieRoutesCallback.set_instance(callback_override)\n"
+        output_str += "else:\n"
+        output_str += '    err_str = f"set instance called more than once in one session"\n'
+        output_str += '    logging.exception(err_str)\n'
+        output_str += '    raise Exception(err_str)\n'
+        return output_str
 
     def set_req_data_members(self, file: protogen.File):
         self.proto_file_name = str(file.proto.name).split('.')[0]
@@ -794,6 +808,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.main_file_name = f"{self.proto_file_name}_cache_main"
         self.model_file_name = f'{self.proto_file_name}_cache_model'
         self.routes_file_name = f'{self.proto_file_name}_cache_routes'
+        self.launch_file_name = self.proto_file_name + "_" + self.output_file_name_suffix
         self.client_file_name = f"{self.proto_file_name}_cache_web_client"
         self.routes_callback_class_name = f"{self.proto_file_name}_routes_callback"
         routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
@@ -811,17 +826,11 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             # Adding project´s main.py
             self.main_file_name + ".py": self.handle_main_file_gen(),
 
-            # Adding route's wrapper class
-            self.routes_callback_class_name + ".py": self.handle_callback_class_file_gen(),
-
-            # Adding empty callback override set_instance file
-            self.callback_override_set_instance_file_name + ".py": self.handle_callback_override_set_instance_file_gen(),
-
             # Adding project's routes.py
             self.routes_file_name + ".py": self.handle_routes_file_gen(),
 
             # Adding project's run file
-            self.proto_file_name + "_" + self.output_file_name_suffix: self.handle_run_file_gen(),
+            self.launch_file_name: self.handle_run_file_gen(),
 
             # Adding client file
             self.client_file_name + ".py": self.handle_client_file_gen()
