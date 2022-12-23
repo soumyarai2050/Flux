@@ -16,6 +16,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlug
 # Required for accessing custom options from schema
 from Flux.PyCodeGenEngine.PluginJSONSchema import insertion_imports
 
+
 class JsonSchemaConvertPlugin(BaseProtoPlugin):
     """
     Plugin script to convert proto schema to json schema
@@ -62,6 +63,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     flux_fld_sequence_number: str = "FluxFldSequenceNumber"
     flux_fld_val_is_datetime: str = "FluxFldValIsDateTime"
     flux_fld_button: str = "FluxFldButton"
+    flux_msg_title: str = "FluxMsgTitle"
+    flux_fld_title: str = "FluxFldTitle"
     # Below field name 'id' must only be used intentionally in beanie pydentic models to make custom type
     # of primary key in that model
     default_id_field_name: str = "id"
@@ -346,6 +349,29 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                             f'{sequence_number},\n'
         return output_str
 
+    def __underlying_handle_title_output(self, field_or_msg_obj: protogen.Field | protogen.Message) -> str | None:
+        if isinstance(field_or_msg_obj, protogen.Field):
+            if JsonSchemaConvertPlugin.flux_fld_title in str(field_or_msg_obj.proto.options):
+                title_option_value = \
+                    self.get_non_repeated_valued_custom_option_value(field_or_msg_obj.proto.options,
+                                                                     JsonSchemaConvertPlugin.flux_fld_title)
+                return title_option_value
+            else:
+                return None
+        elif isinstance(field_or_msg_obj, protogen.Message):
+            if JsonSchemaConvertPlugin.flux_msg_title in str(field_or_msg_obj.proto.options):
+                title_option_value = \
+                    self.get_non_repeated_valued_custom_option_value(field_or_msg_obj.proto.options,
+                                                                     JsonSchemaConvertPlugin.flux_msg_title)
+                return title_option_value
+            else:
+                return None
+        else:
+            err_str = f"Unexpected type instance received, must be either protogen.Field or protogen.Message, " \
+                      f"got {type(field_or_msg_obj)}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
     def __underlying_fld_output_handler(self, field: protogen.Field, init_space_count: int) -> str:
         field_name: str = field.proto.name
         if field_name == JsonSchemaConvertPlugin.default_id_field_name:
@@ -378,22 +404,28 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         # Adding leading comment as FluxFldCmnt attribute
         json_msg_str += self.__handle_fld_leading_comment_as_attribute(field, init_space_count + 2)
 
-        field_name_spaced = str(field.proto.name).replace("_", " ")
-        json_msg_str += ' ' * (init_space_count + 2) + f'"title": "{field_name_spaced}",\n'
+        if (title_option_value := self.__underlying_handle_title_output(field)) is not None:
+            json_msg_str += ' ' * (init_space_count + 2) + f'"title": {title_option_value},\n'
+        else:
+            field_name_spaced = str(field.proto.name).replace("_", " ")
+            json_msg_str += ' ' * (init_space_count + 2) + f'"title": "{field_name_spaced}",\n'
         json_msg_str += self.__handle_fld_sequence_number_attribute(field, init_space_count + 2)
-        underlying_type_title_case_styled = self.__case_style_convert_method("underlying_type")
+        underlying_type_attr_case_styled = self.__case_style_convert_method("underlying_type")
         if underlying_type != json_type:
             json_msg_str += ' ' * (init_space_count + 2) + \
-                            f'"{underlying_type_title_case_styled}": "{underlying_type}",\n'
+                            f'"{underlying_type_attr_case_styled}": "{underlying_type}",\n'
         # else not required: if underlying_type and json_type are same then avoiding underlying type
         json_msg_str += self.__handle_field_json_type_schema(field, init_space_count + 2, json_type)
         return json_msg_str
 
     def __underlying_json_output_handler(self, message: protogen.Message, init_space_count: int) -> str:
         json_msg_str = ""
-        # Space separated names
-        message_name_spaced = self.convert_camel_case_to_specific_case(message.proto.name, " ", False)
-        json_msg_str += ' '*init_space_count + f'"title": "{message_name_spaced}",\n'
+        if (title_option_value := self.__underlying_handle_title_output(message)) is not None:
+            json_msg_str += ' ' * init_space_count + f'"title": {title_option_value},\n'
+        else:
+            # Space separated names
+            message_name_spaced = self.convert_camel_case_to_specific_case(message.proto.name, " ", False)
+            json_msg_str += ' '*init_space_count + f'"title": "{message_name_spaced}",\n'
         json_msg_str += ' '*init_space_count + '"type": "object",\n'
         json_msg_str += ' '*init_space_count + '"properties": {\n'
 

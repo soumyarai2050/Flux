@@ -20,10 +20,10 @@ message PairStratParams{
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   // server provided via security auto complete list (if available)
   required Security leg1_sec = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:CB_List, sec_type=TICKER", (FluxFldHelp) = "CB Tickers"];
-  // server provided via security auto complete list (if available). Open price OR Close Price OR Last Price
+  // server provided via security auto complete list (if available). Open px OR Close px OR Last px
   optional ReferencePx leg1_sec_reference_px = 3;
   required Security leg2_sec = 4 [(FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER", (FluxFldHelp) = "EQT Tickers"];
-  // server provided via security auto complete list (if available). Open price OR Close Price OR Last Price
+  // server provided via security auto complete list (if available). Open px OR Close px OR Last px
   optional ReferencePx leg2_sec_reference_px = 5;
   required Side leg1_side = 6 [default = SIDE_UNSPECIFIED, (FluxFldOrmNoUpdate) = true];
   // default: same as portfolio eligible_brokers except filtered by symbol + allow mod down, reduce portfolio lvl & save
@@ -105,10 +105,10 @@ message OrderLimits{
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required int32 max_price_levels = 2 [(FluxFldSequenceNumber) = 1];
+  required int32 max_px_levels = 2 [(FluxFldSequenceNumber) = 1];
   required int32 max_basis_points = 3 [(FluxFldValMax) = "15", (FluxFldSequenceNumber) = 2];
   required int32 max_cb_order_notional = 4 [(FluxFldSequenceNumber) = 3, (FluxFldHelp) = "open+executed; max ord eqt notional derived (hedge ratio)"];
-  required float max_px_deviation = 5 [default = 2, (FluxFldSequenceNumber) = 4, (FluxFldHelp) = "% of Last Traded Price"];
+  required float max_px_deviation = 5 [default = 2, (FluxFldSequenceNumber) = 4, (FluxFldHelp) = "% of Last Traded px"];
 }
 
 //Widget - 6

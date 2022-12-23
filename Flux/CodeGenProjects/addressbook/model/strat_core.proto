@@ -67,13 +67,13 @@ enum StratState{
 }
 
 message ReferencePx{
-  required float price = 1;
-  required ReferencePxType reference_price_type = 2;
+  required float px = 1;
+  required ReferencePxType reference_px_type = 2;
 }
 
 message Quote{
-  required float price = 1;
-  required int64 quantity = 2;
+  required float px = 1;
+  required int64 qty = 2;
 }
 
 // stores all position types from all sources for optimal selection, usage and clearance
@@ -96,7 +96,7 @@ message Position{
 
 message SecPosition{
   required Security security = 1[(FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER", (FluxFldHelp) = "EQT Tickers"];
-  // Open price OR Close Price OR Last Price
+  // Open px OR Close px OR Last px
   optional ReferencePx reference_px = 2;
   // per position type (PTH, LOCATE, LONG)
   repeated Position positions = 3;

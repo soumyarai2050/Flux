@@ -113,6 +113,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgLayout = 55253;  // Supported values : "Table", "Tree" and "Manual"
   optional bool FluxMsgServerPopulate = 55254; // Use this to signal msg not to populate from UI, populate from server
   optional WidgetUIData FluxMsgWidgetUIData = 55255; // Use this to populate ui widget data for layout messages
+  optional string FluxMsgTitle = 55263; //Set this value to override default title value in schema
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;
@@ -161,6 +162,7 @@ extend google.protobuf.FieldOptions
   optional string FluxFldAlertBubbleSource = 55260; //x-path to any repeated field: bubble shows if repeat field is non 0
   optional string FluxFldAlertBubbleColor = 55261; //x-path to any field with values bound to either of [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]. If this field is in a repeat group, the highest severity in order as defined in this comment of all in collection applies
   optional string FluxFldUIPlaceholder = 55262; //placeholder for UI to display in grayed out font as user action hint
+  optional string FluxFldTitle = 55263; //Set this value to override default title value in schema
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

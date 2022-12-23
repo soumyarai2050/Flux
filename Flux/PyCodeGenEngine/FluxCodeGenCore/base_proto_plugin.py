@@ -113,6 +113,10 @@ class BaseProtoPlugin(ABC):
         else:
             return BaseProtoPlugin.non_capitalized_to_camel_case(value)
 
+    def convert_to_capitalized_camel_case(self, value: str) -> str:
+        value_camel_cased = self.convert_to_camel_case(value)
+        return value_camel_cased[0].upper() + value_camel_cased[1:]
+
     @staticmethod
     def capitalized_to_camel_case(value: str) -> str:
         if acronyms_list := BaseProtoPlugin.find_acronyms_in_string(value):
