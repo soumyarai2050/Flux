@@ -207,8 +207,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.non_root_type:
             output_str += "                    xpath={currentSchemaXpath}\n"
         output_str += "                    onUserChange={onUserChange}\n"
-        if layout_type == JsxFileGenPlugin.root_type:
-            output_str += "                    onButtonToggle={onButtonToggle}\n"
+        output_str += "                    onButtonToggle={onButtonToggle}\n"
         output_str += "                />\n"
         output_str += "            ) : layout === Layouts.TREE_LAYOUT ? (\n"
         output_str += "                <TreeWidget\n"
@@ -243,8 +242,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == self.non_root_type:
             output_str += "                    xpath={currentSchemaXpath}\n"
         output_str += "                    onUserChange={onUserChange}\n"
-        if layout_type == JsxFileGenPlugin.root_type:
-            output_str += "                    onButtonToggle={onButtonToggle}\n"
+        output_str += "                    onButtonToggle={onButtonToggle}\n"
         output_str += "                />\n"
         output_str += "            ) : (\n"
         output_str += "                <h1>Unsupported Layout</h1>\n"
@@ -709,10 +707,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"                    dispatch(set{self.abbreviated_dependent_message_name}Array(" \
                           f"[...updatedArray, updatedData]));\n"
             output_str += "                }\n"
-            output_str += "            }\n\n"
-            output_str += f"            {abbreviated_dependent_msg_camel_cased}GetAllWebsocket.onclose = (event) => " \
-                          f"" + "{\n"
-            output_str += "                dispatch(setMode(Modes.DISABLED_MODE));\n"
             output_str += "            }\n"
             output_str += "        }\n"
             output_str += "    }, " + \
@@ -857,12 +851,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "    }\n\n"
         else:
+            output_str += "    if (mode === Modes.DISABLED_MODE) {\n"
+            output_str += "        return (\n"
+            output_str += "            <h1>Connection lost. Please refresh...</h1>\n"
+            output_str += "        )\n"
+            output_str += "    }\n\n"
             if layout_type == JsxFileGenPlugin.root_type:
-                output_str += "    if (mode === Modes.DISABLED_MODE) {\n"
-                output_str += "        return (\n"
-                output_str += "            <h1>Connection lost. Please refresh...</h1>\n"
-                output_str += "        )\n"
-                output_str += "    }\n\n"
                 output_str += "    const onChangeMode = () => {\n"
                 output_str += "        setMode(Modes.EDIT_MODE);\n"
                 output_str += "    }\n\n"

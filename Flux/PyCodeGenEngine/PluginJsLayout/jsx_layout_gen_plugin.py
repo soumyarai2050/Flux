@@ -70,7 +70,6 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += f"<ToggleIcon title='{message_name_space_sep}' name='{message_name_case_styled}' selected=" + \
                           "{show."+f"{message_name_case_styled}"+"} onClick={onToggleWidget}>\n"
             output_str += "    {getIconText('"+f"{message_name_case_styled}"+"')}\n"
-            output_str += "    {/* <Widgets className={classes.icon} fontSize='large' /> */}\n"
             output_str += "</ToggleIcon>\n"
         return output_str
 
@@ -80,7 +79,7 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             message_name = message.proto.name
             message_name_case_styled = self.case_style_convert_method(message_name)
             output_str += "{"+f"show.{message_name_case_styled} &&\n"
-            output_str += "    <Paper key='"+f"{message_name_case_styled}'" + \
+            output_str += "    <Paper key='"+f"{message_name_case_styled}' id='{message_name_case_styled}'" + \
                           " className={classes.widget} data-grid={getLayoutById("+f"'{message_name_case_styled}'"+")}>\n"
             output_str += f'        <{message.proto.name} name="{message_name_case_styled}"\n'
             output_str += f'        />\n'

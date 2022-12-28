@@ -56,7 +56,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         "FluxFldAbbreviated",
         "FluxFldAlertBubbleSource",
         "FluxFldAlertBubbleColor",
-        "FluxFldValMin"
+        "FluxFldValMax"
     ]
     flx_msg_attribute_options: List[str] = [
         "FluxMsgLayout",
@@ -273,7 +273,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return temp_str
 
     def __handle_options_value_case_having_msg_fld_name(self, option_value: str):
-        if "-" in option_value or "." in option_value:
+        # checking if option_value is not float type and is relevant to be used here
+        if type(option_value).__name__ == "str" and \
+                (("-" in option_value or "." in option_value) and any(char.isalpha() for char in option_value)):
             option_value_hyphen_separated = option_value[1:-1].split("-")
             temp_list_1 = []
 

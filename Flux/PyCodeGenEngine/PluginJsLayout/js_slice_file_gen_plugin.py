@@ -117,13 +117,13 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_message_name = self.dependent_message_relation_dict[message_name]
                 dependent_message_name_camel_cased = self.capitalized_to_camel_case(dependent_message_name)
                 output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', (payload, "+"{ dispatch, getState }) => " + "{\n"
-                output_str += "    const { data, abbreviated, loadedKeyName } = payload;\n"
+                output_str += "    let { data, abbreviated, loadedKeyName } = payload;\n"
+                output_str += "    abbreviated = abbreviated.substring(0, abbreviated.indexOf('$'));\n"
                 output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + "`, data)\n"
                 output_str += "        .then(res => {\n"
                 output_str += "            let state = getState();\n"
                 output_str += f"            let updatedData = cloneDeep(state.{dependent_message_name_camel_cased}" \
                               f".{dependent_message_name_camel_cased});\n"
-                loaded_strat_keys_style_cased = self.case_style_convert_method("loaded_strat_keys")
                 output_str += f"            let newStrat = res.data;\n"
                 output_str += "            let newStratKey = abbreviated.split('-').map(xpath => _.get(newStrat, " \
                               "xpath.substring(xpath.indexOf('.') + 1)));\n"
