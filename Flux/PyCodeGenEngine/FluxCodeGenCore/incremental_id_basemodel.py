@@ -15,20 +15,7 @@ class CacheBaseModel(BaseModel):
     _mutex: ClassVar[Lock] = Lock()
 
     @classmethod
-    def get_all_cached_obj(cls) -> Dict[Any, Any]:
-        return cls._cache_obj_id_to_obj_dict
-
-    @classmethod
-    def add_data_in_cache(cls, obj_id: Any, obj: Any) -> bool:
-        with cls._mutex:
-            if obj_id in cls._cache_obj_id_to_obj_dict:
-                return False
-            else:
-                cls._cache_obj_id_to_obj_dict[obj_id] = obj
-                return True
-
-    @classmethod
-    def get_data_from_cache(cls, obj_id: Any) -> Any | None:
+    async def get(cls, obj_id: Any):
         with cls._mutex:
             if obj_id not in cls._cache_obj_id_to_obj_dict:
                 return None
@@ -36,44 +23,46 @@ class CacheBaseModel(BaseModel):
                 return cls._cache_obj_id_to_obj_dict[obj_id]
 
     @classmethod
-    def replace_data_in_cache(cls, obj_id: Any, obj: Any) -> bool:
-        with cls._mutex:
-            if obj_id not in cls._cache_obj_id_to_obj_dict:
-                return False
-            else:
-                cls._cache_obj_id_to_obj_dict[obj_id] = obj
-                return True
+    def find_all(cls):
+        return cls
 
     @classmethod
-    def patch_data_in_cache(cls, obj_id: Any, obj: Any) -> bool:
-        with cls._mutex:
-            if obj_id not in cls._cache_obj_id_to_obj_dict:
-                return False
+    async def to_list(cls):
+        return list(cls._cache_obj_id_to_obj_dict.values())
+
+    async def create(self):
+        with self._mutex:
+            if self.id in self._cache_obj_id_to_obj_dict:
+                err_str = f"Id: {self.id} already exists"
+                raise Exception(err_str)
             else:
-                existing_obj: BaseModel = cls._cache_obj_id_to_obj_dict[obj_id]
-                update_data = obj.dict(exclude_unset=True, exclude_none=True)
-                updated_obj = existing_obj.copy(update=update_data)
-                cls._cache_obj_id_to_obj_dict[obj_id] = updated_obj
-                return True
+                self._cache_obj_id_to_obj_dict[self.id] = self
+                return self
 
-    @classmethod
-    def delete_data_in_cache(cls, obj_id: Any) -> bool:
-        with cls._mutex:
-            if obj_id not in cls._cache_obj_id_to_obj_dict:
-                return False
+    async def update(self, request_obj: Dict):
+        update_data = dict(request_obj)["$set"]
+        self.__dict__.update(dict(update_data))
+
+    async def delete(self):
+        with self._mutex:
+            if self.id not in self._cache_obj_id_to_obj_dict:
+                err_str = f"Id: {self.id} Doesn't exists"
+                raise Exception(err_str)
             else:
-                del cls._cache_obj_id_to_obj_dict[obj_id]
-                return True
+                del self._cache_obj_id_to_obj_dict[self.id]
 
 
-class CamelCacheBaseModel(CacheBaseModel):
-
+class CamelBaseModel(BaseModel):
     class Config:
         alias_generator = to_camel
         allow_population_by_field_name =  True
 
 
-class IncrementalIdCacheBaseModel(CacheBaseModel):
+class CamelCacheBaseModel(CacheBaseModel, CamelBaseModel):
+    ...
+
+
+class IncrementalIdBaseModel(BaseModel):
     _max_id_val: ClassVar[int | None] = None
     _mutex: ClassVar[Lock] = Lock()
     read_ws_path_ws_connection_manager: ClassVar[Any] = None
@@ -100,26 +89,22 @@ class IncrementalIdCacheBaseModel(CacheBaseModel):
                 raise Exception(err_str)
 
 
-class IncrementalIdCamelCacheBaseModel(CamelCacheBaseModel):
+class IncrementalIdCamelBaseModel(IncrementalIdBaseModel, CamelBaseModel):
     _max_id_val: ClassVar[int | None] = None
     _mutex: ClassVar[Lock] = Lock()
+    read_ws_path_ws_connection_manager: ClassVar[Any] = None
+    read_ws_path_with_id_ws_connection_manager: ClassVar[Any] = None
 
-    @classmethod
-    def init_max_id(cls, max_val: int) -> None:
-        """
-        This method must be called just after db is initialized, and it must be
-        passed with current max id (if recovering) or 0 (if starting fresh)
-        """
-        cls._max_id_val = max_val
 
-    @classmethod
-    def next_id(cls) -> int:
-        with cls._mutex:
-            if cls._max_id_val is not None:
-                cls._max_id_val += 1
-                return cls._max_id_val
-            else:
-                err_str = "init_max_id needs to be called to initialize max_id before calling get_auto_increment_id, " \
-                          f"occurred in model: {cls.__name__}"
-                logging.exception(err_str)
-                raise Exception(err_str)
+class IncrementalIdCacheBaseModel(CacheBaseModel, IncrementalIdBaseModel):
+    _max_id_val: ClassVar[int | None] = None
+    _mutex: ClassVar[Lock] = Lock()
+    read_ws_path_ws_connection_manager: ClassVar[Any] = None
+    read_ws_path_with_id_ws_connection_manager: ClassVar[Any] = None
+
+
+class IncrementalIdCamelCacheBaseModel(CamelCacheBaseModel, IncrementalIdBaseModel):
+    _max_id_val: ClassVar[int | None] = None
+    _mutex: ClassVar[Lock] = Lock()
+    read_ws_path_ws_connection_manager: ClassVar[Any] = None
+    read_ws_path_with_id_ws_connection_manager: ClassVar[Any] = None

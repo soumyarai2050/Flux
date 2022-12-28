@@ -31,6 +31,10 @@ const useStyles = makeStyles({
         '&:hover': {
             backgroundColor: '#ddd !important'
         }
+    },
+    menuContainer: {
+        display: 'inline-flex',
+        alignItems: 'center'
     }
 })
 
@@ -66,7 +70,7 @@ const WidgetContainer = (props) => {
                 <div className={classes.widgetHeader}>
                     <span>{props.title}</span>
                     <span>{props.centerText}</span>
-                    <div>
+                    <div className={classes.menuContainer}>
                         {props.menu}
                         {modeMenu}
                         {layoutMenu}

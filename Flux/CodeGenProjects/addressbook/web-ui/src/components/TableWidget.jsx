@@ -5,7 +5,7 @@ import {
     TableContainer, Table, TableBody, TableRow, TableCell, DialogTitle, DialogContent, DialogContentText,
     DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog
 } from '@mui/material';
-import { generateRowTrees, generateRowsFromTree, addxpath, clearxpath } from '../utils';
+import { generateRowTrees, generateRowsFromTree, addxpath, clearxpath, getTableRows, getTableColumns, getCommonKeyCollections } from '../utils';
 import { Settings, Close, Visibility, VisibilityOff } from '@mui/icons-material';
 import { DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
@@ -83,87 +83,25 @@ const TableWidget = (props) => {
 
     useEffect(() => {
         let trees = generateRowTrees(cloneDeep(data), props.collections, props.xpath);
-        let tableRows = generateRowsFromTree(trees, props.collections, props.xpath);
-        let originalTrees = generateRowTrees(addxpath(cloneDeep(props.originalData)), props.collections, props.xpath);
-        let originalTableRows = generateRowsFromTree(originalTrees, props.collections, props.xpath);
-
-        // combine the original and modified data rows
-        for (let i = 0; i < originalTableRows.length; i++) {
-            if (i < tableRows.length) {
-                if (originalTableRows[i]['data-id'] !== tableRows[i]['data-id']) {
-                    if (!tableRows.filter(row => row['data-id'] === originalTableRows[i]['data-id'])[0]) {
-                        let row = originalTableRows[i];
-                        row['data-remove'] = true;
-                        tableRows.splice(i, 0, row);
-                    }
-                }
-            } else {
-                let row = originalTableRows[i];
-                row['data-remove'] = true;
-                tableRows.splice(i, 0, row);
-            }
-        }
-        for (let i = 0; i < tableRows.length; i++) {
-            if (!originalTableRows.filter(row => row['data-id'] === tableRows[i]['data-id'])[0]) {
-                tableRows[i]['data-add'] = true;
-            }
-        }
-
+        let tableRows = getTableRows(props.collections, props.originalData, data, props.xpath);
         setRowTrees(trees);
         setRows(tableRows);
-    }, [props.collections, data])
+    }, [props.collections, props.originalData, data, props.xpath])
 
     useEffect(() => {
-        let updatedCells = props.collections.map(col => Object.assign({}, col)).filter((col) => {
-            if ([DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.STRING, DataTypes.ENUM].includes(col.type)) {
-                return true;
-            } else if (col.abbreviated && col.abbreviated === "JSON") {
-                return true;
-            }
-            return false;
-        })
-        if (!hide) {
-            updatedCells = updatedCells.map(cell => {
-                cell.hide = false;
-                return cell;
-            })
-        }
-
-        setHeadCells(updatedCells);
-    }, [props.collections, props.mode, rows, hide])
+        let tableColumns = getTableColumns(props.collections);
+        setHeadCells(tableColumns);
+    }, [props.collections, props.mode, hide])
 
     useEffect(() => {
-        let commons = [];
-        if (rows.length > 0 && props.mode !== Modes.EDIT_MODE) {
-            headCells.map((cell) => {
-                if (cell.hide) return;
-
-                let found = true;
-                for (let i = 0; i < rows.length - 1; i++) {
-                    if (rows[i][cell.tableTitle] !== rows[i + 1][cell.tableTitle]) {
-                        found = false;
-                    }
-                }
-                if (found) {
-                    let commonkey = cell;
-                    commonkey.value = rows[0][cell.tableTitle];
-                    // if (cell.abbreviated && cell.abbreviated === "JSON") {
-                    //     commonkey.value = "JSON"
-                    // } else {
-                    //     commonkey.value = rows[0][cell.tableTitle];
-                    // }
-                    commons.push(commonkey);
-                }
-                return cell;
-            })
-        }
-        setCommonkeys(commons);
-    }, [headCells, rows, props.mode])
+        let commonKeyCollections = getCommonKeyCollections(rows, headCells, props.mode)
+        setCommonkeys(commonKeyCollections);
+    }, [rows, headCells, props.mode])
 
     function getFilteredCells() {
         let updatedCells = headCells.filter(cell => !cell.hide);
         updatedCells = updatedCells.filter(cell => {
-            if (commonkeys.filter(commonkey => commonkey.key === cell.key).length > 0) {
+            if (commonkeys.filter(commonkey => commonkey.key === cell.key).length > 0 && props.mode !== Modes.EDIT_MODE) {
                 return false;
             }
             return true;
@@ -472,6 +410,7 @@ const TableWidget = (props) => {
                                                     onUpdate={props.onUpdate}
                                                     onAbbreviatedFieldOpen={onAbbreviatedFieldOpen}
                                                     onDoubleClick={onRowClick}
+                                                    onButtonToggle={props.onButtonToggle}
                                                     onUserChange={props.onUserChange}
                                                 />
                                             )

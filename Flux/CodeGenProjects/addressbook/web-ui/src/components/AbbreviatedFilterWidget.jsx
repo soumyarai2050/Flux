@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
 import { Autocomplete, Box, TextField, Button, Divider, List, ListItem, ListItemButton, ListItemText, Chip, Badge } from '@mui/material';
 import { makeStyles } from '@mui/styles';
 import WidgetContainer from './WidgetContainer';
@@ -6,10 +7,16 @@ import { Download, Delete } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import Icon from './Icon';
 import _ from 'lodash';
-import { DB_ID, Modes } from '../constants';
+import { DB_ID, Modes, DataTypes } from '../constants';
 import Alert from './Alert';
 import AlertBubble from './AlertBubble';
-import { getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey } from '../utils';
+import {
+    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getColorTypeFromValue,
+    getSizeFromValue, getShapeFromValue, normalise, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore
+} from '../utils';
+import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
+import ValueBasedToggleButton from './ValueBasedToggleButton';
+import { ValueBasedProgressBar } from './ValueBasedProgressBar';
 
 const useStyles = makeStyles({
     autocompleteDropdownContainer: {
@@ -24,7 +31,7 @@ const useStyles = makeStyles({
         margin: '0 5px !important'
     },
     listItem: {
-        padding: '0 10px'
+        padding: '0px 10px 10px'
     },
     badge: {
         margin: '0 10px'
@@ -32,8 +39,20 @@ const useStyles = makeStyles({
 })
 
 const AbbreviatedFilterWidget = (props) => {
-
+    const state = useSelector(state => state);
     const classes = useStyles();
+
+    const onButtonClick = (e, action, xpath, value) => {
+        if (action === 'flux_toggle') {
+            let updatedData = flux_toggle(value);
+            props.onButtonToggle(e, xpath, updatedData);
+        } else if (action === 'flux_trigger_strat') {
+            let updatedData = flux_trigger_strat(value);
+            if (updatedData) {
+                props.onButtonToggle(e, xpath, updatedData);
+            }
+        }
+    }
 
     return (
         <WidgetContainer
@@ -68,6 +87,18 @@ const AbbreviatedFilterWidget = (props) => {
                     let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
                     let alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
                     let alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+
+                    let extraProps = [];
+                    if (props.abbreviated.indexOf('$') !== -1) {
+                        props.abbreviated.substring(props.abbreviated.indexOf('$') + 1).split('$').forEach(source => {
+                            let object = {};
+                            object.key = source.split('.').pop();
+                            object.collection = props.itemCollections.filter(col => col.key === object.key)[0];
+                            object.value = _.get(metadata, object.collection.xpath);
+                            extraProps.push(object);
+                        })
+                    }
+
                     return (
                         <ListItem key={i} className={classes.listItem} selected={props.selected === id} disablePadding >
                             {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
@@ -76,6 +107,64 @@ const AbbreviatedFilterWidget = (props) => {
                                     {item}
                                 </ListItemText>
                             </ListItemButton>
+                            {extraProps.map(extraProp => {
+                                let collection = extraProp.collection;
+                                if (collection.type === 'button') {
+                                    let checked = String(extraProp.value) === collection.button.pressed_value_as_text;
+                                    let xpath = collection.xpath;
+                                    let color = getColorTypeFromValue(collection, String(extraProp.value));
+                                    let size = getSizeFromValue(collection.button.button_size);
+                                    let shape = getShapeFromValue(collection.button.button_type);
+                                    let caption = String(extraProp.value);
+
+                                    if (checked && collection.button.pressed_caption) {
+                                        caption = collection.button.pressed_caption;
+                                    } else if (!checked && collection.button.unpressed_caption) {
+                                        caption = collection.button.unpressed_caption;
+                                    }
+
+                                    return (
+                                        <ValueBasedToggleButton
+                                            key={collection.key}
+                                            size={size}
+                                            shape={shape}
+                                            color={color}
+                                            value={extraProp.value}
+                                            caption={caption}
+                                            xpath={xpath}
+                                            action={collection.button.action}
+                                            onClick={onButtonClick}
+                                        />
+                                    )
+                                } else if (collection.type === 'progressBar') {
+                                    let value = extraProp.value;
+                                    if (value === undefined) return;
+
+                                    let min = collection.min;
+                                    if (typeof (min) === DataTypes.STRING) {
+                                        let sliceName = toCamelCase(min.split('.')[0]);
+                                        let propertyName = 'modified' + capitalizeCamelCase(min.split('.')[0]);
+                                        let minxpath = min.substring(min.indexOf('.') + 1);
+                                        min = getValueFromReduxStore(state, sliceName, propertyName, minxpath);
+                                    }
+                                    let max = collection.max;
+                                    if (typeof (max) === DataTypes.STRING) {
+                                        let sliceName = toCamelCase(max.split('.')[0]);
+                                        let propertyName = 'modified' + capitalizeCamelCase(max.split('.')[0]);
+                                        let maxxpath = max.substring(max.indexOf('.') + 1);
+                                        max = getValueFromReduxStore(state, sliceName, propertyName, maxxpath);
+                                    }
+
+                                    let percentage = normalise(value, max, min);
+                                    let color = getColorTypeFromPercentage(collection, percentage);
+
+                                    return (
+                                        <Box key={collection.key} sx={{ minWidth: '95%', position: 'absolute', bottom: 0 }}>
+                                            <ValueBasedProgressBar percentage={percentage} value={value} min={min} max={max} color={color} />
+                                        </Box>
+                                    )
+                                }
+                            })}
                             <Icon title='Unload' disabled={disabled} onClick={() => props.onUnload(item)}>
                                 <Delete fontSize='small' />
                             </Icon>

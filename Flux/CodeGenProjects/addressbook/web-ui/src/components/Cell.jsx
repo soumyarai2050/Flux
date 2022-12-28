@@ -1,11 +1,16 @@
 import React, { useState } from 'react';
-import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete } from '@mui/material';
+import { useSelector } from 'react-redux';
+import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener } from '@mui/material';
 import _, { cloneDeep } from 'lodash';
 import { makeStyles } from '@mui/styles';
-import { clearxpath, getDataxpath } from '../utils';
+import { clearxpath, getDataxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue, toCamelCase, capitalizeCamelCase, getValueFromReduxStore, normalise, getColorTypeFromPercentage } from '../utils';
 import { ColorTypes, DataTypes, Modes } from '../constants';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
+import { AbbreviatedJsonTooltip } from './AbbreviatedJsonWidget';
+import { flux_toggle } from '../projectSpecificUtils';
+import ValueBasedToggleButton from './ValueBasedToggleButton';
+import { ValueBasedProgressBar } from './ValueBasedProgressBar';
 
 const useStyles = makeStyles({
     previousValue: {
@@ -20,7 +25,10 @@ const useStyles = makeStyles({
         maxWidth: 150,
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'nowrap',
+        textDecoration: 'underline',
+        color: 'blue !important',
+        fontWeight: 'bold !important'
     },
     tableCellCritical: {
         color: '#9C0006 !important',
@@ -44,11 +52,14 @@ const useStyles = makeStyles({
         background: '#ccc'
     },
     tableCellRemove: {
-        textDecoration: 'line-through',
+        textDecoration: 'line-through !important',
         background: '#ffc7ce !important'
     },
     tableCellDisabled: {
         background: '#ccc'
+    },
+    tableCellButton: {
+        padding: '0px !important'
     },
     select: {
         background: 'white',
@@ -78,6 +89,8 @@ const useStyles = makeStyles({
 
 const Cell = (props) => {
     const [active, setActive] = useState(false);
+    const [open, setOpen] = useState(false);
+    const state = useSelector(state => state);
     const { data, originalData, row, propname, proptitle, mode, collections } = props;
     const classes = useStyles();
 
@@ -87,6 +100,14 @@ const Cell = (props) => {
 
     const onFocusOut = () => {
         setActive(false);
+    }
+
+    const onOpenTooltip = () => {
+        setOpen(true);
+    }
+
+    const onCloseTooltip = () => {
+        setOpen(false);
     }
 
     const onTextChange = (e, type, xpath, value) => {
@@ -119,6 +140,13 @@ const Cell = (props) => {
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);
+    }
+
+    const onButtonClick = (e, action, xpath, value) => {
+        if (action === 'flux_toggle') {
+            let updatedData = flux_toggle(value);
+            props.onButtonToggle(e, xpath, updatedData);
+        }
     }
 
     let collection = collections.filter(col => col.tableTitle === proptitle)[0];
@@ -220,7 +248,7 @@ const Cell = (props) => {
             )
         } else if (type === DataTypes.NUMBER) {
             let decimalScale = 2;
-            if (props.data.underlyingtype === DataTypes.INT32) {
+            if (props.data.underlyingtype === DataTypes.INT32 || props.data.underlyingtype === DataTypes.INT64) {
                 decimalScale = 0;
             }
             let value = row[proptitle] ? row[proptitle] : 0;
@@ -244,7 +272,7 @@ const Cell = (props) => {
                     />
                 </TableCell>
             )
-        } else {
+        } else if (type === DataTypes.STRING && !collection.abbreviated) {
             let value = row[proptitle];
             return (
                 <TableCell align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
@@ -278,14 +306,102 @@ const Cell = (props) => {
         )
     }
 
-    if (type === DataTypes.OBJECT || type === DataTypes.ARRAY) {
-        let updatedData = proptitle ? clearxpath(cloneDeep(row[proptitle])) : {};
-        let text = JSON.stringify(updatedData)
+    if (type === 'button') {
+        let value = row[proptitle];
+        if (value === undefined) return;
+
+        let checked = String(value) === collection.button.pressed_value_as_text;
+        let color = getColorTypeFromValue(collection, String(value));
+        let size = getSizeFromValue(collection.button.button_size);
+        let shape = getShapeFromValue(collection.button.button_type);
+        let caption = String(value);
+
+        if (checked && collection.button.pressed_caption) {
+            caption = collection.button.pressed_caption;
+        } else if (!checked && collection.button.unpressed_caption) {
+            caption = collection.button.unpressed_caption;
+        }
         return (
-            <TableCell className={classes.abbreviatedJsonCell} align='center' size='medium' onClick={() => props.onAbbreviatedFieldOpen(updatedData)}>
-                <span>{text}</span>
-            </TableCell >
+            <TableCell className={classes.tableCellButton} align='center' size='medium'>
+                <ValueBasedToggleButton
+                    size={size}
+                    shape={shape}
+                    color={color}
+                    value={value}
+                    caption={caption}
+                    xpath={dataxpath}
+                    action={collection.button.action}
+                    onClick={onButtonClick}
+                />
+            </TableCell>
         )
+    }
+
+    if (type === 'progressBar') {
+        let value = row[proptitle];
+        if (value === undefined) return;
+
+        let min = collection.min;
+        if (typeof (min) === DataTypes.STRING) {
+            let sliceName = toCamelCase(min.split('.')[0]);
+            let propertyName = 'modified' + capitalizeCamelCase(min.split('.')[0]);
+            let minxpath = min.substring(min.indexOf('.') + 1);
+            min = getValueFromReduxStore(state, sliceName, propertyName, minxpath);
+        }
+        let max = collection.max;
+        if (typeof (max) === DataTypes.STRING) {
+            let sliceName = toCamelCase(max.split('.')[0]);
+            let propertyName = 'modified' + capitalizeCamelCase(max.split('.')[0]);
+            let maxxpath = max.substring(max.indexOf('.') + 1);
+            max = 10;
+            max = getValueFromReduxStore(state, sliceName, propertyName, maxxpath);
+        }
+
+        let percentage = normalise(value, max, min);
+        let color = getColorTypeFromPercentage(collection, percentage);
+
+        return (
+            <TableCell align='center' size='medium'>
+                <ValueBasedProgressBar percentage={percentage} value={value} color={color} min={min} max={max} />
+            </TableCell>
+        )
+
+    }
+
+    if (collection.abbreviated && collection.abbreviated === "JSON") {
+        let updatedData = row[proptitle];
+        if (type === DataTypes.OBJECT || type === DataTypes.ARRAY || (type === DataTypes.STRING && isValidJsonString(updatedData))) {
+            if (type === DataTypes.OBJECT || type === DataTypes.ARRAY) {
+                updatedData = updatedData ? clearxpath(cloneDeep(updatedData)) : {};
+            } else {
+                updatedData = updatedData.replace(/\\/g, '');
+                updatedData = JSON.parse(updatedData);
+            }
+
+            return (
+                <TableCell className={classes.abbreviatedJsonCell} align='center' size='medium' onClick={onOpenTooltip}>
+                    <AbbreviatedJsonTooltip open={open} onClose={onCloseTooltip} src={updatedData} />
+                </TableCell >
+            )
+        } else if (type === DataTypes.STRING && !isValidJsonString(updatedData)) {
+            return (
+                <TableCell className={classes.abbreviatedJsonCell} align='center' size='medium' onClick={onOpenTooltip}>
+                    <ClickAwayListener onClickAway={onCloseTooltip}>
+                        <div className={classes.abbreviatedJsonCell}>
+                            <Tooltip
+                                title={updatedData}
+                                open={open}
+                                onClose={onCloseTooltip}
+                                disableFocusListener
+                                disableHoverListener
+                                disableTouchListener>
+                                <span>{updatedData}</span>
+                            </Tooltip >
+                        </div>
+                    </ClickAwayListener>
+                </TableCell>
+            )
+        }
     }
 
     let color = ColorTypes.UNSPECIFIED;

@@ -24,7 +24,7 @@ how_to_use() {
 }
 
 update_db_in_beanie() {
-  cd ../output || (echo "cd ../output failed from dir: $PWD"; exit 1)
+  cd ../generated || (echo "cd ../generated failed from dir: $PWD"; exit 1)
   BEANIE_DB_FILE=$(find . -name "*_beanie_database.py")
   LC_ALL=C perl -pi -e "s#$DEFAULT_MONGO_DB_URI#$MONGO_DB_URL#g" "$BEANIE_DB_FILE"
   #sed -i "s/$DEFAULT_MONGO_DB_URI/$MONGO_DB_URL/g" "$BEANIE_DB_FILE"

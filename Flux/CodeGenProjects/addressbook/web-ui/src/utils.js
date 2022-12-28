@@ -25,12 +25,14 @@ const fieldProps = [
     { propertyName: "button", usageName: "button" },
     { propertyName: "abbreviated", usageName: "abbreviated" },
     { propertyName: "val_max", usageName: "max" },
+    { propertyName: "val_min", usageName: "min" },
     { propertyName: "default_value_placeholder_string", usageName: "defaultValuePlaceholderString" },
     { propertyName: "val_sort_weight", usageName: "sortWeight" },
     { propertyName: "val_is_date_time", usageName: "dateTime" },
     { propertyName: "index", usageName: "index" },
     { propertyName: "sticky", usageName: "sticky" },
-    { propertyName: "size_max", usageName: "sizeMax" }
+    { propertyName: "size_max", usageName: "sizeMax" },
+    { propertyName: "progress_bar", usageName: "progressBar" }
 ]
 
 const arrayFieldProps = [
@@ -70,11 +72,10 @@ function setAutocompleteValue(schema, object, autocompleteDict, propname, usageN
     }
 }
 
-export function createCollections(schema, currentSchema, callerProps, collections = [], sequence = { sequence: 1 }, parentxpath) {
+export function createCollections(schema, currentSchema, callerProps, collections = [], sequence = { sequence: 1 }, xpath, objectxpath) {
     currentSchema = cloneDeep(currentSchema);
 
     if (callerProps.xpath) {
-        // let parentSchema = _.get(schema, callerProps.xpath);
         let currentSchemaMetadata = callerProps.parentSchema.properties[callerProps.xpath];
 
         complexFieldProps.map(({ propertyName }) => {
@@ -90,9 +91,13 @@ export function createCollections(schema, currentSchema, callerProps, collection
         let collection = {};
         if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM].includes(v.type)) {
             collection.key = k;
-            collection.tableTitle = parentxpath ? parentxpath + '.' + k : k;
+            collection.tableTitle = objectxpath ? objectxpath + '.' + k : k;
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
+            collection.xpath = xpath ? xpath + '.' + k : k;
+            if (collection.xpath.indexOf('.') === -1) {
+                collection.rootLevel = true;
+            }
 
             if (v.type === DataTypes.ENUM) {
                 let ref = v.items.$ref.split('/');
@@ -106,6 +111,11 @@ export function createCollections(schema, currentSchema, callerProps, collection
                     if (propertyName === "button") {
                         collection.type = "button";
                         collection.color = v.button.value_color_map;
+                    }
+
+                    if (propertyName === "progress_bar") {
+                        collection.type = "progressBar";
+                        collection.color = v.progress_bar.value_color_map;
                     }
                 }
             })
@@ -134,9 +144,12 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
         } else if (v.type === DataTypes.ARRAY) {
             collection.key = k;
-            collection.tableTitle = parentxpath ? parentxpath + '.' + k : k;
+            collection.tableTitle = objectxpath ? objectxpath + '.' + k : k;
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
+            let updatedxpath = xpath ? xpath + '.' + k : k;
+            updatedxpath = updatedxpath + '[0]';
+            collection.xpath = updatedxpath;
 
             fieldProps.map(({ propertyName, usageName }) => {
                 if (v.hasOwnProperty(propertyName)) {
@@ -178,13 +191,15 @@ export function createCollections(schema, currentSchema, callerProps, collection
             }
 
             if (collection.abbreviated !== "JSON") {
-                createCollections(schema, record, callerProps, collections, sequence);
+                createCollections(schema, record, callerProps, collections, sequence, updatedxpath);
             }
         } else if (v.type === DataTypes.OBJECT) {
             collection.key = k;
-            collection.tableTitle = parentxpath ? parentxpath + '.' + k : k;
+            collection.tableTitle = objectxpath ? objectxpath + '.' + k : k;
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
+            let updatedxpath = xpath ? xpath + '.' + k : k;
+            collection.xpath = updatedxpath;
 
             fieldProps.map(({ propertyName, usageName }) => {
                 if (v.hasOwnProperty(propertyName)) {
@@ -216,7 +231,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             }
 
             if (collection.abbreviated !== "JSON") {
-                createCollections(schema, record, callerProps, collections, sequence, k);
+                createCollections(schema, record, callerProps, collections, sequence, updatedxpath, k);
             }
         }
     });
@@ -336,8 +351,8 @@ export function getDataxpath(data, xpath) {
 function compareNodes(originalData, data, dataxpath, propname, xpath) {
     let object = {};
     if (dataxpath || xpath) {
-        let current = _.get(data, dataxpath) ? _.get(data, dataxpath)[propname] : undefined;
-        let original = _.get(originalData, xpath) ? _.get(originalData, xpath)[propname] : undefined;
+        let current = hasxpath(data, dataxpath) ? _.get(data, dataxpath)[propname] : undefined;
+        let original = hasxpath(originalData, xpath) ? _.get(originalData, xpath)[propname] : undefined;
         if (current !== undefined && original !== undefined && (current !== original)) {
             object['data-modified'] = true;
         } else if (current !== undefined && original === undefined) {
@@ -387,8 +402,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
             }
         })
 
-        node.value = dataxpath && _.get(data, dataxpath) && (_.get(data, dataxpath)[propname] || (!_.get(data, dataxpath)[propname] && _.get(data, dataxpath)[propname] === 0)) ?
-            _.get(data, dataxpath)[propname] : data[propname];
+        node.value = dataxpath ? hasxpath(data, node.dataxpath) ? _.get(data, dataxpath)[propname] : undefined : data[propname];
 
         if (attributes.type === DataTypes.BOOLEAN) {
             node.onCheckboxChange = callerProps.onCheckboxChange;
@@ -418,12 +432,12 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
         node = { ...node, ...newprop };
 
         let isRedundant = true;
-        if((!node.serverPopulate || callerProps.mode !== Modes.EDIT_MODE) && (!node.hide || !callerProps.hide)) {
+        if (!(node.serverPopulate && callerProps.mode === Modes.EDIT_MODE) && !(node.hide && callerProps.hide) && !(node.uiUpdateOnly && node.value === undefined)) {
             isRedundant = false;
         }
 
-        if(!isRedundant) {
-            tree.push({...node});
+        if (!isRedundant) {
+            tree.push({ ...node });
         }
     }
 }
@@ -622,6 +636,27 @@ export function lowerFirstLetter(text) {
     return text;
 }
 
+export function capitalizeCamelCase(text) {
+    if (text && text.length > 0) {
+        let textSplit = text.split('_').map(t => t.charAt(0).toUpperCase() + t.slice(1));
+        return textSplit.join('');
+    }
+    return text;
+}
+
+export function toCamelCase(text) {
+    if (text && text.length > 0) {
+        let textSplit = text.split('_');
+        for (let i = 1; i < textSplit.length; i++) {
+            let value = textSplit[i];
+            value = value.charAt(0).toUpperCase() + value.slice(1);
+            textSplit[i] = value;
+        }
+        return textSplit.join('');
+    }
+    return text;
+}
+
 export function generateRowTrees(jsondata, collections, xpath) {
     let trees = [];
     if (xpath) jsondata = _.get(jsondata, xpath);
@@ -633,7 +668,7 @@ export function generateRowTrees(jsondata, collections, xpath) {
             if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
                 tree[k] = v;
             } else if (Array.isArray(v)) {
-                tree[k] = {};
+                tree[k] = [];
                 createTree(tree, jsondata[k], k, { delete: 1 }, collections);
             } else if (_.isObject(v)) {
                 tree[k] = {};
@@ -872,6 +907,42 @@ export function getColorTypeFromValue(collection, value) {
     return color;
 }
 
+export function getColorTypeFromPercentage(collection, percentage) {
+    let color = ColorTypes.UNSPECIFIED;
+    if (collection && collection.color) {
+        let colorSplit = collection.color.split(',');
+        for (let i = 0; i < colorSplit.length; i++) {
+            let valueColorSet = colorSplit[i].trim();
+            if (valueColorSet.indexOf('=') !== -1) {
+                let [val, colorType] = valueColorSet.split('=');
+                val = val.replace('%', '');
+                try {
+                    val = parseInt(val);
+                    if (val === percentage) {
+                        color = ColorTypes[colorType];
+                        break;
+                    }
+                } catch (e) {
+                    break;
+                }
+            } else if (valueColorSet.indexOf('<') !== -1) {
+                let [val, colorType] = valueColorSet.split('<');
+                val = val.replace('%', '');
+                try {
+                    val = parseInt(val);
+                    if (val < percentage) {
+                        color = ColorTypes[colorType];
+                        break;
+                    }
+                } catch (e) {
+                    break;
+                }
+            }
+        }
+    }
+    return color;
+}
+
 export function getPriorityColorType(colorTypesSet) {
     let colorTypesArray = Array.from(colorTypesSet);
     if (colorTypesArray.length > 0) {
@@ -903,6 +974,7 @@ export function getAlertBubbleColor(data, collections, alertBubbleSourceXpath, a
 }
 
 export function getObjectWithLeastId(objectArray) {
+    objectArray = cloneDeep(objectArray);
     objectArray.sort(function (a, b) {
         if (a[DB_ID] > b[DB_ID]) {
             return 1;
@@ -938,3 +1010,119 @@ export function getShapeFromValue(value) {
     return ShapeType.UNSPECIFIED;
 }
 
+export function isValidJsonString(jsonString) {
+    jsonString = jsonString.replace(/\\/g, '');
+    try {
+        JSON.parse(jsonString);
+    } catch (e) {
+        return false;
+    }
+    return true;
+}
+
+export function hasxpath(data, xpath) {
+    if (_.get(data, xpath)) return true;
+    else {
+        let value = _.get(data, xpath);
+        if (value === 0 || value === false || value === '') return true;
+    }
+    return false;
+}
+
+export function getTableColumns(collections) {
+    let columns = collections.map(collection => Object.assign({}, collection)).filter(collection => {
+        if ([DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.STRING, DataTypes.ENUM].includes(collection.type)) {
+            return true;
+        } else if (collection.abbreviated && collection.abbreviated === "JSON") {
+            return true;
+        } else if (collection.type === 'button' && !collection.rootLevel) {
+            return true;
+        } else if (collection.type === 'progressBar') {
+            return true;
+        }
+        return false;
+    })
+    return columns;
+}
+
+export function getCommonKeyCollections(rows, tableColumns) {
+    if (rows.length > 1) {
+        tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => column.type !== 'button');
+    }
+    let commonKeyCollections = [];
+    if (rows.length > 0) {
+        tableColumns.map((column) => {
+            if (column.hide) return;
+
+            let found = true;
+            for (let i = 0; i < rows.length - 1; i++) {
+                if (rows[i][column.tableTitle] !== rows[i + 1][column.tableTitle]) {
+                    found = false;
+                }
+            }
+            if (found) {
+                let collection = column;
+                collection.value = rows[0][column.tableTitle];
+                // collection.xpath = column.tableTitle.indexOf('.') > 0 ? rows[0][column.tableTitle.split('.')[0] + '.xpath_' + column.key] : rows[0]['xpath_' + column.key];
+                commonKeyCollections.push(collection);
+            }
+            return column;
+        })
+    }
+    return commonKeyCollections;
+}
+
+function getTableRowsFromData(collections, data, xpath) {
+    let trees = generateRowTrees(cloneDeep(data), collections, xpath);
+    let rows = generateRowsFromTree(trees, collections, xpath);
+    return rows;
+}
+
+export function getTableRows(collections, originalData, data, xpath) {
+    let originalDataTableRows = getTableRowsFromData(collections, addxpath(cloneDeep(originalData)), xpath);
+    let tableRows = getTableRowsFromData(collections, data, xpath);
+
+    // combine the original and modified data rows
+    for (let i = 0; i < originalDataTableRows.length; i++) {
+        if (i < tableRows.length) {
+            if (originalDataTableRows[i]['data-id'] !== tableRows[i]['data-id']) {
+                if (!tableRows.filter(row => row['data-id'] === originalDataTableRows[i]['data-id'])[0]) {
+                    let row = originalDataTableRows[i];
+                    row['data-remove'] = true;
+                    tableRows.splice(i, 0, row);
+                }
+            }
+        } else {
+            let row = originalDataTableRows[i];
+            row['data-remove'] = true;
+            tableRows.splice(i, 0, row);
+        }
+    }
+    for (let i = 0; i < tableRows.length; i++) {
+        if (!originalDataTableRows.filter(row => row['data-id'] === tableRows[i]['data-id'])[0]) {
+            tableRows[i]['data-add'] = true;
+        }
+    }
+    return tableRows;
+}
+
+export function getValueFromReduxStore(state, sliceName, propertyName, xpath) {
+    if (state && state.hasOwnProperty(sliceName)) {
+        let slice = state[sliceName];
+        if (slice) {
+            let object = slice[propertyName];
+            if (object && hasxpath(object, xpath)) {
+                return _.get(object, xpath);
+            }
+        }
+        return null;
+    }
+}
+
+export function normalise(value, max, min) {
+    if (typeof (value) === DataTypes.NUMBER && typeof (min) === DataTypes.NUMBER && typeof (max) === DataTypes.NUMBER) {
+        let percentage = ((value - min) * 100) / (max - min);
+        return percentage > 100 ? 100 : percentage;
+    }
+    return 0;
+}

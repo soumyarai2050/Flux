@@ -187,7 +187,7 @@ const NodeField = (props) => {
         )
     } else if (props.data.type === DataTypes.NUMBER) {
         let decimalScale = 2;
-        if (props.data.underlyingtype === DataTypes.INT32) {
+        if (props.data.underlyingtype === DataTypes.INT32 || props.data.underlyingtype === DataTypes.INT64) {
             decimalScale = 0;
         }
         let value = props.data.value ? props.data.value : 0;

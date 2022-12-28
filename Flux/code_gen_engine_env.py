@@ -70,7 +70,7 @@ class CodeGenEngineEnvManager:
         os.environ["PLUGIN_DIR"] = str(self.plugin_dir)
 
         # update output dir to be within project output dir
-        self.output_dir = self.project_dir / "output"
+        self.output_dir = self.project_dir / "generated"
         os.environ["OUTPUT_DIR"] = str(self.output_dir)
 
         # Add required path to sys.path & export them
@@ -94,13 +94,13 @@ class CodeGenEngineEnvManager:
     def execute_python_script(file_path: str | PurePath, params: List[str] | None = None):
         if params is not None:
             params_str = " ".join(params)
-            os.system(f'python3 {file_path} {params_str}')
+            return os.system(f'python3 {file_path} {params_str}')
         else:
-            os.system(f'python3 {file_path}')
+            return os.system(f'python3 {file_path}')
 
     @staticmethod
-    def execute_shell_command(shell_cmd: str ):
-        os.system(f'{shell_cmd }')
+    def execute_shell_command(shell_cmd: str):
+        return os.system(f'{shell_cmd }')
 
     @classmethod
     def get_instance(cls) -> 'CodeGenEngineEnvManager':
@@ -111,5 +111,3 @@ class CodeGenEngineEnvManager:
             else:
                 #  Does exist - return cached
                 return cls.code_gen_engine_env_manager
-
-

@@ -7,7 +7,8 @@ export const COOKIE_NAME = 'addressbook';
 
 export const Modes = {
     EDIT_MODE: 'edit',
-    READ_MODE: 'read'
+    READ_MODE: 'read',
+    DISABLED_MODE: 'disabled'
 }
 
 export const Layouts = {
@@ -44,7 +45,13 @@ export const DataTypes = {
     OBJECT: 'object',
     ARRAY: 'array',
     INT32: 'int32',
+    INT64: 'int64',
     FLOAT: 'float'
+}
+
+export const ComponentType = {
+    BUTTON: 'button',
+    PROGRESS_BAR: 'progressBar'
 }
 
 export const SizeType = {

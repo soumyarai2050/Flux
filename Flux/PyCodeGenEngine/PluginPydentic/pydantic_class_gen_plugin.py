@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import logging
 import os
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, Tuple
 import time
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
@@ -44,14 +44,24 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
         self.insertion_point_key_to_callable_list: List[Callable] = [
             self.handle_pydantic_class_gen
         ]
-        self.output_file_name_suffix = os.getenv("OUTPUT_FILE_NAME_SUFFIX")
+        response_field_case_style = None
+        output_file_name_suffix = None
+        if (enum_type := os.getenv("ENUM_TYPE")) is not None and \
+                (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and \
+                (output_file_name_suffix := os.getenv("OUTPUT_FILE_NAME_SUFFIX")) is not None:
+            self.enum_type = enum_type
+            self.output_file_name_suffix = output_file_name_suffix
+            self.response_field_case_style: str = response_field_case_style
+        else:
+            err_str = f"Env var 'ENUM_TYPE', 'OUTPUT_FILE_NAME_SUFFIX' and 'RESPONSE_FIELD_CASE_STYLE' " \
+                      f"received as {enum_type}, {output_file_name_suffix} and {response_field_case_style}"
+            logging.exception(err_str)
+            raise Exception(err_str)
         self.root_message_list: List[protogen.Message] = []
         self.non_root_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
         self.ordered_message_list: List[protogen.Message] = []
-        self.enum_type = os.getenv("ENUM_TYPE")
         self.enum_type_validator()
-        self.response_field_case_style: str = os.getenv("RESPONSE_FIELD_CASE_STYLE")
 
     def enum_type_validator(self):
         match self.enum_type:
@@ -72,7 +82,7 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
                 return field.enum.proto.name
             case other:
                 if PydanticClassGenPlugin.flux_fld_val_is_datetime in str(field.proto.options):
-                    return "datetime.datetime"
+                    return "pendulum.DateTime"
                 else:
                     return PydanticClassGenPlugin.proto_type_to_py_type_dict[field.kind.name.lower()]
 
@@ -128,9 +138,8 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
                     else:
                         self.ordered_message_list.append(message)
 
-    def handle_field_output(self, field) -> str:
+    def _handle_field_cardinality(self, field: protogen.Field) -> str:
         field_type = self.proto_to_py_datatype(field)
-
         match field.cardinality.name.lower():
             case "optional":
                 output_str = f"{field.proto.name}: {field_type} | None"
@@ -138,7 +147,11 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
                 output_str = f"{field.proto.name}: List[{field_type}]"
             case other:
                 output_str = f"{field.proto.name}: {field_type}"
+        return output_str
 
+    def handle_field_output(self, field) -> str:
+
+        output_str = self._handle_field_cardinality(field)
         if leading_comments := field.location.leading_comments:
             comments = ", ".join(leading_comments.split("\n"))
             output_str += f' = Field(description="{comments}")\n'
@@ -202,9 +215,28 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
         output_str += "\n\n"
         return output_str
 
-    def handle_message_output(self, message: protogen.Message) -> str:
-        is_msg_root = False
+    def _handle_incremental_id_protected_field_override(self, message: protogen.Message) -> str:
+        output_str = "    _max_id_val: ClassVar[int | None] = None\n"
+        output_str += "    _mutex: ClassVar[Lock] = Lock()\n"
+        output_str += f'    id: int = Field(default_factory=(lambda: {message.proto.name}.next_id()), ' \
+                      f'description="Server generated unique Id", alias="_id")\n'
+        return output_str
 
+    def _handle_ws_connection_manager_data_members_override(self, message: protogen.Message) -> str:
+        output_str = "    read_ws_path_ws_connection_manager: " \
+                      "ClassVar[PathWSConnectionManager] = PathWSConnectionManager()\n"
+        options_list_of_dict = \
+            self.get_complex_msg_option_values_as_list_of_dict(message,
+                                                               PydanticClassGenPlugin.flux_msg_json_root)
+        if options_list_of_dict and \
+                PydanticClassGenPlugin.flux_json_root_read_websocket_field in options_list_of_dict[0]:
+            output_str += "    read_ws_path_with_id_ws_connection_manager: " \
+                          "ClassVar[PathWithIdWSConnectionManager] = PathWithIdWSConnectionManager()\n"
+        # else not required: Avoid if websocket field in json root option not present
+        return output_str
+
+    def _handle_pydantic_class_declaration(self, message: protogen.Message) -> Tuple[str, bool]:
+        is_msg_root = False
         if self.response_field_case_style.lower() == "snake":
             if message in self.root_message_list:
                 is_msg_root = True
@@ -221,43 +253,104 @@ class PydanticClassGenPlugin(BaseProtoPlugin):
             err_str = f"{self.response_field_case_style} is not supported response type"
             logging.exception(err_str)
             raise Exception(err_str)
+        return output_str, is_msg_root
 
-        # Adding docstring if message lvl comment available
+    def _handle_class_docstring(self, message: protogen.Message) -> str:
+        output_str = ""
         if leading_comments := message.location.leading_comments:
             output_str += '    """\n'
+            if '"' in str(leading_comments):
+                err_str = 'Leading comments can not contain "" (double quotes) to avoid error in generated output,' \
+                          f' found in comment: {leading_comments}'
+                logging.exception(err_str)
+                raise Exception(err_str)
+            # else not required: If double quotes not found then avoiding
             comments = ", ".join(leading_comments.split("\n"))
-            comments_multiline = [comments[0+i:100+i] for i in range(0, len(comments), 100)]
+            comments_multiline = [comments[0 + i:100 + i] for i in range(0, len(comments), 100)]
             for comments_line in comments_multiline:
                 output_str += f"        {comments_line}\n"
-
             output_str += '    """\n'
+        # else not required: empty string will be sent
+        return output_str
+
+    def _handle_cache_n_ws_connection_manager_data_members_override(self, message: protogen.Message, is_msg_root: bool):
+        output_str = ""
         if is_msg_root:
-            output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[Any, '{message.proto.name}']] = " + "{}\n"
+            for field in message.fields:
+                if PydanticClassGenPlugin.default_id_field_name in field.proto.name:
+                    output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{self.proto_to_py_datatype(field)}, " \
+                                  f"'{message.proto.name}']] = " + "{}\n"
+                    break
+                # else not required: If no field is id override then handling default id type in else of for loop
+            else:
+                output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[int, " \
+                              f"'{message.proto.name}']] = " + "{}\n"
+            output_str += self._handle_ws_connection_manager_data_members_override(message)
         # else not required: Avoid cache override if message is not root
+        return output_str
+
+    def _handle_config_class_and_other_root_class_versions(self, message: protogen.Message, is_msg_root: bool) -> str:
+        output_str = ""
+        # Making class able to be populated with field name
+        if is_msg_root:
+            output_str += "\n"
+            output_str += "    class Config:\n"
+            output_str += "        allow_population_by_field_name = True\n"
+        output_str += "\n\n"
+
+        # Adding other versions for root pydantic class
+        if is_msg_root:
+            output_str += self.handle_message_all_optional_field(message)
+            output_str += self.handle_dummy_message_gen(message, is_msg_root)
+        # If message is not root then no need to add message with optional fields
+
+        return output_str
+
+    def handle_message_output(self, message: protogen.Message) -> str:
+        output_str, is_msg_root = self._handle_pydantic_class_declaration(message)
+
+        # Adding docstring if message lvl comment available
+        output_str += self._handle_class_docstring(message)
+
+        output_str += self._handle_cache_n_ws_connection_manager_data_members_override(message, is_msg_root)
+
+        # Handling Id field
+        # If message contain id field of int type then overriding that id field with incremental id field
         for field in message.fields:
             if is_msg_root and field.proto.name == PydanticClassGenPlugin.default_id_field_name and \
                     "int" == self.proto_to_py_datatype(field):
-                output_str += "    _max_id_val: ClassVar[int | None] = None\n"
-                output_str += "    _mutex: ClassVar[Lock] = Lock()\n"
-                output_str += f'    id: int = Field(default_factory=(lambda: {message.proto.name}.next_id()), description="Server generated unique Id")\n'
+                output_str += self._handle_incremental_id_protected_field_override(message)
+                break
+            # else not required: if message doesn't contain id field then else of this for loop will
+            # handle id field creation for this pydantic class. If message contains id field but is not
+            # of int type then override will be avoided
+        else:
+            if is_msg_root and PydanticClassGenPlugin.default_id_field_name not in \
+                    [field.proto.name for field in message.fields]:
+                output_str += self._handle_incremental_id_protected_field_override(message)
+            # else not required: If id already exists and is not of int type then avoiding repetition of code
+
+        # handling remaining fields
+        for field in message.fields:
+            if is_msg_root and field.proto.name == PydanticClassGenPlugin.default_id_field_name:
                 continue
             # else not required: if message is not JsonRoot or field is not default id and is not int type
             # then allowing override on id field
             output_str += ' '*4 + self.handle_field_output(field)
-        output_str += "\n\n"
 
-        if is_msg_root:
-            output_str += self.handle_message_all_optional_field(message)
-            output_str += self.handle_dummy_message_gen(message, is_msg_root)
-        # else not required: If message is not root then no need to add message with optional fields
+        output_str += self._handle_config_class_and_other_root_class_versions(message, is_msg_root)
 
         return output_str
 
     def handle_imports(self) -> str:
         output_str = "from pydantic import Field, BaseModel\n"
-        output_str += "import datetime\n"
+        output_str += "import pendulum\n"
         output_str += "from typing import Dict, List, ClassVar, Any\n"
         output_str += "from threading import Lock\n"
+        ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
+                                                                   "ws_connection_manager")
+        output_str += f"from {ws_connection_manager_path} import PathWSConnectionManager, " \
+                      f"\\\n\tPathWithIdWSConnectionManager\n"
         if self.enum_list:
             if self.enum_type == "int_enum":
                 output_str += "from enum import IntEnum\n"

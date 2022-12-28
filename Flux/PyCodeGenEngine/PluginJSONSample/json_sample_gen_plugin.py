@@ -33,9 +33,17 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         self.insertion_point_key_to_callable_list: List[Callable] = [
             self.__json_sample_gen_handler
         ]
-        self.output_file_name_suffix = os.getenv("OUTPUT_FILE_NAME_SUFFIX")
+        response_field_case_style = None
+        if (output_file_name_suffix := os.getenv("OUTPUT_FILE_NAME_SUFFIX")) is not None and \
+                (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
+            self.output_file_name_suffix = output_file_name_suffix
+            self.__response_field_case_style: str = response_field_case_style
+        else:
+            err_str = f"Env var 'OUTPUT_FILE_NAME_SUFFIX' and 'RESPONSE_FIELD_CASE_STYLE' " \
+                      f"received as {output_file_name_suffix} and {response_field_case_style}"
+            logging.exception(err_str)
+            raise Exception(err_str)
         self.__auto_complete_data_cache: List[Tuple[protogen.Field, str]] = []
-        self.__response_field_case_style: str = os.getenv("RESPONSE_FIELD_CASE_STYLE")
         self.__case_style_convert_method: Callable[[str], str] | None = None
         self.auto_complete_data: Dict | None = None
 

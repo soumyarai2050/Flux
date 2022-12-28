@@ -85,7 +85,6 @@ async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Call
         while True:
             try:
                 data = await asyncio.wait_for(ws.recv(), timeout=10.0)
-                user_callback(data)
             except TimeoutError:
                 logging.debug('timeout!')
             except ConnectionClosedOK as e:
@@ -106,6 +105,7 @@ async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Call
             if data is not None:
                 data = json.loads(data)
                 pydantic_obj_list: PydanticClassTypeList = PydanticClassTypeList(__root__=data)
+                user_callback(pydantic_obj_list)
                 data = None
                 try:
                     for pydantic_obj in pydantic_obj_list.__root__:
@@ -124,7 +124,6 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
         while True:
             try:
                 data = await asyncio.wait_for(ws.recv(), timeout=10.0)
-                user_callback(data)
             except TimeoutError:
                 logging.debug('timeout!')
             except ConnectionClosedOK as e:
@@ -145,6 +144,7 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
             if data is not None:
                 data = json.loads(data)
                 pydantic_type_obj = pydantic_type(**data)
+                user_callback(pydantic_type_obj)
                 data = None
                 try:
                     print('\n', "Update: ", pydantic_type_obj)

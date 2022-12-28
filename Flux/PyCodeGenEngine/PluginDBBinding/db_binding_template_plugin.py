@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from Flux.PyCodeGenEngine.PluginDBBinding.base_db_binding_plugin import BaseDbBindingPlugin
+from Flux.PyCodeGenEngine.PluginDBBinding.base_db_binding_plugin import BaseDbBindingPlugin, main
 from typing import List, Callable
 
 
@@ -10,8 +10,8 @@ class DbBindingTemplatePlugin(BaseDbBindingPlugin):
     by base class pipeline. Uses Template for output.
     """
 
-    def __init__(self, base_dir_path: str, config_path: str | None = None):
-        super().__init__(base_dir_path, config_path)
+    def __init__(self, base_dir_path: str):
+        super().__init__(base_dir_path)
         self.output_file_name_suffix = self.config_yaml["output_file_name_suffix"]
         self.template_file_path = os.path.join(self.base_dir_path, "misc", self.config_yaml["template_file_name"])
         self.insertion_point_key_list: List[str] = [
@@ -53,10 +53,4 @@ class DbBindingTemplatePlugin(BaseDbBindingPlugin):
 
 
 if __name__ == "__main__":
-    def main():
-        project_dir_path = os.getenv("PROJECT_PATH")
-        config_path = os.getenv("CONFIG_PATH")
-        proto_to_db_plugin = DbBindingTemplatePlugin(project_dir_path, config_path)
-        proto_to_db_plugin.process()
-
-    main()
+    main(DbBindingTemplatePlugin)

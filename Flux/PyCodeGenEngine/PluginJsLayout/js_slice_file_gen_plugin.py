@@ -33,7 +33,13 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         self.dependent_message_list: List[protogen.Message] = []
         self.independent_message_list: List[protogen.Message] = []
         self.current_message_is_dependent: bool | None = None  # True if dependent else false
-        self.output_file_name_suffix: str = os.getenv("OUTPUT_FILE_NAME")
+        self.output_file_name_suffix: str = ""
+        if (ui_layout_msg_name := os.getenv("UILAYOUT_MESSAGE_NAME")) is not None:
+            self.__ui_layout_msg_name = ui_layout_msg_name
+        else:
+            err_str = f"Env var 'UILAYOUT_MESSAGE_NAME' received as None"
+            logging.exception(err_str)
+            raise Exception(err_str)
 
     def load_root_message_to_data_member(self, file: protogen.File):
         super().load_root_message_to_data_member(file)
@@ -62,7 +68,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str = "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
             output_str += "import axios from 'axios';\n"
             output_str += "import { API_ROOT_URL, DB_ID } from '../constants';\n"
-            if message.proto.name != os.getenv("UILAYOUT_MESSSAGE_NAME"):
+            if message.proto.name != self.__ui_layout_msg_name:
                 output_str += "import { getObjectWithLeastId } from '../utils';\n"
             output_str += "\n"
         else:
@@ -147,7 +153,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"        [getAll{message_name}.fulfilled]: (state, action) => " + "{\n"
         output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
         if not self.current_message_is_dependent:
-            if message_name != os.getenv("UILAYOUT_MESSSAGE_NAME"):
+            if message_name != self.__ui_layout_msg_name:
                 output_str += "            if (action.payload.length === 0) {\n"
                 output_str += f"                state.{message_name_camel_cased} = initialState.{message_name_camel_cased};\n"
                 output_str += f"                state.modified{message_name} = initialState.modified{message_name};\n"
@@ -191,7 +197,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.modified{message_name} = action.payload;\n"
         if message_name in self.dependent_message_relation_dict.values():
             output_str += f"            state.setSelected{message_name}Id = action.payload[DB_ID];\n"
-        elif not self.current_message_is_dependent and message_name != os.getenv("UILAYOUT_MESSSAGE_NAME"):
+        elif not self.current_message_is_dependent and message_name != self.__ui_layout_msg_name:
             output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
@@ -292,7 +298,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "export const { " + f"set{message_name}Array, set{message_name}, reset{message_name}, " \
                                           f"setModified{message_name}, setSelected{message_name}Id, " \
                                           f"resetSelected{message_name}Id, resetError"
-        if message.proto.name == os.getenv("UILAYOUT_MESSSAGE_NAME"):
+        if message.proto.name == self.__ui_layout_msg_name:
             output_str += " }" + f" = {message_name_camel_cased}Slice.actions;\n"
         else:
             if not self.current_message_is_dependent:

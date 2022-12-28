@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 import os
 import protogen
-from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin
 from typing import List, Callable
+import logging
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 
 
 class Pb2ImportGenerator(BaseProtoPlugin):
@@ -14,9 +15,17 @@ class Pb2ImportGenerator(BaseProtoPlugin):
         super().__init__(base_dir_path)
         # Overriding below all data-members for this script
         # Both template_file_path and output_file_name are same as this plugin adds import in same template file
-        self.template_file_path = os.path.join(os.getenv("PLUGIN_DIR"),
-                                               os.getenv("INSERTION_IMPORT_FILE_NAME"))
-        self.output_file_name = os.getenv("INSERTION_IMPORT_FILE_NAME")
+        plugin_dir = None
+        insertion_import_file_name = None
+        if (plugin_dir := os.getenv("PLUGIN_DIR")) is not None and \
+                (insertion_import_file_name := os.getenv("INSERTION_IMPORT_FILE_NAME")) is not None:
+            self.template_file_path = os.path.join(plugin_dir, insertion_import_file_name)
+            self.output_file_name = insertion_import_file_name
+        else:
+            err_str = f"Env var 'PROJECT_DIR' and 'INSERTION_IMPORT_FILE_NAME' received " \
+                      f"as {plugin_dir} and {insertion_import_file_name}"
+            logging.exception(err_str)
+            raise Exception(err_str)
         self.insertion_point_key_list: List[str] = [
             "import_pb2",
         ]
@@ -26,8 +35,13 @@ class Pb2ImportGenerator(BaseProtoPlugin):
 
     def handle_import_pb2(self, file: protogen.File) -> str:
         proto_file_name = str(file.proto.name).split('/')[-1].split(".")[0]
-        project_dir_import = ".".join(os.getenv("PROJECT_DIR").split("/")[-3:])
-        import_str = f"import {project_dir_import}.output.{proto_file_name}_pb2"
+        if (project_dir := os.getenv("PROJECT_DIR")) is not None:
+            project_dir_import = ".".join(project_dir.split("/")[-3:])
+        else:
+            err_str = "Env var 'PROJECT_DIR' received as None"
+            logging.exception(err_str)
+            raise Exception(err_str)
+        import_str = f"import {project_dir_import}.generated.{proto_file_name}_pb2"
 
         with open(self.template_file_path) as temp_file:
             temp_file_content = temp_file.read()
@@ -41,9 +55,4 @@ class Pb2ImportGenerator(BaseProtoPlugin):
 
 
 if __name__ == "__main__":
-    def main():
-        project_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-        proto_to_db_plugin = Pb2ImportGenerator(project_dir_path)
-        proto_to_db_plugin.process()
-
-    main()
+    main(Pb2ImportGenerator)

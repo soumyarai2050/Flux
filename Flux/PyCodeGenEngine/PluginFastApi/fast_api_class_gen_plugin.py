@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import json
+import logging
 import os
 from pathlib import PurePath
 from typing import List, Callable, Dict
@@ -48,7 +50,16 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.insertion_point_key_to_callable_list: List[Callable] = [
             self.handle_fastapi_class_gen
         ]
-        self.output_file_name_suffix = os.getenv("OUTPUT_FILE_NAME_SUFFIX")
+        response_field_case_style = None
+        if (output_file_name_suffix := os.getenv("OUTPUT_FILE_NAME_SUFFIX")) is not None and \
+                (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
+            self.output_file_name_suffix = output_file_name_suffix
+            self.response_field_case_style: str = response_field_case_style
+        else:
+            err_str = f"Env var 'OUTPUT_FILE_NAME_SUFFIX' and 'RESPONSE_FIELD_CASE_STYLE' " \
+                      f"received as {output_file_name_suffix} and {response_field_case_style}"
+            logging.exception(err_str)
+            raise Exception(err_str)
         self.root_message_list: List[protogen.Message] = []
         self.non_root_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
@@ -66,7 +77,6 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.routes_callback_class_name_capital_camel_cased: str = ""
         self.int_id_message_list: List[protogen.Message] = []
         self.callback_override_set_instance_file_name: str = ""
-        self.response_field_case_style: str = os.getenv("RESPONSE_FIELD_CASE_STYLE")
 
     def load_dependency_messages_and_enums_in_dicts(self, message: protogen.Message):
         for field in message.fields:
@@ -119,14 +129,16 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
                         field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}/' + f'", response_model={message_name}, status_code=201)\n'
-        output_str += f"def create_{message_name_snake_cased}({message_name_snake_cased}: {message_name}) -> {message_name}:\n"
+        output_str = f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}/' + \
+                     f'", response_model={message_name}, status_code=201)\n'
+        output_str += f"async def create_{message_name_snake_cased}_http({message_name_snake_cased}: " \
+                      f"{message_name}) -> {message_name}:\n"
         if method_desc:
             output_str += f'    """\n'
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    return generic_cache_post({message_name}, {message_name_snake_cased})\n"
+        output_str += f"    return await generic_post_http({message_name}, {message_name_snake_cased})\n"
         return output_str
 
     def handle_GET_gen(self, message: protogen.Message, method_desc: str | None = None,
@@ -137,17 +149,17 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
                      f'{message_name_snake_cased}_id' + '}' + \
                      f'", response_model={message.proto.name}, status_code=200)\n'
         if field_type is None:
-            output_str += f"def read_{message_name_snake_cased}({message_name_snake_cased}_id: int) ->" \
+            output_str += f"async def read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id: int) ->" \
                           f" {message_name}:\n"
         else:
-            output_str += f"def read_{message_name_snake_cased}({message_name_snake_cased}_id: {field_type}) -> " \
+            output_str += f"async def read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id: {field_type}) -> " \
                           f"{message_name}:\n"
         if method_desc:
             output_str += f'    """\n'
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    return generic_cache_get({message_name}, {message_name_snake_cased}_id)\n"
+        output_str += f"    return await generic_read_by_id_http({message_name}, {message_name_snake_cased}_id)\n"
         return output_str
 
     def handle_PUT_gen(self, message: protogen.Message, method_desc: str | None = None,
@@ -156,14 +168,14 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}/' + \
                      f'", response_model={message_name}, status_code=200)\n'
-        output_str += f"def update_{message_name_snake_cased}({message_name_snake_cased}: " \
+        output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}: " \
                       f"{message_name}) -> {message_name}:\n"
         if method_desc:
             output_str += f'    """\n'
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    return generic_cache_put({message_name}, {message_name_snake_cased})\n"
+        output_str += f"    return await generic_put_http({message_name}, {message_name_snake_cased})\n"
         return output_str
 
     def handle_PATCH_gen(self, message: protogen.Message, method_desc: str | None = None,
@@ -172,14 +184,14 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}/' + \
                      f'", response_model={message_name}, status_code=200)\n'
-        output_str += f"def partial_update_{message_name_snake_cased}({message_name_snake_cased}: " \
+        output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}: " \
                       f"{message_name}Optional) -> {message_name}:\n"
         if method_desc:
             output_str += f'    """\n'
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    return generic_cache_patch({message_name}, {message_name_snake_cased})\n"
+        output_str += f"    return await generic_patch_http({message_name}, {message_name_snake_cased})\n"
         return output_str
 
     def handle_DELETE_gen(self, message: protogen.Message, method_desc: str | None = None,
@@ -187,19 +199,20 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + '{' + \
-                     f'{message_name_snake_cased}_id' + '}' + f'", response_model=DefaultWebResponse, status_code=200)\n'
+                     f'{message_name_snake_cased}_id' + '}' + \
+                     f'", response_model=DefaultWebResponse, status_code=200)\n'
         if field_type is None:
-            output_str += f"def delete_{message_name_snake_cased}({message_name_snake_cased}_id: int) -> " \
+            output_str += f"async def delete_{message_name_snake_cased}_http({message_name_snake_cased}_id: int) -> " \
                           f"DefaultWebResponse:\n"
         else:
-            output_str += f"def delete_{message_name_snake_cased}({message_name_snake_cased}_id: {field_type}) -> " \
+            output_str += f"async def delete_{message_name_snake_cased}_http({message_name_snake_cased}_id: {field_type}) -> " \
                           f"DefaultWebResponse:\n"
         if method_desc:
             output_str += f'    """\n'
             output_str += f'    {method_desc}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
-        output_str += f"    return generic_cache_delete({message_name}, {message_name_snake_cased}_id)\n"
+        output_str += f"    return await generic_delete_http({message_name}, {message_name}BaseModel, {message_name_snake_cased}_id)\n"
         return output_str
 
     def handle_index_req_gen(self, message: protogen.Message, field: protogen.Field) -> str:
@@ -209,24 +222,34 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         field_type = self.proto_to_py_datatype(field)
         output_str = f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-{field_name}/' + \
                      '{' + f'{field_name}' + '}' + f'", response_model=List[{message_name}], status_code=200)\n'
-        output_str += f"def get_{message_name_snake_cased}_from_{field_name}({field_name}: {field_type}) -> " \
+        output_str += f"async def get_{message_name_snake_cased}_from_{field_name}({field_name}: {field_type}) -> " \
                       f"List[{message_name}]:\n"
         output_str += f'    """\n'
         output_str += f'    Index method for {field_name}\n'
         output_str += f'    """\n'
-        output_str += f'    return generic_cache_index({message_name}, "{field_name}", {field_name})\n'
+        output_str += f'    return await generic_index_http({message_name}, "{field_name}", {field_name})\n'
         return output_str
+
 
     def handle_get_all_message_request(self, message: protogen.Message):
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}/' + \
                      f'", response_model=List[{message_name}], status_code=200)\n'
-        output_str += f"def get_all_{message_name_snake_cased}() -> List[{message_name}]:\n"
+        output_str += f"async def read_{message_name_snake_cased}_http() -> List[{message_name}]:\n"
         output_str += f'    """\n'
         output_str += f'    Get All {message_name}\n'
         output_str += f'    """\n'
-        output_str += f'    return generic_cache_get_all({message_name})\n\n\n'
+        output_str += f'    return await generic_read_http({message_name})\n\n\n'
+        return output_str
+
+    def handle_read_all_WEBSOCKET_gen(self, message: protogen.Message):
+        message_name = message.proto.name
+        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        output_str = f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws/")\n'
+        output_str += f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket) -> None:\n"
+        output_str += f'    """ Get All {message_name} using websocket """\n'
+        output_str += f"    await generic_read_ws(websocket, {message_name})\n"
         return output_str
 
     def handle_read_by_id_WEBSOCKET_gen(self, message: protogen.Message, method_desc: str, id_field_type):
@@ -235,18 +258,19 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str = f'@{self.api_router_app_name}.websocket("/get-{message_name_snake_cased}-ws/' + \
                      '{' + f'{message_name_snake_cased}_id' + '}")\n'
         if id_field_type is not None:
-            output_str += f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket, " \
+            output_str += f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, " \
                           f"{message_name_snake_cased}_id: {id_field_type}) -> None:\n"
         else:
-            output_str += f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket, " \
+            output_str += f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, " \
                           f"{message_name_snake_cased}_id: int) -> None:\n"
         if method_desc:
             output_str += f'    """ {method_desc } """\n'
-        output_str += f"    await generic_cache_get_ws(websocket, {message_name}, {message_name_snake_cased}_id)\n"
+        output_str += f"    await generic_read_by_id_ws(websocket, {message_name}, {message_name_snake_cased}_id)\n"
         return output_str
 
     def handle_CRUD_for_message(self, message: protogen.Message) -> str:
-        options_list_of_dict = self.get_complex_msg_option_values_as_list_of_dict(message, FastApiClassGenPlugin.flux_msg_json_root)
+        options_list_of_dict = \
+            self.get_complex_msg_option_values_as_list_of_dict(message, FastApiClassGenPlugin.flux_msg_json_root)
 
         # Since json_root option is of non-repeated type
         option_dict = options_list_of_dict[0]
@@ -261,6 +285,8 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         }
 
         output_str = self.handle_get_all_message_request(message)
+        output_str += self.handle_read_all_WEBSOCKET_gen(message)
+        output_str += "\n\n"
 
         id_field_type: str = self._get_msg_id_field_type(message)
 
@@ -287,8 +313,10 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
 
     def handle_main_file_gen(self):
         output_str = "from fastapi import FastAPI\n"
-        output_str += f"from {self.routes_file_name} import {self.api_router_app_name}\n"
-        output_str += f"from {self.model_file_name} import "
+        routes_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
+        output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
+        output_str += f"from {model_file_path} import "
         for message in self.int_id_message_list:
             output_str += message.proto.name
             if message != self.int_id_message_list[-1]:
@@ -309,11 +337,19 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
 
         return output_str
 
+    # def _underlying_handle_generic_imports(self) -> str:
+    #     generic_cache_routes_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_cache_routes")
+    #     output_str = f'from {generic_cache_routes_file_path} import generic_cache_post_http, ' + "\\\n"\
+    #                  f'\tgeneric_cache_put_http, generic_cache_patch_http, generic_cache_delete_http, ' \
+    #                  f'generic_cache_index_http, \\\n\tgeneric_cache_read_http, generic_cache_read_ws, ' \
+    #                  f'generic_cache_read_by_id_http, generic_cache_read_by_id_ws\n'
+    #     return output_str
     def _underlying_handle_generic_imports(self) -> str:
-        generic_cache_routes_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_cache_routes")
-        output_str = f'from {generic_cache_routes_file_path} import generic_cache_get_all, ' + "\\\n"\
-                     f'\tgeneric_cache_post, generic_cache_get, generic_cache_put, ' \
-                     f'generic_cache_patch, \\\n\tgeneric_cache_delete, generic_cache_index, generic_cache_get_ws\n'
+        generic_cache_routes_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_routes")
+        output_str = f'from {generic_cache_routes_file_path} import generic_post_http, ' + "\\\n"\
+                     f'\tgeneric_put_http, generic_patch_http, generic_delete_http, ' \
+                     f'generic_index_http, \\\n\tgeneric_read_http, generic_read_ws, ' \
+                     f'generic_read_by_id_http, generic_read_by_id_ws\n'
         return output_str
 
     def _handle_model_imports(self) -> str:
@@ -323,18 +359,26 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             output_str += message.proto.name
             output_str += ", "
             output_str += f"{message.proto.name}Optional"
+            output_str += ", "
+            output_str += f"{message.proto.name}BaseModel"
+
             if message != self.root_message_list[-1]:
                 output_str += ", "
             else:
                 output_str += "\n"
         return output_str
 
+    def _handle_routes_callback_import(self) -> str:
+        return ""
+
+    def _handle_routes_callback_instantiate(self):
+        return ""
+
     def handle_routes_file_gen(self) -> str:
         output_str = "from fastapi import APIRouter, Request, WebSocket\n"
         output_str += "from fastapi.templating import Jinja2Templates\n"
         output_str += "from typing import List\n"
-        routes_callback_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_callback_class_name)
-        output_str += f"from {routes_callback_path} import {self.routes_callback_class_name_capital_camel_cased}\n"
+        output_str += self._handle_routes_callback_import()
         output_str += self._handle_model_imports()
         output_str += self._underlying_handle_generic_imports()
         incremental_id_basemodel_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
@@ -346,7 +390,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str += f'from {default_web_response_file_path} import DefaultWebResponse\n'
         output_str += f"\n\n"
         output_str += f"{self.api_router_app_name} = APIRouter()\n"
-        output_str += f"callback_class = {self.routes_callback_class_name_capital_camel_cased}.get_instance()\n\n\n"
+        output_str += self._handle_routes_callback_instantiate()
         output_str += self.handle_CRUD_task()
         output_str += "\n\ntemplates = Jinja2Templates(directory='templates')\n\n"
         output_str += f"@{self.api_router_app_name}.get('/')\n"
@@ -357,46 +401,46 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
     def handle_POST_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def create_{message_name_snake_cased}_client(pydantic_obj: {message_name}BaseModel) -> " \
-                     f"{message_name}:\n"
-        output_str += f"    return generic_http_post_client(create_{message_name_snake_cased}_client_url, " \
-                      f"pydantic_obj, {message_name}BaseModel)\n"
+        output_str = " "*4 + f"def create_{message_name_snake_cased}_client(self, pydantic_obj: " \
+                     f"{message_name}BaseModel) -> {message_name}:\n"
+        output_str += " "*8 + f"return generic_http_post_client(self.create_{message_name_snake_cased}_client_url, " \
+                      f"pydantic_obj, {message_name}BaseModel)"
         return output_str
 
     def handle_GET_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def get_{message_name_snake_cased}_client({message_name_snake_cased}_id: " \
+        output_str = " "*4 + f"def get_{message_name_snake_cased}_client(self, {message_name_snake_cased}_id: " \
                      f"{field_type}) -> {message_name}:\n"
-        output_str += f"    return generic_http_get_client(get_{message_name_snake_cased}_client_url, " \
-                      f"{message_name_snake_cased}_id, {message_name}BaseModel)\n"
+        output_str += " "*8 + f"return generic_http_get_client(self.get_{message_name_snake_cased}_client_url, " \
+                      f"{message_name_snake_cased}_id, {message_name}BaseModel)"
         return output_str
 
     def handle_PUT_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def put_{message_name_snake_cased}_client(pydantic_obj: {message_name}BaseModel) -> " \
-                     f"{message_name}:\n"
-        output_str += f"    return generic_http_put_client(put_{message_name_snake_cased}_client_url, " \
-                      f"pydantic_obj, {message_name}BaseModel)\n"
+        output_str = " "*4 + f"def put_{message_name_snake_cased}_client(self, pydantic_obj: " \
+                     f"{message_name}BaseModel) -> {message_name}:\n"
+        output_str += " "*4 + f"    return generic_http_put_client(self.put_{message_name_snake_cased}_client_url, " \
+                      f"pydantic_obj, {message_name}BaseModel)"
         return output_str
 
     def handle_PATCH_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def patch_{message_name_snake_cased}_client(pydantic_obj: {message_name}BaseModel) -> " \
-                     f"{message_name}:\n"
-        output_str += f"    return generic_http_patch_client(patch_{message_name_snake_cased}_client_url, " \
-                      f"pydantic_obj, {message_name}BaseModel)\n"
+        output_str = " "*4 + f"def patch_{message_name_snake_cased}_client(self, pydantic_obj: " \
+                     f"{message_name}BaseModel) -> {message_name}:\n"
+        output_str += " "*4 + f"    return generic_http_patch_client(self.patch_{message_name_snake_cased}" \
+                      f"_client_url, pydantic_obj, {message_name}BaseModel)"
         return output_str
 
     def handle_DELETE_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def delete_{message_name_snake_cased}_client({message_name_snake_cased}_id: " \
+        output_str = " "*4 + f"def delete_{message_name_snake_cased}_client(self, {message_name_snake_cased}_id: " \
                      f"{field_type}) -> Dict:\n"
-        output_str += f"    return generic_http_delete_client(delete_{message_name_snake_cased}_client_url, " \
-                      f"{message_name_snake_cased}_id)\n"
+        output_str += " "*4 + f"    return generic_http_delete_client(self.delete_{message_name_snake_cased}" \
+                      f"_client_url, {message_name_snake_cased}_id)"
         return output_str
 
     def handle_index_client_gen(self, message: protogen.Message, field: protogen.Field) -> str:
@@ -404,36 +448,36 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         field_name = field.proto.name
         field_type = self.proto_to_py_datatype(field)
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def get_{message_name_snake_cased}_from_{field_name}_client({field_name}: " \
+        output_str = " "*4 + f"def get_{message_name_snake_cased}_from_{field_name}_client(self, {field_name}: " \
                      f"{field_type}) -> {message_name}:\n"
-        output_str += f"    return generic_http_get_client(" \
-                      f"get_{message_name_snake_cased}_from_{field_name}_client_url, " \
-                      f"{field_name}, {message_name}BaseModel)\n"
+        output_str += " "*4 + f"    return generic_http_get_client(" \
+                      f"self.get_{message_name_snake_cased}_from_{field_name}_client_url, " \
+                      f"{field_name}, {message_name}BaseModel)"
         return output_str
 
     def handle_get_all_message_http_client(self, message: protogen.Message):
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"def get_all_{message_name_snake_cased}_client() -> List[{message_name}]:\n"
-        output_str += f"    return generic_http_get_all_client(get_all_{message_name_snake_cased}_client_url, " \
-                      f"{message_name}BaseModel)\n\n\n"
+        output_str = " "*4 + f"def get_all_{message_name_snake_cased}_client(self) -> List[{message_name}]:\n"
+        output_str += " "*4 + f"    return generic_http_get_all_client(self.get_all_" \
+                      f"{message_name_snake_cased}_client_url, {message_name}BaseModel)\n\n"
         return output_str
 
     def handle_get_all_message_ws_client(self, message: protogen.Message):
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"async def get_all_{message_name_snake_cased}_client_ws(user_callable: Callable):\n"
-        output_str += f"    await generic_ws_get_all_client(get_all_{message_name_snake_cased}_client_ws_url, " \
-                      f"{message_name}BaseModel, user_callable)\n\n\n"
+        output_str = " "*4 + f"async def get_all_{message_name_snake_cased}_client_ws(self, user_callable: Callable):\n"
+        output_str += " "*4 + f"    await generic_ws_get_all_client(self.get_all_{message_name_snake_cased}" \
+                      f"_client_ws_url, {message_name}BaseModel, user_callable)\n\n"
         return output_str
 
     def handle_read_by_id_WEBSOCKET_client_gen(self, message: protogen.Message, id_field_type):
         message_name = message.proto.name
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
-        output_str = f"async def get_{message_name_snake_cased}_client_ws({message_name_snake_cased}_id: " \
-                     f"{id_field_type}, user_callable: Callable):\n"
-        output_str += f"    await generic_ws_get_client(get_{message_name_snake_cased}_client_ws_url, {message_name_snake_cased}_id, " \
-                      f"{message_name}BaseModel, user_callable)\n"
+        output_str = " "*4 + f"async def get_{message_name_snake_cased}_client_ws(self, " \
+                     f"{message_name_snake_cased}_id: {id_field_type}, user_callable: Callable):\n"
+        output_str += " "*4 + f"    await generic_ws_get_client(self.get_{message_name_snake_cased}_client_ws_url, " \
+                      f"{message_name_snake_cased}_id, {message_name}BaseModel, user_callable)"
         return output_str
 
     def _get_msg_id_field_type(self, message: protogen.Message) -> str:
@@ -494,49 +538,56 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         option_dict = options_list_of_dict[0]
 
         crud_field_name_to_url_dict = {
-            FastApiClassGenPlugin.flux_json_root_create_field: f"create_{message_name_snake_cased}_client_url: str = "
-                                                               "f'http://{host}:{port}/"+f"{self.proto_file_package}/"
-                                                               f"create-{message_name_snake_cased}'",
-            FastApiClassGenPlugin.flux_json_root_read_field: f"get_{message_name_snake_cased}_client_url: str = "
-                                                             "f'http://{host}:{port}/"+f"{self.proto_file_package}/"
-                                                             f"get-{message_name_snake_cased}'",
-            FastApiClassGenPlugin.flux_json_root_update_field: f"put_{message_name_snake_cased}_client_url: str = "
-                                                               "f'http://{host}:{port}/"+f"{self.proto_file_package}/"
-                                                               f"put-{message_name_snake_cased}'",
-            FastApiClassGenPlugin.flux_json_root_patch_field: f"patch_{message_name_snake_cased}_client_url: str = "
-                                                              "f'http://{host}:{port}/"+f"{self.proto_file_package}/"
-                                                              f"patch-{message_name_snake_cased}'",
-            FastApiClassGenPlugin.flux_json_root_delete_field: f"delete_{message_name_snake_cased}_client_url: str = "
-                                                               "f'http://{host}:{port}/"+f"{self.proto_file_package}/"
-                                                               f"delete-{message_name_snake_cased}'",
-            FastApiClassGenPlugin.flux_json_root_read_websocket_field: f"get_{message_name_snake_cased}_client_ws_url: "
-                                                                       "str = f'ws://{host}:{port}/" +
+            FastApiClassGenPlugin.flux_json_root_create_field: f"self.create_{message_name_snake_cased}_client_url: "
+                                                               "str = f'http://{self.host}:{self.port}/" +
+                                                               f"{self.proto_file_package}/"
+                                                               f"create-{message_name_snake_cased}/'",
+            FastApiClassGenPlugin.flux_json_root_read_field: f"self.get_{message_name_snake_cased}_client_url: str = "
+                                                             "f'http://{self.host}:{self.port}/" +
+                                                             f"{self.proto_file_package}/"
+                                                             f"get-{message_name_snake_cased}/'",
+            FastApiClassGenPlugin.flux_json_root_update_field: f"self.put_{message_name_snake_cased}_client_url: str = "
+                                                               "f'http://{self.host}:{self.port}/" +
+                                                               f"{self.proto_file_package}/"
+                                                               f"put-{message_name_snake_cased}/'",
+            FastApiClassGenPlugin.flux_json_root_patch_field: f"self.patch_{message_name_snake_cased}_client_url: "
+                                                              "str = f'http://{self.host}:{self.port}/" +
+                                                              f"{self.proto_file_package}/"
+                                                              f"patch-{message_name_snake_cased}/'",
+            FastApiClassGenPlugin.flux_json_root_delete_field: f"self.delete_{message_name_snake_cased}_client_url: "
+                                                               "str = f'http://{self.host}:{self.port}/" +
+                                                               f"{self.proto_file_package}/"
+                                                               f"delete-{message_name_snake_cased}/'",
+            FastApiClassGenPlugin.flux_json_root_read_websocket_field: f"self.get_{message_name_snake_cased}_"
+                                                                       f"client_ws_url: "
+                                                                       "str = f'ws://{self.host}:{self.port}/" +
                                                                        f"{self.proto_file_package}/get-"
-                                                                       f"{message_name_snake_cased}-ws'"
+                                                                       f"{message_name_snake_cased}-ws/'"
         }
-        output_str = "get_all_"+f"{message_name_snake_cased}"+"_client_url: str = f'http://{host}:{port}/" + \
-                     f"{self.proto_file_package}/get-all-{message_name_snake_cased}'\n"
-        output_str += "get_all_"+f"{message_name_snake_cased}"+"_client_ws_url: str = f'ws://{host}:{port}/" + \
-                      f"{self.proto_file_package}/get-all-{message_name_snake_cased}-ws'\n"
+        output_str = " "*8 + "self.get_all_"+f"{message_name_snake_cased}" + \
+                     "_client_url: str = f'http://{self.host}:{self.port}/" + \
+                     f"{self.proto_file_package}/get-all-{message_name_snake_cased}/'\n"
+        output_str += " "*8 + "self.get_all_"+f"{message_name_snake_cased}" + \
+                      "_client_ws_url: str = f'ws://{self.host}:{self.port}/" \
+                      + f"{self.proto_file_package}/get-all-{message_name_snake_cased}-ws/'\n"
 
         for crud_option_field_name, url in crud_field_name_to_url_dict.items():
             if crud_option_field_name in option_dict:
-                output_str += url
+                output_str += " "*8 + f"{url}"
                 output_str += "\n"
             # else not required: Avoiding method creation if desc not provided in option
 
         for field in message.fields:
             if FastApiClassGenPlugin.flux_fld_index in str(field.proto.options):
-                output_str += f"get_{message_name_snake_cased}_from_{field.proto.name}_client_url: str = " \
-                              "f'http://{host}:{port}/" + \
-                              f"{self.proto_file_package}/get-{message_name_snake_cased}-from-{field.proto.name}'\n"
+                output_str += " "*8 + f"self.get_{message_name_snake_cased}_from_{field.proto.name}_client_url: " \
+                              f"str = f'http://" + "{self.host}:{self.port}/" + \
+                              f"{self.proto_file_package}/get-{message_name_snake_cased}-from-{field.proto.name}/'\n"
             # else not required: Avoiding field if index option is not enabled
 
         return output_str
 
     def handle_client_file_gen(self) -> str:
-        output_str = "import os\n"
-        output_str += f'from typing import Dict, List, Callable\n'
+        output_str = f'from typing import Dict, List, Callable\n'
         generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
         output_str += f'from {generic_web_client_path} import generic_http_get_all_client, ' + "\\\n" \
                       f'\tgeneric_http_post_client, generic_http_get_client, generic_http_put_client, ' \
@@ -553,27 +604,28 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             else:
                 output_str += "\n"
         output_str += "\n\n"
-        output_str += "#host and port\n"
-        output_str += f'host = "127.0.0.1" if (env_host := os.getenv("HOST")) is None else env_host\n'
-        output_str += f'port = 8000 if (env_port := os.getenv("PORT")) is None else int(env_port)\n\n\n'
-        output_str += f'# urls\n'
+        output_str += f"class {self.convert_to_capitalized_camel_case(self.client_file_name)}:\n\n"
+        output_str += "    def __init__(self, host: str | None = None, port: int | None = None):\n"
+        output_str += " "*4 + "    # host and port\n"
+        output_str += " "*4 + f'    self.host = "127.0.0.1" if host is None else host\n'
+        output_str += " "*4 + f'    self.port = 8000 if port is None else port\n\n'
+        output_str += " "*4 + f'    # urls\n'
         for message in self.root_message_list:
             output_str += self._handle_client_url_gen(message)
-            output_str += "\n\n"
-        output_str += f'# interfaces\n'
+            output_str += "\n"
+        output_str += f'    # interfaces\n'
         for message in self.root_message_list:
             output_str += self.handle_client_methods(message)
+        return output_str
+
+    def _handle_callback_override_set_instance_import(self) -> str:
+        output_str = ""
         return output_str
 
     def handle_run_file_gen(self) -> str:
         output_str = "import os\n"
         output_str += "import uvicorn\n"
-        output_str += "# below import is to set derived callback's instance if implemented in the script\n"
-        callback_override_set_instamce_file_path = \
-            self.import_path_from_os_path("OUTPUT_DIR", self.callback_override_set_instance_file_name)
-        callback_override_set_instamce_file_path = ".".join(callback_override_set_instamce_file_path.split(".")[:-1])
-        output_str += f"from {callback_override_set_instamce_file_path} import " \
-                      f"{self.callback_override_set_instance_file_name}\n"
+        output_str += self._handle_callback_override_set_instance_import()
         output_str += f"from FluxPythonUtils.scripts.utility_functions import configure_logger\n\n"
         output_str += f'configure_logger(os.getenv("LOG_LEVEL"), log_file_name=os.getenv("LOG_FILE_PATH"))\n'
         output_str += "\n\n"
@@ -669,7 +721,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str = f"    def read_all_{message_name_snake_cased}_pre(self):\n"
         output_str += "        pass\n\n"
         output_str += f"    def read_all_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
+                      f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
         output_str += "        pass\n\n"
         return output_str
 
@@ -693,7 +745,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
     def handle_callback_class_file_gen(self) -> str:
         output_str = "import threading\n"
         output_str += "import logging\n"
-        output_str += "from typing import Optional, TypeVar\n"
+        output_str += "from typing import Optional, TypeVar, List\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
         output_str += f"from {model_file_path} import "
         for message in self.root_message_list:
@@ -730,7 +782,8 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         output_str += f'            raise Exception("{self.routes_callback_class_name_capital_camel_cased}.' \
                       f'set_instance must be invoked ' \
                       f'with a type that is "\n'
-        output_str += f'                            "subclass of {self.routes_callback_class_name_capital_camel_cased} ' \
+        output_str += f'                            "subclass of ' \
+                      f'{self.routes_callback_class_name_capital_camel_cased} ' \
                       f'- is-subclass test failed!")\n'
         output_str += f'        if instance == cls.{self.routes_callback_class_name}_instance:\n'
         output_str += f'            return  # multiple calls with same instance is not an error (though - should be ' \
@@ -762,7 +815,8 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
                 FastApiClassGenPlugin.flux_json_root_update_field: self.handle_PUT_callback_methods_gen,
                 FastApiClassGenPlugin.flux_json_root_patch_field: self.handle_PATCH_callback_methods_gen,
                 FastApiClassGenPlugin.flux_json_root_delete_field: self.handle_DELETE_callback_methods_gen,
-                FastApiClassGenPlugin.flux_json_root_read_websocket_field: self.handle_read_by_id_WEBSOCKET_callback_methods_gen
+                FastApiClassGenPlugin.flux_json_root_read_websocket_field:
+                    self.handle_read_by_id_WEBSOCKET_callback_methods_gen
             }
 
             output_str += self.handle_get_all_message_http_callback_methods(message)
@@ -785,18 +839,233 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
     def handle_callback_override_set_instance_file_gen(self) -> str:
         output_str = "# File to contain injection of override callback instance using set instance\n\n"
         output_str += "import logging\n"
-        # todo make changes to generic once override file is also added to generator
         callback_override_path = self.import_path_from_os_path("OUTPUT_DIR",
-                                                               "strat_manager_service_beanie_routes_callback_override")
-        output_str += f"from {callback_override_path} import StratManagerServiceBeanieRoutesCallback, " \
-                      f"StratManagerServiceRoutesBeanieCallbackOverride\n\n\n"
-        output_str += "if StratManagerServiceBeanieRoutesCallback.strat_manager_service_beanie_routes_callback_instance is None:\n"
-        output_str += "    callback_override = StratManagerServiceRoutesBeanieCallbackOverride()\n"
-        output_str += "    StratManagerServiceBeanieRoutesCallback.set_instance(callback_override)\n"
+                                                               f"{self.proto_file_name}_beanie_routes_callback_override")
+        proto_file_name_camel_cased = self.convert_to_capitalized_camel_case(self.proto_file_name)
+        output_str += f"from {callback_override_path} import {proto_file_name_camel_cased}BeanieRoutesCallback, " \
+                      f"{proto_file_name_camel_cased}RoutesBeanieCallbackOverride\n\n\n"
+        output_str += \
+            f"if {proto_file_name_camel_cased}BeanieRoutesCallback." \
+            f"{self.proto_file_name}_beanie_routes_callback_instance is None:\n"
+        output_str += f"    callback_override = {proto_file_name_camel_cased}RoutesBeanieCallbackOverride()\n"
+        output_str += f"    {proto_file_name_camel_cased}BeanieRoutesCallback.set_instance(callback_override)\n"
         output_str += "else:\n"
         output_str += '    err_str = f"set instance called more than once in one session"\n'
         output_str += '    logging.exception(err_str)\n'
-        output_str += '    raise Exception(err_str)\n'
+        output_str += '    raise Exception(err_str)\n\n\n'
+        output_str += "def app_launch_pre():\n"
+        output_str += '    logging.debug("Pre launch Fastapi app")\n\n\n'
+        output_str += "def app_launch_post():\n"
+        output_str += '    logging.debug("Post launch Fastapi app")\n'
+        return output_str
+
+    def _handle_field_data_manipulation(self, json_content: Dict, message: protogen.Message, id_str: str | None = None,
+                                        single_field: bool | None = False):
+        if not single_field:
+            temp_str = ""
+            for field in message.fields:
+                if FastApiClassGenPlugin.default_id_field_name == field.proto.name:
+                    temp_str += f"{field.proto.name}={id_str}"
+                else:
+                    message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+                    if field == message.fields[0]:
+                        temp_str += f"{field.proto.name}={json_content[message_name_snake_cased][field.proto.name]}"
+                    else:
+                        temp_str += f", {field.proto.name}={json_content[message_name_snake_cased][field.proto.name]}"
+            return temp_str
+        else:
+            for field in message.fields:
+                if FastApiClassGenPlugin.default_id_field_name != field.proto.name:
+                    match field.kind.name.lower():
+                        case "int32" | "int64" | "float":
+                            return f"{field.proto.name} += 10"
+                        case "string":
+                            return f'{field.proto.name} = "test_str"'
+                        case "bool":
+                            return f"{field.proto.name} = True"
+                # else not required: field must not be id to be manipulated in this method's use case
+            else:
+                err_str = f"Can't find any non-complex type field in this message: {message.proto.name}"
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+    def handle_callback_override_file_gen(self) -> str:
+        if (output_dir_path := os.getenv("OUTPUT_DIR")) is not None:
+            json_sample_file_path = PurePath(output_dir_path) / f"{self.proto_file_name}_json_sample.json"
+        else:
+            err_str = "Env var 'OUTPUT_DIR' received as None"
+            logging.exception(err_str)
+            raise Exception(err_str)
+        with open(json_sample_file_path) as json_sample:
+            json_sample_content = json.load(json_sample)
+        try:
+            required_root_msg: List[protogen.Message] = self.root_message_list[:4]
+        except IndexError as e:
+            err_str = f"Model might has less then 4 models, current implementation " \
+                      f"requires at least 4 models, error: {e}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+        proto_file_name_capitalize_camel_cased = self.convert_to_capitalized_camel_case(self.proto_file_name)
+        output_str = "from typing import List\n"
+        output_str += "import threading\n"
+        output_str += "import logging\n"
+        output_str += "import asyncio\n\n"
+        output_str += "# project imports\n"
+        beanie_web_client_path = \
+            self.import_path_from_os_path("OUTPUT_DIR", f"{self.proto_file_name}_beanie_web_client")
+        output_str += f"from {beanie_web_client_path} import " \
+                      f"{proto_file_name_capitalize_camel_cased}BeanieWebClient\n"
+        cache_web_client_path = \
+            self.import_path_from_os_path("OUTPUT_DIR", f"{self.proto_file_name}_cache_web_client")
+        output_str += f"from {cache_web_client_path} import " \
+                      f"{proto_file_name_capitalize_camel_cased}CacheWebClient\n"
+        beanie_model_path = \
+            self.import_path_from_os_path("OUTPUT_DIR", f"{self.proto_file_name}_beanie_model")
+        pydantic_models_comma_sep = ", ".join([msg.proto.name for msg in required_root_msg])
+        output_str += f"from {beanie_model_path} import " \
+                      f"{required_root_msg[0].proto.name}BaseModel, {pydantic_models_comma_sep}\n"
+        beanie_routes_callback = \
+            self.import_path_from_os_path("OUTPUT_DIR", f"{self.proto_file_name}_beanie_routes_callback")
+        output_str += f"from {beanie_routes_callback} import " \
+                      f"{proto_file_name_capitalize_camel_cased}BeanieRoutesCallback\n\n\n"
+        output_str += f"{self.proto_file_name}_beanie_web_client_internal = " \
+                     f"{proto_file_name_capitalize_camel_cased}BeanieWebClient()\n"
+        output_str += f"{self.proto_file_name}_cache_web_client_external = " \
+                      f"{proto_file_name_capitalize_camel_cased}CacheWebClient(port=8080)\n\n\n"
+        output_str += f"class WsGet{required_root_msg[0].proto.name}ByIdCallback:\n"
+        output_str += f"    def __call__(self, " \
+                      f"{self.convert_camel_case_to_specific_case(required_root_msg[0].proto.name)}_base_model: " \
+                      f"{required_root_msg[0].proto.name}BaseModel):\n"
+        output_str += f'        logging.debug(f"callback function: {required_root_msg[0].proto.name} from DB: '+'{' + \
+                      f'{self.convert_camel_case_to_specific_case(required_root_msg[0].proto.name)}_base_model' + \
+                      '}")\n\n\n'
+        output_str += f"class WsGet{required_root_msg[0].proto.name}Callback:\n"
+        output_str += f"    def __call__(self, " \
+                      f"{self.convert_camel_case_to_specific_case(required_root_msg[0].proto.name)}_base_model_list: " \
+                      f"List[{required_root_msg[0].proto.name}BaseModel]):\n"
+        output_str += f'        logging.debug(f"callback function: {required_root_msg[0].proto.name} List from DB: '+'{' + \
+                      f'{self.convert_camel_case_to_specific_case(required_root_msg[0].proto.name)}_base_model_list' + \
+                      '}")\n\n\n'
+        output_str += f"class {proto_file_name_capitalize_camel_cased}RoutesBeanieCallbackOverride(" \
+                      f"{proto_file_name_capitalize_camel_cased}BeanieRoutesCallback):\n\n"
+        output_str += f"    def __init__(self):\n"
+        output_str += f"        super().__init__()\n\n"
+        first_msg_name = required_root_msg[0].proto.name
+        first_msg_name_snake_cased = self.convert_camel_case_to_specific_case(first_msg_name)
+        output_str += f"    # Example 1 of 5: intercept web calls via callback example\n"
+        output_str += f"    def create_{first_msg_name_snake_cased}_pre(self, " \
+                      f"{first_msg_name_snake_cased}_obj: {first_msg_name}):\n"
+        output_str += f'        logging.debug(f"{first_msg_name} From Ui: '+'{' + \
+                      f'{first_msg_name_snake_cased}_obj'+'}'+'")\n'
+        output_str += f'        {first_msg_name_snake_cased}_obj.' \
+                      f'{self._handle_field_data_manipulation(json_sample_content, required_root_msg[0], single_field=True)}\n'
+        output_str += f'        logging.debug(f"{first_msg_name} pre test: ' + '{' + \
+                      f'{first_msg_name_snake_cased}_obj' + '}' + '")\n\n'
+        output_str += f'    def create_{first_msg_name_snake_cased}_post(self, ' \
+                      f'{first_msg_name_snake_cased}_obj: {first_msg_name}):\n'
+        output_str += f'        logging.debug(f"{first_msg_name} from DB: ' + '{' + \
+                      f'{first_msg_name_snake_cased}_obj' + '}' + '")\n'
+        output_str += f'        {first_msg_name_snake_cased}_obj.' \
+                      f'{self._handle_field_data_manipulation(json_sample_content, required_root_msg[0], single_field=True)}\n'
+        output_str += f'        logging.debug(f"{first_msg_name} Post test: ' + '{' + \
+                      f'{first_msg_name_snake_cased}_obj' + '}' + '")\n\n'
+        output_str += f'    # Example 2 of 5: intercept web calls via callback and invoke another ' \
+                      f'service on this very web server example\n'
+        output_str += f'    def _http_create_{first_msg_name_snake_cased}_thread_func(self, obj):\n'
+        field_str = self._handle_field_data_manipulation(json_sample_content, required_root_msg[0], "obj.id")
+        output_str += f'        {first_msg_name_snake_cased}_obj = {first_msg_name}BaseModel({field_str})\n'
+        output_str += f'        {first_msg_name_snake_cased}_obj = {self.proto_file_name}_beanie_web_client' \
+                      f'_internal.create_{first_msg_name_snake_cased}_client({first_msg_name_snake_cased}_obj)\n'
+        output_str += f'        logging.debug(f"Created {first_msg_name} obj from Another Document: ' + \
+                      '{'+f'{first_msg_name_snake_cased}_obj'+'}'+'")\n\n'
+        main_msg = required_root_msg[1]
+        main_msg_name = main_msg.proto.name
+        main_msg_name_snake_cased = self.convert_camel_case_to_specific_case(main_msg_name)
+        output_str += f'    def create_{main_msg_name_snake_cased}_pre(self, ' \
+                      f'{main_msg_name_snake_cased}: {main_msg_name}):\n'
+        output_str += f'        logging.debug(f"{main_msg_name} from UI: '+'{'+f'{main_msg_name_snake_cased}'+'}'+'")\n'
+        output_str += f'        # To avoid deadlock triggering another thread to execute another document creation\n'
+        output_str += f'        # This same implementation is required even in post\n'
+        output_str += f'        new_thread = threading.Thread(target=self._http_create_{first_msg_name_snake_cased}' \
+                      f'_thread_func, args=({main_msg_name_snake_cased},), daemon=True)\n'
+        output_str += f'        new_thread.start()\n\n'
+        output_str += f'    def create_{main_msg_name_snake_cased}_post(self, {main_msg_name_snake_cased}: ' \
+                      f'{main_msg_name}):\n'
+        output_str += f'        logging.debug(f"{main_msg_name} From Db: '+'{'+f'{main_msg_name_snake_cased}'+'}'+'")\n'
+        output_str += f'        {main_msg_name_snake_cased}.' \
+                      f'{self._handle_field_data_manipulation(json_sample_content, main_msg, single_field=True)}\n'
+        output_str += f'        logging.debug(f"{main_msg_name} Post test: ' + \
+                      '{'+f'{main_msg_name_snake_cased}'+'}'+'")\n\n'
+        main_msg = required_root_msg[2]
+        main_msg_name = main_msg.proto.name
+        main_msg_name_snake_cased = self.convert_camel_case_to_specific_case(main_msg_name)
+        output_str += f'    # Example 3 of 5: intercept web calls via callback and invoke ' \
+                      f'another service on different web server example\n'
+        output_str += f'    def create_{main_msg_name_snake_cased}_pre(self, ' \
+                      f'{main_msg_name_snake_cased}_obj: {main_msg_name}):\n'
+        output_str += f'        logging.debug(f"{main_msg_name} from UI: ' + \
+                      '{'+f'{main_msg_name_snake_cased}_obj'+'}'+'")\n'
+        field_str = \
+            self._handle_field_data_manipulation(json_sample_content, required_root_msg[0],
+                                                 f"{main_msg_name_snake_cased}_obj.id")
+        output_str += f'        {first_msg_name_snake_cased}_obj = {first_msg_name}BaseModel({field_str})\n'
+        output_str += f'        {first_msg_name_snake_cased}_obj = {self.proto_file_name}_cache_web_client_external.' \
+                      f'create_{first_msg_name_snake_cased}_client({first_msg_name_snake_cased}_obj)\n'
+        output_str += f'        logging.debug(f"Created {first_msg_name} obj from Another Document: ' + \
+                      '{'+f'{first_msg_name_snake_cased}_obj'+'}'+'")\n\n'
+        output_str += f'    def create_{main_msg_name_snake_cased}_post(self, ' \
+                      f'{main_msg_name_snake_cased}_obj: {main_msg_name}):\n'
+        output_str += f'        logging.debug(f"{main_msg_name} From Db: ' + \
+                      '{'+f'{main_msg_name_snake_cased}_obj'+'}'+'")\n'
+        output_str += f'        {main_msg_name_snake_cased}_obj.' \
+                      f'{self._handle_field_data_manipulation(json_sample_content, main_msg, single_field=True)}\n'
+        output_str += f'        logging.debug(f"{main_msg_name} Post test: ' + \
+                      '{'+f'{main_msg_name_snake_cased}_obj'+'}'+'")\n\n'
+        output_str += f'    # Example 4 of 5: intercept ws web calls via callback and ' \
+                      f'invoke another service on this very web server example\n'
+        output_str += f'    async def _ws_get_{first_msg_name_snake_cased}_by_id_thread_func(self, ' \
+                      f'obj_id: int, ws_get_{first_msg_name_snake_cased}_by_id_callback):\n'
+        output_str += f'        logging.debug("_ws_get_{first_msg_name_snake_cased}_by_id_thread_func: ' \
+                      f'Connecting {first_msg_name_snake_cased} get_by_id ws:")\n'
+        output_str += f'        await {self.proto_file_name}_beanie_web_client_internal.get_' \
+                      f'{first_msg_name_snake_cased}_client_ws(obj_id, ws_get_{first_msg_name_snake_cased}' \
+                      f'_by_id_callback)\n\n'
+        main_msg = required_root_msg[3]
+        main_msg_name = main_msg.proto.name
+        main_msg_name_snake_cased = self.convert_camel_case_to_specific_case(main_msg_name)
+        output_str += f'    def read_by_id_ws_{main_msg_name_snake_cased}_pre(self, obj_id: int):\n'
+        output_str += f'        logging.debug(f"read_by_id_ws_{main_msg_name_snake_cased}_pre:' \
+                      f' {main_msg_name} id from UI: '+'{'+'obj_id'+'}'+'")\n'
+        output_str += f'        ws_get_{first_msg_name_snake_cased}_by_id_callback: ' \
+                      f'WsGet{first_msg_name}ByIdCallback = WsGet{first_msg_name}ByIdCallback()\n'
+        output_str += f'        # running await function is different from running normal function in threading\n'
+        output_str += f'        new_thread = threading.Thread(target=asyncio.run, args=(self._ws_get_' \
+                      f'{first_msg_name_snake_cased}_by_id_thread_func(obj_id, ws_get_{first_msg_name_snake_cased}' \
+                      f'_by_id_callback),), daemon=True)\n'
+        output_str += f'        new_thread.start()\n'
+        output_str += f'    def read_by_id_ws_{main_msg_name_snake_cased}_post(self):\n'
+        output_str += f'        logging.debug(f"closing {main_msg_name_snake_cased} read ws ' \
+                      f'in read_by_id_ws_{main_msg_name_snake_cased}_post")\n\n'
+        output_str += f'    # Example 5 of 5: intercept ws web calls via callback and ' \
+                      f'invoke another service on different web server example\n'
+        output_str += f'    async def _ws_get_all_{first_msg_name_snake_cased}_thread_func(' \
+                      f'self, ws_get_{first_msg_name_snake_cased}_callback):\n'
+        output_str += f'        logging.debug("_ws_get_{first_msg_name_snake_cased}_by_id_thread_func: ' \
+                      f'Connecting another server {first_msg_name_snake_cased} get_all ws:")\n'
+        output_str += f'        await {self.proto_file_name}_cache_web_client_external.get_all_' \
+                      f'{first_msg_name_snake_cased}_client_ws(ws_get_{first_msg_name_snake_cased}_callback)\n\n'
+        output_str += f'    def read_all_ws_{main_msg_name_snake_cased}_pre(self):\n'
+        output_str += f'        logging.debug(f"triggered read_all_ws_{main_msg_name_snake_cased}_pre")\n'
+        output_str += f'        ws_get_{first_msg_name_snake_cased}_callback: WsGet{first_msg_name}Callback ' \
+                      f'= WsGet{first_msg_name}Callback()\n'
+        output_str += f'        # running await function is different from running normal function in threading\n'
+        output_str += f'        new_thread = threading.Thread(target=asyncio.run, args=(self._ws_get_all_' \
+                      f'{first_msg_name_snake_cased}_thread_func(ws_get_{first_msg_name_snake_cased}_callback),),' \
+                      f' daemon=True)\n'
+        output_str += f'        new_thread.start()\n\n'
+        output_str += f'    def read_all_ws_{main_msg_name_snake_cased}_post(self):\n'
+        output_str += f'        logging.debug(f"closing {main_msg_name_snake_cased} read all ws in ' \
+                      f'read_all_ws_{main_msg_name_snake_cased}_post")\n'
         return output_str
 
     def set_req_data_members(self, file: protogen.File):
@@ -810,7 +1079,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         self.routes_file_name = f'{self.proto_file_name}_cache_routes'
         self.launch_file_name = self.proto_file_name + "_" + self.output_file_name_suffix
         self.client_file_name = f"{self.proto_file_name}_cache_web_client"
-        self.routes_callback_class_name = f"{self.proto_file_name}_routes_callback"
+        self.routes_callback_class_name = f"{self.proto_file_name}_cache_routes_callback"
         routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
         self.routes_callback_class_name_capital_camel_cased: str = \
             routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]

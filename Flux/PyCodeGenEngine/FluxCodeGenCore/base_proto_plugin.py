@@ -273,15 +273,24 @@ class BaseProtoPlugin(ABC):
 
     @staticmethod
     def import_path_from_os_path(os_path_env_var_name: str, import_file_name: str):
-        project_root_dir = os.getenv("PROJECT_ROOT")  # remove projects home prefix from all import paths
-        pydantic_path = os.getenv(os_path_env_var_name)
-        if pydantic_path is not None and pydantic_path.startswith("/"):
-            pydantic_path = pydantic_path.removeprefix(project_root_dir)
+        # remove projects home prefix from all import paths
+        if (project_root_dir := os.getenv("PROJECT_ROOT")) is not None:
+            if (pydantic_path := os.getenv(os_path_env_var_name)) is not None:
+                if pydantic_path is not None and pydantic_path.startswith("/"):
+                    pydantic_path = pydantic_path.removeprefix(project_root_dir)
+                else:
+                    raise Exception(f"invalid absolute path: {pydantic_path}")
+                if pydantic_path.startswith("/"):
+                    pydantic_path = pydantic_path[1:]
+                return f'{".".join(pydantic_path.split(os.sep))}.{import_file_name}'
+            else:
+                err_str = f"Env var '{os_path_env_var_name}' received as None"
+                logging.exception(err_str)
+                raise Exception(err_str)
         else:
-            raise Exception(f"invalid absolute path: {pydantic_path}")
-        if pydantic_path.startswith("/"):
-            pydantic_path = pydantic_path[1:]
-        return f'{".".join(pydantic_path.split(os.sep))}.{import_file_name}'
+            err_str = "Env var 'PROJECT_ROOT' received as None"
+            logging.exception(err_str)
+            raise Exception(err_str)
 
     def __handle_single_file_generation(self, plugin: ExtendedProtogenPlugin, file: protogen.File) -> None:
         # If template file is provided then using the content of it to add in generated file
@@ -399,6 +408,10 @@ class BaseProtoPlugin(ABC):
 
 
 def main(plugin_class):
-    project_dir_path = os.getenv("PROJECT_DIR")
-    pydantic_class_gen_plugin = plugin_class(project_dir_path)
-    pydantic_class_gen_plugin.process()
+    if (project_dir_path := os.getenv("PROJECT_DIR")) is not None:
+        pydantic_class_gen_plugin = plugin_class(project_dir_path)
+        pydantic_class_gen_plugin.process()
+    else:
+        err_str = "Env var 'PROJECT_DIR' received as None"
+        logging.exception(err_str)
+        raise Exception(err_str)

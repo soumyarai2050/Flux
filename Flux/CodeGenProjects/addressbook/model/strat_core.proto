@@ -103,7 +103,7 @@ message SecPosition{
 }
 
 message Broker{
-  required bool enabled = 1;
+  required bool enabled = 1 [default=false, (FluxFldSequenceNumber) = 1];
   // per security positions
   repeated SecPosition sec_positions = 2;
   // broker identifier
@@ -137,12 +137,13 @@ message CumulativeOrderBrief{
 }
 
 message Alert{
-  required Severity severity = 1 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
-  required string alert_brief = 2 [(FluxFldSizeMax) = 32];
+  optional bool enabled = 1 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1];
+  required Severity severity = 2 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
+  required string alert_brief = 3 [(FluxFldSizeMax) = 32];
   // must prefix strat:<strat-name> for strat alerts
-  optional string alert_details = 3;
+  optional string alert_details = 4[(FluxFldAbbreviated) = "JSON"];
   // populated only if this alert is for one or more orders
-  repeated OrderBrief impacted_order = 4;
+  repeated OrderBrief impacted_order = 5;
 }
 
 message Residual{

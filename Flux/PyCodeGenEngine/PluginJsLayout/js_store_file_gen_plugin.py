@@ -2,6 +2,7 @@
 import os
 from typing import List, Callable
 import time
+import logging
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
         isinstance(debug_sleep_time := int(debug_sleep_time), int):
@@ -22,7 +23,13 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         self.insertion_point_key_to_callable_list: List[Callable] = [
             self.handle_jsx_file_convert
         ]
-        self.output_file_name = os.getenv("OUTPUT_FILE_NAME")
+        if (output_file_name := os.getenv("OUTPUT_FILE_NAME")) is not None:
+            self.output_file_name = output_file_name
+        else:
+            err_str = f"Env var 'OUTPUT_FILE_NAME' " \
+                      f"received as {output_file_name}"
+            logging.exception(err_str)
+            raise Exception(err_str)
 
     def handle_import_output(self, ) -> str:
         output_str = "import { configureStore } from '@reduxjs/toolkit';\n"

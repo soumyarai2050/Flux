@@ -20,6 +20,13 @@ enum Theme{
     THEME_LIGHT = 3;
 }
 
+enum HoverTextType{
+    HoverTextType_NONE = 0;
+    HoverTextType_VALUE = 1;
+    HoverTextType_PERCENTAGE = 3;
+    HoverTextType_VALUE_AND_PERCENTAGE = 4;
+}
+
 message WidgetUIData{
   // key string connects Widget with Model - future better name via: [(FluxFldAlias) = 'i']
   required string i = 1;
@@ -43,3 +50,7 @@ message UIButton{
   required string pressed_value_as_text = 7;
 }
 
+message UIProgressBar{
+  optional string value_color_map = 1;  // coma separated list of key=value
+  optional HoverTextType hover_text_type = 2;  // x of y
+}

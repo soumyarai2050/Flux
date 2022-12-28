@@ -320,7 +320,12 @@ class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
         self.fastapi_app_name = f"{self.proto_file_name}_app"
         self.db_file_name = f"{self.proto_file_name}_sqlmodel_db.db"
         self.gen_db_script_name = self.proto_file_name + "_sqlmodel_db"
-        self.sqlmodel_fastapi_file_name = self.proto_file_name + "_" + os.getenv("OUTPUT_FILE_NAME_SUFFIX")
+        if (output_file_name_suffix := os.getenv("OUTPUT_FILE_NAME_SUFFIX")) is not None:
+            self.sqlmodel_fastapi_file_name = self.proto_file_name + "_" + output_file_name_suffix
+        else:
+            err_str = "Env var 'OUTPUT_FILE_NAME_SUFFIX' received as None"
+            logging.exception(err_str)
+            raise Exception(err_str)
 
         output_dict = {
             # Adding db script

@@ -1,5 +1,6 @@
 from typing import List
 import os
+import logging
 from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
 
 
@@ -14,11 +15,14 @@ class JsonPluginExecuteScript(PluginExecuteScript):
         proto_file_path_list = [os.path.join(self.base_dir_path, "model", proto_file)
                                 for proto_file in os.listdir(os.path.join(self.base_dir_path, "model"))
                                 if "service" in proto_file]
-        out_dir = os.path.join(os.getenv("PROJECT_DIR"), "output")
+        if (output_dir := os.getenv("OUTPUT_DIR")) is None:
+            err_str = "Env Var 'PROJECT_DIR' received as None"
+            logging.exception(err_str)
+            raise Exception(err_str)
         proto_files_dir_paths_list: List[str] = [
             os.path.join(self.base_dir_path, "model"),
             os.path.abspath(os.path.join(self.base_dir_path, "..", ".."))
         ]
         insertion_imports_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__)))
-        return all_proto_file_path_list, proto_file_path_list, out_dir, proto_files_dir_paths_list, \
+        return all_proto_file_path_list, proto_file_path_list, output_dir, proto_files_dir_paths_list, \
                insertion_imports_dir_path

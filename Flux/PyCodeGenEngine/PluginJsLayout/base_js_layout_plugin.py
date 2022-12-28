@@ -29,7 +29,13 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
         self.tree_layout_msg_list: List[protogen.Message] = []
         self.table_layout_msg_list: List[protogen.Message] = []
         self.abbreviated_filter_layout_msg_list: List[protogen.Message] = []
-        self.response_field_case_style: str = os.getenv("RESPONSE_FIELD_CASE_STYLE")
+        if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
+            self.response_field_case_style: str = response_field_case_style
+        else:
+            err_str = f"Env var 'RESPONSE_FIELD_CASE_STYLE' " \
+                      f"received as {response_field_case_style}"
+            logging.exception(err_str)
+            raise Exception(err_str)
         self.case_style_convert_method: Callable[[str], str] | None = None
 
     def load_root_message_to_data_member(self, file: protogen.File):

@@ -62,7 +62,10 @@ message StratStatus{
   optional float average_premium = 3;
   repeated CumulativeOrderBrief fills_brief = 4 [(FluxFldAbbreviated) = "JSON"];
   repeated CumulativeOrderBrief open_orders_brief = 5 [(FluxFldAbbreviated) = "JSON"];
-  optional float balance_notional = 6;
+  optional float balance_notional = 6[(FluxFldValMin)="StratLimits.max_cb_notional", (FluxFldValMax)="0.0", (FluxFldProgressBar) = {
+    value_color_map: "100%=SUCCESS,50%<INFO,30%<WARNING",  // order of test -> left to right
+    hover_text_type: HoverTextType_VALUE
+  }];
   optional Residual residual = 7;
 }
 
@@ -217,7 +220,7 @@ message StratCollection{
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
-  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "PairStrat.pair_strat_params.leg2_sec.sec_id-PairStrat.pair_strat_params.leg1_sec.sec_id-PairStrat.pair_strat_params.leg1_side-PairStrat.id", (FluxFldAlertBubbleSource) = "PairStrat.strat_status.strat_alerts", (FluxFldAlertBubbleColor) = "PairStrat.strat_status.strat_alerts.severity"];
+  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "PairStrat.pair_strat_params.leg2_sec.sec_id-PairStrat.pair_strat_params.leg1_sec.sec_id-PairStrat.pair_strat_params.leg1_side-PairStrat.id$PairStrat.strat_status.balance_notional$PairStrat.strat_status.strat_state", (FluxFldAlertBubbleSource) = "PairStrat.strat_status.strat_alerts", (FluxFldAlertBubbleColor) = "PairStrat.strat_status.strat_alerts.severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
   repeated string buffered_strat_keys = 3;
