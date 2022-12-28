@@ -62,7 +62,7 @@ message StratStatus{
   optional float average_premium = 3;
   repeated CumulativeOrderBrief fills_brief = 4 [(FluxFldAbbreviated) = "JSON"];
   repeated CumulativeOrderBrief open_orders_brief = 5 [(FluxFldAbbreviated) = "JSON"];
-  optional float balance_notional = 6[(FluxFldValMin)="StratLimits.max_cb_notional", (FluxFldValMax)="0.0", (FluxFldProgressBar) = {
+  optional float balance_notional = 6[(FluxFldValMin)="0.0", (FluxFldValMax)="PairStrat.strat_limits.max_cb_notional", (FluxFldProgressBar) = {
     value_color_map: "100%=SUCCESS,50%<INFO,30%<WARNING",  // order of test -> left to right
     hover_text_type: HoverTextType_VALUE
   }];

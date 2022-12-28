@@ -9,6 +9,7 @@ import { HashLoader } from 'react-spinners';
 import { Box } from '@mui/material';
 import { makeStyles } from '@mui/styles';
 import { theme } from './theme';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const useStyles = makeStyles({
   root: {
@@ -42,7 +43,9 @@ function App() {
     <>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <Layout schema={schema} />
+        <ErrorBoundary>
+          <Layout schema={schema} />
+        </ErrorBoundary>
       </ThemeProvider>
     </>
   );

@@ -66,3 +66,10 @@ export const ShapeType = {
     ROUND: 'round',
     UNSPECIFIED: 'rectangle'
 }
+
+export const HoverTextType = {
+    HoverTextType_NONE: 'none',
+    HoverTextType_VALUE: 'value',
+    HoverTextType_PERCENTAGE: 'percentage',
+    HoverTextType_VALUE_AND_PERCENTAGE: 'valueAndPercentage'
+}

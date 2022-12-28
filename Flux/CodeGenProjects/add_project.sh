@@ -40,5 +40,9 @@ find . \( -name .DS_Store -o -name .git -o -name .svn \) -print0 | xargs -0 rm -
 # replace any reference to old prj name with new prj name
 echo "replacing any text occurrence of: $2 with: $1 in new project"
 find . -type f -print0 | xargs -0 perl -pi -e "s#$2#$1#g"
+NewProjectCamelCaseName=$(echo "$1" | gsed -r 's/(^|_)([a-z])/\U\2/g')
+ExistingProjectCamelCaseName=$(echo "$2" | gsed -r 's/(^|_)([a-z])/\U\2/g')
+echo "replacing any CapitalizedCamelCase text occurrence of: $ExistingProjectCamelCaseName with: $NewProjectCamelCaseName in new project"
+find . -type f -print0 | xargs -0 perl -pi -e "s#$ExistingProjectCamelCaseName#$NewProjectCamelCaseName#g"
 cd "$START_DIR" || (echo "cd $START_DIR failed"; exit 1)
 echo "Created Project $1 from $ORIG_GEN_PRJ"

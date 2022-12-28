@@ -3,14 +3,14 @@ import { useSelector } from 'react-redux';
 import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener } from '@mui/material';
 import _, { cloneDeep } from 'lodash';
 import { makeStyles } from '@mui/styles';
-import { clearxpath, getDataxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue, toCamelCase, capitalizeCamelCase, getValueFromReduxStore, normalise, getColorTypeFromPercentage } from '../utils';
+import { clearxpath, getDataxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue, toCamelCase, capitalizeCamelCase, getValueFromReduxStore, normalise, getColorTypeFromPercentage, getHoverTextType } from '../utils';
 import { ColorTypes, DataTypes, Modes } from '../constants';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
 import { AbbreviatedJsonTooltip } from './AbbreviatedJsonWidget';
-import { flux_toggle } from '../projectSpecificUtils';
+import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
-import { ValueBasedProgressBar } from './ValueBasedProgressBar';
+import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 
 const useStyles = makeStyles({
     previousValue: {
@@ -146,6 +146,11 @@ const Cell = (props) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
             props.onButtonToggle(e, xpath, updatedData);
+        } else if (action === 'flux_trigger_strat') {
+            let updatedData = flux_trigger_strat(value);
+            if (updatedData) {
+                props.onButtonToggle(e, xpath, updatedData);
+            }
         }
     }
 
@@ -181,6 +186,12 @@ const Cell = (props) => {
         }
     } else {
         disabled = false;
+    }
+
+    if (row[proptitle] === undefined) {
+        return (
+            <TableCell className={classes.tableCellDisabled} />
+        )
     }
 
     if (active && mode === Modes.EDIT_MODE && !disabled) {
@@ -359,16 +370,25 @@ const Cell = (props) => {
 
         let percentage = normalise(value, max, min);
         let color = getColorTypeFromPercentage(collection, percentage);
+        let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 
         return (
             <TableCell align='center' size='medium'>
-                <ValueBasedProgressBar percentage={percentage} value={value} color={color} min={min} max={max} />
+                <ValueBasedProgressBarWithHover
+                    percentage={percentage}
+                    value={value}
+                    color={color}
+                    min={min}
+                    max={max}
+                    hoverType={hoverType}
+                />
             </TableCell>
         )
 
     }
 
     if (collection.abbreviated && collection.abbreviated === "JSON") {
+        let tableCellRemove = row['data-remove'] ? classes.tableCellRemove : '';
         let updatedData = row[proptitle];
         if (type === DataTypes.OBJECT || type === DataTypes.ARRAY || (type === DataTypes.STRING && isValidJsonString(updatedData))) {
             if (type === DataTypes.OBJECT || type === DataTypes.ARRAY) {
@@ -379,13 +399,13 @@ const Cell = (props) => {
             }
 
             return (
-                <TableCell className={classes.abbreviatedJsonCell} align='center' size='medium' onClick={onOpenTooltip}>
+                <TableCell className={`${classes.abbreviatedJsonCell} ${tableCellRemove}`} align='center' size='medium' onClick={onOpenTooltip}>
                     <AbbreviatedJsonTooltip open={open} onClose={onCloseTooltip} src={updatedData} />
                 </TableCell >
             )
         } else if (type === DataTypes.STRING && !isValidJsonString(updatedData)) {
             return (
-                <TableCell className={classes.abbreviatedJsonCell} align='center' size='medium' onClick={onOpenTooltip}>
+                <TableCell className={`${classes.abbreviatedJsonCell} ${tableCellRemove}`} align='center' size='medium' onClick={onOpenTooltip}>
                     <ClickAwayListener onClickAway={onCloseTooltip}>
                         <div className={classes.abbreviatedJsonCell}>
                             <Tooltip

@@ -29,7 +29,7 @@ code_gen_engine_env_manager.execute_python_script(str(code_gen_engine_env_manage
 env_var_dict["OUTPUT_FILE_NAME"] = "file.jsx"
 env_var_dict["PLUGIN_FILE_NAME"] = "js_slice_file_gen_plugin.py"
 env_var_dict["PB2_IMPORT_GENERATOR_PATH"] = "jsx_pb2_import_generator.py"
-env_var_dict["UILAYOUT_MESSSAGE_NAME"] = "UILayout"
+env_var_dict["UILAYOUT_MESSAGE_NAME"] = "UILayout"
 code_gen_engine_env_manager.init_env_and_update_sys_path("addressbook", "_",
                                                          "PluginJsLayout", env_var_dict)
 project_dir_path = str(code_gen_engine_env_manager.project_dir)

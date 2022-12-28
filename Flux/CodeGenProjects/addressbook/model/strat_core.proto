@@ -103,7 +103,15 @@ message SecPosition{
 }
 
 message Broker{
-  required bool enabled = 1 [default=false, (FluxFldSequenceNumber) = 1];
+  required bool enabled = 1 [default=false, (FluxFldSequenceNumber) = 1, (FluxFldButton) = {
+    unpressed_caption: "enable",
+    pressed_caption: "disable",
+    value_color_map: "true=SUCCESS,false=INFO"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true"
+  }];
   // per security positions
   repeated SecPosition sec_positions = 2;
   // broker identifier
@@ -137,7 +145,15 @@ message CumulativeOrderBrief{
 }
 
 message Alert{
-  optional bool enabled = 1 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1];
+  optional bool dismiss = 1 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldButton) = {
+    unpressed_caption: "dismiss",
+    pressed_caption: "undo",
+    value_color_map: "true=DEBUG,false=INFO"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true"
+  }];
   required Severity severity = 2 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
   required string alert_brief = 3 [(FluxFldSizeMax) = 32];
   // must prefix strat:<strat-name> for strat alerts

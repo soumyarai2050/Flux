@@ -12,11 +12,11 @@ import Alert from './Alert';
 import AlertBubble from './AlertBubble';
 import {
     getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getColorTypeFromValue,
-    getSizeFromValue, getShapeFromValue, normalise, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore
+    getSizeFromValue, getShapeFromValue, normalise, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, getHoverTextType
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
-import { ValueBasedProgressBar } from './ValueBasedProgressBar';
+import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 
 const useStyles = makeStyles({
     autocompleteDropdownContainer: {
@@ -109,6 +109,7 @@ const AbbreviatedFilterWidget = (props) => {
                             </ListItemButton>
                             {extraProps.map(extraProp => {
                                 let collection = extraProp.collection;
+                                if (extraProp.value === undefined) return;
                                 if (collection.type === 'button') {
                                     let checked = String(extraProp.value) === collection.button.pressed_value_as_text;
                                     let xpath = collection.xpath;
@@ -129,6 +130,7 @@ const AbbreviatedFilterWidget = (props) => {
                                             size={size}
                                             shape={shape}
                                             color={color}
+                                            disabled={disabled}
                                             value={extraProp.value}
                                             caption={caption}
                                             xpath={xpath}
@@ -157,10 +159,18 @@ const AbbreviatedFilterWidget = (props) => {
 
                                     let percentage = normalise(value, max, min);
                                     let color = getColorTypeFromPercentage(collection, percentage);
+                                    let hoverType = getHoverTextType(collection.progressBar.hover_text_type)
 
                                     return (
                                         <Box key={collection.key} sx={{ minWidth: '95%', position: 'absolute', bottom: 0 }}>
-                                            <ValueBasedProgressBar percentage={percentage} value={value} min={min} max={max} color={color} />
+                                            <ValueBasedProgressBarWithHover
+                                                percentage={percentage}
+                                                value={value}
+                                                min={min}
+                                                max={max}
+                                                color={color}
+                                                hoverType={hoverType}
+                                            />
                                         </Box>
                                     )
                                 }

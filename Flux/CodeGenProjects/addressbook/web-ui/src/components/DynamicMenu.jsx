@@ -4,10 +4,10 @@ import { makeStyles } from '@mui/styles';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { DataTypes } from '../constants';
-import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise } from '../utils';
+import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType } from '../utils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
-import { ValueBasedProgressBar } from './ValueBasedProgressBar';
+import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import { Box } from '@mui/material';
 
 const useStyles = makeStyles({})
@@ -54,13 +54,23 @@ const DynamicMenu = (props) => {
 
                     let percentage = normalise(value, max, min);
                     let color = getColorTypeFromPercentage(collection, percentage);
+                    let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 
                     return (
-                        <Box key={collection.key} sx={{minWidth: 150, margin: '0 10px'}}>
-                            <ValueBasedProgressBar percentage={percentage} value={value} min={min} max={max} color={color} />
+                        <Box key={collection.key} sx={{ minWidth: 150, margin: '0 10px' }}>
+                            <ValueBasedProgressBarWithHover
+                                percentage={percentage}
+                                value={value}
+                                min={min}
+                                max={max}
+                                color={color}
+                                hoverType={hoverType}
+                            />
                         </Box>
                     )
                 } else if (collection.type === 'button') {
+                    if (collection.value === undefined) return;
+
                     let checked = String(collection.value) === collection.button.pressed_value_as_text;
                     let xpath = collection.xpath;
                     let color = getColorTypeFromValue(collection, String(collection.value));

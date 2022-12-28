@@ -1,7 +1,7 @@
 import _, { cloneDeep } from 'lodash';
 import Node from './components/Node';
 import HeaderField from './components/HeaderField';
-import { ColorPriority, ColorTypes, DataTypes, DB_ID, Modes, NEW_ITEM_ID, ShapeType, SizeType } from './constants';
+import { ColorPriority, ColorTypes, DataTypes, DB_ID, HoverTextType, Modes, NEW_ITEM_ID, ShapeType, SizeType } from './constants';
 
 const treeState = {};
 
@@ -1045,14 +1045,14 @@ export function getTableColumns(collections) {
     return columns;
 }
 
-export function getCommonKeyCollections(rows, tableColumns) {
+export function getCommonKeyCollections(rows, tableColumns, hide = false) {
     if (rows.length > 1) {
         tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => column.type !== 'button');
     }
     let commonKeyCollections = [];
     if (rows.length > 0) {
         tableColumns.map((column) => {
-            if (column.hide) return;
+            if(hide && column.hide) return; 
 
             let found = true;
             for (let i = 0; i < rows.length - 1; i++) {
@@ -1063,7 +1063,6 @@ export function getCommonKeyCollections(rows, tableColumns) {
             if (found) {
                 let collection = column;
                 collection.value = rows[0][column.tableTitle];
-                // collection.xpath = column.tableTitle.indexOf('.') > 0 ? rows[0][column.tableTitle.split('.')[0] + '.xpath_' + column.key] : rows[0]['xpath_' + column.key];
                 commonKeyCollections.push(collection);
             }
             return column;
@@ -1125,4 +1124,12 @@ export function normalise(value, max, min) {
         return percentage > 100 ? 100 : percentage;
     }
     return 0;
+}
+
+export function getHoverTextType(value) {
+    let hoverType = value.trim();
+    if (HoverTextType.hasOwnProperty(hoverType)) {
+        return HoverTextType[hoverType];
+    }
+    return HoverTextType.HoverTextType_NONE;
 }

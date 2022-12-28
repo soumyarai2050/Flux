@@ -1,8 +1,8 @@
 import React from 'react';
 import { makeStyles } from '@mui/styles';
-import { LinearProgress, Box, Typography, Grid } from '@mui/material';
+import { LinearProgress, Box, Typography, Tooltip } from '@mui/material';
 import PropTypes from 'prop-types';
-import { ColorTypes } from '../constants';
+import { ColorTypes, HoverTextType } from '../constants';
 
 const useStyles = makeStyles({
     progressBar: {
@@ -54,7 +54,7 @@ const useStyles = makeStyles({
     }
 })
 
-export const ValueBasedProgressBar = (props) => {
+export const ValueBasedProgressBarWithHover = (props) => {
 
     const classes = useStyles();
 
@@ -66,8 +66,19 @@ export const ValueBasedProgressBar = (props) => {
     else if (props.color === ColorTypes.DEBUG) progressBarColorClass = classes.debug;
     else if (props.color === ColorTypes.SUCCESS) progressBarColorClass = classes.success;
 
+    let hoverText = '';
+    if(props.hoverType === HoverTextType.HoverTextType_VALUE) {
+        hoverText = props.value + '/' + props.max;
+    } else if(props.hoverType === HoverTextType.HoverTextType_PERCENTAGE) {
+        hoverText = props.percentage + '%';
+    } else if(props.hoverType === HoverTextType.HoverTextType_VALUE_AND_PERCENTAGE) {
+        hoverText = props.value + '/' + props.max + ' | ' + props.percentage + '%';  
+    }
+
     return (
+        <Tooltip title={hoverText}>
             <LinearProgress variant="determinate" value={props.percentage} className={`${classes.progressBar} ${progressBarColorClass}`} />
+        </Tooltip>
     )
 }
 

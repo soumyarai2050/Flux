@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { makeStyles } from "@mui/styles";
-import { Typography, Box } from "@mui/material";
+import { Typography, Box, ClickAwayListener } from "@mui/material";
 import { IndeterminateCheckBox, AddBox, AddCircle, RemoveCircle, Menu, LiveHelp } from "@mui/icons-material";
 import { DataTypes, Modes } from '../constants';
 import Icon from './Icon';
@@ -66,10 +66,12 @@ const HeaderField = (props) => {
                 </div>
             </Typography>
             {allowCreate ? showOptions ? (
-                <div className={classes.options}>
-                    <AddCircle data-add={props.data.xpath} data-ref={props.data.ref} onClick={onClick} />
-                    <RemoveCircle data-remove={props.data.xpath} onClick={onClick} />
-                </div>
+                <ClickAwayListener onClickAway={() => setShowOptions(false)}>
+                    <div className={classes.options}>
+                        <AddCircle data-add={props.data.xpath} data-ref={props.data.ref} onClick={onClick} />
+                        <RemoveCircle data-remove={props.data.xpath} onClick={onClick} />
+                    </div>
+                </ClickAwayListener>
             ) : (
                 <Icon title="More Options" onClick={() => setShowOptions(!showOptions)}>
                     <Menu />

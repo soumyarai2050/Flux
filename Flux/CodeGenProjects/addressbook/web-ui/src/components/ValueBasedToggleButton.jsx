@@ -64,6 +64,7 @@ const ValueBasedToggleButton = (props) => {
             className={`${classes.button} ${buttonClass}`}
             size={props.size}
             selected={true}
+            disabled={props.disabled ? props.disabled : false}
             value={props.caption}
             onClick={(e) => props.onClick(e, props.action, props.xpath, props.value)}>
             {props.caption}

@@ -94,12 +94,15 @@ const TableWidget = (props) => {
     }, [props.collections, props.mode, hide])
 
     useEffect(() => {
-        let commonKeyCollections = getCommonKeyCollections(rows, headCells, props.mode)
+        let commonKeyCollections = getCommonKeyCollections(rows, headCells, hide)
         setCommonkeys(commonKeyCollections);
-    }, [rows, headCells, props.mode])
+    }, [rows, headCells, props.mode, hide])
 
     function getFilteredCells() {
-        let updatedCells = headCells.filter(cell => !cell.hide);
+        let updatedCells = headCells;
+        if (hide) {
+            updatedCells = updatedCells.filter(cell => !cell.hide);
+        }
         updatedCells = updatedCells.filter(cell => {
             if (commonkeys.filter(commonkey => commonkey.key === cell.key).length > 0 && props.mode !== Modes.EDIT_MODE) {
                 return false;
