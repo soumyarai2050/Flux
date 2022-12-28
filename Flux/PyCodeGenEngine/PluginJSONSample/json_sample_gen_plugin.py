@@ -46,6 +46,13 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         self.__auto_complete_data_cache: List[Tuple[protogen.Field, str]] = []
         self.__case_style_convert_method: Callable[[str], str] | None = None
         self.auto_complete_data: Dict | None = None
+        self.root_msg_list: List[protogen.Message] = []
+
+    def __load_root_json_msg(self, file: protogen.File):
+        for message in file.messages:
+            if JsonSampleGenPlugin.flux_msg_json_root in str(message.proto.options):
+                self.root_msg_list.append(message)
+            # else not required: avoiding non-json msg append to list
 
     def __json_non_repeated_field_sample_gen(self, field: protogen.Field, indent_space_count: int) -> str:
         json_sample_output = ""
@@ -222,6 +229,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         return new_option_value
 
     def __json_sample_gen_handler(self, file: protogen.File) -> str:
+        self.__load_root_json_msg(file)
         self.auto_complete_data = self.__load_auto_complete_json()
         if self.__response_field_case_style.lower() == "snake":
             self.__case_style_convert_method = self.convert_camel_case_to_specific_case
@@ -234,12 +242,9 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
         json_sample_output = "{\n"
 
-        for message in file.messages:
-            if JsonSampleGenPlugin.flux_msg_json_root in str(message.proto.options):
-                json_sample_output += self.__handle_root_msg_json_gen(message, 2)
-            # else not required: avoid if message not of json root
-
-                json_sample_output += self.__handle_json_last_values(message, file.messages)
+        for message in self.root_msg_list:
+            json_sample_output += self.__handle_root_msg_json_gen(message, 2)
+            json_sample_output += self.__handle_json_last_values(message, self.root_msg_list)
 
         json_sample_output += "}"
 

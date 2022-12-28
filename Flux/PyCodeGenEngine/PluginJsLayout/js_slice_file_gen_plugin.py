@@ -33,6 +33,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         self.dependent_message_list: List[protogen.Message] = []
         self.independent_message_list: List[protogen.Message] = []
         self.current_message_is_dependent: bool | None = None  # True if dependent else false
+        # Since output file name for this plugin will be created at runtime
         self.output_file_name_suffix: str = ""
         if (ui_layout_msg_name := os.getenv("UILAYOUT_MESSAGE_NAME")) is not None:
             self.__ui_layout_msg_name = ui_layout_msg_name

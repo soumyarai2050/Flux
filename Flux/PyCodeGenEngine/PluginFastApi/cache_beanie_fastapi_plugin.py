@@ -13,6 +13,9 @@ from Flux.PyCodeGenEngine.PluginFastApi.beanie_fast_api_class_gen_plugin import 
     BeanieFastApiClassGenPlugin, main
 
 
+# Todo: Might be broken due to changes made in cache and beanie fastapi
+
+
 class CacheBeanieFastApiClassGenPlugin(BeanieFastApiClassGenPlugin):
     """
     Plugin script to generate Hybrid-Beanie enabled fastapi app
@@ -131,7 +134,7 @@ class CacheBeanieFastApiClassGenPlugin(BeanieFastApiClassGenPlugin):
         output_str += f"\n\n"
         return output_str
 
-    def handle_main_file_gen(self) -> str:
+    def handle_fastapi_initialize_file_gen(self) -> str:
         output_str = "import logging\n"
         output_str += "from fastapi import FastAPI\n"
         output_str += f"from {self.routes_file_name} import {self.api_router_app_name}\n"

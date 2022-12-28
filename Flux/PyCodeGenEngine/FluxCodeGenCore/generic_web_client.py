@@ -9,17 +9,7 @@ from asyncio.exceptions import TimeoutError
 import json
 from fastapi.encoders import jsonable_encoder
 
-
-def log_n_except(original_function):
-    def wrapper_function(*args, **kwargs):
-        try:
-            result = original_function(*args, **kwargs)
-            return result
-        except Exception as e:
-            err_str = f"Client Error Occurred: {e}"
-            logging.exception(err_str)
-            raise Exception(err_str)
-    return wrapper_function
+from FluxPythonUtils.scripts.utility_functions import log_n_except
 
 
 @log_n_except
