@@ -243,3 +243,13 @@ message UILayout{
     repeated WidgetUIData widget_ui_data = 3;
     optional Theme theme = 4;
 }
+
+message TradeBrief{
+  required string trade_id = 1;
+  required Security security = 2;
+  required Side side = 3;
+  required float px = 4;
+  required int64 qty = 5;
+  optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldHide) = "True"];
+  optional float computed_notional = 8[(FluxFldHide) = "True"];
+}
