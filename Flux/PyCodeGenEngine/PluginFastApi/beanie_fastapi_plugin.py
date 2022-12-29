@@ -10,10 +10,10 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginFastApi.fast_api_class_gen_plugin import FastApiClassGenPlugin, main
+from Flux.PyCodeGenEngine.PluginFastApi.cache_fastapi_plugin import CacheFastApiPlugin, main
 
 
-class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
+class BeanieFastApiPlugin(CacheFastApiPlugin):
     """
     Plugin script to generate Beanie enabled fastapi app
     """
@@ -28,12 +28,12 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if BeanieFastApiClassGenPlugin.flux_msg_json_root in str(message.proto.options):
+            if BeanieFastApiPlugin.flux_msg_json_root in str(message.proto.options):
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
 
-                if BeanieFastApiClassGenPlugin.default_id_field_name in [field.proto.name for field in message.fields]:
+                if BeanieFastApiPlugin.default_id_field_name in [field.proto.name for field in message.fields]:
                     self.custom_id_primary_key_messages.append(message)
             else:
                 if message not in self.non_root_message_list:
@@ -46,7 +46,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         id_field_type: str = "PydanticObjectId"
         if message in self.custom_id_primary_key_messages:
             for field in message.fields:
-                if field.proto.name == BeanieFastApiClassGenPlugin.default_id_field_name:
+                if field.proto.name == BeanieFastApiPlugin.default_id_field_name:
                     id_field_type = self.proto_to_py_datatype(field)
                     break
                 # else not required: Avoiding field if not id
@@ -128,10 +128,7 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
         return output_str
 
     def set_req_data_members(self, file: protogen.File):
-        self.proto_file_name = str(file.proto.name).split('.')[0]
-        self.proto_file_package = str(file.proto.package)
-        self.fastapi_app_name = f"{self.proto_file_name}_app"
-        self.api_router_app_name = f"{self.proto_file_name}_API_router"
+        super().set_req_data_members(file)
         self.database_file_name = f"{self.proto_file_name}_beanie_database"
         self.fastapi_file_name = f"{self.proto_file_name}_beanie_fastapi"
         self.model_file_name = f'{self.proto_file_name}_beanie_model'
@@ -181,4 +178,4 @@ class BeanieFastApiClassGenPlugin(FastApiClassGenPlugin):
 
 
 if __name__ == "__main__":
-    main(BeanieFastApiClassGenPlugin)
+    main(BeanieFastApiPlugin)

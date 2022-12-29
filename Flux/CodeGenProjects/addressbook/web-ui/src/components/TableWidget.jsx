@@ -450,6 +450,7 @@ const TableWidget = (props) => {
                     onUpdate={onUpdate}
                     xpath={props.xpath}
                     subtree={rowTrees[selectedRow]}
+                    onUserChange={props.onUserChange}
                 />
                 <Dialog
                     open={openModalPopup}

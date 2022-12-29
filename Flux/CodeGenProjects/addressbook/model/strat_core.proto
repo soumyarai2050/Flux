@@ -135,7 +135,9 @@ message OrderBrief{
   required Side side = 3;
   required float px = 4;
   required int64 qty = 5;
-  required string underlying_broker = 6;
+  required string underlying_account = 6;
+  optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldHide) = "True"];
+  optional float computed_notional = 8[(FluxFldHide) = "True"];
 }
 
 message CumulativeOrderBrief{

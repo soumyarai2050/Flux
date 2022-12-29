@@ -10,10 +10,10 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginFastApi.fast_api_class_gen_plugin import FastApiClassGenPlugin, main
+from Flux.PyCodeGenEngine.PluginFastApi.cache_fastapi_plugin import CacheFastApiPlugin, main
 
 
-class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
+class SQLModelFastApiPlugin(CacheFastApiPlugin):
     """
     Plugin script to generate SqlModel enabled fastapi app
     """
@@ -33,7 +33,7 @@ class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
                     self.enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if SQLModelFastApiClassGenPlugin.flux_msg_json_root in str(field.message.proto.options):
+                if SQLModelFastApiPlugin.flux_msg_json_root in str(field.message.proto.options):
                     if field.message not in self.root_message_list:
                         self.root_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -47,7 +47,7 @@ class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
             option_str = str(message.proto.options)
-            if SQLModelFastApiClassGenPlugin.flux_msg_json_root in str(message.proto.options):
+            if SQLModelFastApiPlugin.flux_msg_json_root in str(message.proto.options):
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
@@ -105,7 +105,7 @@ class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
 
     def handle_PUT_gen(self, message: protogen.Message, method_desc: str | None = None) -> str:
         for field in message.fields:
-            if SQLModelFastApiClassGenPlugin.flux_fld_primary in str(field.proto.options):
+            if SQLModelFastApiPlugin.flux_fld_primary in str(field.proto.options):
                 primary_key_field_name: str = field.proto.name
                 break
         else:
@@ -140,7 +140,7 @@ class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
 
     def handle_DELETE_gen(self, message: protogen.Message, method_desc: str | None = None) -> str:
         for field in message.fields:
-            if SQLModelFastApiClassGenPlugin.flux_fld_primary in str(field.proto.options):
+            if SQLModelFastApiPlugin.flux_fld_primary in str(field.proto.options):
                 primary_key_field_type: str = \
                     self.proto_to_py_datatype(field)
                 break
@@ -213,16 +213,16 @@ class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
         return output_str
 
     def handle_CRUD_for_message(self, message: protogen.Message) -> str:
-        options_list_of_dict = self.get_complex_msg_option_values_as_list_of_dict(message, SQLModelFastApiClassGenPlugin.flux_msg_json_root)
+        options_list_of_dict = self.get_complex_msg_option_values_as_list_of_dict(message, SQLModelFastApiPlugin.flux_msg_json_root)
 
         # Since json_root option is of non-repeated type
         option_dict = options_list_of_dict[0]
 
         crud_field_name_to_method_call_dict = {
-            SQLModelFastApiClassGenPlugin.flux_json_root_create_field: self.handle_POST_gen,
-            SQLModelFastApiClassGenPlugin.flux_json_root_read_field: self.handle_GET_gen,
-            SQLModelFastApiClassGenPlugin.flux_json_root_update_field: self.handle_PUT_gen,
-            SQLModelFastApiClassGenPlugin.flux_json_root_delete_field: self.handle_DELETE_gen
+            SQLModelFastApiPlugin.flux_json_root_create_field: self.handle_POST_gen,
+            SQLModelFastApiPlugin.flux_json_root_read_field: self.handle_GET_gen,
+            SQLModelFastApiPlugin.flux_json_root_update_field: self.handle_PUT_gen,
+            SQLModelFastApiPlugin.flux_json_root_delete_field: self.handle_DELETE_gen
         }
 
         output_str = self.handle_get_all_message_request(message)
@@ -234,7 +234,7 @@ class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
             # else not required: Avoiding method creation if desc not provided in option
 
         for field in message.fields:
-            if SQLModelFastApiClassGenPlugin.flux_fld_index in str(field.proto.options):
+            if SQLModelFastApiPlugin.flux_fld_index in str(field.proto.options):
                 output_str += self.handle_index_req_gen(message, field)
             # else not required: Avoiding field if index option is not enabled
 
@@ -339,4 +339,4 @@ class SQLModelFastApiClassGenPlugin(FastApiClassGenPlugin):
 
 
 if __name__ == "__main__":
-    main(SQLModelFastApiClassGenPlugin)
+    main(SQLModelFastApiPlugin)

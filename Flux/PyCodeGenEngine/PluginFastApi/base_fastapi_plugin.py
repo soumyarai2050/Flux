@@ -5,6 +5,7 @@ import os
 from pathlib import PurePath
 from typing import List, Callable, Dict
 import time
+from abc import abstractmethod
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
         isinstance(debug_sleep_time := int(debug_sleep_time), int):
@@ -18,7 +19,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlug
 from Flux.PyCodeGenEngine.PluginFastApi import insertion_imports
 
 
-class FastApiClassGenPlugin(BaseProtoPlugin):
+class BaseFastapiPlugin(BaseProtoPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
@@ -85,7 +86,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
                     self.enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if FastApiClassGenPlugin.flux_msg_json_root in str(field.message.proto.options):
+                if BaseFastapiPlugin.flux_msg_json_root in str(field.message.proto.options):
                     if field.message not in self.root_message_list:
                         self.root_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -98,13 +99,13 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if FastApiClassGenPlugin.flux_msg_json_root in str(message.proto.options):
+            if BaseFastapiPlugin.flux_msg_json_root in str(message.proto.options):
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
 
                 for field in message.fields:
-                    if field.proto.name == FastApiClassGenPlugin.default_id_field_name and \
+                    if field.proto.name == BaseFastapiPlugin.default_id_field_name and \
                             "int" == self.proto_to_py_datatype(field):
                         self.int_id_message_list.append(message)
                     # else enot required: If field is not id or is not type int then avoiding append
@@ -123,7 +124,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             case "enum":
                 return field.enum.proto.name
             case other:
-                return FastApiClassGenPlugin.proto_type_to_py_type_dict[field.kind.name.lower()]
+                return BaseFastapiPlugin.proto_type_to_py_type_dict[field.kind.name.lower()]
 
     def handle_POST_gen(self, message: protogen.Message, method_desc: str | None = None,
                         id_field_type: str | None = None) -> str:
@@ -321,19 +322,19 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
 
     def handle_CRUD_for_message(self, message: protogen.Message) -> str:
         options_list_of_dict = \
-            self.get_complex_msg_option_values_as_list_of_dict(message, FastApiClassGenPlugin.flux_msg_json_root)
+            self.get_complex_msg_option_values_as_list_of_dict(message, BaseFastapiPlugin.flux_msg_json_root)
 
         # Since json_root option is of non-repeated type
         option_dict = options_list_of_dict[0]
 
         crud_field_name_to_method_call_dict = {
-            FastApiClassGenPlugin.flux_json_root_create_field: self.handle_POST_gen,
-            FastApiClassGenPlugin.flux_json_root_read_field: self.handle_GET_gen,
-            FastApiClassGenPlugin.flux_json_root_update_field: self.handle_PUT_gen,
-            FastApiClassGenPlugin.flux_json_root_patch_field: self.handle_PATCH_gen,
-            FastApiClassGenPlugin.flux_json_root_delete_field: self.handle_DELETE_gen,
-            FastApiClassGenPlugin.flux_json_root_read_websocket_field: self.handle_read_by_id_WEBSOCKET_gen,
-            FastApiClassGenPlugin.flux_json_root_update_websocket_field: self.handle_update_WEBSOCKET_gen
+            BaseFastapiPlugin.flux_json_root_create_field: self.handle_POST_gen,
+            BaseFastapiPlugin.flux_json_root_read_field: self.handle_GET_gen,
+            BaseFastapiPlugin.flux_json_root_update_field: self.handle_PUT_gen,
+            BaseFastapiPlugin.flux_json_root_patch_field: self.handle_PATCH_gen,
+            BaseFastapiPlugin.flux_json_root_delete_field: self.handle_DELETE_gen,
+            BaseFastapiPlugin.flux_json_root_read_websocket_field: self.handle_read_by_id_WEBSOCKET_gen,
+            BaseFastapiPlugin.flux_json_root_update_websocket_field: self.handle_update_WEBSOCKET_gen
         }
 
         output_str = self.handle_get_all_message_request(message)
@@ -349,11 +350,11 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             # else not required: Avoiding method creation if desc not provided in option
 
         for field in message.fields:
-            if FastApiClassGenPlugin.flux_fld_index in str(field.proto.options):
+            if BaseFastapiPlugin.flux_fld_index in str(field.proto.options):
                 output_str += self.handle_index_req_gen(message, field)
             # else not required: Avoiding field if index option is not enabled
 
-            if FastApiClassGenPlugin.flux_fld_web_socket in str(field.proto.options):
+            if BaseFastapiPlugin.flux_fld_web_socket in str(field.proto.options):
                 output_str += self.handle_field_web_socket_gen(message, field)
             # else not required: Avoiding field if websocket option is not enabled
 
@@ -548,7 +549,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         id_field_type: str = "int"
         if message in self.int_id_message_list:
             for field in message.fields:
-                if field.proto.name == FastApiClassGenPlugin.default_id_field_name and \
+                if field.proto.name == BaseFastapiPlugin.default_id_field_name and \
                         "int" != (field_type := self.proto_to_py_datatype(field)):
                     id_field_type = field_type
                     break
@@ -559,18 +560,18 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
     def handle_client_methods(self, message: protogen.Message) -> str:
         options_list_of_dict = \
             self.get_complex_msg_option_values_as_list_of_dict(message,
-                                                               FastApiClassGenPlugin.flux_msg_json_root)
+                                                               BaseFastapiPlugin.flux_msg_json_root)
 
         # Since json_root option is of non-repeated type
         option_dict = options_list_of_dict[0]
 
         crud_field_name_to_method_call_dict = {
-            FastApiClassGenPlugin.flux_json_root_create_field: self.handle_POST_client_gen,
-            FastApiClassGenPlugin.flux_json_root_read_field: self.handle_GET_client_gen,
-            FastApiClassGenPlugin.flux_json_root_update_field: self.handle_PUT_client_gen,
-            FastApiClassGenPlugin.flux_json_root_patch_field: self.handle_PATCH_client_gen,
-            FastApiClassGenPlugin.flux_json_root_delete_field: self.handle_DELETE_client_gen,
-            FastApiClassGenPlugin.flux_json_root_read_websocket_field: self.handle_read_by_id_WEBSOCKET_client_gen
+            BaseFastapiPlugin.flux_json_root_create_field: self.handle_POST_client_gen,
+            BaseFastapiPlugin.flux_json_root_read_field: self.handle_GET_client_gen,
+            BaseFastapiPlugin.flux_json_root_update_field: self.handle_PUT_client_gen,
+            BaseFastapiPlugin.flux_json_root_patch_field: self.handle_PATCH_client_gen,
+            BaseFastapiPlugin.flux_json_root_delete_field: self.handle_DELETE_client_gen,
+            BaseFastapiPlugin.flux_json_root_read_websocket_field: self.handle_read_by_id_WEBSOCKET_client_gen
         }
 
         output_str = self.handle_get_all_message_http_client(message)
@@ -585,7 +586,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             # else not required: Avoiding method creation if desc not provided in option
 
         for field in message.fields:
-            if FastApiClassGenPlugin.flux_fld_index in str(field.proto.options):
+            if BaseFastapiPlugin.flux_fld_index in str(field.proto.options):
                 output_str += self.handle_index_client_gen(message, field)
             # else not required: Avoiding field if index option is not enabled
 
@@ -596,33 +597,33 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
         options_list_of_dict = \
             self.get_complex_msg_option_values_as_list_of_dict(message,
-                                                               FastApiClassGenPlugin.flux_msg_json_root)
+                                                               BaseFastapiPlugin.flux_msg_json_root)
 
         # Since json_root option is of non-repeated type
         option_dict = options_list_of_dict[0]
 
         crud_field_name_to_url_dict = {
-            FastApiClassGenPlugin.flux_json_root_create_field: f"self.create_{message_name_snake_cased}_client_url: "
+            BaseFastapiPlugin.flux_json_root_create_field: f"self.create_{message_name_snake_cased}_client_url: "
                                                                "str = f'http://{self.host}:{self.port}/" +
                                                                f"{self.proto_file_package}/"
                                                                f"create-{message_name_snake_cased}/'",
-            FastApiClassGenPlugin.flux_json_root_read_field: f"self.get_{message_name_snake_cased}_client_url: str = "
+            BaseFastapiPlugin.flux_json_root_read_field: f"self.get_{message_name_snake_cased}_client_url: str = "
                                                              "f'http://{self.host}:{self.port}/" +
                                                              f"{self.proto_file_package}/"
                                                              f"get-{message_name_snake_cased}/'",
-            FastApiClassGenPlugin.flux_json_root_update_field: f"self.put_{message_name_snake_cased}_client_url: str = "
+            BaseFastapiPlugin.flux_json_root_update_field: f"self.put_{message_name_snake_cased}_client_url: str = "
                                                                "f'http://{self.host}:{self.port}/" +
                                                                f"{self.proto_file_package}/"
                                                                f"put-{message_name_snake_cased}/'",
-            FastApiClassGenPlugin.flux_json_root_patch_field: f"self.patch_{message_name_snake_cased}_client_url: "
+            BaseFastapiPlugin.flux_json_root_patch_field: f"self.patch_{message_name_snake_cased}_client_url: "
                                                               "str = f'http://{self.host}:{self.port}/" +
                                                               f"{self.proto_file_package}/"
                                                               f"patch-{message_name_snake_cased}/'",
-            FastApiClassGenPlugin.flux_json_root_delete_field: f"self.delete_{message_name_snake_cased}_client_url: "
+            BaseFastapiPlugin.flux_json_root_delete_field: f"self.delete_{message_name_snake_cased}_client_url: "
                                                                "str = f'http://{self.host}:{self.port}/" +
                                                                f"{self.proto_file_package}/"
                                                                f"delete-{message_name_snake_cased}/'",
-            FastApiClassGenPlugin.flux_json_root_read_websocket_field: f"self.get_{message_name_snake_cased}_"
+            BaseFastapiPlugin.flux_json_root_read_websocket_field: f"self.get_{message_name_snake_cased}_"
                                                                        f"client_ws_url: "
                                                                        "str = f'ws://{self.host}:{self.port}/" +
                                                                        f"{self.proto_file_package}/get-"
@@ -642,12 +643,25 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             # else not required: Avoiding method creation if desc not provided in option
 
         for field in message.fields:
-            if FastApiClassGenPlugin.flux_fld_index in str(field.proto.options):
+            if BaseFastapiPlugin.flux_fld_index in str(field.proto.options):
                 output_str += " "*8 + f"self.get_{message_name_snake_cased}_from_{field.proto.name}_client_url: " \
                               f"str = f'http://" + "{self.host}:{self.port}/" + \
                               f"{self.proto_file_package}/get-{message_name_snake_cased}-from-{field.proto.name}/'\n"
             # else not required: Avoiding field if index option is not enabled
 
+        return output_str
+
+    def _import_model_in_client_file(self) -> str:
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
+        output_str = f"from {model_file_path} import "
+        for message in self.root_message_list:
+            output_str += message.proto.name
+            output_str += ", "
+            output_str += f"{message.proto.name}BaseModel"
+            if message != self.root_message_list[-1]:
+                output_str += ", "
+            else:
+                output_str += "\n"
         return output_str
 
     def handle_client_file_gen(self) -> str:
@@ -657,16 +671,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
                       f'\tgeneric_http_post_client, generic_http_get_client, generic_http_put_client, ' \
                       f'generic_http_patch_client, \\\n\tgeneric_http_delete_client, generic_ws_get_client, ' \
                       f'generic_ws_get_all_client\n'
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str += f"from {model_file_path} import "
-        for message in self.root_message_list:
-            output_str += message.proto.name
-            output_str += ", "
-            output_str += f"{message.proto.name}BaseModel"
-            if message != self.root_message_list[-1]:
-                output_str += ", "
-            else:
-                output_str += "\n"
+        output_str += self._import_model_in_client_file()
         output_str += "\n\n"
         output_str += f"class {self.convert_to_capitalized_camel_case(self.client_file_name)}:\n\n"
         output_str += "    def __init__(self, host: str | None = None, port: int | None = None):\n"
@@ -879,18 +884,18 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         for message in self.root_message_list:
             options_list_of_dict = \
                 self.get_complex_msg_option_values_as_list_of_dict(message,
-                                                                   FastApiClassGenPlugin.flux_msg_json_root)
+                                                                   BaseFastapiPlugin.flux_msg_json_root)
 
             # Since json_root option is of non-repeated type
             option_dict = options_list_of_dict[0]
 
             crud_field_name_to_method_call_dict = {
-                FastApiClassGenPlugin.flux_json_root_create_field: self.handle_POST_callback_methods_gen,
-                FastApiClassGenPlugin.flux_json_root_read_field: self.handle_GET_callback_methods_gen,
-                FastApiClassGenPlugin.flux_json_root_update_field: self.handle_PUT_callback_methods_gen,
-                FastApiClassGenPlugin.flux_json_root_patch_field: self.handle_PATCH_callback_methods_gen,
-                FastApiClassGenPlugin.flux_json_root_delete_field: self.handle_DELETE_callback_methods_gen,
-                FastApiClassGenPlugin.flux_json_root_read_websocket_field:
+                BaseFastapiPlugin.flux_json_root_create_field: self.handle_POST_callback_methods_gen,
+                BaseFastapiPlugin.flux_json_root_read_field: self.handle_GET_callback_methods_gen,
+                BaseFastapiPlugin.flux_json_root_update_field: self.handle_PUT_callback_methods_gen,
+                BaseFastapiPlugin.flux_json_root_patch_field: self.handle_PATCH_callback_methods_gen,
+                BaseFastapiPlugin.flux_json_root_delete_field: self.handle_DELETE_callback_methods_gen,
+                BaseFastapiPlugin.flux_json_root_read_websocket_field:
                     self.handle_read_by_id_WEBSOCKET_callback_methods_gen
             }
 
@@ -905,7 +910,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
                 # else not required: Avoiding method creation if desc not provided in option
 
             for field in message.fields:
-                if FastApiClassGenPlugin.flux_fld_index in str(field.proto.options):
+                if BaseFastapiPlugin.flux_fld_index in str(field.proto.options):
                     output_str += self.handle_index_callback_methods_gen(message, field)
                 # else not required: Avoiding field if index option is not enabled
 
@@ -941,7 +946,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
         if not single_field:
             temp_str = ""
             for field in message.fields:
-                if FastApiClassGenPlugin.default_id_field_name == field.proto.name:
+                if BaseFastapiPlugin.default_id_field_name == field.proto.name:
                     temp_str += f"{field.proto.name}={id_str}"
                 else:
                     message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
@@ -952,7 +957,7 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
             return temp_str
         else:
             for field in message.fields:
-                if FastApiClassGenPlugin.default_id_field_name != field.proto.name:
+                if BaseFastapiPlugin.default_id_field_name != field.proto.name:
                     match field.kind.name.lower():
                         case "int32" | "int64" | "float":
                             return f"{field.proto.name} += 10"
@@ -1148,55 +1153,15 @@ class FastApiClassGenPlugin(BaseProtoPlugin):
                       f'read_all_ws_{main_msg_name_snake_cased}_post")\n'
         return output_str
 
+    @abstractmethod
     def set_req_data_members(self, file: protogen.File):
+        """Pre Code generation initializations, must be called before code generation in `handle_fastapi_class_gen`"""
         self.proto_file_name = str(file.proto.name).split('.')[0]
         self.proto_file_package = str(file.proto.package)
         self.fastapi_app_name = f"{self.proto_file_name}_app"
         self.api_router_app_name = f"{self.proto_file_name}_API_router"
-        self.database_file_name = f"{self.proto_file_name}_cache_database"
-        self.fastapi_file_name = f"{self.proto_file_name}_cache_fastapi"
-        self.model_file_name = f'{self.proto_file_name}_cache_model'
-        self.routes_file_name = f'{self.proto_file_name}_cache_routes'
-        self.launch_file_name = self.proto_file_name + "_cache_launch_server"
-        self.client_file_name = f"{self.proto_file_name}_cache_web_client"
-        self.routes_callback_class_name = f"{self.proto_file_name}_cache_routes_callback"
-        self.routes_callback_class_name_override = f"{self.proto_file_name}_cache_routes_callback_override"
-        routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
-        self.routes_callback_class_name_capital_camel_cased: str = \
-            routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
-        self.callback_override_set_instance_file_name = "cache_callback_override_set_instance"
 
+    @abstractmethod
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
-        # Pre-code generation initializations
-        self.load_root_and_non_root_messages_in_dicts(file.messages)
-        self.set_req_data_members(file)
-
-        output_dict: Dict[str, str] = {
-            # Adding project´s main.py
-            self.fastapi_file_name + ".py": self.handle_fastapi_initialize_file_gen(),
-
-            # Adding route's callback class
-            self.routes_callback_class_name + ".py": self.handle_callback_class_file_gen(),
-
-            # Adding callback override set_instance file
-            self.callback_override_set_instance_file_name + ".py":
-                self.handle_callback_override_set_instance_file_gen(),
-
-            # Adding callback override class file
-            self.routes_callback_class_name_override + ".py": self.handle_callback_override_file_gen(),
-
-            # Adding project's routes.py
-            self.routes_file_name + ".py": self.handle_routes_file_gen(),
-
-            # Adding project's run file
-            self.launch_file_name + ".py": self.handle_launch_file_gen(),
-
-            # Adding client file
-            self.client_file_name + ".py": self.handle_client_file_gen()
-        }
-
-        return output_dict
-
-
-if __name__ == "__main__":
-    main(FastApiClassGenPlugin)
+        """Main method: returns dictionary of filename and file's content as key-value pair"""
+        raise NotImplementedError

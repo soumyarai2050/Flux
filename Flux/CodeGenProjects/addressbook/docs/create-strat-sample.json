@@ -1,0 +1,53 @@
+{
+  "exch_id": "hose",
+  "leg1_sec": {
+    "sec_id": "123.sh",
+    "sec_type": "SEDOL"
+  },
+  "leg1_sec_reference_px": {
+    "price": 5,
+    "reference_price_type": "OPEN_PX"
+  },
+  "leg2_sec": {
+    "sec_id": "768.zh",
+    "sec_type": "RIC"
+  },
+  "leg2_sec_reference_px": {
+    "price": 5,
+    "reference_price_type": "OPEN_PX"
+  },
+  "leg1_side": "BUY",
+  "eligible_brokers": [
+    {
+      "enabled": true,
+      "sec_positions": [
+        {
+          "security": {
+            "sec_id": "768.zh",
+            "sec_type": "RIC"
+          },
+          "reference_px": {
+            "price": 20,
+            "reference_price_type": "OPEN_PX"
+          },
+          "positions": [
+            {
+              "position_type": "PTH",
+              "available_position_size": 100,
+              "allocated_position_size": 20,
+              "consumed_position_size": 10,
+              "carry_cost": 5000
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "residual_restriction": {
+    "max_residual": 20000,
+    "residual_mark_seconds": 10
+  },
+  "exch_response_max_seconds": 10,
+  "trigger_premium_percentage": 2,
+  "hedge_ratio": 1
+}

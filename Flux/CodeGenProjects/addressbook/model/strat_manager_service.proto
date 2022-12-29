@@ -28,7 +28,6 @@ message PairStratParams{
   required Side leg1_side = 6 [default = SIDE_UNSPECIFIED, (FluxFldOrmNoUpdate) = true];
   // default: same as portfolio eligible_brokers except filtered by symbol + allow mod down, reduce portfolio lvl & save
   repeated Broker eligible_brokers = 7;
-  optional ResidualRestriction residual_restriction = 8;
   optional int32 exch_response_max_seconds = 9 [default = 30, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
   // these are specific to CB-EQT strat - move to derived later
   required float trigger_premium_percentage = 10;
@@ -79,12 +78,13 @@ message StratLimits{
     w: 8,
     h: 3
   };
-
-  required float max_cb_notional = 1 [(FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
-  required float max_open_cb_notional = 2 [(FluxFldHelp) = "max open eqt notional derived applying hedge ratio ]"];
-  required int32 max_open_baskets = 3  [(FluxFldHelp) = "max simultaneous open order pairs allowed for this strat"];
-  optional MarketParticipation market_participation = 4 [(FluxFldHelp) = "server provided, UI overridable"];
-  optional float max_concentration = 5 [(FluxFldHelp) = "server provided, UI overridable"];
+  required int32 max_open_order_per_side = 1 [(FluxFldHelp) = "max simultaneous open orders allowed per side for this strat"];
+  required float max_cb_notional = 2 [(FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
+  required float max_open_cb_notional = 3 [(FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
+  required int32 max_net_filled_notional = 4  [(FluxFldHelp) = "absolute [buy - sell] maximum notional allowed for this strat"];
+  optional MarketParticipation market_participation = 5 [(FluxFldHelp) = "server provided, UI overridable"];
+  optional float max_concentration = 6 [(FluxFldHelp) = "server provided, UI overridable"];
+  optional ResidualRestriction residual_restriction = 7;
 }
 
 //Widget - 5
@@ -108,10 +108,11 @@ message OrderLimits{
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required int32 max_px_levels = 2 [(FluxFldSequenceNumber) = 1];
-  required int32 max_basis_points = 3 [(FluxFldValMax) = "15", (FluxFldSequenceNumber) = 2];
-  required int32 max_cb_order_notional = 4 [(FluxFldSequenceNumber) = 3, (FluxFldHelp) = "open+executed; max ord eqt notional derived (hedge ratio)"];
-  required float max_px_deviation = 5 [default = 2, (FluxFldSequenceNumber) = 4, (FluxFldHelp) = "% of Last Traded px"];
+  required int32 max_basis_points = 2 [(FluxFldValMax) = "15", (FluxFldSequenceNumber) = 1];
+  required float max_px_deviation = 3 [default = 2, (FluxFldSequenceNumber) = 2, (FluxFldHelp) = "max % deviation allowed from Last Traded px (if no last trading price, use closing price instead)"];
+  required int32 max_px_levels = 4 [(FluxFldSequenceNumber) = 3, (FluxFldHelp) = "max orderbook levels allowed to be consumed by single order"];
+  required int32 max_order_quantity = 5 [(FluxFldSequenceNumber) = 4];
+  required int32 max_order_notional = 6 [(FluxFldSequenceNumber) = 5, (FluxFldHelp) = "order qty times limit price"];
 }
 
 //Widget - 6
@@ -135,9 +136,11 @@ message PortfolioLimits{
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // auto update symbol's availability when allocated/consumed by strat(block strat creation if not enough availability), this has both limit and status in Position
-  repeated Broker eligible_brokers = 2 [(FluxFldSequenceNumber) = 3];
-  required float max_cb_notional = 3 [(FluxFldSequenceNumber) = 1, (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
-  required CancelRate cancel_rate = 4 [(FluxFldSequenceNumber) = 2];
+  required int32 max_open_baskets = 2  [(FluxFldSequenceNumber) = 1, (FluxFldHelp) = "max simultaneous open orders allowed per side for this portfolio"];
+  required int32 max_open_notional_per_side = 3[(FluxFldSequenceNumber) = 2];
+  required float max_gross_n_open_notional = 4 [(FluxFldSequenceNumber) = 3, (FluxFldHelp) = "aggregated buy+sell: open+executed max allowed notional"];
+  required CancelRate cancel_rate = 5 [(FluxFldSequenceNumber) = 4];
+  repeated Broker eligible_brokers = 6 [(FluxFldSequenceNumber) = 5];
 }
 
 //Widget - 7
@@ -190,7 +193,7 @@ message PairStrat{
     };
     //Server generated unique Id
     required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-    //An int64 may or may-not be date time. A datetime field must have FluxFldValDateTime option set
+    //An int64 may or may-not be date time. A datetime field must have FluxFldValIsDateTime option set to true
     // CodeGen to handle appropriate datetime generation if the FluxFldValIsDateTime option is set
     optional int64 last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
     optional int32  frequency = 3 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 1, (FluxFldServerPopulate) = true];

@@ -9,14 +9,14 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginFastApi.beanie_fast_api_class_gen_plugin import \
-    BeanieFastApiClassGenPlugin, main
+from Flux.PyCodeGenEngine.PluginFastApi.beanie_fastapi_plugin import \
+    BeanieFastApiPlugin, main
 
 
 # Todo: Might be broken due to changes made in cache and beanie fastapi
 
 
-class CacheBeanieFastApiClassGenPlugin(BeanieFastApiClassGenPlugin):
+class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
     """
     Plugin script to generate Hybrid-Beanie enabled fastapi app
     """
@@ -190,4 +190,4 @@ class CacheBeanieFastApiClassGenPlugin(BeanieFastApiClassGenPlugin):
 
 
 if __name__ == "__main__":
-    main(CacheBeanieFastApiClassGenPlugin)
+    main(CacheBeanieFastApiPlugin)

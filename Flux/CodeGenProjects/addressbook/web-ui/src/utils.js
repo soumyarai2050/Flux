@@ -567,7 +567,8 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
             });
         }
     } else if (currentSchema.hasOwnProperty('items') && currentSchema.type === DataTypes.ARRAY) {
-        if (_.get(data, dataxpath) && _.get(data, dataxpath).length === 0 && _.get(originalData, xpath) && _.get(originalData, xpath).length === 0) {
+        if (((_.get(data, dataxpath) && _.get(data, dataxpath).length === 0) || (_.keys(data).length > 0 && !_.get(data, dataxpath))) &&
+            (( _.get(originalData, xpath) && _.get(originalData, xpath).length === 0) || !_.get(originalData, xpath))) {
             let childxpath = dataxpath + '[-1]';
             let updatedxpath = xpath + '[-1]';
             addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, childxpath, updatedxpath, currentSchema.items.$ref);
@@ -575,9 +576,9 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
             let paths = [];
             if (_.get(originalData, xpath)) {
                 for (let i = 0; i < _.get(originalData, xpath).length; i++) {
-                    let childxpath = dataxpath + '[' + i + ']';
-                    childxpath = getDataxpath(data, childxpath);
                     let updatedxpath = xpath + '[' + i + ']';
+                    let childxpath = dataxpath + '[' + i + ']';
+                    childxpath = getDataxpath(data, updatedxpath);
                     paths.push(updatedxpath);
                     if (!isNodeInSubtree(callerProps, xpath, updatedxpath)) continue;
                     addNode(tree, schema, currentSchema, propname, callerProps, childxpath, DataTypes.OBJECT, updatedxpath);

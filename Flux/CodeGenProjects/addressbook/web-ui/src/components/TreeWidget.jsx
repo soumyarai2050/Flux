@@ -54,7 +54,7 @@ const TreeWidget = (props) => {
     const onTextChange = (e, type, xpath, value) => {
         let updatedData = cloneDeep(props.data);
         let dataxpath = e.target.getAttribute('dataxpath');
-        if(type === DataTypes.NUMBER) {
+        if (type === DataTypes.NUMBER) {
             value = value * 1;
         }
 
@@ -113,6 +113,10 @@ const TreeWidget = (props) => {
             let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
             let originalindex = _.get(props.originalData, parentxpath) ? _.get(props.originalData, parentxpath).length : 0;
             let parentObject = _.get(updatedData, parentxpath);
+            if (!parentObject) {
+                _.set(updatedData, parentxpath, []);
+                parentObject = _.get(updatedData, parentxpath);
+            }
             let parentindex = 0;
             if (parentObject.length > 0) {
                 let propname = _.keys(parentObject[parentObject.length - 1]).filter(key => key.startsWith('xpath_'))[0];
@@ -126,7 +130,7 @@ const TreeWidget = (props) => {
             }
             let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
             let emptyObject = generateObjectFromSchema(props.schema, currentSchema);
-            emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']')
+            emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
             parentObject.push(emptyObject);
             console.log({ updatedData });
             props.onUpdate(updatedData, 'add');
