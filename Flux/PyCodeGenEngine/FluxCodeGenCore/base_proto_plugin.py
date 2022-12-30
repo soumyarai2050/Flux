@@ -4,7 +4,7 @@ import re
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, ClassVar
 import logging
 from abc import ABC
 
@@ -38,9 +38,49 @@ class BaseProtoPlugin(ABC):
         Dictionary containing insertion point keys with respective contents as value. Gets
         assigned by `__process` method at run-time
     """
-    flux_msg_cmnt_option_key = "FluxMsgCmnt"
-    flux_fld_cmnt_option_key = "FluxFldCmnt"
-    flux_file_cmnt_option_key = "FluxFileCmnt"
+    msg_options_standard_prefix = "FluxMsg"
+    fld_options_standard_prefix = "FluxFld"
+    flux_msg_json_layout: str = "FluxMsgLayout"
+    flux_fld_val_is_datetime: ClassVar[str] = "FluxFldValIsDateTime"
+    flux_fld_alias: ClassVar[str] = "FluxFldAlias"
+    flux_msg_json_root: ClassVar[str] = "FluxMsgJsonRoot"
+    flux_json_root_create_field: ClassVar[str] = "CreateDesc"
+    flux_json_root_read_field: ClassVar[str] = "ReadDesc"
+    flux_json_root_update_field: ClassVar[str] = "UpdateDesc"
+    flux_json_root_patch_field: ClassVar[str] = "PatchDesc"
+    flux_json_root_delete_field: ClassVar[str] = "DeleteDesc"
+    flux_json_root_read_websocket_field: ClassVar[str] = "ReadWebSocketDesc"
+    flux_json_root_update_websocket_field: ClassVar[str] = "UpdateWebSocketDesc"
+    flux_fld_is_required: ClassVar[str] = "FluxFldIsRequired"
+    flux_fld_cmnt: ClassVar[str] = "FluxFldCmnt"
+    flux_msg_cmnt: ClassVar[str] = "FluxMsgCmnt"
+    flux_file_cmnt: ClassVar[str] = "FluxFileCmnt"
+    flux_fld_index: ClassVar[str] = "FluxFldIndex"
+    flux_fld_web_socket: ClassVar[str] = "FluxFldWebSocket"
+    flux_msg_layout: str = "FluxMsgLayout"
+    flux_fld_abbreviated: str = "FluxFldAbbreviated"
+    flux_fld_auto_complete: str = "FluxFldAutoComplete"
+    flux_fld_sequence_number: str = "FluxFldSequenceNumber"
+    flux_fld_button: str = "FluxFldButton"
+    flux_msg_title: str = "FluxMsgTitle"
+    flux_fld_title: str = "FluxFldTitle"
+    default_id_field_name: ClassVar[str] = "id"
+    proto_type_to_py_type_dict: ClassVar[Dict[str, str]] = {
+        "int32": "int",
+        "int64": "int",
+        "string": "str",
+        "bool": "bool",
+        "float": "float"
+    }
+    proto_type_to_json_type_dict: Dict[str, str] = {
+        "int32": "number",
+        "int64": "number",
+        "string": "string",
+        "bool": "boolean",
+        "enum": "enum",
+        "message": "object",
+        "float": "number"
+    }
 
     # This class member is used to add content in output file if no template file is provided for output
     # This insertion point is added in output file while creating output file and this insertion point
@@ -253,21 +293,21 @@ class BaseProtoPlugin(ABC):
     def get_flux_msg_cmt_option_value(self, message: protogen.Message) -> str:
         flux_msg_cmt_option_value = \
             BaseProtoPlugin.get_non_repeated_valued_custom_option_value(str(message.proto.options),
-                                                                        BaseProtoPlugin.flux_msg_cmnt_option_key)
+                                                                        BaseProtoPlugin.flux_msg_cmnt)
         return flux_msg_cmt_option_value[2:-1] \
             if flux_msg_cmt_option_value is not None else ""
 
     def get_flux_fld_cmt_option_value(self, field: protogen.Field) -> str:
         flux_fld_cmt_option_value = \
             BaseProtoPlugin.get_non_repeated_valued_custom_option_value(field.proto.options,
-                                                                        BaseProtoPlugin.flux_fld_cmnt_option_key)
+                                                                        BaseProtoPlugin.flux_fld_cmnt)
         return flux_fld_cmt_option_value[2:-1] \
             if flux_fld_cmt_option_value is not None else ""
 
     def get_flux_file_cmt_option_value(self, file: protogen.File) -> str:
         flux_file_cmt_option_value = \
             BaseProtoPlugin.get_non_repeated_valued_custom_option_value(file.proto.options,
-                                                                        BaseProtoPlugin.flux_file_cmnt_option_key)
+                                                                        BaseProtoPlugin.flux_file_cmnt)
         return flux_file_cmt_option_value[2:-1] \
             if flux_file_cmt_option_value is not None else ""
 

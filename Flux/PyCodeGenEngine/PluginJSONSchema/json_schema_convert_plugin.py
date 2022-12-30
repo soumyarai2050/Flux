@@ -22,12 +22,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
-
-    msg_options_standard_prefix = "FluxMsg"
-    fld_options_standard_prefix = "FluxFld"
-    flux_msg_json_layout: str = "FluxMsgLayout"
-    flux_msg_json_root: str = "FluxMsgJsonRoot"
-    flux_fld_is_required: str = "FluxFldIsRequired"
     flx_fld_simple_attribute_options: List[str] = [
         "FluxFldHelp",
         "FluxFldHide",
@@ -62,26 +56,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         "FluxMsgLayout",
         "FluxMsgServerPopulate"
     ]
-    flux_fld_cmnt: str = "FluxFldCmnt"
-    flux_msg_cmnt: str = "FluxMsgCmnt"
-    flux_fld_sequence_number: str = "FluxFldSequenceNumber"
-    flux_fld_val_is_datetime: str = "FluxFldValIsDateTime"
-    flux_fld_button: str = "FluxFldButton"
-    flux_msg_title: str = "FluxMsgTitle"
-    flux_fld_title: str = "FluxFldTitle"
-    # Below field name 'id' must only be used intentionally in beanie pydentic models to make custom type
-    # of primary key in that model
-    default_id_field_name: str = "id"
-
-    proto_type_to_json_type_dict: Dict[str, str] = {
-        "int32": "number",
-        "int64": "number",
-        "string": "string",
-        "bool": "boolean",
-        "enum": "enum",
-        "message": "object",
-        "float": "number"
-    }
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)

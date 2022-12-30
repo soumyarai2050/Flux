@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import os
 from typing import List, Dict
-import logging
 import time
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
@@ -17,9 +16,6 @@ class BeanieFastApiPlugin(CacheFastApiPlugin):
     """
     Plugin script to generate Beanie enabled fastapi app
     """
-    # Below field name 'id' must only be used intentionally in beanie pydentic models to make custom type
-    # of primary key in that model
-    default_id_field_name: str = "id"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -58,7 +54,7 @@ class BeanieFastApiPlugin(CacheFastApiPlugin):
         model_names = ", ".join(root_msg_list)
         output_str = "async def init_db():\n"
         output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := os.getenv("MONGO_SERVER")) ' \
-                      'is not None else mongo_env\n'
+                      'is None else mongo_env\n'
         output_str += f'    client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server)\n'
         output_str += f'    await init_beanie(\n'
         output_str += f'              database=client.{self.proto_file_package},\n'
@@ -131,16 +127,9 @@ class BeanieFastApiPlugin(CacheFastApiPlugin):
         super().set_req_data_members(file)
         self.database_file_name = f"{self.proto_file_name}_beanie_database"
         self.fastapi_file_name = f"{self.proto_file_name}_beanie_fastapi"
-        self.model_file_name = f'{self.proto_file_name}_beanie_model'
-        self.routes_file_name = f'{self.proto_file_name}_beanie_routes'
-        self.launch_file_name = self.proto_file_name + "_beanie_launch_server"
-        self.client_file_name = f"{self.proto_file_name}_beanie_web_client"
-        self.routes_callback_class_name = f"{self.proto_file_name}_beanie_routes_callback"
-        self.routes_callback_class_name_override = f"{self.proto_file_name}_beanie_routes_callback_override"
         routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
         self.routes_callback_class_name_capital_camel_cased: str = \
             routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
-        self.callback_override_set_instance_file_name = "beanie_callback_override_set_instance"
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
         # Pre-code generation initializations

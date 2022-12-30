@@ -23,8 +23,6 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
     """
     Plugin to generate json sample from proto schema
     """
-    flux_msg_json_root: str = "FluxMsgJsonRoot"
-    flux_fld_auto_complete: str = "FluxFldAutoComplete"
     random_int_range: Tuple[int, int] = (1, 10)
     random_str_length: int = 10
 

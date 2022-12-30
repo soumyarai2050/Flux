@@ -92,18 +92,10 @@ class CacheFastApiPlugin(BaseFastapiPlugin):
 
     def set_req_data_members(self, file: protogen.File):
         super().set_req_data_members(file)
-        self.database_file_name = f"{self.proto_file_name}_cache_database"
         self.fastapi_file_name = f"{self.proto_file_name}_cache_fastapi"
-        self.model_file_name = f'{self.proto_file_name}_cache_model'
-        self.routes_file_name = f'{self.proto_file_name}_cache_routes'
-        self.launch_file_name = self.proto_file_name + "_cache_launch_server"
-        self.client_file_name = f"{self.proto_file_name}_cache_web_client"
-        self.routes_callback_class_name = f"{self.proto_file_name}_cache_routes_callback"
-        self.routes_callback_class_name_override = f"{self.proto_file_name}_cache_routes_callback_override"
         routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
         self.routes_callback_class_name_capital_camel_cased: str = \
             routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
-        self.callback_override_set_instance_file_name = "cache_callback_override_set_instance"
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
         # Pre-code generation initializations

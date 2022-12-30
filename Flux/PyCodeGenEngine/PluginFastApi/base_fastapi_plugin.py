@@ -24,34 +24,11 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     Plugin script to convert proto schema to json schema
     """
 
-    flux_msg_json_root: str = "FluxMsgJsonRoot"
-    flux_json_root_create_field: str = "CreateDesc"
-    flux_json_root_read_field: str = "ReadDesc"
-    flux_json_root_update_field: str = "UpdateDesc"
-    flux_json_root_patch_field: str = "PatchDesc"
-    flux_json_root_delete_field: str = "DeleteDesc"
-    flux_json_root_read_websocket_field: str = "ReadWebSocketDesc"
-    flux_json_root_update_websocket_field: str = "UpdateWebSocketDesc"
-    flux_fld_is_required: str = "FluxFldIsRequired"
-    flux_fld_cmnt: str = "FluxFldCmnt"
-    flux_msg_cmnt: str = "FluxMsgCmnt"
-    flux_fld_index: str = "FluxFldIndex"
-    flux_fld_web_socket: str = "FluxFldWebSocket"
-    default_id_field_name: str = "id"
-    proto_type_to_py_type_dict: Dict[str, str] = {
-        "int32": "int",
-        "int64": "int",
-        "string": "str",
-        "bool": "bool",
-        "float": "float"
-    }
-
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
         self.insertion_point_key_to_callable_list: List[Callable] = [
             self.handle_fastapi_class_gen
         ]
-        response_field_case_style = None
         if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
             self.response_field_case_style: str = response_field_case_style
         else:
@@ -394,8 +371,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         return output_str
 
     def _underlying_handle_generic_imports(self) -> str:
-        generic_cache_routes_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_routes")
-        output_str = f'from {generic_cache_routes_file_path} import generic_post_http, ' + "\\\n"\
+        generic_routes_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_routes")
+        output_str = f'from {generic_routes_file_path} import generic_post_http, ' + "\\\n"\
                      f'\tgeneric_put_http, generic_patch_http, generic_delete_http, ' \
                      f'generic_index_http, \\\n\tgeneric_read_http, generic_read_ws, ' \
                      f'generic_read_by_id_http, generic_read_by_id_ws\n'
@@ -711,10 +688,15 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         output_str += f'    # CRITICAL: 50\n'
         output_str += f'    host = "127.0.0.1" if (env_host := os.getenv("HOST")) is None else env_host\n'
         output_str += f'    port = 8000 if (env_port := os.getenv("PORT")) is None else int(env_port)\n'
+        output_str += f'    if (fastapi_file_name := os.getenv("FASTAPI_FILE_NAME")) is None:\n'
+        output_str += f'        err_str = "Env Var FASTAPI_FILE_NAME received as None"\n'
+        output_str += f'        logging.exception(err_str)\n'
+        output_str += f'        raise Exception(err_str)\n'
+        output_str += f'    # else not required: if fastapi file name received successfully then running server\n'
         output_str += f'    uvicorn.run(reload=reload_status, \n'
         output_str += f'                host=host, \n'
         output_str += f'                port=port, \n'
-        output_str += f'                app="{self.fastapi_file_name}:{self.fastapi_app_name}", \n'
+        output_str += '                app=f"{fastapi_file_name}'+f':{self.fastapi_app_name}", \n'
         output_str += f'                log_level=20)\n'
         output_str += f'    callback_instance.app_launch_post()\n'
         return output_str
@@ -993,28 +975,24 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         output_str += "import logging\n"
         output_str += "import asyncio\n\n"
         output_str += "# project imports\n"
-        beanie_web_client_path = \
-            self.import_path_from_os_path("OUTPUT_DIR", f"{self.proto_file_name}_beanie_web_client")
-        output_str += f"from {beanie_web_client_path} import " \
-                      f"{proto_file_name_capitalize_camel_cased}BeanieWebClient\n"
-        cache_web_client_path = \
-            self.import_path_from_os_path("OUTPUT_DIR", f"{self.proto_file_name}_cache_web_client")
-        output_str += f"from {cache_web_client_path} import " \
-                      f"{proto_file_name_capitalize_camel_cased}CacheWebClient\n"
-        beanie_model_path = \
-            self.import_path_from_os_path("OUTPUT_DIR", f"{self.proto_file_name}_beanie_model")
+        web_client_path = \
+            self.import_path_from_os_path("OUTPUT_DIR", f"{self.client_file_name}")
+        web_client_name_caps_camel_cased = self.convert_to_capitalized_camel_case(self.client_file_name)
+        output_str += f"from {web_client_path} import {web_client_name_caps_camel_cased}\n"
+        model_path = \
+            self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_file_name}")
         pydantic_models_comma_sep = ", ".join([msg.proto.name for msg in required_root_msg])
-        output_str += f"from {beanie_model_path} import " \
+        output_str += f"from {model_path} import " \
                       f"{required_root_msg[0].proto.name}BaseModel, {pydantic_models_comma_sep}\n"
-        beanie_routes_callback = \
+        routes_callback = \
             self.import_path_from_os_path("OUTPUT_DIR", f"{self.routes_callback_class_name}")
         callback_class_name_camel_cased = self.convert_to_capitalized_camel_case(self.routes_callback_class_name)
-        output_str += f"from {beanie_routes_callback} import " \
+        output_str += f"from {routes_callback} import " \
                       f"{callback_class_name_camel_cased}\n\n\n"
-        output_str += f"{self.proto_file_name}_beanie_web_client_internal = " \
-                     f"{proto_file_name_capitalize_camel_cased}BeanieWebClient()\n"
-        output_str += f"{self.proto_file_name}_cache_web_client_external = " \
-                      f"{proto_file_name_capitalize_camel_cased}CacheWebClient(port=8080)\n\n\n"
+        output_str += f"{self.proto_file_name}_web_client_internal = " \
+                     f"{web_client_name_caps_camel_cased}()\n"
+        output_str += f"{self.proto_file_name}_web_client_external = " \
+                      f"{web_client_name_caps_camel_cased}(port=8080)\n\n\n"
         output_str += f"class WsGet{required_root_msg[0].proto.name}ByIdCallback:\n"
         output_str += f"    def __call__(self, " \
                       f"{self.convert_camel_case_to_specific_case(required_root_msg[0].proto.name)}_base_model: " \
@@ -1059,7 +1037,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         output_str += f'    def _http_create_{first_msg_name_snake_cased}_thread_func(self, obj):\n'
         field_str = self._handle_field_data_manipulation(json_sample_content, required_root_msg[0], "obj.id")
         output_str += f'        {first_msg_name_snake_cased}_obj = {first_msg_name}BaseModel({field_str})\n'
-        output_str += f'        {first_msg_name_snake_cased}_obj = {self.proto_file_name}_beanie_web_client' \
+        output_str += f'        {first_msg_name_snake_cased}_obj = {self.proto_file_name}_web_client' \
                       f'_internal.create_{first_msg_name_snake_cased}_client({first_msg_name_snake_cased}_obj)\n'
         output_str += f'        logging.debug(f"Created {first_msg_name} obj from Another Document: ' + \
                       '{'+f'{first_msg_name_snake_cased}_obj'+'}'+'")\n\n'
@@ -1094,7 +1072,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             self._handle_field_data_manipulation(json_sample_content, required_root_msg[0],
                                                  f"{main_msg_name_snake_cased}_obj.id")
         output_str += f'        {first_msg_name_snake_cased}_obj = {first_msg_name}BaseModel({field_str})\n'
-        output_str += f'        {first_msg_name_snake_cased}_obj = {self.proto_file_name}_cache_web_client_external.' \
+        output_str += f'        {first_msg_name_snake_cased}_obj = {self.proto_file_name}_web_client_external.' \
                       f'create_{first_msg_name_snake_cased}_client({first_msg_name_snake_cased}_obj)\n'
         output_str += f'        logging.debug(f"Created {first_msg_name} obj from Another Document: ' + \
                       '{'+f'{first_msg_name_snake_cased}_obj'+'}'+'")\n\n'
@@ -1112,7 +1090,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                       f'obj_id: int, ws_get_{first_msg_name_snake_cased}_by_id_callback):\n'
         output_str += f'        logging.debug("_ws_get_{first_msg_name_snake_cased}_by_id_thread_func: ' \
                       f'Connecting {first_msg_name_snake_cased} get_by_id ws:")\n'
-        output_str += f'        await {self.proto_file_name}_beanie_web_client_internal.get_' \
+        output_str += f'        await {self.proto_file_name}_web_client_internal.get_' \
                       f'{first_msg_name_snake_cased}_client_ws(obj_id, ws_get_{first_msg_name_snake_cased}' \
                       f'_by_id_callback)\n\n'
         main_msg = required_root_msg[3]
@@ -1137,7 +1115,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                       f'self, ws_get_{first_msg_name_snake_cased}_callback):\n'
         output_str += f'        logging.debug("_ws_get_{first_msg_name_snake_cased}_by_id_thread_func: ' \
                       f'Connecting another server {first_msg_name_snake_cased} get_all ws:")\n'
-        output_str += f'        await {self.proto_file_name}_cache_web_client_external.get_all_' \
+        output_str += f'        await {self.proto_file_name}_web_client_external.get_all_' \
                       f'{first_msg_name_snake_cased}_client_ws(ws_get_{first_msg_name_snake_cased}_callback)\n\n'
         output_str += f'    def read_all_ws_{main_msg_name_snake_cased}_pre(self):\n'
         output_str += f'        logging.debug(f"triggered read_all_ws_{main_msg_name_snake_cased}_pre")\n'
@@ -1160,6 +1138,13 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.proto_file_package = str(file.proto.package)
         self.fastapi_app_name = f"{self.proto_file_name}_app"
         self.api_router_app_name = f"{self.proto_file_name}_API_router"
+        self.client_file_name = f"{self.proto_file_name}_web_client"
+        self.model_file_name = f'{self.proto_file_name}_model_imports'
+        self.launch_file_name = self.proto_file_name + "_launch_server"
+        self.routes_file_name = f'{self.proto_file_name}_routes'
+        self.routes_callback_class_name = f"{self.proto_file_name}_routes_callback"
+        self.routes_callback_class_name_override = f"{self.proto_file_name}_routes_callback_override"
+        self.callback_override_set_instance_file_name = f"{self.proto_file_name}_callback_override_set_instance"
 
     @abstractmethod
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:

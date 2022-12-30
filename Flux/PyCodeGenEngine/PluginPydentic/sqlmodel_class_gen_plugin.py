@@ -8,10 +8,10 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginPydentic.pydantic_class_gen_plugin import PydanticClassGenPlugin, main
+from Flux.PyCodeGenEngine.PluginPydentic.cached_pydantic_model_plugin import CachedPydanticModelPlugin, main
 
 
-class SQLModelClassGenPlugin(PydanticClassGenPlugin):
+class SQLModelModelPlugin(CachedPydanticModelPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
@@ -37,14 +37,14 @@ class SQLModelClassGenPlugin(PydanticClassGenPlugin):
             output_str += f' = Field(description="{comments}"'
         # else not required: Avoid if comment is not present
 
-        if is_primary := (SQLModelClassGenPlugin.flux_fld_primary in str(field.proto.options)):
+        if is_primary := (SQLModelModelPlugin.flux_fld_primary in str(field.proto.options)):
             if leading_comments:
                 output_str += f', default=None, primary_key=True'
             else:
                 output_str += f' = Field(default=None, primary_key=True)\n'
         # else not required: Avoid if primary option in not set
 
-        if SQLModelClassGenPlugin.flux_fld_index in str(field.proto.options):
+        if SQLModelModelPlugin.flux_fld_index in str(field.proto.options):
             if leading_comments or is_primary:
                 output_str += f', index=True)\n'
             else:
@@ -106,4 +106,4 @@ class SQLModelClassGenPlugin(PydanticClassGenPlugin):
 
 
 if __name__ == "__main__":
-    main(SQLModelClassGenPlugin)
+    main(SQLModelModelPlugin)

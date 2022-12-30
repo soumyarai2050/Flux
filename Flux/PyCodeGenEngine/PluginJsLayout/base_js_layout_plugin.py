@@ -15,12 +15,9 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
     """
     Plugin script to generate jsx file for ORM root messages
     """
-    flux_msg_json_root: str = "FluxMsgJsonRoot"
-    flux_msg_layout: str = "FluxMsgLayout"
     flux_msg_tree_layout_value: str = "Tree"
     flux_msg_table_layout_value: str = "Table"
     flux_msg_abbreviated_filter_layout_value: str = "AbbreviatedFilter"
-    flux_fld_abbreviated: str = "FluxFldAbbreviated"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
