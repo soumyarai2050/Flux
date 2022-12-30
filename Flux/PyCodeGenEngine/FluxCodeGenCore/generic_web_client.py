@@ -1,6 +1,6 @@
 import requests
-from pydantic import BaseModel, Field
-from typing import Dict, Any, Callable, List
+from pydantic import BaseModel
+from typing import Any, Callable, List
 import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, ConnectionClosed
@@ -9,24 +9,23 @@ from asyncio.exceptions import TimeoutError
 import json
 from fastapi.encoders import jsonable_encoder
 
-from FluxPythonUtils.scripts.utility_functions import log_n_except
+from FluxPythonUtils.scripts.utility_functions import log_n_except, http_response_as_class_type, HTTPRequestType
 
 
 @log_n_except
 def generic_http_get_all_client(url: str, pydantic_type):
-    result = requests.get(url)
-    result_json = result.json()
-    pydantic_obj_list = [pydantic_type(**json_obj) for json_obj in result_json]
+    response: requests.Response = requests.get(url)
+    response_json = response.json()
+    pydantic_obj_list = [pydantic_type(**json_obj) for json_obj in response_json]
     return pydantic_obj_list
 
 
 @log_n_except
 def generic_http_post_client(url: str, pydantic_obj, pydantic_type):
-    # create doesn't need to delete any field - model default should handle that, so: exclude_unset=True, exclude_none=True)
+    # create don't need to delete any field: model default should handle that, so: exclude_unset=True, exclude_none=True
     json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
-    result = requests.post(url, json=json_data)
-    result_json = result.json()
-    return pydantic_type(**result_json)
+    response: requests.Response = requests.post(url, json=json_data)
+    return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.POST)
 
 
 @log_n_except
@@ -35,25 +34,22 @@ def generic_http_get_client(url: str, query_param: Any, pydantic_type):
         url = f"{url}{query_param}"
     else:
         url = f"{url}/{query_param}"
-    result = requests.get(url)
-    result_json = result.json()
-    return pydantic_type(**result_json)
+    response: requests.Response = requests.get(url)
+    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
 
 
 @log_n_except
 def generic_http_put_client(url: str, pydantic_obj, pydantic_type):
     json_data = jsonable_encoder(pydantic_obj, by_alias=True)
-    result = requests.put(url, json=json_data)
-    result_json = result.json()
-    return pydantic_type(**result_json)
+    response: requests.Response = requests.put(url, json=json_data)
+    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PUT)
 
 
 @log_n_except
 def generic_http_patch_client(url: str, pydantic_obj, pydantic_type):
     json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
-    result = requests.patch(url, json=json_data)
-    result_json = result.json()
-    return pydantic_type(**result_json)
+    response: requests.Response = requests.patch(url, json=json_data)
+    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
 
 
 @log_n_except
@@ -62,9 +58,9 @@ def generic_http_delete_client(url: str, query_param: Any):
         url = f"{url}{query_param}"
     else:
         url = f"{url}/{query_param}"
-    result = requests.delete(url)
-    result_json = result.json()
-    return result_json
+    response: requests.Response = requests.delete(url)
+    response_json = response.json()
+    return response_json
 
 
 async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Callable):
@@ -140,59 +136,3 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
                     print('\n', "Update: ", pydantic_type_obj)
                 except KeyError:
                     continue
-
-
-# class OrderLimitsOptional(BaseModel):
-#     """
-#         Widget - 5
-#     """
-#     id: int | None = Field(alias="_id")
-#     max_price_levels: int | None = None
-#     max_basis_points: int | None = None
-#     max_cb_order_notional: int | None = None
-#     max_px_deviation: float | None = None
-
-
-# js = {'id': 1, 'max_price_levels': 40, 'max_basis_points': 0, 'max_cb_order_notional': 1, 'max_px_deviation': 0.0}
-# print(OrderLimitsOptional(**js).json())
-
-# Get All
-# URL = "http://127.0.0.1:8000/pair_strat_engine/get-all-order_limits/"
-# print(generic_http_get_all_client(URL, OrderLimitsOptional))
-
-
-# Post
-# js = {'_id': 3, 'max_price_levels': 40, 'max_basis_points': 0, 'max_cb_order_notional': 1, 'max_px_deviation': 0.0}
-# URL = "http://127.0.0.1:8000/pair_strat_engine/create-order_limits"
-# print(generic_http_post_client(URL, OrderLimitsOptional(**js), OrderLimitsOptional))
-
-
-# Get
-# URL = "http://127.0.0.1:8000/pair_strat_engine/get-order_limits"
-# print(generic_http_get_client(URL, 1, OrderLimitsOptional))
-
-
-# Put
-# js = {'id': 1, 'max_price_levels': 10, 'max_basis_points': 0, 'max_cb_order_notional': 1, 'max_px_deviation': 0.0}
-# URL = "http://127.0.0.1:8000/pair_strat_engine/put-order_limits/"
-# print(generic_http_put_client(URL, js, OrderLimitsOptional))
-
-# Patch
-# js = {'id': 2, 'max_price_levels': 10}
-# URL = "http://127.0.0.1:8000/pair_strat_engine/patch-order_limits/"
-# print(generic_http_patch_client(URL, js, OrderLimitsOptional))
-
-# Delete
-# URL = "http://127.0.0.1:8000/pair_strat_engine/delete-order_limits/"
-# print(generic_http_delete_client(URL, 3, OrderLimitsOptional))
-
-# Get -ws
-# URL = "ws://127.0.0.1:8000/pair_strat_engine/get-order_limits-ws"
-# try:
-#     new_loop = asyncio.new_event_loop()
-#     test = "testing"
-#     new_loop.run_until_complete(generic_ws_get_client(URL, 1, OrderLimitsOptional))
-# except KeyboardInterrupt:
-#     pass
-# finally:
-#     asyncio.get_event_loop().stop()

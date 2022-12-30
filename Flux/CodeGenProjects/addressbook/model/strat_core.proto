@@ -79,6 +79,8 @@ message Quote{
 // stores all position types from all sources for optimal selection, usage and clearance
 // one can design to make entry with cheapest option first and clear the most expensive used position first
 message Position{
+  // this can be converted into a button (more thought needed)
+  optional bool enabled = 1 [default = true];
   required PositionType position_type = 2;
   // available size for consumption
   required int64 available_position_size = 3;
@@ -92,10 +94,11 @@ message Position{
   optional float incurred_cost = 7;
   // T+1 and onwards recurring daily cost
   optional float carry_cost = 8;
+  optional int32 position_priority = 9 [default = 100, (FluxFldHelp) = "default priority: 10,  orders to respect specified priority (lower value is higher priority), duplicates allowed"];
 }
 
 message SecPosition{
-  required Security security = 1[(FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER", (FluxFldHelp) = "EQT Tickers"];
+  required Security security = 1 [(FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER", (FluxFldHelp) = "EQT Tickers"];
   // Open px OR Close px OR Last px
   optional ReferencePx reference_px = 2;
   // per position type (PTH, LOCATE, LONG)
@@ -116,6 +119,7 @@ message Broker{
   repeated SecPosition sec_positions = 2;
   // broker identifier
   required string broker_code = 3;
+  optional int32 broker_priority = 9 [default = 0, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; orders respect specified priority (lower value is higher priority), duplicates allowed"];
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
@@ -137,7 +141,7 @@ message OrderBrief{
   required int64 qty = 5;
   required string underlying_account = 6;
   optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldHide) = "True"];
-  optional float computed_notional = 8[(FluxFldHide) = "True"];
+  optional float computed_notional = 8 [(FluxFldHide) = "True"];
 }
 
 message CumulativeOrderBrief{
@@ -159,7 +163,7 @@ message Alert{
   required Severity severity = 2 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
   required string alert_brief = 3 [(FluxFldSizeMax) = 32];
   // must prefix strat:<strat-name> for strat alerts
-  optional string alert_details = 4[(FluxFldAbbreviated) = "JSON"];
+  optional string alert_details = 4 [(FluxFldAbbreviated) = "JSON"];
   // populated only if this alert is for one or more orders
   repeated OrderBrief impacted_order = 5;
 }
