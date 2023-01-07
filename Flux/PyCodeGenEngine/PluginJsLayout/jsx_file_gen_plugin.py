@@ -11,6 +11,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, convert_to_camel_case
 
 
 class JsxFileGenPlugin(BaseJSLayoutPlugin):
@@ -36,9 +37,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         self.output_file_name_suffix: str = ""
 
     def handle_import_output(self, message: protogen.Message, layout_type: str) -> str:
-        output_str = "import React, { Fragment, useEffect, useState } from 'react';\n"
+        output_str = "import React, { Fragment, useEffect, useState, memo } from 'react';\n"
         output_str += "import { useSelector, useDispatch } from 'react-redux';\n"
-        output_str += "import _, { cloneDeep } from 'lodash';\n"
+        output_str += "import _, { cloneDeep, isEqual } from 'lodash';\n"
         output_str += "import { makeStyles } from '@mui/styles';\n"
         if layout_type == JsxFileGenPlugin.root_type:
             message_name = message.proto.name
@@ -55,7 +56,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"    getAll{message_name}, get{message_name}, create{message_name}, update{message_name},\n"
             output_str += f"    set{message_name}, reset{message_name}, setModified{message_name}, " \
                           f"setSelected{message_name}Id, resetSelected{message_name}Id, resetError"
-            output_str += ", setUserChanges, setDiscardedChanges\n"
+            output_str += ", setUserChanges, setDiscardedChanges, setOpenConfirmSavePopup\n"
         else:
             output_str += "import {\n"
             output_str += f"    getAll{message_name}, get{message_name}, create{message_name}, update{message_name},\n"
@@ -72,7 +73,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"    set{dependent_message_name}Array, reset{dependent_message_name}, " \
                           f"setModified{dependent_message_name}, setSelected{dependent_message_name}Id, " \
                           f"resetSelected{dependent_message_name}Id, setMode, setCreateMode, " \
-                          f"setUserChanges, setDiscardedChanges\n"
+                          f"setUserChanges, setDiscardedChanges, setOpenConfirmSavePopup\n"
             output_str += "}"+f" from '../features/{dependent_message_name_camel_cased}Slice';\n"
             output_str += "import { createCollections, generateObjectFromSchema, addxpath, clearxpath, " \
                           "lowerFirstLetter, getNewItem, compareObjects, getObjectWithLeastId, " \
@@ -86,6 +87,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import { Add, Delete } from '@mui/icons-material';\n"
             output_str += "import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } " \
                           "from '@mui/material';\n"
+            output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup } from '../components/Popup';\n"
             output_str += "\n"
         else:
             output_str += "import { \n"
@@ -101,17 +103,44 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import DynamicMenu from '../components/DynamicMenu';\n"
             output_str += "import { Button, Dialog, DialogActions, DialogContent, DialogContentText, " \
                           "DialogTitle } from '@mui/material';\n"
+            output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup } from '../components/Popup';\n"
             output_str += "\n"
 
         return output_str
 
     def handle_non_abbreviated_return(self, message_name: str, message_name_camel_cased: str, layout_type: str) -> str:
-        output_str = "    const onUserChange = (xpath, value) => {\n"
+        output_str = "    const onUserChange = (xpath, value, deleted = false, keyValueDict) => {\n"
+        output_str += "        let updatedData = cloneDeep(userChanges);\n"
+        output_str += "        if (deleted && keyValueDict) {\n"
+        if layout_type == self.non_root_type:
+            root_msg_name = self.root_message.proto.name
+            output_str += f"            updatedData[DB_ID] = selected{root_msg_name}Id;\n"
+        output_str += "            if (updatedData.deleted) {\n"
+        output_str += "                updatedData.deleted = { ...updatedData.deleted, ...keyValueDict };\n"
+        output_str += "            } else {\n"
+        output_str += "                updatedData.deleted = keyValueDict;\n"
+        output_str += "            }\n"
+        output_str += "        } else {\n"
+        output_str += "            if (keyValueDict) {\n"
         if layout_type == self.root_type:
-            output_str += "        setUserChanges({ ...userChanges, [xpath]: value });\n"
+            output_str += "                updatedData = { ...updatedData, ...keyValueDict };\n"
         else:
-            output_str += "        dispatch(setUserChanges({ ...userChanges, [xpath]: value, [DB_ID]: " + \
-                          f"selected{self.root_message.proto.name}Id "+"}));\n"
+            root_msg_name = self.root_message.proto.name
+            output_str += "                updatedData = { ...updatedData, ...keyValueDict, [DB_ID]: " \
+                          f"selected{root_msg_name}Id "+"};\n"
+        output_str += "            } else {\n"
+        if layout_type == self.root_type:
+            output_str += "                updatedData = { ...updatedData, [xpath]: value };\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "        setUserChanges(updatedData);\n"
+        else:
+            root_msg_name = self.root_message.proto.name
+            output_str += "                updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
+                          f"selected{root_msg_name}Id "+"};\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "        dispatch(setUserChanges(updatedData));\n"
         output_str += "    }\n\n"
         output_str += "    const onClosePopup = (e, reason) => {\n"
         output_str += "        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;\n"
@@ -131,22 +160,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"            dispatch(setModified{message_name}(updatedData));\n"
             output_str += "        }\n"
             output_str += "    }\n\n"
-            output_str += "    let menu = <DynamicMenu collections={collections} commonKeyCollections=" \
-                          "{commonKeyCollections} data=" \
-                          "{modified"+f"{message_name}" + \
-                          "} disabled={mode !== Modes.EDIT_MODE} onButtonToggle={onButtonToggle} />;\n"
-            output_str += "    if (isJsonRoot) {\n"
-            output_str += "        menu = (\n"
-            output_str += "            <DynamicMenu collections={collections} " \
+            output_str += "    let menu = (\n"
+            output_str += "        <DynamicMenu collections={collections} " \
                           "commonKeyCollections={commonKeyCollections} data={modified"+f"{message_name}" \
                           "} disabled={mode !== Modes.EDIT_MODE} onButtonToggle={onButtonToggle}>\n"
-            output_str += "                {mode === Modes.READ_MODE && _.keys("+f"{message_name_camel_cased})." \
+            output_str += "            {mode === Modes.READ_MODE && _.keys("+f"{message_name_camel_cased})." \
                           f"length === 0 && _.keys(modified{message_name}).length === 0 &&\n"
-            output_str += "                    <Icon className={classes.icon} title='Create' onClick={onCreate}" \
-                          "><Add fontSize='small' /></Icon>}\n"
-            output_str += "            </DynamicMenu>\n"
-            output_str += "        )\n"
-            output_str += "    }\n\n"
+            output_str += "                <Icon className={classes.icon} name='Create' title='Create' " \
+                          "onClick={onCreate}><Add fontSize='small' /></Icon>}\n"
+            output_str += "        </DynamicMenu>\n"
+            output_str += "    )\n\n"
 
         else:
             root_msg_name = self.root_message.proto.name
@@ -200,6 +223,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    data={modified"+f"{root_msg_name}"+"}\n"
             output_str += "                    originalData={"+f"{root_message_name_camel_cased}"+"}\n"
         output_str += "                    collections={collections}\n"
+        output_str += "                    rows={rows}\n"
+        output_str += "                    tableColumns={tableColumns}\n"
+        output_str += "                    commonKeyCollections={commonKeyCollections}\n"
         output_str += "                    mode={mode}\n"
         output_str += "                    onUpdate={onUpdate}\n"
         output_str += "                    error={error}\n"
@@ -247,20 +273,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "            ) : (\n"
         output_str += "                <h1>Unsupported Layout</h1>\n"
         output_str += "            )}\n"
-        output_str += "            <Dialog open={openPopup} onClose={onClosePopup}>\n"
-        output_str += "                <DialogTitle>{title} Change Detected</DialogTitle>\n"
-        output_str += "                <DialogContent>\n"
-        output_str += "                    <DialogContentText>New change detected from server. Your changes " \
-                      "may be lost. Following changes are discarded:</DialogContentText>\n"
-        output_str += "                    {Object.keys(discardedChanges).map(xpath => (\n"
-        output_str += "                        <DialogContentText>{xpath}: " \
-                      "{discardedChanges[xpath]}</DialogContentText>\n"
-        output_str += "                    ))}\n"
-        output_str += "                </DialogContent>\n"
-        output_str += "                <DialogActions>\n"
-        output_str += "                    <Button onClick={onClosePopup} autoFocus>OK</Button>\n"
-        output_str += "                </DialogActions>\n"
-        output_str += "            </Dialog>\n"
+        if layout_type == JsxFileGenPlugin.root_type:
+            output_str += "            <ConfirmSavePopup\n"
+            output_str += "                open={openConfirmSavePopup}\n"
+            output_str += "                onClose={onCloseConfirmPopup}\n"
+            output_str += "                onSave={onConfirmSave}\n"
+            output_str += "                src={userChanges}\n"
+            output_str += "            />\n"
+        output_str += "            <WebsocketUpdatePopup\n"
+        output_str += "                title={title}\n"
+        output_str += "                open={openPopup}\n"
+        output_str += "                onClose={onClosePopup}\n"
+        output_str += "                src={discardedChanges}\n"
+        output_str += "            />\n"
         output_str += "        </Fragment>\n"
         output_str += "    )\n"
         output_str += "}\n"
@@ -272,7 +297,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         match layout_type:
             case JsxFileGenPlugin.root_type:
                 output_str += "    const { "+f"{message_name_camel_cased}Array, {message_name_camel_cased}, modified{message_name}, selected{message_name}Id, loading, error "+"} = useSelector(state => "+f"state.{message_name_camel_cased});\n"
-                output_str += "    const { schema } = useSelector(state => state.schema);\n"
+                output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
                 output_str += "    const [layout, setLayout] = useState(Layouts.UNSPECIFIED);\n"
                 output_str += "    const [websocket, setWebsocket] = useState();\n"
@@ -280,15 +305,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [userChanges, setUserChanges] = useState({});\n"
                 output_str += "    const [discardedChanges, setDiscardedChanges] = useState({})\n"
                 output_str += "    const [openPopup, setOpenPopup] = useState(false);\n"
+                output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
             case JsxFileGenPlugin.non_root_type:
                 message_name = self.root_message.proto.name
                 message_name_camel_cased = message_name[0].lower() + message_name[1:]
                 output_str += "    const { "+f"{message_name_camel_cased}Array, {message_name_camel_cased}, " \
-                                             f"modified{message_name}, selected{message_name}Id, loading, error, " \
-                                             f"mode, createMode, userChanges, discardedChanges " + \
-                                             "}"+f" = useSelector((state) => " \
-                                             f"state.{message_name_camel_cased});\n"
-                output_str += "    const { schema } = useSelector((state) => state.schema);\n"
+                              f"modified{message_name}, selected{message_name}Id, loading, error, " \
+                              f"mode, createMode, userChanges, discardedChanges, openConfirmSavePopup " + \
+                              "}"+f" = useSelector((state) => " \
+                              f"state.{message_name_camel_cased});\n"
+                output_str += "    const { schema, schemaCollections } = useSelector((state) => state.schema);\n"
                 output_str += "    const [layout, setLayout] = useState(Layouts.TABLE_LAYOUT);\n"
                 output_str += "    const [websocket, setWebsocket] = useState();\n"
                 output_str += "    const [openPopup, setOpenPopup] = useState(false);\n\n"
@@ -300,8 +326,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_mesaage_camel_cased = dependent_message[0].lower() + dependent_message[1:]
                 output_str += "    const {"+f" {dependent_mesaage_camel_cased}Array, {dependent_mesaage_camel_cased}," \
                                             f" modified{dependent_message}, selected{dependent_message}Id, mode, " \
-                                            f"createMode "+"}"+f" = useSelector(state => " \
-                                                               f"state.{dependent_mesaage_camel_cased});\n"
+                                            f"createMode, openConfirmSavePopup, userChanges, discardedChanges " + \
+                                            "}"+f" = useSelector(state => " \
+                                            f"state.{dependent_mesaage_camel_cased});\n"
                 output_str += "    const { schema } = useSelector((state) => state.schema);\n"
                 output_str += "    const [layout, setLayout] = useState(Layouts.UNSPECIFIED);\n"
                 output_str += "    const [searchValue, setSearchValue] = useState('');\n"
@@ -336,22 +363,33 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        setOpenPopup(false);\n"
         output_str += "    }\n\n"
         output_str += "    const onButtonToggle = (e, xpath, value) => {\n"
-        output_str += "        if (mode === Modes.READ_MODE) {\n"
-        output_str += f"            let updatedData = cloneDeep({dependent_msg_name_camel_cased});\n"
-        output_str += "            _.set(updatedData, xpath, value);\n"
-        output_str += f"           dispatch(update{dependent_msg_name}(updatedData));\n"
-        output_str += "        } else {\n"
-        output_str += f"            let updatedData = cloneDeep({dependent_msg_name_camel_cased});\n"
-        output_str += "            if (updatedData[DB_ID] && updatedData[DB_ID] !== NEW_ITEM_ID && " \
-                      "hasxpath(updatedData, xpath)) {\n"
-        output_str += "                _.set(updatedData, xpath, value);\n"
-        output_str += f"                dispatch(update{dependent_msg_name}(updatedData));\n"
+        output_str += "        onUserChange(xpath, value);\n"
+        output_str += f"        let updatedData = cloneDeep(modified{dependent_msg_name});\n"
+        output_str += "        _.set(updatedData, xpath, value);\n"
+        output_str += f"        dispatch(setModified{dependent_msg_name}(updatedData));\n"
+        output_str += f"        if({dependent_msg_name_camel_cased}[DB_ID]) "+"{\n"
+        output_str += f"            onSave(null, true);\n"
+        output_str += "        }\n"
+        output_str += "    }\n\n"
+        output_str += "    const onUserChange = (xpath, value, deleted = false, keyValueDict) => {\n"
+        output_str += "        let updatedData = cloneDeep(userChanges);\n"
+        output_str += "        if (deleted && keyValueDict) {\n"
+        output_str += f"            updatedData[DB_ID] = selected{dependent_msg_name}Id;\n"
+        output_str += "            if (updatedData.deleted) {\n"
+        output_str += "                updatedData.deleted = { ...updatedData.deleted, ...keyValueDict };\n"
         output_str += "            } else {\n"
-        output_str += f"                let updatedData = cloneDeep(modified{dependent_msg_name});\n"
-        output_str += "                _.set(updatedData, xpath, value);\n"
-        output_str += f"                dispatch(setModified{dependent_msg_name}(updatedData));\n"
+        output_str += "                updatedData.deleted = keyValueDict;\n"
+        output_str += "            }\n"
+        output_str += "        } else {\n"
+        output_str += "            if (keyValueDict) {\n"
+        output_str += "                updatedData = { ...updatedData, ...keyValueDict, [DB_ID]: " \
+                      f"selected{dependent_msg_name}Id " + "};\n"
+        output_str += "            } else {\n"
+        output_str += "                updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
+                      f"selected{dependent_msg_name}Id " + "};\n"
         output_str += "            }\n"
         output_str += "        }\n"
+        output_str += "        dispatch(setUserChanges(updatedData));\n"
         output_str += "    }\n\n"
         output_str += "    let createMenu = '';\n"
         output_str += "    if (mode === Modes.READ_MODE) {\n"
@@ -438,16 +476,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onButtonToggle={onButtonToggle}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
-        output_str += "            <Dialog open={openPopup} onClose={onClosePopup}>\n"
-        output_str += "                <DialogTitle>{title} Change Detected</DialogTitle>\n"
-        output_str += "                <DialogContent>\n"
-        output_str += "                    <DialogContentText>New change detected from server. Your " \
-                      "changes may be lost.</DialogContentText>\n"
-        output_str += "                </DialogContent>\n"
-        output_str += "                <DialogActions>\n"
-        output_str += "                    <Button onClick={onClosePopup} autoFocus>OK</Button>\n"
-        output_str += "                </DialogActions>\n"
-        output_str += "            </Dialog>\n"
+        output_str += "            <ConfirmSavePopup\n"
+        output_str += "                open={openConfirmSavePopup}\n"
+        output_str += "                onClose={onCloseConfirmPopup}\n"
+        output_str += "                onSave={onConfirmSave}\n"
+        output_str += "                src={userChanges}\n"
+        output_str += "            />\n"
+        output_str += "            <WebsocketUpdatePopup\n"
+        output_str += "                title={title}\n"
+        output_str += "                open={openPopup}\n"
+        output_str += "                onClose={onClosePopup}\n"
+        output_str += "                src={discardedChanges}\n"
+        output_str += "            />\n"
         output_str += "        </Fragment>\n"
         output_str += "    )\n"
         output_str += "}\n\n"
@@ -466,33 +506,36 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "    }\n"
         output_str += "})\n\n"
         message_name = message.proto.name
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         message_name_camel_cased = message_name[0].lower() + message_name[1:]
         output_str += f"const {message_name} = (props) => " + "{\n\n"
         output_str += self.__handle_const_on_layout(message_name, layout_type)
         output_str += "    const dispatch = useDispatch();\n"
         output_str += "    const classes = useStyles();\n\n"
         output_str += "    let currentSchema = _.get(schema, props.name);\n"
-        output_str += "    let currentSchemaXpath = null;\n"
-        output_str += "    let title = currentSchema ? currentSchema.title : props.name;\n"
-        json_root_case_styled = self.case_style_convert_method("json_root")
-        output_str += f"    let isJsonRoot = _.keys(schema).length > 0 && currentSchema.{json_root_case_styled} ? true : false;\n"
-        output_str += "    let parentSchema = null;\n"
-        if layout_type != JsxFileGenPlugin.abbreviated_type:
-            output_str += "    let parentSchemaName = null;\n"
-        output_str += "    if (!isJsonRoot) {\n"
-        output_str += "        let currentSchemaPropname = lowerFirstLetter(props.name);\n"
-        output_str += "        _.keys(_.get(schema, SCHEMA_DEFINITIONS_XPATH)).map((key) => {\n"
-        output_str += "            let current = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, key]);\n"
-        output_str += "            if (current.type === DataTypes.OBJECT && _.has(current.properties, " \
-                      "currentSchemaPropname)) {\n"
-        output_str += "                parentSchema = current;\n"
-        if layout_type != JsxFileGenPlugin.abbreviated_type:
-            output_str += "                parentSchemaName = SCHEMA_DEFINITIONS_XPATH + '.' + key;\n"
-        output_str += "                currentSchemaXpath = currentSchemaPropname;\n"
-        output_str += "            }\n"
-        output_str += "        })\n"
-        output_str += "    }\n"
+        if layout_type != JsxFileGenPlugin.root_type:
+            output_str += "    let currentSchemaXpath = null;\n"
+            output_str += "    let title = currentSchema ? currentSchema.title : props.name;\n"
+            json_root_case_styled = self.case_style_convert_method("json_root")
+            output_str += f"    let isJsonRoot = _.keys(schema).length > 0 && currentSchema.{json_root_case_styled} ? true : false;\n"
+            output_str += "    let parentSchema = null;\n"
+            if layout_type != JsxFileGenPlugin.abbreviated_type:
+                output_str += "    let parentSchemaName = null;\n"
+            output_str += "    if (!isJsonRoot) {\n"
+            output_str += "        let currentSchemaPropname = lowerFirstLetter(props.name);\n"
+            output_str += "        _.keys(_.get(schema, SCHEMA_DEFINITIONS_XPATH)).map((key) => {\n"
+            output_str += "            let current = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, key]);\n"
+            output_str += "            if (current.type === DataTypes.OBJECT && _.has(current.properties, " \
+                          "currentSchemaPropname)) {\n"
+            output_str += "                parentSchema = current;\n"
+            if layout_type != JsxFileGenPlugin.abbreviated_type:
+                output_str += "                parentSchemaName = SCHEMA_DEFINITIONS_XPATH + '.' + key;\n"
+            output_str += "                currentSchemaXpath = currentSchemaPropname;\n"
+            output_str += "            }\n"
+            output_str += "        })\n"
+            output_str += "    }\n"
+        else:
+            output_str += "    let title = currentSchema ? currentSchema.title : props.name;\n"
         output_str += "    \n"
         if layout_type == JsxFileGenPlugin.root_type:
             output_str += "    useEffect(() => {\n"
@@ -519,11 +562,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    let dependentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, dependentName]);\n\n"
             output_str += "    let dependentCollections = [];\n"
             output_str += "    if (dependentSchema) {\n"
-            output_str += "        dependentCollections = createCollections(schema, dependentSchema, { mode: Modes.READ_MODE });\n"
+            output_str += "        dependentCollections = createCollections(schema, dependentSchema, " \
+                          "{ mode: Modes.READ_MODE });\n"
             output_str += "    }\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += f"        dispatch(getAll{message_name}());\n"
             output_str += f"        dispatch(getAll{self.abbreviated_dependent_message_name}());\n"
+            output_str += f"        dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "    }, []);\n\n"
         if layout_type != JsxFileGenPlugin.non_root_type:
             output_str += "    useEffect(() => {\n"
@@ -607,7 +652,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    }, [selected"+f"{message_name}"+"Id])\n\n"
             else:
                 dependent_msg_name = self.root_message.proto.name
-                dependent_msg_name_snake_cased = self.convert_camel_case_to_specific_case(dependent_msg_name)
+                dependent_msg_name_snake_cased = convert_camel_case_to_specific_case(dependent_msg_name)
                 dependent_msg_name_camel_cased = dependent_msg_name[0].lower() + dependent_msg_name[1:]
                 output_str += "    const applyUserChanges = (updatedData) => {\n"
                 output_str += "        _.keys(userChanges).map(xpath => {\n"
@@ -654,7 +699,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    useEffect(() => {\n"
             output_str += f"        if (selected{message_name}Id) "+"{\n"
             abbreviated_dependent_msg_snake_cased = \
-                self.convert_camel_case_to_specific_case(self.abbreviated_dependent_message_name)
+                convert_camel_case_to_specific_case(self.abbreviated_dependent_message_name)
             abbreviated_dependent_msg_camel_cased = self.abbreviated_dependent_message_name[0].lower() + \
                                                         self.abbreviated_dependent_message_name[1:]
             output_str += "            let socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/" \
@@ -726,27 +771,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        )\n"
             output_str += "    }\n\n"
         else:
-            output_str += f"    let collections = [];\n"
-            output_str += f"    let rows = [];\n"
-            output_str += f"    let tableColumns = [];\n"
-            output_str += f"    let commonKeyCollections = [];\n"
-            output_str += "    if (currentSchema) {\n"
-            if layout_type == self.root_type:
-                output_str += "        collections = createCollections(schema, currentSchema, { mode: mode });\n"
-                output_str += "        tableColumns = getTableColumns(collections);\n"
-                output_str += f"        rows = getTableRows(collections, {message_name_camel_cased}, " \
-                              f"modified{message_name});\n"
-                output_str += "        commonKeyCollections = getCommonKeyCollections(rows, tableColumns);\n"
+            output_str += f"    let collections = schemaCollections[props.name];\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += f"    let rows = getTableRows(collections, " \
+                              f"{message_name_camel_cased}, modified{message_name});\n"
             else:
-                output_str += "        collections = createCollections(schema, currentSchema, { mode: mode, " \
-                              "parentSchema: parentSchema, xpath: currentSchemaXpath }, undefined, undefined, currentSchemaXpath);\n"
-                output_str += "        tableColumns = getTableColumns(collections);\n"
-                dependent_msg_name = self.root_message.proto.name
-                dependent_msg_name_camel_cased = self.convert_to_camel_case(dependent_msg_name)
-                output_str += f"        rows = getTableRows(collections, {dependent_msg_name_camel_cased}, " \
-                              f"modified{dependent_msg_name}, currentSchemaXpath);\n"
-                output_str += "        commonKeyCollections = getCommonKeyCollections(rows, tableColumns);\n"
-            output_str += "    }\n\n"
+                root_message_name = self.root_message.proto.name
+                root_message_name_camel_cased = root_message_name[0].lower() + root_message_name[1:]
+                output_str += f"    let rows = getTableRows(collections, {root_message_name_camel_cased}, " \
+                              f"modified{root_message_name}, currentSchemaXpath);\n"
+            output_str += f"    let tableColumns = getTableColumns(collections, mode);\n"
+            output_str += f"    let commonKeyCollections = getCommonKeyCollections(rows, tableColumns);\n\n"
+
         if layout_type != JsxFileGenPlugin.abbreviated_type:
             output_str += "    useEffect(() => {\n"
             output_str += "        if (websocket) {\n"
@@ -899,7 +935,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"            dispatch(setModified{self.abbreviated_dependent_message_name}(modifiedData));\n"
             output_str += "        }\n"
             output_str += "    }\n\n"
-            output_str += "    const onSave = () => {\n"
+            output_str += "    const onSave = (e, openPopup = false) => {\n"
+            output_str += "        if (_.keys(userChanges).length > 0 || openPopup) {\n"
+            output_str += "            dispatch(setOpenConfirmSavePopup(true));\n"
+            output_str += "        } else {\n"
+            output_str += "            onConfirmSave();\n"
+            output_str += "        }\n"
+            output_str += "    }\n\n"
+            output_str += "    const onConfirmSave = () => {\n"
             output_str += "        if (createMode) {\n"
             output_str += "            dispatch(setCreateMode(false));\n"
             output_str += f"            let updated{self.abbreviated_dependent_message_name} = clearxpath(cloneDeep" \
@@ -921,6 +964,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "        dispatch(setUserChanges({}));\n"
             output_str += "        dispatch(setDiscardedChanges({}));\n"
+            output_str += "        dispatch(setOpenConfirmSavePopup(false));\n"
+            output_str += "    }\n\n"
+            output_str += "    const onCloseConfirmPopup = (e, reason) => {\n"
+            output_str += "        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;\n"
+            output_str += "        onReload();\n"
+            output_str += "        dispatch(setOpenConfirmSavePopup(false));\n"
             output_str += "    }\n\n"
             output_str += "    const onChange = (e, value) => {\n"
             output_str += "        setSearchValue(value);\n"
@@ -936,7 +985,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const onUpdate = (updatedData) => {\n"
                 output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
                 output_str += "    }\n\n"
-                output_str += "    const onSave = () => {\n"
+                output_str += "    const onSave = (e, openPopup = false) => {\n"
+                output_str += "        if (_.keys(userChanges).length > 0 || openPopup) {\n"
+                output_str += "            setOpenConfirmSavePopup(true);\n"
+                output_str += "        } else {\n"
+                output_str += "            onConfirmSave();\n"
+                output_str += "        }\n"
+                output_str += "    }\n\n"
+                output_str += "    const onConfirmSave = () => {\n"
                 output_str += f"        let updatedData = clearxpath(cloneDeep(modified{message_name}));\n"
                 output_str += f"        if (!_.isEqual({message_name_camel_cased}, updatedData)) " + "{\n"
                 output_str += f"            if (_.get({message_name_camel_cased}, DB_ID)) "+"{\n"
@@ -948,10 +1004,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        setMode(Modes.READ_MODE);\n"
                 output_str += "        setUserChanges({});\n"
                 output_str += "        setDiscardedChanges({});\n"
+                output_str += "        setOpenConfirmSavePopup(false);\n"
                 output_str += "    }\n\n"
+                output_str += "    const onCloseConfirmPopup = (e, reason) => {\n"
+                output_str += "        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;\n"
+                output_str += "        onReload();\n"
+                output_str += "        setOpenConfirmSavePopup(false);\n"
+                output_str += "    }\n"
             else:
                 output_str += "    const onUpdate = (updatedData) => {\n"
                 output_str += f"        dispatch(setModified{self.root_message.proto.name}(updatedData));\n"
+                output_str += "    }\n\n"
+                output_str += "    const onSave = () => {\n"
+                output_str += "        dispatch(setOpenConfirmSavePopup(true));\n"
                 output_str += "    }\n"
 
         if layout_type == JsxFileGenPlugin.abbreviated_type:
@@ -969,48 +1034,32 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         else:
             output_str += "\n"
             output_str += "    const onButtonToggle = (e, xpath, value) => {\n"
-            if layout_type == JsxFileGenPlugin.root_type:
-                output_str += "        if (mode === Modes.READ_MODE) {\n"
-                output_str += f"            let updatedData = cloneDeep({message_name_camel_cased});\n"
-                output_str += f"            _.set(updatedData, xpath, value);\n"
-                output_str += f"            dispatch(update{message_name}(updatedData));\n"
-                output_str += "        } else {\n"
-                output_str += f"            if ({message_name_camel_cased}[DB_ID] && hasxpath({message_name_camel_cased}, xpath)) "+"{\n"
-                output_str += f"                let updatedData = cloneDeep({message_name_camel_cased});\n"
-                output_str += f"                _.set(updatedData, xpath, value);\n"
-                output_str += f"                dispatch(update{message_name}(updatedData));\n"
-                output_str += "            } else {\n"
-                output_str += f"                let updatedData = cloneDeep(modified{message_name});\n"
-                output_str += f"                _.set(updatedData, xpath, value);\n"
-                output_str += f"                dispatch(setModified{message_name}(updatedData));\n"
-                output_str += "            }\n"
+            if layout_type != JsxFileGenPlugin.non_root_type:
+                output_str += "        onUserChange(xpath, value);\n"
+                output_str += f"        let updatedData = cloneDeep(modified{message_name});\n"
+                output_str += f"        _.set(updatedData, xpath, value);\n"
+                output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
+                output_str += f"        if ({message_name_camel_cased}[DB_ID]) "+"{\n"
+                output_str += f"            onSave(null, true);\n"
                 output_str += "        }\n"
                 output_str += "    }\n\n"
             else:
                 root_msg_name = self.root_message.proto.name
-                root_msg_camel_cased = self.convert_to_camel_case(root_msg_name)
-                output_str += "        if (mode === Modes.READ_MODE) {\n"
-                output_str += "            let updatedData = cloneDeep("+f"{root_msg_camel_cased});\n"
-                output_str += "            _.set(updatedData, xpath, value);\n"
-                output_str += f"           dispatch(update{root_msg_name}(updatedData));\n"
-                output_str += "        } else {\n"
-                output_str += f"            let updatedData = cloneDeep({root_msg_camel_cased});\n"
-                output_str += "            if (updatedData[DB_ID] && updatedData[DB_ID] !== NEW_ITEM_ID && " \
-                              "hasxpath(updatedData, xpath)) {\n"
-                output_str += f"                _.set(updatedData, xpath, value);\n"
-                output_str += f"                dispatch(update{root_msg_name}(updatedData));\n"
-                output_str += "            } else {\n"
-                output_str += f"                let updatedData = cloneDeep(modified{root_msg_name});\n"
-                output_str += f"                _.set(updatedData, xpath, value);\n"
-                output_str += f"                dispatch(setModified{root_msg_name}(updatedData));\n"
-                output_str += "            }\n"
+                root_msg_camel_cased = convert_to_camel_case(root_msg_name)
+                output_str += "        onUserChange(xpath, value);\n"
+                output_str += f"        let updatedData = cloneDeep(modified{root_msg_name});\n"
+                output_str += "        _.set(updatedData, xpath, value);\n"
+                output_str += f"        dispatch(setModified{root_msg_name}(updatedData));\n"
+                output_str += f"        if({root_msg_camel_cased}[DB_ID]) "+"{\n"
+                output_str += f"            onSave();\n"
                 output_str += "        }\n"
                 output_str += "    }\n\n"
         if layout_type == JsxFileGenPlugin.abbreviated_type:
             output_str += self.handle_abbriviated_return(message_name, message_name_camel_cased)
+            output_str += f"export default {message_name};\n\n"
         else:
             output_str += self.handle_non_abbreviated_return(message_name, message_name_camel_cased, layout_type)
-        output_str += f"export default {message_name};\n\n"
+            output_str += f"export default memo({message_name}, isEqual);\n\n"
 
         return output_str
 

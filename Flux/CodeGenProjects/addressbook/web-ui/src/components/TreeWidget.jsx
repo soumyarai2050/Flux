@@ -152,14 +152,14 @@ const TreeWidget = (props) => {
         <>
             {props.headerProps.menu}
             {expand ? (
-                <Icon className={classes.icon} title='Collapse All' onClick={() => onTreeChange(false)}><UnfoldLess fontSize='small' /></Icon>
+                <Icon className={classes.icon} name="Collapse" title='Collapse All' onClick={() => onTreeChange(false)}><UnfoldLess fontSize='small' /></Icon>
             ) : (
-                <Icon className={classes.icon} title='Expand All' onClick={() => onTreeChange(true)}><UnfoldMore fontSize='small' /></Icon>
+                <Icon className={classes.icon} name="Expand" title='Expand All' onClick={() => onTreeChange(true)}><UnfoldMore fontSize='small' /></Icon>
             )}
             {hide ? (
-                <Icon className={classes.icon} title='Show hidden fields' onClick={() => setHide(false)}><Visibility fontSize='small' /></Icon>
+                <Icon className={classes.icon} name="Show" title='Show hidden fields' onClick={() => setHide(false)}><Visibility fontSize='small' /></Icon>
             ) : (
-                <Icon className={classes.icon} title='Hide hidden fields' onClick={() => setHide(true)}><VisibilityOff fontSize='small' /></Icon>
+                <Icon className={classes.icon} name="Hide" title='Hide hidden fields' onClick={() => setHide(true)}><VisibilityOff fontSize='small' /></Icon>
             )}
         </>
     )

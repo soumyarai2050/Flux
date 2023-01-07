@@ -8,6 +8,9 @@ from typing import List, Callable, Dict, ClassVar
 import logging
 from abc import ABC
 
+# Required for accessing custom options from schema
+from Flux.PyCodeGenEngine.FluxCodeGenCore import insertion_imports
+
 
 class BaseProtoPlugin(ABC):
     """
@@ -64,13 +67,19 @@ class BaseProtoPlugin(ABC):
     flux_fld_button: str = "FluxFldButton"
     flux_msg_title: str = "FluxMsgTitle"
     flux_fld_title: str = "FluxFldTitle"
+    flux_fld_filter: str = "FluxFldFilter"
+    flux_fld_val_max: str = "FluxFldValMax"
+    flux_fld_val_min: str = "FluxFldValMin"
+    flux_msg_nested_fld_val_filter_param: str = "FluxMsgNestedFldValFilterParam"
     default_id_field_name: ClassVar[str] = "id"
+    default_id_type: str = "DefaultIdType"  # to be used in models as default type variable name
     proto_type_to_py_type_dict: ClassVar[Dict[str, str]] = {
         "int32": "int",
         "int64": "int",
         "string": "str",
         "bool": "bool",
-        "float": "float"
+        "float": "float",
+        "double": "float"
     }
     proto_type_to_json_type_dict: Dict[str, str] = {
         "int32": "number",
@@ -79,7 +88,8 @@ class BaseProtoPlugin(ABC):
         "bool": "boolean",
         "enum": "enum",
         "message": "object",
-        "float": "number"
+        "float": "number",
+        "double": "number"
     }
 
     # This class member is used to add content in output file if no template file is provided for output
@@ -112,65 +122,13 @@ class BaseProtoPlugin(ABC):
         # Below data member will override on the run time
         self.insertion_points_to_content_dict: Dict[str, str] | Dict[str, Dict[str, str]] = {}
 
-    @staticmethod
-    def find_acronyms_in_string(data: str) -> List[str]:
-        return re.findall(r"[A-Z]{2,}", data)
-
-    @staticmethod
-    def convert_camel_case_to_specific_case(data: str, char_to_be_added: str = '_', lower_case: bool = True):
-        """
-        Converts Camel cased vale to specific case. For Example snake case
-        Parameters:
-        -----------
-            data: [str] Camel cased value to be converted
-            char_to_be_added: [str]: Default: '_'
-                character to be added between words to replace camel
-                case to specific case like snake_case using '_' between words
-            lower_case: [bool] make return as lower_value if True else ignore
-        """
-
-        if acronyms_list:=BaseProtoPlugin.find_acronyms_in_string(data):
-            for acronym in acronyms_list:
-                if data.startswith(acronym):
-                    data = data.replace(acronym, acronym[:-1].lower()+acronym[-1])
-                elif data.endswith(acronym):
-                    data = data.replace(acronym, "_"+acronym.lower())
-                else:
-                    data = data.replace(acronym, "_"+acronym[:-1].lower()+acronym[-1])
-        # else not required: If data doesn't contain acronym then ignore
-
-        if lower_case:
-            return re.sub(r'(?<!^)(?=[A-Z])', char_to_be_added, data).lower()
+    def is_bool_option_enabled(self, msg_or_fld_option: protogen.Message | protogen.Field, option_name: str) -> bool:
+        if option_name in str(msg_or_fld_option.proto.options) and \
+                "true" == self.get_non_repeated_valued_custom_option_value(msg_or_fld_option.proto.options,
+                                                                           option_name):
+            return True
         else:
-            return re.sub(r'(?<!^)(?=[A-Z])', char_to_be_added, data)
-
-    def convert_to_camel_case(self, value: str) -> str:
-        if value != value.lower() and value != value.upper() and "_" not in value:
-            if value[0].isupper():
-                return BaseProtoPlugin.capitalized_to_camel_case(value)
-            else:
-                return value
-        else:
-            return BaseProtoPlugin.non_capitalized_to_camel_case(value)
-
-    def convert_to_capitalized_camel_case(self, value: str) -> str:
-        value_camel_cased = self.convert_to_camel_case(value)
-        return value_camel_cased[0].upper() + value_camel_cased[1:]
-
-    @staticmethod
-    def capitalized_to_camel_case(value: str) -> str:
-        if acronyms_list := BaseProtoPlugin.find_acronyms_in_string(value):
-            for acronym in acronyms_list:
-                if value.startswith(acronym):
-                    return value.replace(acronym, acronym[:-1].lower()+acronym[-1])
-        # else not required: If data doesn't contain acronym then ignore
-
-        return "".join([value[0].lower(), value[1:]])
-
-    @staticmethod
-    def non_capitalized_to_camel_case(value: str) -> str:
-        value = re.sub(r"(_|-)+", " ", value).title().replace(" ", "")
-        return "".join([value[0].lower(), value[1:]])
+            return False
 
     def insertion_points_and_resp_methods_checker(self):
         """
@@ -250,26 +208,33 @@ class BaseProtoPlugin(ABC):
     def _get_complex_option_value_as_list_of_dict(option_string: str, option_name: str) -> List[Dict]:
         option_value_list_of_dict: List[Dict] = []
         for option_str_line in str(option_string).split("\n"):
-            temp_dict = {}
+            temp_dict: Dict[List[str, ...] | str] = {}
             if option_name in str(option_str_line):
                 option_str_line_index = option_string.index(option_str_line)
                 sliced_message_option_str = option_string[option_str_line_index:]
                 option_string = option_string[option_str_line_index + 1:]
                 for sliced_option_str_line in sliced_message_option_str.split("\n"):
                     if ":" in sliced_option_str_line:
-                        if '"' in sliced_option_str_line.split(":")[1]:
+                        field_name = sliced_option_str_line.split(":")[0][2:]
+                        field_val = sliced_option_str_line.split(":")[1]
+                        if '"' in field_val:
                             # For string value: removing extra quotation marks
-                            temp_dict[sliced_option_str_line.split(":")[0][2:]] = str(sliced_option_str_line.split(":")[1][2:-1])
+                            processed_field_val = str(field_val[2:-1])
                         else:
-                            if ' true' == sliced_option_str_line.split(":")[1] or ' false' == \
-                                    sliced_option_str_line.split(":")[1]:
-                                temp_dict[sliced_option_str_line.split(":")[0][2:]] = True if sliced_option_str_line.split(":")[1] == ' true' else False
+                            if ' true' == field_val or ' false' == field_val:
+                                processed_field_val = True if field_val == ' true' else False
                             else:
                                 if sliced_option_str_line.split(":")[1].isdigit():
-                                    temp_dict[sliced_option_str_line.split(":")[0][2:]] = int(sliced_option_str_line.split(":")[1])
+                                    processed_field_val = int(field_val)
                                 else:
-                                    temp_dict[sliced_option_str_line.split(":")[0][2:]] = sliced_option_str_line.split(":")[1]
-
+                                    processed_field_val = field_val
+                        if field_name in temp_dict:
+                            if isinstance(temp_dict[field_name], list):
+                                temp_dict[field_name].append(processed_field_val)
+                            else:
+                                temp_dict[field_name] = [temp_dict[field_name], processed_field_val]
+                        else:
+                            temp_dict[field_name] = processed_field_val
                     elif "}" in sliced_option_str_line:
                         option_value_list_of_dict.append(temp_dict)
                         break

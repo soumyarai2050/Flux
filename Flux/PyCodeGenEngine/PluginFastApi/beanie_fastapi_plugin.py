@@ -39,7 +39,7 @@ class BeanieFastApiPlugin(CacheFastApiPlugin):
             self.load_dependency_messages_and_enums_in_dicts(message)
 
     def _get_msg_id_field_type(self, message: protogen.Message) -> str:
-        id_field_type: str = "PydanticObjectId"
+        id_field_type: str = BeanieFastApiPlugin.default_id_type
         if message in self.custom_id_primary_key_messages:
             for field in message.fields:
                 if field.proto.name == BeanieFastApiPlugin.default_id_field_name:
@@ -87,13 +87,15 @@ class BeanieFastApiPlugin(CacheFastApiPlugin):
         routes_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
         output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str += f"from {model_file_path} import "
-        for message in self.custom_id_primary_key_messages:
-            output_str += message.proto.name
-            if message != self.custom_id_primary_key_messages[-1]:
-                output_str += ", "
-            else:
-                output_str += "\n"
+        if self.custom_id_primary_key_messages:
+            output_str += f"from {model_file_path} import "
+            for message in self.custom_id_primary_key_messages:
+                output_str += message.proto.name
+                if message != self.custom_id_primary_key_messages[-1]:
+                    output_str += ", "
+                else:
+                    output_str += "\n"
+        # else not required: if no message with custom id is found then avoiding import statement
         database_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.database_file_name)
         output_str += f"from {database_file_path} import init_db\n\n\n"
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
@@ -127,9 +129,6 @@ class BeanieFastApiPlugin(CacheFastApiPlugin):
         super().set_req_data_members(file)
         self.database_file_name = f"{self.proto_file_name}_beanie_database"
         self.fastapi_file_name = f"{self.proto_file_name}_beanie_fastapi"
-        routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
-        self.routes_callback_class_name_capital_camel_cased: str = \
-            routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
         # Pre-code generation initializations

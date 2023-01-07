@@ -20,11 +20,7 @@ message PairStratParams{
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   // server provided via security auto complete list (if available)
   required Security leg1_sec = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:CB_List, sec_type=TICKER", (FluxFldHelp) = "CB Tickers"];
-  // server provided via security auto complete list (if available). Open px OR Close px OR Last px
-  optional ReferencePx leg1_sec_reference_px = 3;
   required Security leg2_sec = 4 [(FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER", (FluxFldHelp) = "EQT Tickers"];
-  // server provided via security auto complete list (if available). Open px OR Close px OR Last px
-  optional ReferencePx leg2_sec_reference_px = 5;
   required Side leg1_side = 6 [default = SIDE_UNSPECIFIED, (FluxFldOrmNoUpdate) = true];
   optional int32 exch_response_max_seconds = 7 [default = 30, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
   // these are specific to CB-EQT strat - move to derived later
@@ -43,10 +39,8 @@ message StratStatus{
     h: 6
   };
 
-  // One or more alerts
-  repeated Alert strat_alerts = 1;
   // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
-  required StratState strat_state = 2 [default = StratState_UNSPECIFIED, (FluxFldButton) = {
+  required StratState strat_state = 1 [default = StratState_UNSPECIFIED, (FluxFldButton) = {
     unpressed_caption: "Activate",
     pressed_caption: "Pause",
     button_type: BUTTON_TYPE_RECTANGLE,
@@ -56,14 +50,16 @@ message StratStatus{
     pressed_value_as_text: "StratState_ACTIVE"
   }];
   // these are specific to CB-EQT strat - move to derived later
-  optional float average_premium = 3;
+  optional float average_premium = 2;
+  optional Residual residual = 3;
   repeated CumulativeOrderBrief fills_brief = 4 [(FluxFldAbbreviated) = "JSON"];
   repeated CumulativeOrderBrief open_orders_brief = 5 [(FluxFldAbbreviated) = "JSON"];
   optional float balance_notional = 6 [(FluxFldValMin)="0.0", (FluxFldValMax)="PairStrat.strat_limits.max_cb_notional", (FluxFldProgressBar) = {
-    value_color_map: "100%=SUCCESS,50%<INFO,30%<WARNING",  // order of test -> left to right
-    hover_text_type: HoverTextType_VALUE
+    value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // order of condition matching -> left to right (select first match)
+    hover_text_type: HoverTextType_VALUE,
+    is_reverse: true
   }];
-  optional Residual residual = 7;
+  repeated Alert strat_alerts = 7;
 }
 
 //Widget - 4
@@ -81,8 +77,8 @@ message StratLimits{
   required float max_cb_notional = 2 [(FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
   required float max_open_cb_notional = 3 [(FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
   required int32 max_net_filled_notional = 4  [(FluxFldHelp) = "absolute [buy - sell] maximum notional allowed for this strat"];
-  optional MarketParticipation market_participation = 5 [(FluxFldHelp) = "server provided, UI overridable"];
-  optional float max_concentration = 6 [(FluxFldHelp) = "server provided, UI overridable"];
+  optional float max_concentration = 5 [(FluxFldHelp) = "server provided, UI overridable"];
+  optional MarketParticipation market_participation = 6 [(FluxFldHelp) = "server provided, UI overridable"];
   optional ResidualRestriction residual_restriction = 7;
   // same as portfolio eligible_brokers except filtered by server [strat specific symbol(s)] + user allowed to mod down
   repeated Broker eligible_brokers = 8;
@@ -134,6 +130,8 @@ message PortfolioLimits{
     w: 8,
     h: 6
   };
+  option (FluxMsgNestedFldValFilterParam) = {field_name: "pos_disable", bool_val_filters: [False]};
+  option (FluxMsgNestedFldValFilterParam) = {field_name: "bkr_disable", bool_val_filters: [False]};
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -201,7 +199,7 @@ message PairStrat{
     optional int32  frequency = 3 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 1, (FluxFldServerPopulate) = true];
     required PairStratParams pair_strat_params = 4;
     optional StratStatus strat_status = 5 [(FluxFldUIUpdateOnly) = true];
-    required StratLimits strat_limits = 6 [(FluxFldUIUpdateOnly) = true];
+    optional StratLimits strat_limits = 6 [(FluxFldUIUpdateOnly) = true];
 }
 
 // Widget - 1

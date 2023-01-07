@@ -13,9 +13,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-
-# Required for accessing custom options from schema
-from Flux.PyCodeGenEngine.PluginJSONSchema import insertion_imports
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, convert_to_camel_case
 
 
 class JsonSchemaConvertPlugin(BaseProtoPlugin):
@@ -164,7 +162,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             field_name_case_styled = self.__case_style_convert_method(field.proto.name)
             required_field_names.append(field_name_case_styled)
         elif field.cardinality.name.lower() == "repeated":
-            if self.flux_fld_is_required in str(field.proto.options):
+            if self.is_bool_option_enabled(field, JsonSchemaConvertPlugin.flux_fld_is_required):
                 field_name_case_styled = self.__case_style_convert_method(field.proto.name)
                 required_field_names.append(field_name_case_styled)
         # else not required: avoiding optional cardinality
@@ -187,7 +185,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 self.__handle_message_or_enum_type_json_schema('e', init_space_count, field_enum_name_case_styled,
                                                                json_type, field.enum)
         else:
-            if JsonSchemaConvertPlugin.flux_fld_val_is_datetime in str(field.proto.options):
+            if self.is_bool_option_enabled(field, JsonSchemaConvertPlugin.flux_fld_val_is_datetime):
                 json_msg_str += ' ' * init_space_count + f'"type": "date-time"\n'
             else:
                 json_msg_str += ' ' * init_space_count + f'"type": "{json_type}"\n'
@@ -321,7 +319,14 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 json_msg_str += ' ' * init_space_count + \
                                 f'"{flux_prefix_removed_option_name_case_styled}": ' + '{\n'
                 for key, value in option_value_list_of_dict[0].items():
-                    value = self.__parse_other_than_string_value(value)
+                    if isinstance(value, str):
+                        # stripping extra '"' in value
+                        value = self.__parse_other_than_string_value(value)
+                    elif isinstance(value, bool):
+                        value = "true" if value else "false"
+                    # else not required: Avoiding if value is not of string or bool type as other types can be
+                    # used as usual
+
                     if option == JsonSchemaConvertPlugin.flux_fld_button and '"' not in value:
                         value = f'"{value}"'
                     # else not required: if option is not flux_fld_button then avoid as only this option
@@ -434,7 +439,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             json_msg_str += ' ' * init_space_count + f'"title": {title_option_value},\n'
         else:
             # Space separated names
-            message_name_spaced = self.convert_camel_case_to_specific_case(message.proto.name, " ", False)
+            message_name_spaced = convert_camel_case_to_specific_case(message.proto.name, " ", False)
             json_msg_str += ' ' * init_space_count + f'"title": "{message_name_spaced}",\n'
         json_msg_str += ' ' * init_space_count + '"type": "object",\n'
         json_msg_str += ' ' * init_space_count + '"properties": {\n'
@@ -566,9 +571,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         # adding to their respective data-member
         self.__load_json_layout_and_non_layout_messages_in_dicts(file.messages)
         if self.__response_field_case_style.lower() == "snake":
-            self.__case_style_convert_method = self.convert_camel_case_to_specific_case
+            self.__case_style_convert_method = convert_camel_case_to_specific_case
         elif self.__response_field_case_style.lower() == "camel":
-            self.__case_style_convert_method = self.convert_to_camel_case
+            self.__case_style_convert_method = convert_to_camel_case
         else:
             err_str = f"{self.__response_field_case_style} is not supported case style"
             logging.exception(err_str)

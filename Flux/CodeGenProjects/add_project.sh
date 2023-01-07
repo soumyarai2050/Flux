@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 how_to_use()
 {
   echo "Usage: $0 {New-Project-Name} <Existing-Project-Name> <with_model>"
@@ -27,6 +28,7 @@ fi
 if ! command -v gsed &> /dev/null
 then
     echo "gsed could not be found, defaulting to sed"
+    shopt -s expand_aliases
     alias gsed="sed"
 fi
 

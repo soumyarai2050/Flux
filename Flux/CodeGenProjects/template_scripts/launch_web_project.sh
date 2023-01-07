@@ -136,7 +136,7 @@ fi
 # - run launch fast api script
 
 # prod only:
-# visit : http://127.0.0.1:8000/addressbook
+# visit : http://127.0.0.1:8000/template_project_name
 
 # additional run notes when running UI in Dev/Debug mode Only
 # go inside web-ui directory and run:

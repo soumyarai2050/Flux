@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+
+// complex types to represent filter and sort for various data types
+message FluxIntRange{
+  required int64 range_start = 1; // int32 start of range to compare and filter data (if range end is not supplied - filter by exact match)
+  optional int64 range_end = 2; // int32 end of range to compare and filter data
+}
+
+message FluxUIntRange{
+  required uint64 range_start = 1; // int32 start of range to compare and filter data (if range end is not supplied - filter by exact match)
+  optional uint64 range_end = 2; // int32 end of range to compare and filter data
+}

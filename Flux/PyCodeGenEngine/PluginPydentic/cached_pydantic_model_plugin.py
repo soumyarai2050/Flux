@@ -12,18 +12,15 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 import protogen
 from Flux.PyCodeGenEngine.PluginPydentic.base_pydantic_model_plugin import BasePydanticModelPlugin, main
 
-# Required for accessing custom options from schema
-from Flux.PyCodeGenEngine.PluginPydentic import insertion_imports
-
 
 class CachedPydanticModelPlugin(BasePydanticModelPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
-    default_id_type: str = "int"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
+        self.default_id_field_type: str = "int"
 
     def _handle_field_cardinality(self, field: protogen.Field) -> str:
         field_type = self.proto_to_py_datatype(field)

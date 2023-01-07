@@ -62,6 +62,7 @@ const ValueBasedToggleButton = (props) => {
     return (
         <ToggleButton
             className={`${classes.button} ${buttonClass}`}
+            name={props.name}
             size={props.size}
             selected={true}
             disabled={props.disabled ? props.disabled : false}

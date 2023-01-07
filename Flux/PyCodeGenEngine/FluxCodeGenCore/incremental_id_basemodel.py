@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar, Dict, Any, List
+from typing import ClassVar, Dict, Any
 from threading import Lock
 from re import sub
 from pydantic import BaseModel
@@ -36,7 +36,7 @@ class CacheBaseModel(BaseModel):
                 err_str = f"Id: {self.id} already exists"
                 raise Exception(err_str)
             else:
-                self._cache_obj_id_to_obj_dict[self.id] = self
+                self._cache_obj_id_to_obj_dict[self.id] = self.copy(deep=True)
                 return self
 
     async def update(self, request_obj: Dict):
@@ -52,6 +52,30 @@ class CacheBaseModel(BaseModel):
                 del self._cache_obj_id_to_obj_dict[self.id]
 
 
+class BareBaseModel(BaseModel):
+
+    @classmethod
+    async def get(cls, obj_id: Any):
+        return None
+
+    @classmethod
+    def find_all(cls):
+        return cls
+
+    @classmethod
+    async def to_list(cls):
+        return []
+
+    async def create(self):
+        return self
+
+    async def update(self, request_obj: Dict):
+        return self
+
+    async def delete(self):
+        return None
+
+
 class CamelBaseModel(BaseModel):
     class Config:
         alias_generator = to_camel
@@ -61,6 +85,9 @@ class CamelBaseModel(BaseModel):
 class CamelCacheBaseModel(CacheBaseModel, CamelBaseModel):
     ...
 
+
+class BareCamelBaseModel(BareBaseModel, CamelBaseModel):
+    ...
 
 class IncrementalIdBaseModel(BaseModel):
     _max_id_val: ClassVar[int | None] = None

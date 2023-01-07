@@ -16,3 +16,8 @@ code_gen_engine_env_manager.execute_shell_command(cmd)
 # For ui_core.proto
 cmd = f"protoc --proto_path={flux_options_dir_path} --python_out={code_gen_core_path} ui_core.proto"
 code_gen_engine_env_manager.execute_shell_command(cmd)
+
+# For flux_utils.proto
+cmd = f"protoc --proto_path={flux_options_dir_path} --python_out={code_gen_core_path} flux_utils.proto"
+code_gen_engine_env_manager.execute_shell_command(cmd)
+

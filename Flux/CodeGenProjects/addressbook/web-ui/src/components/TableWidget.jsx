@@ -1,9 +1,9 @@
-import React, { useState, useEffect, Fragment } from 'react';
-import _, { cloneDeep } from 'lodash';
+import React, { useState, useEffect, useCallback, Fragment, memo } from 'react';
+import _, { cloneDeep, isEqual } from 'lodash';
 import { makeStyles } from '@mui/styles';
 import {
     TableContainer, Table, TableBody, TableRow, TableCell, DialogTitle, DialogContent, DialogContentText,
-    DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog
+    DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination
 } from '@mui/material';
 import { generateRowTrees, generateRowsFromTree, addxpath, clearxpath, getTableRows, getTableColumns, getCommonKeyCollections } from '../utils';
 import { Settings, Close, Visibility, VisibilityOff } from '@mui/icons-material';
@@ -16,6 +16,7 @@ import Cell from './Cell';
 import Icon from './Icon';
 import Alert from './Alert';
 import AbbreviatedJsonWidget from './AbbreviatedJsonWidget';
+import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 
 const useStyles = makeStyles({
     tableContainer: {
@@ -72,6 +73,8 @@ const TableWidget = (props) => {
     const [showAbbreviatedJson, setShowAbbreviatedJson] = useState(false);
     const [hide, setHide] = useState(true);
 
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [page, setPage] = useState(0);
     const [order, setOrder] = React.useState('asc');
     const [orderBy, setOrderBy] = React.useState('');
     const [openModalPopup, setOpenModalPopup] = useState(false);
@@ -79,19 +82,22 @@ const TableWidget = (props) => {
 
     useEffect(() => {
         setData(props.data);
-    }, [props.data])
+        setRows(props.rows);
+        setHeadCells(props.tableColumns);
+        setCommonkeys(props.commonKeyCollections);
+    }, [props.data]);
 
     useEffect(() => {
         let trees = generateRowTrees(cloneDeep(data), props.collections, props.xpath);
-        let tableRows = getTableRows(props.collections, props.originalData, data, props.xpath);
+        // let tableRows = getTableRows(props.collections, props.originalData, data, props.xpath);
         setRowTrees(trees);
-        setRows(tableRows);
-    }, [props.collections, props.originalData, data, props.xpath])
+        // setRows(tableRows);
+    }, [props.collections, data, props.xpath])
 
-    useEffect(() => {
-        let tableColumns = getTableColumns(props.collections);
-        setHeadCells(tableColumns);
-    }, [props.collections, props.mode, hide])
+    // useEffect(() => {
+    //     let tableColumns = getTableColumns(props.collections);
+    //     setHeadCells(tableColumns);
+    // }, [props.collections, props.mode, hide])
 
     useEffect(() => {
         let commonKeyCollections = getCommonKeyCollections(rows, headCells, hide)
@@ -127,6 +133,15 @@ const TableWidget = (props) => {
         }
         return 0;
     }
+
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
 
     // This method is created for cross-browser compatibility, if you don't
     // need to support IE11, you can use Array.prototype.sort() directly
@@ -166,7 +181,11 @@ const TableWidget = (props) => {
             })
             setSelectedRow(selectedIndex);
             setTimeout(() => {
-                document.getElementById(`${props.name}${props.xpath}`).querySelectorAll("[data-xpath='" + xpath + "']").forEach(el => {
+                let modalId = props.name + '_modal';
+                if (props.xpath) {
+                    modalId = props.name + '_' + props.xpath + '_modal';
+                }
+                document.getElementById(modalId).querySelectorAll("[data-xpath='" + xpath + "']").forEach(el => {
                     el.classList.add(classes.nodeContainerHighlighted)
                 })
             }, 500)
@@ -242,62 +261,59 @@ const TableWidget = (props) => {
         setShowSettings(false);
     }
 
-    // const onTextChange = (e) => {
-    //     let updatedTree = cloneDeep(rowTrees[selectedRow]);
-    //     let xpath = e.target.getAttribute('xpath');
-    //     _.set(updatedTree, xpath, e.target.value);
-    //     let updatedData = cloneDeep(data);
-    //     _.set(updatedData, xpath, e.target.value);
-    //     setData(updatedData);
-    // }
+    const onTextChange = useCallback((e, type, xpath, value) => {
+        if (type === DataTypes.NUMBER) {
+            value = value * 1;
+        }
+        let dataxpath = e.target.getAttribute('dataxpath');
+        let updatedData = cloneDeep(data);
+        _.set(updatedData, dataxpath, value);
+        props.onUpdate(updatedData);
+        props.onUserChange(xpath, value);
+    }, [data, props.onUpdate, props.onUserChange])
 
-    // const onSelectItemChange = (e, xpath) => {
-    //     let updatedTree = cloneDeep(rowTrees[selectedRow]);
-    //     _.set(updatedTree, xpath, e.target.value);
-    //     let updatedData = cloneDeep(data);
-    //     _.set(updatedData, xpath, e.target.value);
-    //     setData(updatedData);
-    // }
+    const onSelectItemChange = useCallback((e, dataxpath, xpath) => {
+        let updatedData = cloneDeep(data);
+        _.set(updatedData, dataxpath, e.target.value);
+        props.onUpdate(updatedData);
+        props.onUserChange(xpath, e.target.value);
+    }, [data, props.onUpdate, props.onUserChange])
 
-    // const onCheckboxChange = (e, xpath) => {
-    //     let updatedTree = cloneDeep(rowTrees[selectedRow]);
-    //     _.set(updatedTree, xpath, e.target.checked);
-    //     let updatedData = cloneDeep(data);
-    //     _.set(updatedData, xpath, e.target.checked);
-    //     setData(updatedData);
-    // }
+    const onCheckboxChange = useCallback((e, dataxpath, xpath) => {
+        let updatedData = cloneDeep(data);
+        _.set(updatedData, dataxpath, e.target.checked);
+        props.onUpdate(updatedData);
+        props.onUserChange(xpath, e.target.checked);
+    }, [data, props.onUpdate, props.onUserChange])
 
-    // const onNodeAdd = (object, xpath) => {
-    //     console.log({ object, xpath });
-    //     let updatedData = cloneDeep(data);
-    //     let parentObject = _.get(updatedData, xpath);
-    //     parentObject.push(object);
-    //     updatedData = addxpath(clearxpath(updatedData));
-    //     props.onUpdate(updatedData);
-    //     setOpen(false);
-    // }
+    const onAutocompleteOptionChange = useCallback((e, value, dataxpath, xpath) => {
+        let updatedData = cloneDeep(data);
+        _.set(updatedData, dataxpath, value);
+        props.onUpdate(updatedData);
+        props.onUserChange(xpath, value);
+    }, [data, props.onUpdate, props.onUserChange])
 
-    // const onNodeRemove = (index, xpath) => {
-    //     console.log({ index, xpath });
-    //     setOpen(false);
-    //     let updatedData = cloneDeep(data);
-    //     let parentObject = _.get(updatedData, xpath);
-    //     parentObject.splice(index, 1);
-    //     console.log({ updatedData });
-    //     updatedData = addxpath(clearxpath(updatedData));
-    //     props.onUpdate(updatedData);
-
-    // }
+    const onButtonClick = useCallback((e, action, xpath, value) => {
+        if (action === 'flux_toggle') {
+            let updatedData = flux_toggle(value);
+            props.onButtonToggle(e, xpath, updatedData);
+        } else if (action === 'flux_trigger_strat') {
+            let updatedData = flux_trigger_strat(value);
+            if (updatedData) {
+                props.onButtonToggle(e, xpath, updatedData);
+            }
+        }
+    }, [flux_toggle, flux_trigger_strat, props.onButtonToggle])
 
     let menu = (
         <Fragment>
             {props.headerProps.menu}
             {hide ? (
-                <Icon className={classes.icon} title='Show hidden fields' onClick={() => setHide(false)}><Visibility fontSize='small' /></Icon>
+                <Icon className={classes.icon} name="Show" title='Show hidden fields' onClick={() => setHide(false)}><Visibility fontSize='small' /></Icon>
             ) : (
-                <Icon className={classes.icon} title='Hide hidden fields' onClick={() => setHide(true)}><VisibilityOff fontSize='small' /></Icon>
+                <Icon className={classes.icon} name="Hide" title='Hide hidden fields' onClick={() => setHide(true)}><VisibilityOff fontSize='small' /></Icon>
             )}
-            <Icon className={classes.icon} title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
+            <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
             <Select
                 className={classes.settings}
                 open={showSettings}
@@ -327,6 +343,10 @@ const TableWidget = (props) => {
     )
 
     let modalCloseMenu = <Icon className={classes.icon} title="Close" onClick={onClose} ><Close fontSize='small' /></Icon>
+    let modalId = props.name + '_modal';
+    if (props.xpath) {
+        modalId = props.name + '_' + props.xpath + '_modal';
+    }
 
     return (
         <WidgetContainer
@@ -341,95 +361,113 @@ const TableWidget = (props) => {
             commonkeys={commonkeys}>
 
             {getFilteredCells().length > 0 && rows.length > 0 &&
-                <TableContainer className={classes.tableContainer}>
-                    <Table
-                        className={classes.table}
-                        size='medium'>
-                        <TableHead
-                            headCells={getFilteredCells()}
-                            mode={props.mode}
-                            order={order}
-                            orderBy={orderBy}
-                            onRequestSort={handleRequestSort}
-                        />
-                        <TableBody>
-                            {stableSort(rows, getComparator(order, orderBy)).map((row, index) => {
-                                // for respecting sequenceNumber provided in the schema.
-                                // sorts the row keys based on sequenceNumber
-                                if (props.collections.length > 0) {
-                                    row = Object.keys(row).sort(function (a, b) {
-                                        if (a.startsWith('xpath_') && b.startsWith('xpath_')) return 0;
-                                        else if (a.startsWith('xpath_') || a.startsWith(DB_ID)) return -1;
-                                        else if (b.startsWith('xpath_') || b.startsWith(DB_ID)) return 1;
-                                        else {
-                                            let colA = props.collections.filter(col => col.key === a)[0];
-                                            let colB = props.collections.filter(col => col.key === b)[0];
-                                            if (!colA || !colB) return 0;
-                                            if (colA.sequenceNumber < colB.sequenceNumber) return -1;
-                                            else return 1;
-                                        }
-                                    }).reduce(function (obj, key) {
-                                        obj[key] = row[key];
-                                        return obj;
-                                    }, {})
-                                }
+                <Fragment>
+                    <TableContainer className={classes.tableContainer}>
+                        <Table
+                            className={classes.table}
+                            size='medium'>
+                            <TableHead
+                                headCells={getFilteredCells()}
+                                mode={props.mode}
+                                order={order}
+                                orderBy={orderBy}
+                                onRequestSort={handleRequestSort}
+                            />
+                            <TableBody>
+                                {stableSort(rows, getComparator(order, orderBy))
+                                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                                    .map((row, index) => {
+                                    // for respecting sequenceNumber provided in the schema.
+                                    // sorts the row keys based on sequenceNumber
+                                    if (props.collections.length > 0) {
+                                        row = Object.keys(row).sort(function (a, b) {
+                                            if (a.startsWith('xpath_') && b.startsWith('xpath_')) return 0;
+                                            else if (a.startsWith('xpath_') || a.startsWith(DB_ID)) return -1;
+                                            else if (b.startsWith('xpath_') || b.startsWith(DB_ID)) return 1;
+                                            else {
+                                                let colA = props.collections.filter(col => col.key === a)[0];
+                                                let colB = props.collections.filter(col => col.key === b)[0];
+                                                if (!colA || !colB) return 0;
+                                                if (colA.sequenceNumber < colB.sequenceNumber) return -1;
+                                                else return 1;
+                                            }
+                                        }).reduce(function (obj, key) {
+                                            obj[key] = row[key];
+                                            return obj;
+                                        }, {})
+                                    }
 
-                                let tableRowClass = '';
-                                if (row['data-add']) {
-                                    tableRowClass = classes.tableRowAdd;
-                                } else if (row['data-remove']) {
-                                    tableRowClass = classes.tableRowRemove;
-                                }
+                                    let tableRowClass = '';
+                                    if (row['data-add']) {
+                                        tableRowClass = classes.tableRowAdd;
+                                    } else if (row['data-remove']) {
+                                        tableRowClass = classes.tableRowRemove;
+                                    }
 
-                                return (
-                                    <TableRow
-                                        key={index}
-                                        className={`${classes.tableRow} ${tableRowClass}`}
-                                        hover
-                                        selected={selectedRows.filter(id => id === row['data-id']).length > 0}
-                                        onDoubleClick={(e) => onRowDisselect(e, row['data-id'])}
-                                        onClick={(e) => onRowSelect(e, row['data-id'])}>
+                                    return (
+                                        <TableRow
+                                            key={index}
+                                            className={`${classes.tableRow} ${tableRowClass}`}
+                                            hover
+                                            selected={selectedRows.filter(id => id === row['data-id']).length > 0}
+                                            onDoubleClick={(e) => onRowDisselect(e, row['data-id'])}
+                                            onClick={(e) => onRowSelect(e, row['data-id'])}>
 
-                                        {/* {props.mode === Modes.EDIT_MODE &&
+                                            {/* {props.mode === Modes.EDIT_MODE &&
                                             <TableCell align='center' size='small'>
                                                 <Icon title="Expand" onClick={(e) => onRowClick(e, index)}><MoreHoriz /></Icon>
                                             </TableCell>
                                         } */}
 
-                                        {getFilteredCells().map((cell, i) => {
-                                            // don't show cells that are hidden
-                                            if (cell.hide) return;
-                                            return (
-                                                <Cell
-                                                    key={i}
-                                                    row={row}
-                                                    rowindex={row['data-id']}
-                                                    propname={cell.key}
-                                                    proptitle={cell.tableTitle}
-                                                    mode={props.mode}
-                                                    data={props.data}
-                                                    originalData={props.originalData}
-                                                    collections={props.collections}
-                                                    onUpdate={props.onUpdate}
-                                                    onAbbreviatedFieldOpen={onAbbreviatedFieldOpen}
-                                                    onDoubleClick={onRowClick}
-                                                    onButtonToggle={props.onButtonToggle}
-                                                    onUserChange={props.onUserChange}
-                                                />
-                                            )
-                                        })}
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                                            {getFilteredCells().map((cell, i) => {
+                                                // don't show cells that are hidden
+                                                if (cell.hide) return;
+                                                return (
+                                                    <Cell
+                                                        key={i}
+                                                        row={row}
+                                                        rowindex={row['data-id']}
+                                                        propname={cell.key}
+                                                        proptitle={cell.tableTitle}
+                                                        mode={props.mode}
+                                                        data={props.data}
+                                                        originalData={props.originalData}
+                                                        collections={props.collections}
+                                                        onUpdate={props.onUpdate}
+                                                        onAbbreviatedFieldOpen={onAbbreviatedFieldOpen}
+                                                        onDoubleClick={onRowClick}
+                                                        // onButtonToggle={onButtonToggle}
+                                                        onButtonClick={onButtonClick}
+                                                        onCheckboxChange={onCheckboxChange}
+                                                        onTextChange={onTextChange}
+                                                        onSelectItemChange={onSelectItemChange}
+                                                        onAutocompleteOptionChange={onAutocompleteOptionChange}
+                                                    // onUserChange={props.onUserChange}
+                                                    />
+                                                )
+                                            })}
+                                        </TableRow>
+                                    );
+                                })}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    <TablePagination
+                        rowsPerPageOptions={[25, 50]}
+                        component="div"
+                        count={rows.length}
+                        rowsPerPage={rowsPerPage}
+                        page={page}
+                        onPageChange={handleChangePage}
+                        onRowsPerPageChange={handleChangeRowsPerPage}
+                    />
+                </Fragment>
             }
 
             <AbbreviatedJsonWidget open={showAbbreviatedJson} onClose={onAbbreviatedFieldClose} json={abbreviatedJson} />
 
             <FullScreenModal
-                id={`${props.name}${props.xpath}`}
+                id={modalId}
                 open={open}
                 onClose={onClose}
                 onSave={onSave}
@@ -471,4 +509,4 @@ const TableWidget = (props) => {
     )
 }
 
-export default TableWidget;
+export default memo(TableWidget);

@@ -11,6 +11,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, capitalized_to_camel_case
 
 
 class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
@@ -84,13 +85,13 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import { addxpath } from '../utils';\n"
             if dependent_message_name is not None:
                 output_str += "import { setModified"+f"{dependent_message_name}, "+"update"+f"{dependent_message_name}"+" } from './"+\
-                              f"{self.capitalized_to_camel_case(dependent_message_name)}Slice';\n"
+                              f"{capitalized_to_camel_case(dependent_message_name)}Slice';\n"
             output_str += "\n"
 
         return output_str
 
     def handle_get_all_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll', () => " + "{\n"
         output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
         output_str += "        .then(res => res.data);\n"
@@ -98,7 +99,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         return output_str
 
     def handle_get_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const get{message_name} = createAsyncThunk('{message_name_camel_cased}/get', (id) => " + "{\n"
         output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-{message_name_snake_cased}"+"/${id}`)\n"
         output_str += "        .then(res => res.data);\n"
@@ -106,7 +107,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         return output_str
 
     def handle_create_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         if not self.current_message_is_dependent:
             output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', (payload) => " + "{\n"
             output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + "`, payload)\n"
@@ -116,7 +117,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         else:
             if message_name in self.dependent_message_relation_dict:
                 dependent_message_name = self.dependent_message_relation_dict[message_name]
-                dependent_message_name_camel_cased = self.capitalized_to_camel_case(dependent_message_name)
+                dependent_message_name_camel_cased = capitalized_to_camel_case(dependent_message_name)
                 output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', (payload, "+"{ dispatch, getState }) => " + "{\n"
                 output_str += "    let { data, abbreviated, loadedKeyName } = payload;\n"
                 output_str += "    abbreviated = abbreviated.substring(0, abbreviated.indexOf('$'));\n"
@@ -137,7 +138,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 return output_str
 
     def handle_update_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const update{message_name} = createAsyncThunk('{message_name_camel_cased}/update', (payload) => "+"{\n"
         output_str += "    return axios.put(`${API_ROOT_URL}/put-"+f"{message_name_snake_cased}"+"`, payload)\n"
         output_str += "        .then(res => res.data);\n"
@@ -227,7 +228,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     def handle_slice_content(self, message: protogen.Message) -> str:
         output_str = self.handle_import_output(message)
         message_name = message.proto.name
-        message_name_camel_cased = self.capitalized_to_camel_case(message_name)
+        message_name_camel_cased = capitalized_to_camel_case(message_name)
         output_str += f"const initialState = " + "{\n"
         output_str += f"    {message_name_camel_cased}Array: [],\n"
         output_str += f"    {message_name_camel_cased}: " + "{},\n"
@@ -239,7 +240,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    mode: Modes.READ_MODE,\n"
             output_str += "    createMode: false,\n"
             output_str += "    userChanges: {},\n"
-            output_str += "    discardedChanges: {}\n"
+            output_str += "    discardedChanges: {},\n"
+            output_str += "    openConfirmSavePopup: false\n"
         else:
             output_str += "    error: null\n"
         output_str += "}\n\n"
@@ -286,6 +288,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        },\n"
             output_str += "        setDiscardedChanges: (state, action) => {\n"
             output_str += "            state.discardedChanges = action.payload;\n"
+            output_str += "        },\n"
+            output_str += "        setOpenConfirmSavePopup: (state, action) => {\n"
+            output_str += "            state.openConfirmSavePopup = action.payload;\n"
         output_str += "        }\n"
         output_str += "    },\n"
         output_str += "    extraReducers: {\n"
@@ -306,7 +311,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += " }" + f" = {message_name_camel_cased}Slice.actions;\n"
             else:
                 output_str += f", setMode, setCreateMode" + \
-                              ", setUserChanges, setDiscardedChanges }" + \
+                              ", setUserChanges, setDiscardedChanges, setOpenConfirmSavePopup }" + \
                               f" = {message_name_camel_cased}Slice.actions;\n"
         return output_str
 
@@ -325,7 +330,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 err_str = f"message {message.proto.name} not found neither in dependent_list nor in independent_list"
                 logging.exception(err_str)
                 raise Exception(err_str)
-            message_name_camel_cased = self.capitalized_to_camel_case(message.proto.name)
+            message_name_camel_cased = capitalized_to_camel_case(message.proto.name)
             output_dict_key = f"{message_name_camel_cased}Slice.js"
             output_str = self.handle_slice_content(message)
 

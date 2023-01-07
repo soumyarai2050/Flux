@@ -11,6 +11,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 import protogen
 from Flux.PyCodeGenEngine.PluginFastApi.beanie_fastapi_plugin import \
     BeanieFastApiPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 
 # Todo: Might be broken due to changes made in cache and beanie fastapi
@@ -26,7 +27,7 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
 
     def handle_POST_gen(self, message: protogen.Message, method_desc: str | None = None, id_field_type: str | None = None) -> str:
         message_name = message.proto.name
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + f'", response_model={message_name}, status_code=201)\n'
         output_str += f"async def create_{message_name_snake_cased}({message_name_snake_cased}: {message_name}) -> {message_name}:\n"
         if method_desc:
@@ -40,7 +41,7 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
     def handle_GET_gen(self, message: protogen.Message, method_desc: str | None = None,
                        id_field_type: str | None = None) -> str:
         message_name = message.proto.name
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}/' + \
                      '{' + f'{message_name_snake_cased}_id' + '}' + \
                      f'", response_model={message_name}, status_code=200)\n'
@@ -60,7 +61,7 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
 
     def handle_PUT_gen(self, message: protogen.Message, method_desc: str | None = None, id_field_type: str | None = None) -> str:
         message_name = message.proto.name
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
                      f'", response_model={message_name}, status_code=200)\n'
         output_str += f"async def update_{message_name_snake_cased}({message_name_snake_cased}_updated: " \
@@ -75,7 +76,7 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
 
     def handle_PATCH_gen(self, message: protogen.Message, method_desc: str | None = None, id_field_type: str | None = None) -> str:
         message_name = message.proto.name
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
                      f'", response_model={message_name}, status_code=200)\n'
         output_str += f"async def partial_update_{message_name_snake_cased}({message_name_snake_cased}_updated: " \
@@ -90,7 +91,7 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
 
     def handle_DELETE_gen(self, message: protogen.Message, method_desc: str | None = None, id_field_type: str | None = None) -> str:
         message_name = message.proto.name
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + \
                      '{'+f'{message_name_snake_cased}_id'+'}' + \
                      f'", response_model=DefaultWebResponse, status_code=200)\n'
@@ -110,7 +111,7 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
 
     def handle_index_req_gen(self, message: protogen.Message, field: protogen.Field) -> str:
         message_name = message.proto.name
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         field_name = field.proto.name
         field_type = self.proto_to_py_datatype(field)
         output_str = f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-{field_name}/' + \
@@ -123,7 +124,7 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
 
     def handle_get_all_message_request(self, message: protogen.Message) -> str:
         message_name = message.proto.name
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message_name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}/' + \
                      f'", response_model=List[{message_name}], status_code=200)\n'
         output_str += f"async def get_all_{message_name_snake_cased}() -> List[{message_name}]:\n"

@@ -7,12 +7,14 @@ function ErrorFallback({ error, resetErrorBoundary }) {
         <Box sx={{ padding: 10 }}>
             <Typography variant='h4'><ErrorOutline color='error' />Something went wrong</Typography>
             <Alert severity='error'>
-                <Typography variant='subtitle1'>
-                    <div><pre>{error.message}</pre></div>
-                </Typography>
-                <Typography variant='body2'>
-                    <div><pre>{error.stack}</pre></div>
-                </Typography>
+                <pre>
+                    <Typography variant='subtitle1'>
+                        {error.message}
+                    </Typography>
+                    <Typography variant='body2'>
+                        {error.stack}
+                    </Typography>
+                </pre>
             </Alert>
         </Box>
     )

@@ -52,16 +52,16 @@ const WidgetContainer = (props) => {
 
     let modeMenu = '';
     if (props.onSave && props.mode === Modes.EDIT_MODE) {
-        modeMenu = <Icon className={classes.icon} title="Save" onClick={props.onSave}><Save fontSize='small' /></Icon>
+        modeMenu = <Icon className={classes.icon} name="Save" title="Save" onClick={props.onSave}><Save fontSize='small' /></Icon>
     } else if (props.onChangeMode && props.mode === Modes.READ_MODE) {
-        modeMenu = <Icon className={classes.icon} title="Edit" onClick={props.onChangeMode}><Edit fontSize='small' /></Icon>
+        modeMenu = <Icon className={classes.icon} name="Edit" title="Edit" onClick={props.onChangeMode}><Edit fontSize='small' /></Icon>
     }
 
     let layoutMenu = '';
     if (props.layout === Layouts.TABLE_LAYOUT) {
-        layoutMenu = <Icon className={classes.icon} title="Tree View" onClick={props.onChangeLayout} ><AccountTree fontSize='small' /></Icon>
+        layoutMenu = <Icon className={classes.icon} name="Tree" title="Tree View" onClick={props.onChangeLayout} ><AccountTree fontSize='small' /></Icon>
     } else if (props.layout === Layouts.TREE_LAYOUT) {
-        layoutMenu = <Icon className={classes.icon} title="Table View" onClick={props.onChangeLayout} ><TableView fontSize='small' /></Icon>
+        layoutMenu = <Icon className={classes.icon} name="Table" title="Table View" onClick={props.onChangeLayout} ><TableView fontSize='small' /></Icon>
     }
 
     return (
@@ -74,7 +74,7 @@ const WidgetContainer = (props) => {
                         {props.menu}
                         {modeMenu}
                         {layoutMenu}
-                        {props.onReload && <Icon className={classes.icon} title="Reload" onClick={props.onReload}><Cached fontSize='small' /></Icon>}
+                        {props.onReload && <Icon className={classes.icon} name="Reload" title="Reload" onClick={props.onReload}><Cached fontSize='small' /></Icon>}
                         {props.menuRight}
                     </div>
                 </div>

@@ -11,28 +11,29 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.PluginPydentic.cached_pydantic_model_plugin import CachedPydanticModelPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 
 class BeanieModelPlugin(CachedPydanticModelPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
-    default_id_type: str = "PydanticObjectId"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
+        self.default_id_field_type: str = "PydanticObjectId"
 
     def _handle_field_cardinality(self, field: protogen.Field) -> str:
         field_type = self.proto_to_py_datatype(field)
 
         match field.cardinality.name.lower():
             case "optional":
-                if BeanieModelPlugin.flux_fld_index in str(field.proto.options):
+                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
                     output_str = f"{field.proto.name}: Indexed({field_type} | None)"
                 else:
                     output_str = f"{field.proto.name}: {field_type} | None"
             case "repeated":
-                if BeanieModelPlugin.flux_fld_index in str(field.proto.options):
+                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
                     output_str = f"{field.proto.name}: Indexed(List[{field_type}])"
                 else:
                     if self.flux_fld_is_required in str(field.proto.options):
@@ -40,7 +41,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                     else:
                         output_str = f"{field.proto.name}: List[{field_type}] | None"
             case other:
-                if BeanieModelPlugin.flux_fld_index in str(field.proto.options):
+                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
                     output_str = f"{field.proto.name}: Indexed({field_type})"
                 else:
                     output_str = f"{field.proto.name}: {field_type}"
@@ -56,7 +57,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
 
             if is_id_field:
                 parent_message_name = field.parent.proto.name
-                parent_message_name_snake_cased = self.convert_camel_case_to_specific_case(parent_message_name)
+                parent_message_name_snake_cased = convert_camel_case_to_specific_case(parent_message_name)
                 output_str += f"default_factory={parent_message_name_snake_cased}_id_auto_increment"
             # else not required: If not is_id_field then avoiding text to be added
 
@@ -164,6 +165,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         output_str += "from pydantic import BaseModel, Field\n"
         output_str += "import pendulum\n"
         output_str += "from threading import Lock\n"
+        output_str += "from typing import List, ClassVar, Dict\n"
         ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
                                                                    "ws_connection_manager")
         output_str += f"from {ws_connection_manager_path} import PathWSConnectionManager, " \
@@ -187,7 +189,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                 output_str += "from enum import auto\n"
                 output_str += "from fastapi_utils.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
-        output_str += "from typing import List, ClassVar, Dict\n\n\n"
+        output_str += "\n\n"
         return output_str
 
     def assign_required_data_members(self, file: protogen.File):

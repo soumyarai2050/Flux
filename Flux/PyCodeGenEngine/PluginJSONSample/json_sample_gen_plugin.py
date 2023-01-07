@@ -12,11 +12,9 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
     time.sleep(debug_sleep_time)
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
-from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 import protogen
-
-# to access options
-import insertion_imports
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, convert_to_camel_case
 
 
 class JsonSampleGenPlugin(BaseProtoPlugin):
@@ -64,7 +62,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
             case "int32" | "int64":
                 random_int = randint(*JsonSampleGenPlugin.random_int_range)
                 json_sample_output += " "*indent_space_count + f'"{field_name_case_styled}": {random_int}'
-            case "float":
+            case "float" | "double":
                 random_int_or_float = choice([randint(*JsonSampleGenPlugin.random_int_range),
                                               round(random(), 2)])
                 json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": {random_int_or_float}'
@@ -132,7 +130,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         for field_value_pair in new_option_value[1:-1].split(","):
             field_name, value = field_value_pair.split("=")
             if self.__response_field_case_style == "camel":
-                field_name_case_styled = self.convert_to_camel_case(field_name)
+                field_name_case_styled = convert_to_camel_case(field_name)
             else:
                 field_name_case_styled = field_name
             output_str += " " * (indent_space_count + 2) + f'"{field_name_case_styled}": "{value}"'
@@ -153,7 +151,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
                     self.get_non_repeated_valued_custom_option_value(field.proto.options,
                                                                      JsonSampleGenPlugin.flux_fld_auto_complete)
                 if self.__response_field_case_style == "camel":
-                    field_name_case_styled = self.convert_to_camel_case(field.proto.name)
+                    field_name_case_styled = convert_to_camel_case(field.proto.name)
                 else:
                     field_name_case_styled = field.proto.name
                 json_sample_output += " "*(indent_space_count+2) + f'"{field_name_case_styled}":'
@@ -230,9 +228,9 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         self.__load_root_json_msg(file)
         self.auto_complete_data = self.__load_auto_complete_json()
         if self.__response_field_case_style.lower() == "snake":
-            self.__case_style_convert_method = self.convert_camel_case_to_specific_case
+            self.__case_style_convert_method = convert_camel_case_to_specific_case
         elif self.__response_field_case_style.lower() == "camel":
-            self.__case_style_convert_method = self.convert_to_camel_case
+            self.__case_style_convert_method = convert_to_camel_case
         else:
             err_str = f"{self.__response_field_case_style} is not supported case style"
             logging.exception(err_str)

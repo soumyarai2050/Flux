@@ -14,15 +14,11 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 
-# Required for accessing custom options from schema
-from Flux.PyCodeGenEngine.PluginPydentic import insertion_imports
-
 
 class BasePydanticModelPlugin(BaseProtoPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
-    default_id_type: str = "int"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -39,6 +35,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                       f"received as {enum_type} and {response_field_case_style}"
             logging.exception(err_str)
             raise Exception(err_str)
+        self.default_id_field_type: str | None = None
         # Since output file name for this plugin will be created at runtime
         self.output_file_name_suffix: str = ""
         self.root_message_list: List[protogen.Message] = []
@@ -68,7 +65,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             case "enum":
                 return field.enum.proto.name
             case other:
-                if BasePydanticModelPlugin.flux_fld_val_is_datetime in str(field.proto.options):
+                if self.is_bool_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_is_datetime):
                     return "pendulum.DateTime"
                 else:
                     return BasePydanticModelPlugin.proto_type_to_py_type_dict[field.kind.name.lower()]
@@ -93,7 +90,6 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            option_str = str(message.proto.options)
             if BasePydanticModelPlugin.flux_msg_json_root in str(message.proto.options):
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
@@ -154,10 +150,16 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
         return output_str
 
-    def _underlying_handle_none_default_fields(self, message: protogen.Message, auto_gen_id: bool) -> str:
+    def _underlying_handle_none_default_fields(self, message: protogen.Message, has_id_field: bool) -> str:
         output_str = ""
+        if not has_id_field:
+            output_str += f"    {BasePydanticModelPlugin.default_id_field_name}: " \
+                          f"{BasePydanticModelPlugin.default_id_type} = " \
+                          f"Field(alias='_id')\n"
+        # else not required: if id field is present already then will be handled in next for loop
+
         for field in message.fields:
-            if auto_gen_id and field.proto.name == BasePydanticModelPlugin.default_id_field_name:
+            if field.proto.name == BasePydanticModelPlugin.default_id_field_name:
                 output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = " \
                               f"Field(alias='_id')\n"
             else:
@@ -172,23 +174,23 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str += "        allow_population_by_field_name = True\n"
         return output_str
 
-    def handle_message_all_optional_field(self, message: protogen.Message, auto_gen_id: bool) -> str:
+    def handle_message_all_optional_field(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         output_str = f"class {message_name}Optional({message_name}):\n"
-        output_str += self._underlying_handle_none_default_fields(message, auto_gen_id)
-        if auto_gen_id:
-            output_str += "\n"
-            output_str += self._add_config_class()
+        has_id_field = BasePydanticModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
+        output_str += self._underlying_handle_none_default_fields(message, has_id_field)
+        output_str += "\n"
+        output_str += self._add_config_class()
         output_str += "\n\n"
         return output_str
 
-    def handle_dummy_message_gen(self, message: protogen.Message, auto_gen_id: bool) -> str:
+    def handle_dummy_message_gen(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         output_str = f"class {message_name}BaseModel(BaseModel):\n"
-        output_str += self._underlying_handle_none_default_fields(message, auto_gen_id)
-        if auto_gen_id:
-            output_str += "\n"
-            output_str += self._add_config_class()
+        has_id_field = BasePydanticModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
+        output_str += self._underlying_handle_none_default_fields(message, has_id_field)
+        output_str += "\n"
+        output_str += self._add_config_class()
         output_str += "\n\n"
         return output_str
 
@@ -244,7 +246,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     break
                 # else not required: If no field is id override then handling default id type in else of for loop
             else:
-                output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{self.default_id_type}, " \
+                output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{BasePydanticModelPlugin.default_id_type}, " \
                               f"'{message.proto.name}']] = " + "{}\n"
             output_str += self._handle_ws_connection_manager_data_members_override(message)
         # else not required: Avoid cache override if message is not root
@@ -259,9 +261,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str += "\n\n"
 
         # Adding other versions for root pydantic class
-        if auto_gen_id:
-            output_str += self.handle_message_all_optional_field(message, auto_gen_id)
-            output_str += self.handle_dummy_message_gen(message, auto_gen_id)
+        if message in self.root_message_list:
+            output_str += self.handle_message_all_optional_field(message)
+            output_str += self.handle_dummy_message_gen(message)
         # If message is not root then no need to add message with optional fields
 
         return output_str
@@ -276,6 +278,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def handle_pydantic_class_gen(self) -> str:
         output_str = self.handle_imports()
+        output_str += f"{BasePydanticModelPlugin.default_id_type} = {self.default_id_field_type}\n\n"
         for enum in self.enum_list:
             output_str += self.handle_enum_output(enum, self.enum_type)
         for message in self.ordered_message_list:
@@ -285,14 +288,20 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def _import_current_models(self) -> str:
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str = f"from {model_file_path} import "
-        for message in self.root_message_list:
+        output_str = f"from {model_file_path} import {BasePydanticModelPlugin.default_id_type}, "
+        # importing enums
+        for enum in self.enum_list:
+            output_str += enum.proto.name + ", "
+
+        for message in self.ordered_message_list:
             output_str += message.proto.name
-            output_str += ", "
-            output_str += f"{message.proto.name}Optional"
-            output_str += ", "
-            output_str += f"{message.proto.name}BaseModel"
-            if message != self.root_message_list[-1]:
+            if message in self.root_message_list:
+                output_str += ", "
+                output_str += f"{message.proto.name}Optional"
+                output_str += ", "
+                output_str += f"{message.proto.name}BaseModel"
+            # else not required: if message is not of root type then optional abd basemodel version doesn't exist
+            if message != self.ordered_message_list[-1]:
                 output_str += ", "
             else:
                 output_str += "\n"
@@ -303,26 +312,44 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             model_import_file_name = self.model_import_file_name + ".py"
             model_import_file_path = PurePath(output_dir_path) / model_import_file_name
             current_import_statement = self._import_current_models()
+            if (db_type_env_name := os.getenv("DBType")) is None:
+                err_str = "env var DBType received as None"
+                logging.exception(err_str)
+                raise Exception(err_str)
             if not os.path.exists(model_import_file_path):
-                # print(f"###### ----> Not exists {model_import_file_path}")
-                return current_import_statement
+                output_str = "import logging\n"
+                output_str += "import os\n\n"
+                output_str += 'if (db_type := os.getenv("DBType")) is None:\n'
+                output_str += '    err_str = f"env var DBType must not be None"\n'
+                output_str += '    logging.exception(err_str)\n'
+                output_str += '    raise Exception(err_str)\n'
+                output_str += 'else:\n'
+                output_str += '    match db_type.lower():\n'
+                output_str += f'        case "{db_type_env_name}":\n'
+                output_str += f'            {current_import_statement}\n'
+                output_str += f'        case other:\n'
+                output_str += '            err_str = f"unsupported db type {db_type}"\n'
+                output_str += f'            logging.exception(err_str)\n'
+                output_str += f'            raise Exception(err_str)\n'
+                return output_str
             else:
                 with open(model_import_file_path) as import_file:
-                    imports_list: List[str] = import_file.readlines()
+                    imports_file_content: List[str] = import_file.readlines()
 
-                    # Making all imports commented
-                    imports_list_commented = [f"# {import_str}" for import_str in imports_list if import_str[0] != "#"]
-                    imports_list = []
+                    match_str_index = imports_file_content.index("    match db_type.lower():\n")
 
-                    # Removing current import if already present
-                    for import_str in imports_list_commented:
-                        if f"# {current_import_statement}" != import_str:
-                            imports_list.append(import_str)
+                    # checking if already imported
+                    for content in imports_file_content[match_str_index:]:
+                        if "case" in content and db_type_env_name in content:
+                            # if current db_type already exists in match statement then avoiding content modification
+                            break
+                        # else not required: if current db_type already not in match statement then
+                        # adding it in for-else
+                    else:
+                        imports_file_content.insert(match_str_index+1, f'        case "{db_type_env_name}":\n')
+                        imports_file_content.insert(match_str_index+2, f'            {current_import_statement}\n')
 
-                    # Adding current import statement
-                    imports_list.append(current_import_statement)
-
-                return "".join(imports_list)
+                return "".join(imports_file_content)
         else:
             err_str = "Env var 'OUTPUT_DIR' received as None"
             logging.exception(err_str)

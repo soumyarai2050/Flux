@@ -12,6 +12,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 # Required for accessing custom options from schema
 
@@ -159,7 +160,7 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
         # foreign_key = foreign_table_key + foreign_field_name (in snake case)
         counter = 0
         for foreign_key_tuple in self.foreign_keys_list_of_tuples:
-            foreign_key_field = f"{self.convert_camel_case_to_specific_case(foreign_key_tuple[0])}_{self.convert_camel_case_to_specific_case(foreign_key_tuple[1])}"
+            foreign_key_field = f"{convert_camel_case_to_specific_case(foreign_key_tuple[0])}_{convert_camel_case_to_specific_case(foreign_key_tuple[1])}"
             self.foreign_keys_list_of_tuples[counter] = (foreign_key_field, *foreign_key_tuple)
             counter += 1
 
@@ -312,7 +313,7 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
 
             output_str += ",\n"
         for foreign_key_tuple in self.foreign_keys_list_of_tuples:
-            output_str += f'    FOREIGN KEY ({foreign_key_tuple[0]}) REFERENCES ' + ''''{}-''' + f'''{self.convert_camel_case_to_specific_case(foreign_key_tuple[1], "-")}'({foreign_key_tuple[2]})\n'''
+            output_str += f'    FOREIGN KEY ({foreign_key_tuple[0]}) REFERENCES ' + ''''{}-''' + f'''{convert_camel_case_to_specific_case(foreign_key_tuple[1], "-")}'({foreign_key_tuple[2]})\n'''
 
         output_str += f'); """'''
 
@@ -603,8 +604,8 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
         # else not required: if no message finds "MainMessage" as true, then handling it below
 
         if message_name is not None:
-            msg_name_snake_case = BaseProtoPlugin.convert_camel_case_to_specific_case(message_name)
-            msg_name_hyphen_case = BaseProtoPlugin.convert_camel_case_to_specific_case(message_name, "-")
+            msg_name_snake_case = convert_camel_case_to_specific_case(message_name)
+            msg_name_hyphen_case = convert_camel_case_to_specific_case(message_name, "-")
 
             self.main_proto_msg_class_name = message_name
             self.class_name_snake_cased = msg_name_snake_case

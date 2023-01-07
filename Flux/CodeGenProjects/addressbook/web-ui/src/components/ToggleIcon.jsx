@@ -28,7 +28,7 @@ const ToggleIcon = (props) => {
 
     return (
         <Tooltip title={props.title}>
-            <ToggleButton size='small' className={classes.toggleIcon} selected={props.selected} onClick={() => props.onClick(props.name)} value={props.name}>
+            <ToggleButton size='small' className={classes.toggleIcon} name={props.name} selected={props.selected} onClick={() => props.onClick(props.name)} value={props.name}>
                 <Avatar className={classes.avatar}>{props.children}</Avatar>
             </ToggleButton>
         </Tooltip>

@@ -4,7 +4,7 @@ import { makeStyles } from '@mui/styles';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { DataTypes } from '../constants';
-import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType } from '../utils';
+import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType, getValueFromReduxStoreFromXpath } from '../utils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
@@ -31,46 +31,33 @@ const DynamicMenu = (props) => {
     return (
         <Fragment>
             {props.commonKeyCollections && props.commonKeyCollections.filter(collection => ['button', 'progressBar'].includes(collection.type)).map((collection, index) => {
-                if (collection.value === undefined) return;
+                if (collection.value === undefined || collection.value === null) return;
 
                 if (collection.type === 'progressBar') {
                     let value = collection.value;
-                    if (value === undefined) return;
 
                     let min = collection.min;
                     if (typeof (min) === DataTypes.STRING) {
-                        let sliceName = toCamelCase(min.split('.')[0]);
-                        let propertyName = 'modified' + capitalizeCamelCase(min.split('.')[0]);
-                        let minxpath = min.substring(min.indexOf('.') + 1);
-                        min = getValueFromReduxStore(state, sliceName, propertyName, minxpath);
+                        min = getValueFromReduxStoreFromXpath(state, min);
                     }
                     let max = collection.max;
                     if (typeof (max) === DataTypes.STRING) {
-                        let sliceName = toCamelCase(max.split('.')[0]);
-                        let propertyName = 'modified' + capitalizeCamelCase(max.split('.')[0]);
-                        let maxxpath = max.substring(max.indexOf('.') + 1);
-                        max = getValueFromReduxStore(state, sliceName, propertyName, maxxpath);
+                        max = getValueFromReduxStoreFromXpath(state, max);
                     }
-
-                    let percentage = normalise(value, max, min);
-                    let color = getColorTypeFromPercentage(collection, percentage);
                     let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 
                     return (
-                        <Box key={collection.key} sx={{ minWidth: 150, margin: '0 10px' }}>
+                        <Box key={collection.tableTitle} sx={{ minWidth: 150, margin: '0 10px' }}>
                             <ValueBasedProgressBarWithHover
-                                percentage={percentage}
+                                collection={collection}                    
                                 value={value}
                                 min={min}
                                 max={max}
-                                color={color}
                                 hoverType={hoverType}
                             />
                         </Box>
                     )
                 } else if (collection.type === 'button') {
-                    if (collection.value === undefined) return;
-
                     let checked = String(collection.value) === collection.button.pressed_value_as_text;
                     let xpath = collection.xpath;
                     let color = getColorTypeFromValue(collection, String(collection.value));
@@ -86,7 +73,8 @@ const DynamicMenu = (props) => {
 
                     return (
                         <ValueBasedToggleButton
-                            key={collection.key}
+                            key={collection.tableTitle}
+                            name={collection.tableTitle}
                             size={size}
                             shape={shape}
                             color={color}
@@ -102,13 +90,15 @@ const DynamicMenu = (props) => {
 
             {
                 props.collections.filter(collection => collection.type === 'button' && collection.rootLevel).map((collection, index) => {
-                    if (_.get(props.data, collection.key) === undefined) return;
-                    let checked = String(_.get(props.data, collection.key)) === collection.button.pressed_value_as_text;
+                    let value = _.get(props.data, collection.key);
+                    if (value === undefined || value === null) return;
+
+                    let checked = String(value) === collection.button.pressed_value_as_text;
                     let xpath = _.get(props.data, `xpath_${collection.key}`) ? _.get(props.data, `xpath_${collection.key}`) : '';
-                    let color = getColorTypeFromValue(collection, String(_.get(props.data, collection.key)));
+                    let color = getColorTypeFromValue(collection, String(value));
                     let size = getSizeFromValue(collection.button.button_size);
                     let shape = getShapeFromValue(collection.button.button_type);
-                    let caption = String(_.get(props.data, collection.key));
+                    let caption = String(value);
 
                     if (checked && collection.button.pressed_caption) {
                         caption = collection.button.pressed_caption;
@@ -118,11 +108,12 @@ const DynamicMenu = (props) => {
 
                     return (
                         <ValueBasedToggleButton
-                            key={collection.key}
+                            key={collection.tableTitle}
+                            name={collection.tableTitle}
                             size={size}
                             shape={shape}
                             color={color}
-                            value={_.get(props.data, collection.key)}
+                            value={value}
                             caption={caption}
                             xpath={xpath}
                             action={collection.button.action}

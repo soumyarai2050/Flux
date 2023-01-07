@@ -226,10 +226,10 @@ const Layout = (props) => {
     return (
         <Box className={classes.layout}>
             <SideDrawer draggable={draggable} onToggleDrag={onToggleDrag}>
-                <Icon className={classes.iconButton} title='Load Layout' onClick={() => setOpenLoadLayout(true)}>
+                <Icon className={classes.iconButton} name="LoadLayout" title='Load Layout' onClick={() => setOpenLoadLayout(true)}>
                     <DashboardCustomize fontSize='medium' />
                 </Icon>
-                <Icon className={classes.iconButton} title='Save Layout' onClick={() => setOpenSaveLayout(true)}>
+                <Icon className={classes.iconButton} name="SaveLayout" title='Save Layout' onClick={() => setOpenSaveLayout(true)}>
                     <SaveAs fontSize='medium' />
                 </Icon>
                 # @@protoc_insertion_point(add_root_in_jsx_layout)

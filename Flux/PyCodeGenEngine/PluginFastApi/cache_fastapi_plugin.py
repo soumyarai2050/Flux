@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 import os
 from typing import List, Dict
 import time
@@ -10,9 +11,6 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, main
-
-# Required for accessing custom options from schema
-from Flux.PyCodeGenEngine.PluginFastApi import insertion_imports
 
 
 class CacheFastApiPlugin(BaseFastapiPlugin):
@@ -31,11 +29,18 @@ class CacheFastApiPlugin(BaseFastapiPlugin):
                 # else not required: avoiding repetition
 
                 for field in message.fields:
-                    if field.proto.name == CacheFastApiPlugin.default_id_field_name and \
-                            "int" == self.proto_to_py_datatype(field):
-                        self.int_id_message_list.append(message)
-                    # else enot required: If field is not id or is not type int then avoiding append
-                    # in int_id_message_list
+                    if field.proto.name == CacheFastApiPlugin.default_id_field_name:
+                        if "int" == self.proto_to_py_datatype(field):
+                            self.int_id_message_list.append(message)
+                            break
+                        else:
+                            err_str = "Id field other than int not supported for cached pydantic model"
+                            logging.exception(err_str)
+                            raise Exception(err_str)
+                # else not required : If no id field exists then adding id field using int
+                # auto-increment in next for loop
+                else:
+                    self.int_id_message_list.append(message)
             else:
                 if message not in self.non_root_message_list:
                     self.non_root_message_list.append(message)
@@ -58,12 +63,15 @@ class CacheFastApiPlugin(BaseFastapiPlugin):
         output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
         output_str += f"from {model_file_path} import "
-        for message in self.int_id_message_list:
-            output_str += message.proto.name
-            if message != self.int_id_message_list[-1]:
-                output_str += ", "
-            else:
-                output_str += "\n\n\n"
+        if self.int_id_message_list:
+            for message in self.int_id_message_list:
+                output_str += message.proto.name
+                if message != self.int_id_message_list[-1]:
+                    output_str += ", "
+                else:
+                    output_str += "\n\n\n"
+        else:
+            output_str += "\n\n\n"
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
         output_str += f"async def init_max_id_handler(root_base_model):\n"
         output_str += f'    root_base_model.init_max_id(0)\n\n\n'
@@ -78,24 +86,9 @@ class CacheFastApiPlugin(BaseFastapiPlugin):
 
         return output_str
 
-    def _get_msg_id_field_type(self, message: protogen.Message) -> str:
-        id_field_type: str = "int"
-        if message in self.int_id_message_list:
-            for field in message.fields:
-                if field.proto.name == CacheFastApiPlugin.default_id_field_name and \
-                        "int" != (field_type := self.proto_to_py_datatype(field)):
-                    id_field_type = field_type
-                    break
-                # else not required: Avoiding field if not id
-        # else not required: Avoid if message does not have custom id field
-        return id_field_type
-
     def set_req_data_members(self, file: protogen.File):
         super().set_req_data_members(file)
         self.fastapi_file_name = f"{self.proto_file_name}_cache_fastapi"
-        routes_callback_class_name_camel_cased: str = self.convert_to_camel_case(self.routes_callback_class_name)
-        self.routes_callback_class_name_capital_camel_cased: str = \
-            routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
 
     def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
         # Pre-code generation initializations

@@ -1,9 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import { API_PUBLIC_URL } from '../constants';
+import _ from 'lodash';
+import { API_PUBLIC_URL, Modes, SCHEMA_AUTOCOMPLETE_XPATH, SCHEMA_DEFINITIONS_XPATH } from '../constants';
+import { createCollections, getParentSchema } from '../utils';
 
 const initialState = {
     schema: {},
+    schemaCollections: {},
     loading: true,
     error: null
 }
@@ -24,7 +27,23 @@ const schemaSlice = createSlice({
         },
         [getSchema.fulfilled]: (state, action) => {
             state.schema = action.payload;
+            Object.keys(state.schema).map(schemaName => {
+                if ([SCHEMA_AUTOCOMPLETE_XPATH, SCHEMA_DEFINITIONS_XPATH].includes(schemaName)) return;
+                let schema = state.schema;
+                let currentSchema = _.get(schema, schemaName);
+                let isJsonRoot = currentSchema.json_root ? currentSchema.json_root : false;
+                let xpath;
+                let callerProps = {};
+                if (!isJsonRoot) {
+                    xpath = schemaName;
+                    callerProps.xpath = xpath;
+                    callerProps.parentSchema = getParentSchema(schema, schemaName);
+                    callerProps.mode = Modes.READ_MODE;
+                }
+                state.schemaCollections[schemaName] = createCollections(schema, currentSchema, callerProps, undefined, undefined, xpath);
+            });
             state.loading = false;
+            return;
         },
         [getSchema.rejected]: (state, action) => {
             state.error = action.error.code + ': ' + action.error.message;

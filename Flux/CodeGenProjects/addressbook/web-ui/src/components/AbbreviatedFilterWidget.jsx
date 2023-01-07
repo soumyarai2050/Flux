@@ -12,7 +12,7 @@ import Alert from './Alert';
 import AlertBubble from './AlertBubble';
 import {
     getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getColorTypeFromValue,
-    getSizeFromValue, getShapeFromValue, normalise, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, getHoverTextType
+    getSizeFromValue, getShapeFromValue, normalise, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, getHoverTextType, getValueFromReduxStoreFromXpath
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
@@ -35,6 +35,9 @@ const useStyles = makeStyles({
     },
     badge: {
         margin: '0 10px'
+    },
+    listItemSelected: {
+        background: 'rgba(25, 118, 210, 0.2) !important'
     }
 })
 
@@ -80,13 +83,14 @@ const AbbreviatedFilterWidget = (props) => {
                 </Button>
             </Box>
             <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
-            <List>
+            <List className={classes.list}>
                 {props.items && props.items.map((item, i) => {
                     let id = getIdFromAbbreviatedKey(props.abbreviated, item);
                     let disabled = props.mode === Modes.EDIT_MODE && props.selected !== id ? true : false;
                     let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
                     let alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
                     let alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                    let selectedClass = props.selected === id ? classes.listItemSelected : '';
 
                     let extraProps = [];
                     if (props.abbreviated.indexOf('$') !== -1) {
@@ -100,7 +104,7 @@ const AbbreviatedFilterWidget = (props) => {
                     }
 
                     return (
-                        <ListItem key={i} className={classes.listItem} selected={props.selected === id} disablePadding >
+                        <ListItem key={i} className={`${classes.listItem} ${selectedClass}`} selected={props.selected === id} disablePadding >
                             {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
                             <ListItemButton disabled={disabled} onClick={() => props.onSelect(id)}>
                                 <ListItemText>
@@ -109,7 +113,8 @@ const AbbreviatedFilterWidget = (props) => {
                             </ListItemButton>
                             {extraProps.map(extraProp => {
                                 let collection = extraProp.collection;
-                                if (extraProp.value === undefined) return;
+                                if (extraProp.value === undefined || extraProp.value === null) return;
+
                                 if (collection.type === 'button') {
                                     let checked = String(extraProp.value) === collection.button.pressed_value_as_text;
                                     let xpath = collection.xpath;
@@ -130,7 +135,7 @@ const AbbreviatedFilterWidget = (props) => {
                                             size={size}
                                             shape={shape}
                                             color={color}
-                                            disabled={disabled}
+                                            disabled={props.selected !== id ? true : false}
                                             value={extraProp.value}
                                             caption={caption}
                                             xpath={xpath}
@@ -140,35 +145,24 @@ const AbbreviatedFilterWidget = (props) => {
                                     )
                                 } else if (collection.type === 'progressBar') {
                                     let value = extraProp.value;
-                                    if (value === undefined) return;
 
                                     let min = collection.min;
                                     if (typeof (min) === DataTypes.STRING) {
-                                        let sliceName = toCamelCase(min.split('.')[0]);
-                                        let propertyName = 'modified' + capitalizeCamelCase(min.split('.')[0]);
-                                        let minxpath = min.substring(min.indexOf('.') + 1);
-                                        min = getValueFromReduxStore(state, sliceName, propertyName, minxpath);
+                                        min = getValueFromReduxStoreFromXpath(state, min)
                                     }
                                     let max = collection.max;
                                     if (typeof (max) === DataTypes.STRING) {
-                                        let sliceName = toCamelCase(max.split('.')[0]);
-                                        let propertyName = 'modified' + capitalizeCamelCase(max.split('.')[0]);
-                                        let maxxpath = max.substring(max.indexOf('.') + 1);
-                                        max = getValueFromReduxStore(state, sliceName, propertyName, maxxpath);
+                                        max = getValueFromReduxStoreFromXpath(state, max);
                                     }
-
-                                    let percentage = normalise(value, max, min);
-                                    let color = getColorTypeFromPercentage(collection, percentage);
-                                    let hoverType = getHoverTextType(collection.progressBar.hover_text_type)
+                                    let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 
                                     return (
                                         <Box key={collection.key} sx={{ minWidth: '95%', position: 'absolute', bottom: 0 }}>
                                             <ValueBasedProgressBarWithHover
-                                                percentage={percentage}
+                                                collection={collection}
                                                 value={value}
                                                 min={min}
                                                 max={max}
-                                                color={color}
                                                 hoverType={hoverType}
                                             />
                                         </Box>

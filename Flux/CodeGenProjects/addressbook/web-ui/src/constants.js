@@ -2,6 +2,7 @@ export const API_ROOT_URL = 'http://127.0.0.1:8000/addressbook';
 export const API_PUBLIC_URL = 'http://127.0.0.1:3000';
 export const DB_ID = '_id';
 export const SCHEMA_DEFINITIONS_XPATH = 'definitions';
+export const SCHEMA_AUTOCOMPLETE_XPATH = 'autocomplete';
 export const NEW_ITEM_ID = 999999;
 export const COOKIE_NAME = 'addressbook';
 

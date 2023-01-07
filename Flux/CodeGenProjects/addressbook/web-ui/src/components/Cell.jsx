@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { useSelector } from 'react-redux';
-import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener } from '@mui/material';
-import _, { cloneDeep } from 'lodash';
+import _, { cloneDeep, isEqual } from 'lodash';
 import { makeStyles } from '@mui/styles';
-import { clearxpath, getDataxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue, toCamelCase, capitalizeCamelCase, getValueFromReduxStore, normalise, getColorTypeFromPercentage, getHoverTextType } from '../utils';
-import { ColorTypes, DataTypes, Modes } from '../constants';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
+import {
+    clearxpath, getDataxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
+    toCamelCase, capitalizeCamelCase, getValueFromReduxStore, normalise, getColorTypeFromPercentage, getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue
+} from '../utils';
+import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener } from '@mui/material';
+import { ColorTypes, DataTypes, Modes } from '../constants';
 import { AbbreviatedJsonTooltip } from './AbbreviatedJsonWidget';
-import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 
@@ -88,130 +90,71 @@ const useStyles = makeStyles({
 })
 
 const Cell = (props) => {
+    const state = useSelector(state => state);
     const [active, setActive] = useState(false);
     const [open, setOpen] = useState(false);
-    const state = useSelector(state => state);
-    const { data, originalData, row, propname, proptitle, mode, collections } = props;
     const classes = useStyles();
 
-    const onFocusIn = () => {
+    const { data, originalData, row, propname, proptitle, mode, collections } = props;
+
+    const onFocusIn = useCallback(() => {
         setActive(true);
-    }
+    }, [])
 
-    const onFocusOut = () => {
+    const onFocusOut = useCallback(() => {
         setActive(false);
-    }
+    }, [])
 
-    const onOpenTooltip = () => {
+    const onOpenTooltip = useCallback(() => {
         setOpen(true);
-    }
+    }, [])
 
-    const onCloseTooltip = () => {
+    const onCloseTooltip = useCallback(() => {
         setOpen(false);
-    }
-
-    const onTextChange = (e, type, xpath, value) => {
-        if (type === DataTypes.NUMBER) {
-            value = value * 1;
-        }
-        let dataxpath = e.target.getAttribute('dataxpath');
-        let updatedData = cloneDeep(data);
-        _.set(updatedData, dataxpath, value);
-        props.onUpdate(updatedData);
-        props.onUserChange(xpath, value);
-    }
-
-    const onSelectItemChange = (e, dataxpath, xpath) => {
-        let updatedData = cloneDeep(data);
-        _.set(updatedData, dataxpath, e.target.value);
-        props.onUpdate(updatedData);
-        props.onUserChange(xpath, e.target.value);
-    }
-
-    const onCheckboxChange = (e, dataxpath, xpath) => {
-        let updatedData = cloneDeep(data);
-        _.set(updatedData, dataxpath, e.target.checked);
-        props.onUpdate(updatedData);
-        props.onUserChange(xpath, e.target.checked);
-    }
-
-    const onAutocompleteOptionChange = (e, value, dataxpath, xpath) => {
-        let updatedData = cloneDeep(data);
-        _.set(updatedData, dataxpath, value);
-        props.onUpdate(updatedData);
-        props.onUserChange(xpath, value);
-    }
-
-    const onButtonClick = (e, action, xpath, value) => {
-        if (action === 'flux_toggle') {
-            let updatedData = flux_toggle(value);
-            props.onButtonToggle(e, xpath, updatedData);
-        } else if (action === 'flux_trigger_strat') {
-            let updatedData = flux_trigger_strat(value);
-            if (updatedData) {
-                props.onButtonToggle(e, xpath, updatedData);
-            }
-        }
-    }
+    }, [])
 
     let collection = collections.filter(col => col.tableTitle === proptitle)[0];
     let type = DataTypes.STRING;
     let enumValues = [];
     let xpath = proptitle ? proptitle.indexOf('.') > 0 ? row[proptitle.split('.')[0] + '.xpath_' + propname] : row['xpath_' + propname] : row['xpath_' + propname];
     let dataxpath = getDataxpath(data, xpath)
-    let disabled = true;
+    let disabled = false;
 
     if (collection) {
         type = collection.type;
         enumValues = collection.autocomplete_list;
     }
 
-    if (mode === Modes.EDIT_MODE) {
+    if (row[proptitle] === undefined) {
+        disabled = true;
+    } else if (mode === Modes.EDIT_MODE) {
         if (collection && collection.ormNoUpdate && !row['data-add']) {
             disabled = true;
         } else if (collection.uiUpdateOnly && row['data-add']) {
             disabled = true;
         } else if (row['data-remove']) {
             disabled = true;
-        } else if (type === DataTypes.STRING && row[proptitle] === undefined) {
-            disabled = true;
-        } else if (type === DataTypes.BOOLEAN && (row[proptitle] === undefined)) {
-            disabled = true;
-        } else if (type === DataTypes.NUMBER && row[proptitle] === undefined) {
-            disabled = true;
-        } else if (type === DataTypes.ENUM && !row[proptitle]) {
-            disabled = true;
-        } else {
-            disabled = false;
         }
-    } else {
-        disabled = false;
     }
 
-    if (row[proptitle] === undefined) {
-        return (
-            <TableCell className={classes.tableCellDisabled} />
-        )
-    }
-
-    if (active && mode === Modes.EDIT_MODE && !disabled) {
+    if (mode === Modes.EDIT_MODE && active && !disabled) {
         if (collection.autocomplete) {
             return (
                 <TableCell align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
                     <Autocomplete
-                        options={collection.options}
-                        getOptionLabel={(option) => option}
-                        isOptionEqualToValue={(option, value) => option == value}
-                        disableClearable
-                        disabled={disabled}
+                        sx={{ minWidth: 160 }}
+                        className={classes.textField}
                         variant='outlined'
                         size='small'
-                        onBlur={onFocusOut}
-                        sx={{ minWidth: 160 }}
+                        options={collection.options}
+                        disableClearable
+                        disabled={disabled}
                         clearOnBlur={false}
-                        className={classes.textField}
                         value={collection.value}
-                        onChange={(e, v) => onAutocompleteOptionChange(e, v, dataxpath, xpath)}
+                        getOptionLabel={(option) => option}
+                        isOptionEqualToValue={(option, value) => option == value}
+                        onBlur={onFocusOut}
+                        onChange={(e, v) => props.onAutocompleteOptionChange(e, v, dataxpath, xpath)}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
@@ -230,11 +173,10 @@ const Cell = (props) => {
                         size='small'
                         open={active}
                         disabled={disabled}
+                        value={row[proptitle]}
                         onOpen={onFocusIn}
                         onClose={onFocusOut}
-                        value={row[proptitle]}
-                        onChange={(e) => onSelectItemChange(e, dataxpath, xpath)}>
-
+                        onChange={(e) => props.onSelectItemChange(e, dataxpath, xpath)}>
                         {enumValues.map((val) => {
                             return (
                                 <MenuItem key={val} value={val}>
@@ -253,7 +195,7 @@ const Cell = (props) => {
                         defaultValue={false}
                         checked={row[proptitle]}
                         disabled={disabled}
-                        onChange={(e) => onCheckboxChange(e, dataxpath, xpath)}
+                        onChange={(e) => props.onCheckboxChange(e, dataxpath, xpath)}
                     />
                 </TableCell >
             )
@@ -263,41 +205,56 @@ const Cell = (props) => {
                 decimalScale = 0;
             }
             let value = row[proptitle] ? row[proptitle] : 0;
+
+            let min = collection.min;
+            if (typeof (min) === DataTypes.STRING) {
+                min = getValueFromReduxStoreFromXpath(state, min);
+            }
+
+            let max = collection.max;
+            if (typeof (max) === DataTypes.STRING) {
+                max = getValueFromReduxStoreFromXpath(state, max);
+            }
+
             return (
                 <TableCell align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
                     <NumericFormat
                         className={classes.textField}
-                        customInput={TextField}
-                        autoFocus
                         size='small'
-                        disabled={disabled}
-                        onValueChange={(values, sourceInfo) => onTextChange(sourceInfo.event, type, xpath, values.value)}
-                        // onChange={(e) => onTextChange(e, type, xpath)}
-                        // onKeyDown={(e) => onKeyDown(e, type)}
-                        inputProps={{ style: { padding: '6px 10px' }, dataxpath: dataxpath, underlyingtype: collection.underlyingtype }}
                         value={value}
-                        // type={type}
                         placeholder={collection.placeholder}
                         thousandSeparator=','
                         decimalScale={decimalScale}
+                        autoFocus
+                        disabled={disabled}
+                        customInput={TextField}
+                        isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
+                        onValueChange={(values, sourceInfo) => props.onTextChange(sourceInfo.event, type, xpath, values.value)}
+                        inputProps={{
+                            style: { padding: '6px 10px' },
+                            dataxpath: dataxpath,
+                            underlyingtype: collection.underlyingtype
+                        }}
                     />
                 </TableCell>
             )
         } else if (type === DataTypes.STRING && !collection.abbreviated) {
-            let value = row[proptitle];
+            let value = row[proptitle] ? row[proptitle] : '';
             return (
                 <TableCell align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
                     <TextField
                         className={classes.textField}
-                        autoFocus
                         size='small'
-                        disabled={disabled}
-                        onChange={(e) => onTextChange(e, type, xpath, e.target.value)}
-                        // onKeyDown={(e) => onKeyDown(e, type)}
-                        inputProps={{ style: { padding: '6px 10px' }, dataxpath: dataxpath, underlyingtype: collection.underlyingtype }}
+                        autoFocus
                         value={value}
-                        // type={type}
                         placeholder={collection.placeholder}
+                        disabled={disabled}
+                        onChange={(e) => props.onTextChange(e, type, xpath, e.target.value)}
+                        inputProps={{
+                            style: { padding: '6px 10px' },
+                            dataxpath: dataxpath,
+                            underlyingtype: collection.underlyingtype
+                        }}
                     />
                 </TableCell>
             )
@@ -319,7 +276,12 @@ const Cell = (props) => {
 
     if (type === 'button') {
         let value = row[proptitle];
-        if (value === undefined) return;
+        if (value === undefined || value === null) {
+            let tableCellRemove = row['data-remove'] ? classes.tableCellRemove : '';
+            return (
+                <TableCell className={`${classes.tableCellDisabled} ${tableCellRemove}`} />
+            )
+        }
 
         let checked = String(value) === collection.button.pressed_value_as_text;
         let color = getColorTypeFromValue(collection, String(value));
@@ -332,6 +294,7 @@ const Cell = (props) => {
         } else if (!checked && collection.button.unpressed_caption) {
             caption = collection.button.unpressed_caption;
         }
+
         return (
             <TableCell className={classes.tableCellButton} align='center' size='medium'>
                 <ValueBasedToggleButton
@@ -341,8 +304,9 @@ const Cell = (props) => {
                     value={value}
                     caption={caption}
                     xpath={dataxpath}
+                    disabled={row['data-remove'] ? true : false}
                     action={collection.button.action}
-                    onClick={onButtonClick}
+                    onClick={props.onButtonClick}
                 />
             </TableCell>
         )
@@ -350,41 +314,35 @@ const Cell = (props) => {
 
     if (type === 'progressBar') {
         let value = row[proptitle];
-        if (value === undefined) return;
+        if (value === undefined || value === null) {
+            let tableCellRemove = row['data-remove'] ? classes.tableCellRemove : '';
+            return (
+                <TableCell className={`${classes.tableCellDisabled} ${tableCellRemove}`} />
+            )
+        }
 
         let min = collection.min;
         if (typeof (min) === DataTypes.STRING) {
-            let sliceName = toCamelCase(min.split('.')[0]);
-            let propertyName = 'modified' + capitalizeCamelCase(min.split('.')[0]);
-            let minxpath = min.substring(min.indexOf('.') + 1);
-            min = getValueFromReduxStore(state, sliceName, propertyName, minxpath);
-        }
-        let max = collection.max;
-        if (typeof (max) === DataTypes.STRING) {
-            let sliceName = toCamelCase(max.split('.')[0]);
-            let propertyName = 'modified' + capitalizeCamelCase(max.split('.')[0]);
-            let maxxpath = max.substring(max.indexOf('.') + 1);
-            max = 10;
-            max = getValueFromReduxStore(state, sliceName, propertyName, maxxpath);
+            min = getValueFromReduxStoreFromXpath(state, min);
         }
 
-        let percentage = normalise(value, max, min);
-        let color = getColorTypeFromPercentage(collection, percentage);
+        let max = collection.max;
+        if (typeof (max) === DataTypes.STRING) {
+            max = getValueFromReduxStoreFromXpath(state, max);
+        }
         let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 
         return (
             <TableCell align='center' size='medium'>
                 <ValueBasedProgressBarWithHover
-                    percentage={percentage}
+                    collection={collection}
                     value={value}
-                    color={color}
                     min={min}
                     max={max}
                     hoverType={hoverType}
                 />
             </TableCell>
         )
-
     }
 
     if (collection.abbreviated && collection.abbreviated === "JSON") {
@@ -411,6 +369,7 @@ const Cell = (props) => {
                             <Tooltip
                                 title={updatedData}
                                 open={open}
+                                placement='bottom-start'
                                 onClose={onCloseTooltip}
                                 disableFocusListener
                                 disableHoverListener
@@ -424,18 +383,7 @@ const Cell = (props) => {
         }
     }
 
-    let color = ColorTypes.UNSPECIFIED;
-    if (collection) {
-        if (collection.color) {
-            collection.color.split(',').map((colorSet) => {
-                colorSet = colorSet.trim();
-                let [key, value] = colorSet.split('=');
-                if (key === row[proptitle]) {
-                    color = ColorTypes[value];
-                }
-            });
-        }
-    }
+    let color = getColorTypeFromValue(collection, row[proptitle]);
 
     let tableCellColorClass = '';
     if (color === ColorTypes.CRITICAL) tableCellColorClass = classes.tableCellCritical;
@@ -448,9 +396,9 @@ const Cell = (props) => {
     let tableCellRemove = row['data-remove'] ? classes.tableCellRemove : '';
     let disabledClass = disabled ? classes.tableCellDisabled : '';
 
-    let currentValue = row[proptitle] !== undefined ? row[proptitle].toLocaleString() : '';
+    let currentValue = row[proptitle] !== undefined && row[proptitle] !== null ? row[proptitle].toLocaleString() : '';
     if (dataModified) {
-        let originalValue = _.get(originalData, xpath) !== undefined ? _.get(originalData, xpath).toLocaleString() : '';
+        let originalValue = _.get(originalData, xpath) !== undefined && _.get(originalData, xpath) !== null ? _.get(originalData, xpath).toLocaleString() : '';
         return (
             <TableCell className={`${tableCellColorClass} ${disabledClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 <span className={classes.previousValue}>{originalValue}</span>
@@ -476,4 +424,4 @@ Cell.propTypes = {
     collections: PropTypes.array.isRequired
 }
 
-export default Cell;
+export default memo(Cell, isEqual);

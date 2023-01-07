@@ -5,10 +5,7 @@ from typing import List, Callable
 import protogen
 # below main is imported to be accessible to derived classes
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-
-
-# Required for accessing custom options from schema
-import insertion_imports
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, convert_to_camel_case
 
 
 class BaseJSLayoutPlugin(BaseProtoPlugin):
@@ -60,9 +57,9 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
             # else not required: Avoiding manual layout type messages
 
         if self.response_field_case_style.lower() == "snake":
-            self.case_style_convert_method = self.convert_camel_case_to_specific_case
+            self.case_style_convert_method = convert_camel_case_to_specific_case
         elif self.response_field_case_style.lower() == "camel":
-            self.case_style_convert_method = self.convert_to_camel_case
+            self.case_style_convert_method = convert_to_camel_case
         else:
             err_str = f"{self.response_field_case_style} is not supported case style"
             logging.exception(err_str)

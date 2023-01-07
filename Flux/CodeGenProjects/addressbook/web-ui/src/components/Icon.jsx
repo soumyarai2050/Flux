@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 
 const Icon = (props) => {
     return (
-        <IconButton size='small' disabled={props.disabled} className={props.className} onClick={props.onClick}>
+        <IconButton size='small' name={props.name} disabled={props.disabled} className={props.className} onClick={props.onClick}>
             <Tooltip title={props.title}>
                 {props.children}
             </Tooltip>

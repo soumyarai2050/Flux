@@ -11,6 +11,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.PluginFastApi.cache_fastapi_plugin import CacheFastApiPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 
 class SQLModelFastApiPlugin(CacheFastApiPlugin):
@@ -46,7 +47,6 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            option_str = str(message.proto.options)
             if SQLModelFastApiPlugin.flux_msg_json_root in str(message.proto.options):
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
@@ -59,7 +59,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
             self.load_dependency_messages_and_enums_in_dicts(message)
 
     def handle_POST_gen(self, message: protogen.Message, method_desc: str | None = None) -> str:
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = f'@{self.fastapi_app_name}.post("/create-{message_name_snake_cased}' + f'", response_model={message.proto.name} | DefaultWebResponse)\n'
         output_str += f"async def create_{message_name_snake_cased}({message_name_snake_cased}: {message.proto.name}, session: AsyncSession = Depends(get_session)):\n"
         if method_desc:
@@ -81,7 +81,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
         return output_str
 
     def handle_GET_gen(self, message: protogen.Message, method_desc: str | None = None) -> str:
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = f'@{self.fastapi_app_name}.get("/get-{message_name_snake_cased}/' + '{'+f'{message_name_snake_cased}'+'_id}' + f'", response_model={message.proto.name} | DefaultWebResponse)\n'
         output_str += f"async def read_{message_name_snake_cased}({message_name_snake_cased}_id: int, session: AsyncSession = Depends(get_session)):\n"
         if method_desc:
@@ -112,7 +112,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
             err_str = f"Could not find any primary key in {message.proto.name} table"
             logging.exception(err_str)
             raise Exception(err_str)
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = f'@{self.fastapi_app_name}.put("/put-{message_name_snake_cased}/' + f'", response_model={message.proto.name} | DefaultWebResponse)\n'
         output_str += f"async def update_{message_name_snake_cased}({message_name_snake_cased}: {message.proto.name}, session: AsyncSession = Depends(get_session)):\n"
         if method_desc:
@@ -148,7 +148,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
             err_str = f"Could not find any primary key in {message.proto.name} table"
             logging.exception(err_str)
             raise Exception(err_str)
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = f'@{self.fastapi_app_name}.delete("/delete-{message_name_snake_cased}/' + f'", response_model=DefaultWebResponse)\n'
         output_str += f"async def delete_{message_name_snake_cased}({message_name_snake_cased}_id: {primary_key_field_type}, session: AsyncSession = Depends(get_session)):\n"
         if method_desc:
@@ -173,7 +173,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
     def handle_index_req_gen(self, message: protogen.Message, field: protogen.Field) -> str:
         field_name = field.proto.name
         field_type = self.proto_to_py_datatype(field)
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         # @@@ TODO: use response model in this case (throwing error for now)
         output_str = f'@{self.fastapi_app_name}.get("/get-{message_name_snake_cased}_from_{field_name}/' + '{' + f'{message_name_snake_cased}' + '_id}' + f'")\n'
         output_str += f"async def read_{message_name_snake_cased}_from_{field_name}({field_name}: {field_type}, session: AsyncSession = Depends(get_session)):\n"
@@ -193,7 +193,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
         return output_str
 
     def handle_get_all_message_request(self, message: protogen.Message) -> str:
-        message_name_snake_cased = self.convert_camel_case_to_specific_case(message.proto.name)
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         # @@@ TODO: use response model in this case (throwing error for now)
         output_str = f'@{self.fastapi_app_name}.get("/get-all-{message_name_snake_cased}/' + f'")\n'
         output_str += f"async def read_all_{message_name_snake_cased}(session: AsyncSession = Depends(get_session)):\n"

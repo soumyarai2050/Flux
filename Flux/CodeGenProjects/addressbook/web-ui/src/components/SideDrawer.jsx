@@ -32,12 +32,12 @@ const SideDrawer = (props) => {
     return (
         <Paper className={classes.sideDrawer} elevation={3}>
             {props.draggable ? (
-                <Icon className={classes.icon} title='Disable Drag' onClick={props.onToggleDrag}>
+                <Icon className={classes.icon} name="DisableDrag" title='Disable Drag' onClick={props.onToggleDrag}>
                     <DoNotTouch fontSize='medium' />
                 </Icon>
 
             ) : (
-                <Icon className={classes.icon} title='Enable Drag' onClick={props.onToggleDrag}>
+                <Icon className={classes.icon} name="EnableDrag" title='Enable Drag' onClick={props.onToggleDrag}>
                     <PanTool fontSize='medium' />
                 </Icon>
             )}

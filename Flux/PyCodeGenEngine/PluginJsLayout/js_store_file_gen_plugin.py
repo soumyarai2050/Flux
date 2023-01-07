@@ -11,6 +11,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
+from FluxPythonUtils.scripts.utility_functions import capitalized_to_camel_case
 
 
 class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
@@ -35,7 +36,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str = "import { configureStore } from '@reduxjs/toolkit';\n"
         for message in self.root_msg_list:
             message_name = message.proto.name
-            message_name_camel_cased = self.capitalized_to_camel_case(message_name)
+            message_name_camel_cased = capitalized_to_camel_case(message_name)
             output_str += f"import {message_name_camel_cased}Slice from './features/{message_name_camel_cased}Slice';\n"
         output_str += "import schemaSlice from './features/schemaSlice';\n\n"
 
@@ -47,7 +48,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        schema: schemaSlice,\n"
         for message in self.root_msg_list:
             message_name = message.proto.name
-            message_name_camel_cased = self.capitalized_to_camel_case(message_name)
+            message_name_camel_cased = capitalized_to_camel_case(message_name)
 
             # If message is last in list
             if message == self.root_msg_list[-1]:

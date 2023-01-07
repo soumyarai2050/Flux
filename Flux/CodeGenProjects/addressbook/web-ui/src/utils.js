@@ -1,10 +1,15 @@
 import _, { cloneDeep } from 'lodash';
+import {
+    ColorPriority, ColorTypes, DataTypes, HoverTextType, Modes, ShapeType, SizeType,
+    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH
+} from './constants';
 import Node from './components/Node';
 import HeaderField from './components/HeaderField';
-import { ColorPriority, ColorTypes, DataTypes, DB_ID, HoverTextType, Modes, NEW_ITEM_ID, ShapeType, SizeType } from './constants';
 
+// stores the tree expand/collapse states
 const treeState = {};
 
+// complex field properties that are to be passed to the child components
 const complexFieldProps = [
     { propertyName: "server_populate", usageName: "serverPopulate" },
     { propertyName: "ui_update_only", usageName: "uiUpdateOnly" },
@@ -35,6 +40,7 @@ const fieldProps = [
     { propertyName: "progress_bar", usageName: "progressBar" }
 ]
 
+// properties supported explicitly on the array types
 const arrayFieldProps = [
     { propertyName: "alert_bubble_source", usageName: "alertBubbleSource" },
     { propertyName: "alert_bubble_color", usageName: "alertBubbleColor" }
@@ -95,7 +101,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
             collection.xpath = xpath ? xpath + '.' + k : k;
-            if (collection.xpath.indexOf('.') === -1) {
+            if (collection.xpath.indexOf('.') === -1 || (callerProps.parentSchema && collection.xpath.substring(collection.xpath.indexOf('.') + 1).indexOf('.') === -1)) {
                 collection.rootLevel = true;
             }
 
@@ -191,7 +197,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             }
 
             if (collection.abbreviated !== "JSON") {
-                createCollections(schema, record, callerProps, collections, sequence, updatedxpath);
+                createCollections(schema, record, callerProps, collections, sequence, updatedxpath, k);
             }
         } else if (v.type === DataTypes.OBJECT) {
             collection.key = k;
@@ -434,6 +440,9 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
         let isRedundant = true;
         if (!(node.serverPopulate && callerProps.mode === Modes.EDIT_MODE) && !(node.hide && callerProps.hide) && !(node.uiUpdateOnly && node.value === undefined)) {
             isRedundant = false;
+            if (node.type === DataTypes.BOOLEAN && node.button && callerProps.mode === Modes.EDIT_MODE) {
+                isRedundant = true;
+            }
         }
 
         if (!isRedundant) {
@@ -568,7 +577,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
         }
     } else if (currentSchema.hasOwnProperty('items') && currentSchema.type === DataTypes.ARRAY) {
         if (((_.get(data, dataxpath) && _.get(data, dataxpath).length === 0) || (_.keys(data).length > 0 && !_.get(data, dataxpath))) &&
-            (( _.get(originalData, xpath) && _.get(originalData, xpath).length === 0) || !_.get(originalData, xpath))) {
+            ((_.get(originalData, xpath) && _.get(originalData, xpath).length === 0) || !_.get(originalData, xpath))) {
             let childxpath = dataxpath + '[-1]';
             let updatedxpath = xpath + '[-1]';
             addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, childxpath, updatedxpath, currentSchema.items.$ref);
@@ -668,6 +677,8 @@ export function generateRowTrees(jsondata, collections, xpath) {
         Object.entries(jsondata).map(([k, v]) => {
             if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
                 tree[k] = v;
+            } else if (_.isNull(v)) {
+                tree[k] = null;
             } else if (Array.isArray(v)) {
                 tree[k] = [];
                 createTree(tree, jsondata[k], k, { delete: 1 }, collections);
@@ -724,6 +735,8 @@ function createTree(tree, currentjson, propname, count, collections) {
                 currentjson.splice(0, 1);
             }
         }
+    } else if (_.isNull(currentjson)) {
+        tree[propname] = null;
     } else if (_.isObject(currentjson)) {
         if (collections.filter((c) => c.key === propname && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
             tree[propname] = currentjson;
@@ -748,6 +761,8 @@ function createTree(tree, currentjson, propname, count, collections) {
 export function addxpath(jsondata, xpath) {
     Object.entries(jsondata).map(([k, v]) => {
         if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+            jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
+        } else if (_.isNull(v)) {
             jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
         } else if (Array.isArray(v)) {
             for (let i = 0; i < v.length; i++) {
@@ -783,6 +798,16 @@ export function clearxpath(jsondata) {
 function flattenObject(jsondata, object, collections, xpath, parentxpath) {
     Object.entries(jsondata).map(([k, v]) => {
         if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+            if (parentxpath && k !== 'data-id') {
+                if (xpath && xpath === parentxpath) {
+                    object[k] = v;
+                } else {
+                    object[parentxpath + '.' + k] = v;
+                }
+            } else {
+                object[k] = v;
+            }
+        } else if (_.isNull(v)) {
             if (parentxpath) {
                 if (xpath && xpath === parentxpath) {
                     object[k] = v;
@@ -796,7 +821,7 @@ function flattenObject(jsondata, object, collections, xpath, parentxpath) {
             if (collections.filter((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
                 object[k] = v;
             } else if (v.length > 0) {
-                flattenObject(jsondata[k][0], object, collections, xpath);
+                flattenObject(jsondata[k][0], object, collections, xpath, k);
             }
         } else if (_.isObject(v)) {
             if (collections.filter((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
@@ -926,8 +951,8 @@ export function getColorTypeFromPercentage(collection, percentage) {
                 } catch (e) {
                     break;
                 }
-            } else if (valueColorSet.indexOf('<') !== -1) {
-                let [val, colorType] = valueColorSet.split('<');
+            } else if (valueColorSet.indexOf('>') !== -1) {
+                let [val, colorType] = valueColorSet.split('>');
                 val = val.replace('%', '');
                 try {
                     val = parseInt(val);
@@ -1030,9 +1055,11 @@ export function hasxpath(data, xpath) {
     return false;
 }
 
-export function getTableColumns(collections) {
+export function getTableColumns(collections, mode) {
     let columns = collections.map(collection => Object.assign({}, collection)).filter(collection => {
-        if ([DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.STRING, DataTypes.ENUM].includes(collection.type)) {
+        if (collection.serverPopulate && mode === Modes.EDIT_MODE) {
+            return false;
+        } else if ([DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.STRING, DataTypes.ENUM].includes(collection.type)) {
             return true;
         } else if (collection.abbreviated && collection.abbreviated === "JSON") {
             return true;
@@ -1053,11 +1080,11 @@ export function getCommonKeyCollections(rows, tableColumns, hide = false) {
     let commonKeyCollections = [];
     if (rows.length > 0) {
         tableColumns.map((column) => {
-            if(hide && column.hide) return; 
+            if (hide && column.hide) return;
 
             let found = true;
             for (let i = 0; i < rows.length - 1; i++) {
-                if (rows[i][column.tableTitle] !== rows[i + 1][column.tableTitle]) {
+                if (!_.isEqual(rows[i][column.tableTitle], rows[i + 1][column.tableTitle])) {
                     found = false;
                 }
             }
@@ -1106,6 +1133,13 @@ export function getTableRows(collections, originalData, data, xpath) {
     return tableRows;
 }
 
+export function getValueFromReduxStoreFromXpath(state, xpath) {
+    let sliceName = toCamelCase(xpath.split('.')[0]);
+    let propertyName = 'modified' + capitalizeCamelCase(xpath.split('.')[0]);
+    let propxpath = xpath.substring(xpath.indexOf('.') + 1);
+    return getValueFromReduxStore(state, sliceName, propertyName, propxpath);
+}
+
 export function getValueFromReduxStore(state, sliceName, propertyName, xpath) {
     if (state && state.hasOwnProperty(sliceName)) {
         let slice = state[sliceName];
@@ -1133,4 +1167,28 @@ export function getHoverTextType(value) {
         return HoverTextType[hoverType];
     }
     return HoverTextType.HoverTextType_NONE;
+}
+
+export function getParentSchema(schema, currentSchemaName) {
+    let parentSchema;
+    _.keys(_.get(schema, SCHEMA_DEFINITIONS_XPATH)).map((key) => {
+        let current = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, key]);
+        if (current.type === DataTypes.OBJECT && _.has(current.properties, currentSchemaName)) {
+            parentSchema = current;
+        }
+        return;
+    })
+    return parentSchema;
+}
+
+export function isAllowedNumericValue(value, min, max) {
+    console.log({value, min, max});
+    if (min !== undefined && max !== undefined) {
+        return min <= value && value <= max;
+    } else if (min !== undefined) {
+        return min <= value;
+    } else if (max !== undefined) {
+        return value <= max;
+    }
+    return true;
 }

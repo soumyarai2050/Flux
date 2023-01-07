@@ -11,6 +11,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 
 class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
@@ -65,7 +66,7 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
         output_str = ""
         for index, message in enumerate(self.layout_msg_list):
             message_name = message.proto.name
-            message_name_space_sep = self.convert_camel_case_to_specific_case(message_name, " ", False)
+            message_name_space_sep = convert_camel_case_to_specific_case(message_name, " ", False)
             message_name_case_styled = self.case_style_convert_method(message_name)
             output_str += f"<ToggleIcon title='{message_name_space_sep}' name='{message_name_case_styled}' selected=" + \
                           "{show."+f"{message_name_case_styled}"+"} onClick={onToggleWidget}>\n"

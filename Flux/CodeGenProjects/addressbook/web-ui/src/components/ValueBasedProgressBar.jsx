@@ -1,8 +1,8 @@
 import React from 'react';
 import { makeStyles } from '@mui/styles';
-import { LinearProgress, Box, Typography, Tooltip } from '@mui/material';
-import PropTypes from 'prop-types';
+import { LinearProgress, Tooltip } from '@mui/material';
 import { ColorTypes, HoverTextType } from '../constants';
+import { getColorTypeFromPercentage, normalise } from '../utils';
 
 const useStyles = makeStyles({
     progressBar: {
@@ -58,13 +58,21 @@ export const ValueBasedProgressBarWithHover = (props) => {
 
     const classes = useStyles();
 
+    let percentage = normalise(props.value, props.max, props.min);
+    let reverse = props.collection.progressBar.is_reverse ? true : false;
+    if(reverse) {
+        percentage = normalise(props.max - props.value, props.max, props.min);
+    }
+
+    let color = getColorTypeFromPercentage(props.collection, percentage);
+
     let progressBarColorClass = '';
-    if (props.color === ColorTypes.CRITICAL) progressBarColorClass = classes.critical;
-    else if (props.color === ColorTypes.ERROR) progressBarColorClass = classes.error;
-    else if (props.color === ColorTypes.WARNING) progressBarColorClass = classes.warning;
-    else if (props.color === ColorTypes.INFO) progressBarColorClass = classes.info;
-    else if (props.color === ColorTypes.DEBUG) progressBarColorClass = classes.debug;
-    else if (props.color === ColorTypes.SUCCESS) progressBarColorClass = classes.success;
+    if (color === ColorTypes.CRITICAL) progressBarColorClass = classes.critical;
+    else if (color === ColorTypes.ERROR) progressBarColorClass = classes.error;
+    else if (color === ColorTypes.WARNING) progressBarColorClass = classes.warning;
+    else if (color === ColorTypes.INFO) progressBarColorClass = classes.info;
+    else if (color === ColorTypes.DEBUG) progressBarColorClass = classes.debug;
+    else if (color === ColorTypes.SUCCESS) progressBarColorClass = classes.success;
 
     let hoverText = '';
     if(props.hoverType === HoverTextType.HoverTextType_VALUE) {
@@ -77,34 +85,7 @@ export const ValueBasedProgressBarWithHover = (props) => {
 
     return (
         <Tooltip title={hoverText}>
-            <LinearProgress variant="determinate" value={props.percentage} className={`${classes.progressBar} ${progressBarColorClass}`} />
+            <LinearProgress variant="determinate" value={percentage} className={`${classes.progressBar} ${progressBarColorClass}`} />
         </Tooltip>
-    )
-}
-
-export const ValueBasedProgressBarWithLabel = (props) => {
-
-    const classes = useStyles();
-
-    let progressBarColorClass = '';
-    if (props.color === ColorTypes.CRITICAL) progressBarColorClass = classes.critical;
-    else if (props.color === ColorTypes.ERROR) progressBarColorClass = classes.error;
-    else if (props.color === ColorTypes.WARNING) progressBarColorClass = classes.warning;
-    else if (props.color === ColorTypes.INFO) progressBarColorClass = classes.info;
-    else if (props.color === ColorTypes.DEBUG) progressBarColorClass = classes.debug;
-    else if (props.color === ColorTypes.SUCCESS) progressBarColorClass = classes.success;
-
-    return (
-
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Box sx={{ width: '100%', mr: 1 }}>
-                <LinearProgress variant="determinate" value={props.percentage} className={`${classes.progressBar} ${progressBarColorClass}`} />
-            </Box>
-            <Box sx={{ minWidth: 35 }}>
-                <Typography variant="body2" color="text.secondary">
-                    {props.value}/{props.max}
-                </Typography>
-            </Box>
-        </Box>
     )
 }

@@ -9,6 +9,12 @@ import "ui_core.proto";
 // 2. Trailing comments private to model files and not accessible in plugin
 
 
+message FluxMsgNestedFldValFilter{
+  required string field_name = 1;
+  repeated string string_val_filters = 2;
+  repeated bool bool_val_filters = 3;
+}
+
 message ForeignKeyOption
 {
   required string JoiningTableName = 1;
@@ -67,6 +73,7 @@ extend google.protobuf.MessageOptions
   repeated ForeignKeyOption FluxMsgFk = 52155;
   repeated DBOnlyFieldOption FluxDbOnlyField = 52156;
   repeated UsageParamNameOption FluxMsgOrmUsageParam = 52157;
+  repeated FluxMsgNestedFldValFilter FluxMsgNestedFldValFilterParam = 52158;
 
 
   //Service Options - 53

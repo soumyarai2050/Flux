@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os
 import protogen
-from typing import List, Callable
+from typing import List, Callable, ClassVar
 import logging
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 
@@ -10,20 +10,17 @@ class Pb2ImportGenerator(BaseProtoPlugin):
     """
     Plugin Script to add imports of pb2 files in insertion_imports.py
     """
+    insertion_import_file_name: ClassVar[str] = "insertion_imports.py"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
         # Overriding below all data-members for this script
         # Both template_file_path and output_file_name are same as this plugin adds import in same template file
-        plugin_dir = None
-        insertion_import_file_name = None
-        if (plugin_dir := os.getenv("PLUGIN_DIR")) is not None and \
-                (insertion_import_file_name := os.getenv("INSERTION_IMPORT_FILE_NAME")) is not None:
-            self.template_file_path = os.path.join(plugin_dir, insertion_import_file_name)
-            self.output_file_name = insertion_import_file_name
+        if (py_code_gen_core_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None:
+            self.template_file_path = os.path.join(py_code_gen_core_path, Pb2ImportGenerator.insertion_import_file_name)
+            self.output_file_name = Pb2ImportGenerator.insertion_import_file_name
         else:
-            err_str = f"Env var 'PROJECT_DIR' and 'INSERTION_IMPORT_FILE_NAME' received " \
-                      f"as {plugin_dir} and {insertion_import_file_name}"
+            err_str = f"Env var 'PY_CODE_GEN_CORE_PATH' received as None"
             logging.exception(err_str)
             raise Exception(err_str)
         self.insertion_point_key_list: List[str] = [

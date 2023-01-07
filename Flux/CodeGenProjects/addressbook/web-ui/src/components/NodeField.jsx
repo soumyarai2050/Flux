@@ -1,10 +1,11 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
 import { makeStyles } from '@mui/styles';
 import { ColorTypes, DataTypes, Modes } from '../constants';
 import { Select, MenuItem, TextField, Autocomplete, Checkbox } from '@mui/material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue } from '../utils';
+import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue } from '../utils';
 
 const useStyles = makeStyles({
     autocomplete: {
@@ -88,7 +89,7 @@ const useStyles = makeStyles({
 })
 
 const NodeField = (props) => {
-
+    const state = useSelector(state => state);
     const classes = useStyles();
 
     let disabled = true;
@@ -114,8 +115,8 @@ const NodeField = (props) => {
             if (!props.data.value) {
                 error = true;
             }
-        } else if(props.data.type === DataTypes.ENUM) {
-            if(props.data.value.includes('UNSPECIFIED')) {
+        } else if (props.data.type === DataTypes.ENUM) {
+            if (props.data.value.includes('UNSPECIFIED')) {
                 error = true;
             }
         }
@@ -123,9 +124,9 @@ const NodeField = (props) => {
 
     let color = '';
     let colorClass = '';
-    if(props.data.color) {
+    if (props.data.color) {
         color = getColorTypeFromValue(props.data, props.data.value);
-    } 
+    }
     if (color === ColorTypes.CRITICAL) colorClass = classes.nodeFieldCritical;
     else if (color === ColorTypes.ERROR) colorClass = classes.nodeFieldError;
     else if (color === ColorTypes.WARNING) colorClass = classes.nodeFieldWarning;
@@ -148,7 +149,7 @@ const NodeField = (props) => {
                 sx={{ minWidth: 160 }}
                 className={`${classes.textField} ${nodeFieldRemove} ${colorClass}`}
                 required={props.data.required}
-                value={props.data.value}
+                value={props.data.value ? props.data.value : null}
                 onChange={(e, v) => props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath)}
                 renderInput={(params) => (
                     <TextField
@@ -190,6 +191,17 @@ const NodeField = (props) => {
         if (props.data.underlyingtype === DataTypes.INT32 || props.data.underlyingtype === DataTypes.INT64) {
             decimalScale = 0;
         }
+
+        let min = props.data.min;
+        if (typeof (min) === DataTypes.STRING) {
+            min = getValueFromReduxStoreFromXpath(state, min);
+        }
+
+        let max = props.data.max;
+        if (typeof (max) === DataTypes.STRING) {
+            max = getValueFromReduxStoreFromXpath(state, max);
+        }
+
         let value = props.data.value ? props.data.value : 0;
         return (
             <NumericFormat
@@ -203,6 +215,7 @@ const NodeField = (props) => {
                 value={value}
                 disabled={disabled}
                 thousandSeparator=','
+                isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
                 onValueChange={(values, sourceInfo) => props.data.onTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value)}
                 // onChange={(e) => props.data.onTextChange(e, props.data.type, props.data.xpath)}
                 // onKeyDown={(e) => props.data.onKeyDown(e, props.data.type)}

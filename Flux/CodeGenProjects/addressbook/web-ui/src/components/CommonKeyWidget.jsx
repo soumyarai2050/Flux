@@ -153,7 +153,9 @@ const CommonKey = (props) => {
                     {abbreviatedField}
                 </span>
             ) : (
-                <span className={commonkeyColorClass}>{String(collection.value)}</span>
+                <span className={commonkeyColorClass}>
+                    {collection.type === DataTypes.NUMBER && collection.value ? collection.value.toLocaleString() : String(collection.value)}
+                </span>
             )}
         </Box>
     )
