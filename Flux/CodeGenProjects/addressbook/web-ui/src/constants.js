@@ -47,7 +47,8 @@ export const DataTypes = {
     ARRAY: 'array',
     INT32: 'int32',
     INT64: 'int64',
-    FLOAT: 'float'
+    FLOAT: 'float',
+    DATE_TIME: 'date-time'
 }
 
 export const ComponentType = {

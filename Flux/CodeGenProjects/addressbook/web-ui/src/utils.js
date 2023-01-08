@@ -8,6 +8,7 @@ import HeaderField from './components/HeaderField';
 
 // stores the tree expand/collapse states
 const treeState = {};
+const primitiveDataTypes = [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM, DataTypes.DATE_TIME];
 
 // complex field properties that are to be passed to the child components
 const complexFieldProps = [
@@ -391,7 +392,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     if ((Object.keys(data).length === 0 && Object.keys(originalData).length === 0) || (dataxpath && !_.get(data, dataxpath) && !_.get(originalData, xpath))) return;
 
     let attributes = currentSchema.properties[propname];
-    if (attributes.hasOwnProperty('type') && [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM].includes(attributes.type)) {
+    if (attributes.hasOwnProperty('type') && primitiveDataTypes.includes(attributes.type)) {
         node.id = propname;
         node.key = propname;
         node.required = currentSchema.required.filter(p => p === propname) ? true : false;
@@ -419,6 +420,10 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
             let enumdata = getEnumValues(schema, ref, attributes.type);
             node.dropdowndataset = enumdata;
             node.onSelectItemChange = callerProps.onSelectItemChange;
+        }
+
+        if (attributes.type === DataTypes.DATE_TIME) {
+            node.onDateTimeChange = callerProps.onDateTimeChange;
         }
 
         complexFieldProps.map(({ propertyName, usageName }) => {
@@ -501,7 +506,7 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps) {
     Object.keys(currentSchema.properties).map((propname) => {
         if (callerProps.xpath && callerProps.xpath !== propname) return;
         let metadataProp = currentSchema.properties[propname];
-        if (metadataProp.hasOwnProperty('type') && [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM].includes(metadataProp.type)) {
+        if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
             addSimpleNode(childNode, schema, currentSchema, propname, callerProps);
         }
         else {
@@ -563,7 +568,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
                     }
                     let updatedxpath = xpath + '.' + prop;
                     addNode(childNode, schema, metadataProp, prop, callerProps, childxpath, null, updatedxpath);
-                } else if (metadataProp.hasOwnProperty('type') && [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM].includes(metadataProp.type)) {
+                } else if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
                     addSimpleNode(childNode, schema, metadata, prop, callerProps, dataxpath, xpath);
                 } else {
                     let childxpath = dataxpath;
@@ -774,6 +779,7 @@ export function addxpath(jsondata, xpath) {
             let childxpath = xpath ? xpath + '.' + k : k;
             addxpath(jsondata[k], childxpath)
         }
+        return;
     });
     return jsondata;
 }
@@ -1182,7 +1188,6 @@ export function getParentSchema(schema, currentSchemaName) {
 }
 
 export function isAllowedNumericValue(value, min, max) {
-    console.log({value, min, max});
     if (min !== undefined && max !== undefined) {
         return min <= value && value <= max;
     } else if (min !== undefined) {
@@ -1191,4 +1196,28 @@ export function isAllowedNumericValue(value, min, max) {
         return value <= max;
     }
     return true;
+}
+
+export function getXpathKeyValuePairFromObject(object, dict = {}) {
+    Object.entries(object).map(([k, v]) => {
+        if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+            if (!k.startsWith('xpath_')) {
+                let xpath = object['xpath_' + k];
+                dict[xpath] = v;
+            }
+        } else if (_.isNull(v)) {
+            if (!k.startsWith('xpath_')) {
+                let xpath = object['xpath_' + k];
+                dict[xpath] = v;
+            }
+        } else if (Array.isArray(v)) {
+            for (let i = 0; i < v.length; i++) {
+                getXpathKeyValuePairFromObject(object[k][i], dict);
+            }
+        } else if (_.isObject(v)) {
+            getXpathKeyValuePairFromObject(object[k], dict);
+        }
+        return;
+    });
+    return dict;
 }

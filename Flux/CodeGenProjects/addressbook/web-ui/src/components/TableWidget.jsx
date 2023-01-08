@@ -293,6 +293,13 @@ const TableWidget = (props) => {
         props.onUserChange(xpath, value);
     }, [data, props.onUpdate, props.onUserChange])
 
+    const onDateTimeChange = useCallback((dataxpath, xpath, value) => {
+        let updatedData = cloneDeep(data);
+        _.set(updatedData, dataxpath, value);
+        props.onUpdate(updatedData);
+        props.onUserChange(xpath, value);
+    }, [data, props.onUpdate, props.onUserChange])
+
     const onButtonClick = useCallback((e, action, xpath, value) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
@@ -436,13 +443,12 @@ const TableWidget = (props) => {
                                                         onUpdate={props.onUpdate}
                                                         onAbbreviatedFieldOpen={onAbbreviatedFieldOpen}
                                                         onDoubleClick={onRowClick}
-                                                        // onButtonToggle={onButtonToggle}
                                                         onButtonClick={onButtonClick}
                                                         onCheckboxChange={onCheckboxChange}
                                                         onTextChange={onTextChange}
                                                         onSelectItemChange={onSelectItemChange}
                                                         onAutocompleteOptionChange={onAutocompleteOptionChange}
-                                                    // onUserChange={props.onUserChange}
+                                                        onDateTimeChange={onDateTimeChange}
                                                     />
                                                 )
                                             })}

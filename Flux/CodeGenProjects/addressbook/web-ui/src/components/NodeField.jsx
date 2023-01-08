@@ -6,6 +6,8 @@ import { Select, MenuItem, TextField, Autocomplete, Checkbox } from '@mui/materi
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
 import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue } from '../utils';
+import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 const useStyles = makeStyles({
     autocomplete: {
@@ -229,6 +231,26 @@ const NodeField = (props) => {
                     underlyingtype: props.data.underlyingtype
                 }}
             />
+        )
+    } else if (props.data.type === DataTypes.DATE_TIME) {
+        let value = props.data.value ? new Date(props.data.value) : null;
+        return (
+            <LocalizationProvider dateAdapter={AdapterDayjs}>
+                <DateTimePicker
+                    className={`${classes.textField} ${nodeFieldRemove} ${colorClass}`}
+                    disabled={disabled}
+                    error={error}
+                    value={value}
+                    inputFormat="DD-MM-YYYY HH:mm:ss"
+                    onChange={(newValue) => props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, new Date(newValue).toISOString())}
+                    inputProps={{
+                        style: { padding: '6px 10px' },
+                        dataxpath: props.data.dataxpath,
+                        underlyingtype: props.data.underlyingtype
+                    }}
+                    renderInput={(props) => <TextField {...props} />}
+                />
+            </LocalizationProvider>
         )
     } else {
         let value = props.data.value ? props.data.value : '';

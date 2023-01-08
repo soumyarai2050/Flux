@@ -13,6 +13,8 @@ import { ColorTypes, DataTypes, Modes } from '../constants';
 import { AbbreviatedJsonTooltip } from './AbbreviatedJsonWidget';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
+import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 const useStyles = makeStyles({
     previousValue: {
@@ -237,6 +239,25 @@ const Cell = (props) => {
                         }}
                     />
                 </TableCell>
+            )
+        } else if (type === DataTypes.DATE_TIME) {
+            let value = row[proptitle] ? new Date(row[proptitle]) : null;
+            return (
+                <LocalizationProvider dateAdapter={AdapterDayjs}>
+                    <DateTimePicker
+                        className={classes.textField}
+                        disabled={disabled}
+                        value={value}
+                        inputFormat="DD-MM-YYYY HH:mm:ss"
+                        onChange={(newValue) => props.onDateTimeChange(props.data.dataxpath, props.data.xpath, new Date(newValue).toISOString())}
+                        inputProps={{
+                            style: { padding: '6px 10px' },
+                            dataxpath: dataxpath,
+                            underlyingtype: collection.underlyingtype
+                        }}
+                        renderInput={(props) => <TextField {...props} />}
+                    />
+                </LocalizationProvider>
             )
         } else if (type === DataTypes.STRING && !collection.abbreviated) {
             let value = row[proptitle] ? row[proptitle] : '';

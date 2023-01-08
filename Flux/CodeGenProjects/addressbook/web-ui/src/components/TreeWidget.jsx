@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import WidgetContainer from './WidgetContainer';
 import InfinityMenu from 'react-infinity-menu-plus';
 import _, { cloneDeep } from 'lodash';
-import { generateTreeStructure, generateObjectFromSchema, addxpath, getDataxpath, setTreeState } from '../utils';
+import { generateTreeStructure, generateObjectFromSchema, addxpath, getDataxpath, setTreeState, getXpathKeyValuePairFromObject } from '../utils';
 import Icon from './Icon';
 import { UnfoldMore, UnfoldLess, VisibilityOff, Visibility } from '@mui/icons-material';
 import { makeStyles } from '@mui/styles';
@@ -41,7 +41,8 @@ const TreeWidget = (props) => {
             // 'onKeyDown': props.onKeyDown ? props.onKeyDown : onKeyDown,
             'onSelectItemChange': props.onSelectItemChange ? props.onSelectItemChange : onSelectItemChange,
             'onCheckboxChange': props.onCheckboxChange ? props.onCheckboxChange : onCheckboxChange,
-            'onAutocompleteOptionChange': props.onAutocompleteOptionChange ? props.onAutocompleteOptionChange : onAutocompleteOptionChange
+            'onAutocompleteOptionChange': props.onAutocompleteOptionChange ? props.onAutocompleteOptionChange : onAutocompleteOptionChange,
+            'onDateTimeChange': props.onDateTimeChange ? props.onDateTimeChange : onDateTimeChange
         }))
         setIsOpen();
     }, [props.schema, props.data, props.mode, props.subtree, props.xpath, isOpen, hide])
@@ -63,14 +64,13 @@ const TreeWidget = (props) => {
         props.onUserChange(xpath, value);
     }
 
-    // const onKeyDown = (e, type) => {
-    //     let underlyingtype = e.target.getAttribute('underlyingtype');
-    //     if (type === DataTypes.NUMBER && underlyingtype === DataTypes.INT32) {
-    //         if (e.keyCode === 110) {
-    //             e.preventDefault();
-    //         }
-    //     }
-    // }
+    const onDateTimeChange = (dataxpath, xpath, value) => {
+        console.log(value);
+        let updatedData = cloneDeep(props.data);
+        _.set(updatedData, dataxpath, value);
+        props.onUpdate(updatedData);
+        props.onUserChange(xpath, value);
+    }
 
     const onSelectItemChange = (e, dataxpath, xpath) => {
         let updatedData = cloneDeep(props.data);
@@ -102,6 +102,8 @@ const TreeWidget = (props) => {
             let index = parseInt(xpath.substring(xpath.lastIndexOf('[') + 1, xpath.lastIndexOf(']')));
             let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
             let parentObject = _.get(updatedData, parentxpath);
+            let changesDict = getXpathKeyValuePairFromObject(_.get(updatedData, xpath));
+            props.onUserChange(undefined, undefined, true, changesDict);
             parentObject.splice(index, 1);
             console.log({ updatedData });
             props.onUpdate(updatedData, 'remove');
@@ -131,6 +133,8 @@ const TreeWidget = (props) => {
             let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
             let emptyObject = generateObjectFromSchema(props.schema, currentSchema);
             emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
+            let changesDict = getXpathKeyValuePairFromObject(emptyObject);
+            props.onUserChange(undefined, undefined, false, changesDict);
             parentObject.push(emptyObject);
             console.log({ updatedData });
             props.onUpdate(updatedData, 'add');

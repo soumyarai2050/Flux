@@ -1,10 +1,14 @@
+# system imports
 import json
-from fastapi.encoders import jsonable_encoder
 from typing import List, Any, Tuple
 import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException
+# other package imports
+from pydantic import ValidationError
+from fastapi.encoders import jsonable_encoder
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+# project specific imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
 
@@ -222,11 +226,15 @@ async def get_obj(pydantic_class_type, pydantic_obj_id, filter_var_val_list: Lis
 
 async def get_obj_list(pydantic_class_type, filter_var_val_list: List[Tuple] | None = None):
     pydantic_list: List[pydantic_class_type]
-    if filter_var_val_list is None:
-        pydantic_list = await pydantic_class_type.find_all().to_list()
-    else:
-        pydantic_list = await get_filtered_obj_list(filter_var_val_list, pydantic_class_type)
-    return pydantic_list
+    try:
+        if filter_var_val_list is None:
+            pydantic_list = await pydantic_class_type.find_all().to_list()
+        else:
+            pydantic_list = await get_filtered_obj_list(filter_var_val_list, pydantic_class_type)
+        return pydantic_list
+    except ValidationError as e:
+        logging.error(f"Pydantic validation error: {e}")
+        raise e
 
 
 async def get_filtered_obj_list(filter_var_val_list, pydantic_class_type, pydantic_obj_id=None):

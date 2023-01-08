@@ -79,7 +79,6 @@ message Quote{
 // stores all position types from all sources for optimal selection, usage and clearance
 // one can design to make entry with the cheapest option first & clear the most expensive used position first
 message Position{
-  // this can be converted into a button (more thought needed)
   optional bool pos_disable = 1 [default = false, (FluxFldButton) = {
     unpressed_caption: "disable",
     pressed_caption: "enable",
