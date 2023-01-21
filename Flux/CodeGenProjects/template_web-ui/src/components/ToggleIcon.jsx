@@ -1,23 +1,33 @@
 import React from 'react';
 import { makeStyles } from '@mui/styles';
-import { Tooltip, ToggleButton, Avatar } from '@mui/material';
+import { Tooltip, ToggleButton, Avatar, IconButton } from '@mui/material';
 import PropTypes from 'prop-types';
 
 const useStyles = makeStyles({
     toggleIcon: {
-        margin: '4px !important',
+        // margin: '4px !important',
+        padding: '2px !important',
+        borderRadius: '50%',
         color: '444 !important',
         '&.Mui-selected': {
             color: 'blue !important',
-            backgroundColor: '#999 !important'
+            // backgroundColor: '#999 !important'
+        },
+        '&.Mui-selected>.MuiAvatar-root': {
+            color: 'white !important',
+            backgroundColor: 'blue !important'
         }
     },
     avatar: {
         color: 'inherit !important',
-        // height: '30px!important',
-        // width: '30px !important',
+        height: '30px! important',
+        width: '30px !important',
         '&:hover': {
             background: 'white'
+        },
+        '&.Mui-selected': {
+            color: 'white',
+            backgroundColor: 'blue !important'
         }
     }
 })

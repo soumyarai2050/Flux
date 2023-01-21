@@ -12,9 +12,9 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
     """
     Plugin script to generate jsx file for ORM root messages
     """
-    flux_msg_tree_layout_value: str = "Tree"
-    flux_msg_table_layout_value: str = "Table"
-    flux_msg_abbreviated_filter_layout_value: str = "AbbreviatedFilter"
+    flux_msg_tree_layout_value: str = "UI_TREE"
+    flux_msg_table_layout_value: str = "UI_TABLE"
+    flux_msg_abbreviated_filter_layout_value: str = "UI_ABBREVIATED_FILTER"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -38,23 +38,26 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                 self.root_msg_list.append(message)
             # else not required: Avoiding non ORM root messages
 
-            if BaseJSLayoutPlugin.flux_msg_layout in options_str:
-                self.layout_msg_list.append(message)
-                layout_type: str = self.get_non_repeated_valued_custom_option_value(
-                            message.proto.options,
-                            BaseJSLayoutPlugin.flux_msg_layout)[1:-1]
-                if BaseJSLayoutPlugin.flux_msg_tree_layout_value == layout_type:
-                    self.tree_layout_msg_list.append(message)
-                elif BaseJSLayoutPlugin.flux_msg_table_layout_value == layout_type:
-                    self.table_layout_msg_list.append(message)
-                elif BaseJSLayoutPlugin.flux_msg_abbreviated_filter_layout_value == layout_type:
-                    self.abbreviated_filter_layout_msg_list.append(message)
-                else:
-                    err_str = f"{layout_type} is not a valid layout option value found in proto message " \
-                              f"{message.proto.name}"
-                    logging.exception(err_str)
-                    raise Exception(err_str)
-            # else not required: Avoiding manual layout type messages
+            if BaseJSLayoutPlugin.flx_msg_widget_ui_data in options_str:
+                widget_ui_data_option_list_of_dict = \
+                    self.get_complex_option_values_as_list_of_dict(message,
+                                                                   BaseJSLayoutPlugin.flx_msg_widget_ui_data)[0]
+                if "layout" in widget_ui_data_option_list_of_dict:
+                    self.layout_msg_list.append(message)
+                    layout_type: str = widget_ui_data_option_list_of_dict["layout"].strip()
+                    if BaseJSLayoutPlugin.flux_msg_tree_layout_value == layout_type:
+                        self.tree_layout_msg_list.append(message)
+                    elif BaseJSLayoutPlugin.flux_msg_table_layout_value == layout_type:
+                        self.table_layout_msg_list.append(message)
+                    elif BaseJSLayoutPlugin.flux_msg_abbreviated_filter_layout_value == layout_type:
+                        self.abbreviated_filter_layout_msg_list.append(message)
+                    else:
+                        err_str = f"{layout_type} is not a valid layout option value found in proto message " \
+                                  f"{message.proto.name}"
+                        logging.exception(err_str)
+                        raise Exception(err_str)
+                # else not required: Avoiding if flx_msg_widget_ui_data doesn't have layout field
+            # else not required: If msg doesn't have flx_msg_widget_ui_data then it will not have layout field
 
         if self.response_field_case_style.lower() == "snake":
             self.case_style_convert_method = convert_camel_case_to_specific_case

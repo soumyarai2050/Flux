@@ -24,7 +24,8 @@ const useStyles = makeStyles({
         paddingRight: 5
     },
     commonkeyCritical: {
-        color: '#9C0006 !important'
+        color: '#9C0006 !important',
+        animation: `$blink 0.5s step-start infinite`
     },
     commonkeyError: {
         color: '#9C0006 !important'
@@ -48,6 +49,36 @@ const useStyles = makeStyles({
         color: 'blue',
         fontWeight: 'bold',
         cursor: 'pointer'
+    },
+    keyCritical: {
+        color: '#9C0006 !important',
+        animation: `$blink 0.5s step-start infinite`
+    },
+    keyError: {
+        color: '#9C0006 !important'
+    },
+    keyInfo: {
+        color: 'blue !important'
+    },
+    keyWarning: {
+        color: '#9c6500 !important'
+    },
+    keySuccess: {
+        color: 'darkgreen !important'
+    },
+    keyDebug: {
+        color: 'black !important'
+    },
+    "@keyframes blink": {
+        "from": {
+            opacity: 1
+        },
+        "50%": {
+            opacity: 0.8
+        },
+        "to": {
+            opacity: 1
+        }
     }
 })
 
@@ -62,7 +93,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
     return (
         <Box ref={ref} className={classes.widgetContainer}>
             {commonkeys.map((collection, i) => {
-                if (collection.value === undefined) return;
+                if (collection.value === undefined || collection.value === null) return;
                 if (collection.type === 'button') return;
                 if (Array.isArray(collection.value) && collection.value.length === 0) return;
                 if (_.isObject(collection.value) && _.keys(collection.value).length === 0) return;
@@ -145,9 +176,22 @@ const CommonKey = (props) => {
     else if (color === ColorTypes.INFO) commonkeyColorClass = classes.commonkeyInfo;
     else if (color === ColorTypes.DEBUG) commonkeyColorClass = classes.commonkeyDebug;
 
+    let commonkeyTitleColorClass = '';
+    if (collection.nameColor) {
+        let nameColor = collection.nameColor.toLowerCase();
+        if (nameColor === ColorTypes.CRITICAL) commonkeyTitleColorClass = classes.keyCritical;
+        else if (nameColor === ColorTypes.ERROR) commonkeyTitleColorClass = classes.keyError;
+        else if (nameColor === ColorTypes.WARNING) commonkeyTitleColorClass = classes.keyWarning;
+        else if (nameColor === ColorTypes.INFO) commonkeyTitleColorClass = classes.keyInfo;
+        else if (nameColor === ColorTypes.DEBUG) commonkeyTitleColorClass = classes.keyDebug;
+        else if (nameColor === ColorTypes.SUCCESS) commonkeyTitleColorClass = classes.keySuccess;
+    }
+
     return (
         <Box className={classes.commonkey}>
-            <span className={classes.commonkeyTitle}>{collection.tableTitle}:</span>
+            <span className={`${classes.commonkeyTitle} ${commonkeyTitleColorClass}`}>
+                {collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}:
+            </span>
             {collection.abbreviated && collection.abbreviated === "JSON" ? (
                 <span className={abbreviatedJsonClass} onClick={onOpenAbbreviatedField}>
                     {abbreviatedField}

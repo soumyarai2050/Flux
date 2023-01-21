@@ -130,7 +130,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         return output_str
 
     def handle_imports(self) -> str:
-        output_str = "from pydantic import Field, BaseModel\n"
+        output_str = "from pydantic import Field, BaseModel, validator\n"
         output_str += "import pendulum\n"
         output_str += "from typing import Dict, List, ClassVar, Any\n"
         output_str += "from threading import Lock\n"
@@ -157,6 +157,8 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
             err_str = f"{self.response_field_case_style} is not supported response type"
             logging.exception(err_str)
             raise Exception(err_str)
+        generic_utils_import_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_utils")
+        output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime\n"
         output_str += "from typing import List\n\n\n"
         return output_str
 

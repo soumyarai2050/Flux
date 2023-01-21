@@ -44,6 +44,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.ordered_message_list: List[protogen.Message] = []
         self.enum_type_validator()
         self.proto_file_name: str = ""
+        self.proto_package_name: str = ""
         self.model_file_name: str = ""
         self.model_import_file_name: str = ""
 
@@ -154,7 +155,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str = ""
         if not has_id_field:
             output_str += f"    {BasePydanticModelPlugin.default_id_field_name}: " \
-                          f"{BasePydanticModelPlugin.default_id_type} = " \
+                          f"{BasePydanticModelPlugin.default_id_type_var_name} = " \
                           f"Field(alias='_id')\n"
         # else not required: if id field is present already then will be handled in next for loop
 
@@ -191,7 +192,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str += self._underlying_handle_none_default_fields(message, has_id_field)
         output_str += "\n"
         output_str += self._add_config_class()
-        output_str += "\n\n"
+        output_str += "\n"
+        output_str += self._add_datetime_validator(message)
+        output_str += "\n"
         return output_str
 
     def _handle_incremental_id_protected_field_override(self, message: protogen.Message) -> str:
@@ -205,8 +208,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str = "    read_ws_path_ws_connection_manager: " \
                      "ClassVar[PathWSConnectionManager] = PathWSConnectionManager()\n"
         options_list_of_dict = \
-            self.get_complex_msg_option_values_as_list_of_dict(message,
-                                                               BasePydanticModelPlugin.flux_msg_json_root)
+            self.get_complex_option_values_as_list_of_dict(message,
+                                                           BasePydanticModelPlugin.flux_msg_json_root)
         if options_list_of_dict and \
                 BasePydanticModelPlugin.flux_json_root_read_websocket_field in options_list_of_dict[0]:
             output_str += "    read_ws_path_with_id_ws_connection_manager: " \
@@ -246,10 +249,25 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     break
                 # else not required: If no field is id override then handling default id type in else of for loop
             else:
-                output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{BasePydanticModelPlugin.default_id_type}, " \
+                output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{BasePydanticModelPlugin.default_id_type_var_name}, " \
                               f"'{message.proto.name}']] = " + "{}\n"
             output_str += self._handle_ws_connection_manager_data_members_override(message)
         # else not required: Avoid cache override if message is not root
+        return output_str
+
+    def _add_datetime_validator(self, message: protogen.Message) -> str:
+        output_str = ""
+        for field in message.fields:
+            if BasePydanticModelPlugin.flux_fld_date_time_format in str(field.proto.options):
+                output_str += "    @validator('date', pre=True)\n"
+                output_str += "    def time_validate(cls, v):\n"
+                date_time_format = \
+                    self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                                                                     BasePydanticModelPlugin.flux_fld_date_time_format)
+                output_str += f"        return validate_pendulum_datetime(v, {date_time_format})\n"
+                break
+            # else not required: if date_time option is not set to any field of message then
+            # avoiding datetime validation
         return output_str
 
     def _handle_config_class_and_other_root_class_versions(self, message: protogen.Message, auto_gen_id: bool) -> str:
@@ -258,6 +276,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         if auto_gen_id:
             output_str += "\n"
             output_str += self._add_config_class()
+        output_str += "\n"
+        output_str += self._add_datetime_validator(message)
+
         output_str += "\n\n"
 
         # Adding other versions for root pydantic class
@@ -278,7 +299,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def handle_pydantic_class_gen(self) -> str:
         output_str = self.handle_imports()
-        output_str += f"{BasePydanticModelPlugin.default_id_type} = {self.default_id_field_type}\n\n"
+        output_str += f"{BasePydanticModelPlugin.default_id_type_var_name} = {self.default_id_field_type}\n"
+        output_str += f'{BasePydanticModelPlugin.proto_package_var_name} = "{self.proto_package_name}"\n\n'
         for enum in self.enum_list:
             output_str += self.handle_enum_output(enum, self.enum_type)
         for message in self.ordered_message_list:
@@ -288,7 +310,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def _import_current_models(self) -> str:
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str = f"from {model_file_path} import {BasePydanticModelPlugin.default_id_type}, "
+        output_str = f"from {model_file_path} import {BasePydanticModelPlugin.default_id_type_var_name}, " \
+                     f"{BasePydanticModelPlugin.proto_package_var_name}, "
         # importing enums
         for enum in self.enum_list:
             output_str += enum.proto.name + ", "
@@ -341,13 +364,15 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     # checking if already imported
                     for content in imports_file_content[match_str_index:]:
                         if "case" in content and db_type_env_name in content:
-                            # if current db_type already exists in match statement then avoiding content modification
+                            # if current db_type already exists in match statement then removing old import
+                            del imports_file_content[imports_file_content.index(content)+2]  # empty space
+                            del imports_file_content[imports_file_content.index(content)+1]  # import statement
+                            del imports_file_content[imports_file_content.index(content)]    # match case check
                             break
-                        # else not required: if current db_type already not in match statement then
-                        # adding it in for-else
-                    else:
-                        imports_file_content.insert(match_str_index+1, f'        case "{db_type_env_name}":\n')
-                        imports_file_content.insert(match_str_index+2, f'            {current_import_statement}\n')
+                        # else not required: if current db_type already not in match statement then no need
+                        # to remove it
+                    imports_file_content.insert(match_str_index+1, f'        case "{db_type_env_name}":\n')
+                    imports_file_content.insert(match_str_index+2, f'            {current_import_statement}\n')
 
                 return "".join(imports_file_content)
         else:
@@ -357,6 +382,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def assign_required_data_members(self, file: protogen.File):
         self.proto_file_name = str(file.proto.name).split('.')[0]
+        self.proto_package_name = str(file.proto.package)
         self.model_import_file_name = f'{self.proto_file_name}_model_imports'
 
     @final

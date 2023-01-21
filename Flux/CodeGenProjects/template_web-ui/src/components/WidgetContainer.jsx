@@ -59,9 +59,9 @@ const WidgetContainer = (props) => {
 
     let layoutMenu = '';
     if (props.layout === Layouts.TABLE_LAYOUT) {
-        layoutMenu = <Icon className={classes.icon} name="Tree" title="Tree View" onClick={props.onChangeLayout} ><AccountTree fontSize='small' /></Icon>
+        layoutMenu = <Icon className={classes.icon} name="Tree" title="Tree View" onClick={() => props.onChangeLayout(props.name, Layouts.TREE_LAYOUT)} ><AccountTree fontSize='small' /></Icon>
     } else if (props.layout === Layouts.TREE_LAYOUT) {
-        layoutMenu = <Icon className={classes.icon} name="Table" title="Table View" onClick={props.onChangeLayout} ><TableView fontSize='small' /></Icon>
+        layoutMenu = <Icon className={classes.icon} name="Table" title="Table View" onClick={() => props.onChangeLayout(props.name, Layouts.TABLE_LAYOUT)} ><TableView fontSize='small' /></Icon>
     }
 
     return (

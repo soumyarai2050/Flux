@@ -155,14 +155,13 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                 continue
             # else not required: If auto_gen_id is false, then skip adding it to output
             output_str += ' '*4 + self.handle_field_output(field)
-
         output_str += self._handle_config_class_and_other_root_class_versions(message, auto_gen_id)
 
         return output_str
 
     def handle_imports(self) -> str:
         output_str = "from beanie import Indexed, Document, PydanticObjectId\n"
-        output_str += "from pydantic import BaseModel, Field\n"
+        output_str += "from pydantic import BaseModel, Field, validator\n"
         output_str += "import pendulum\n"
         output_str += "from threading import Lock\n"
         output_str += "from typing import List, ClassVar, Dict\n"
@@ -189,6 +188,9 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                 output_str += "from enum import auto\n"
                 output_str += "from fastapi_utils.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
+        generic_utils_import_path= self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_utils")
+        output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime"
+
         output_str += "\n\n"
         return output_str
 

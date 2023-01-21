@@ -7,7 +7,7 @@ import PropTypes from 'prop-types';
 
 const useStyles = makeStyles({
     sideDrawer: {
-        width: '60px',
+        width: '45px',
         height: '100vh',
         display: 'flex',
         flexDirection: 'column',

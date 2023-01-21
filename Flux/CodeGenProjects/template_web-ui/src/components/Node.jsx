@@ -6,6 +6,7 @@ import { LiveHelp } from '@mui/icons-material';
 import Icon from './Icon';
 import NodeField from './NodeField';
 import PropTypes from 'prop-types';
+import { ColorTypes } from '../constants';
 
 const useStyles = makeStyles({
     container: {
@@ -47,6 +48,36 @@ const useStyles = makeStyles({
     nodeType: {
         fontWeight: 'bold',
         marginLeft: 20
+    },
+    nodeTitleCritical: {
+        color: '#9C0006 !important',
+        animation: `$blink 0.5s step-start infinite`
+    },
+    nodeTitleError: {
+        color: '#9C0006 !important'
+    },
+    nodeTitleInfo: {
+        color: 'blue !important'
+    },
+    nodeTitleWarning: {
+        color: '#9c6500 !important'
+    },
+    nodeTitleSuccess: {
+        color: 'darkgreen !important'
+    },
+    nodeTitleDebug: {
+        color: 'black !important'
+    },
+    "@keyframes blink": {
+        "from": {
+            opacity: 1
+        },
+        "50%": {
+            opacity: 0.8
+        },
+        "to": {
+            opacity: 1
+        }
     }
 })
 
@@ -63,13 +94,24 @@ const Node = (props) => {
         nodeClass = classes.nodeDataModified;
     }
 
+    let nodeTitleColorClass = '';
+    if (props.data.nameColor) {
+        let nameColor = props.data.nameColor.toLowerCase();
+        if (nameColor === ColorTypes.CRITICAL) nodeTitleColorClass = classes.nodeTitleCritical;
+        else if (nameColor === ColorTypes.ERROR) nodeTitleColorClass = classes.nodeTitleError;
+        else if (nameColor === ColorTypes.WARNING) nodeTitleColorClass = classes.nodeTitleWarning;
+        else if (nameColor === ColorTypes.INFO) nodeTitleColorClass = classes.nodeTitleInfo;
+        else if (nameColor === ColorTypes.DEBUG) nodeTitleColorClass = classes.nodeTitleDebug;
+        else if (nameColor === ColorTypes.SUCCESS) nodeTitleColorClass = classes.nodeTitleSuccess;
+    }
+
     return (
         <Box className={classes.container}>
             <span className={classes.dash}>-</span>
             <Box className={classes.nodeContainer} data-xpath={props.data.xpath} data-dataxpath={props.data.dataxpath}>
                 <div className={`${classes.node} ${nodeClass}`} onDoubleClick={() => props.data.onNodeDblClick(props.name)}>
-                    <span>{props.data.title ? props.data.title : props.data.name}</span>
-                    <span className={classes.nodeType}>{capitalizeFirstLetter(props.data.type)}</span>
+                    <span className={nodeTitleColorClass}>{props.data.title ? props.data.title : props.data.name}</span>
+                    {props.data.showDataType && <span className={classes.nodeType}>{capitalizeFirstLetter(props.data.type)}</span>}
                 </div>
                 <NodeField data={props.data} />
             </Box>

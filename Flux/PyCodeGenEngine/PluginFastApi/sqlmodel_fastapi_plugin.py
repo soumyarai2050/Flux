@@ -213,7 +213,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
         return output_str
 
     def handle_CRUD_for_message(self, message: protogen.Message) -> str:
-        options_list_of_dict = self.get_complex_msg_option_values_as_list_of_dict(message, SQLModelFastApiPlugin.flux_msg_json_root)
+        options_list_of_dict = self.get_complex_option_values_as_list_of_dict(message, SQLModelFastApiPlugin.flux_msg_json_root)
 
         # Since json_root option is of non-repeated type
         option_dict = options_list_of_dict[0]

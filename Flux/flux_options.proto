@@ -53,6 +53,9 @@ extend google.protobuf.FileOptions
   //General Options - 51
   optional string FluxFileCmnt = 51151;
   optional string FluxFileModelType = 51152;//Possible values: SERVICE
+
+  // UI Options 552
+  optional WebPageUIData FluxFileWebPageUIData = 55251;
 }
 
 extend google.protobuf.MessageOptions
@@ -118,10 +121,10 @@ extend google.protobuf.MessageOptions
   optional MessageJsonRoot FluxMsgJsonRoot = 55251;
   // UI may use Abbreviated representation of msg to show msg as single value
   optional string FluxMsgAbbreviated = 55252;
-  optional string FluxMsgLayout = 55253;  // Supported values : "Table", "Tree" and "Manual"
-  optional bool FluxMsgServerPopulate = 55254; // Use this to signal msg not to populate from UI, populate from server
-  optional WidgetUIData FluxMsgWidgetUIData = 55255; // Use this to populate ui widget data for layout messages
-  optional string FluxMsgTitle = 55263; //Set this value to override default title value in schema
+  optional bool FluxMsgServerPopulate = 55253; // Use this to signal msg not to populate from UI, populate from server
+  optional WidgetUIData FluxMsgWidgetUIData = 55254; // Use this to populate ui widget data for layout messages
+  optional string FluxMsgTitle = 55255; //Set this value to override default title value in schema
+  optional MessageJsonRoot FluxMsgJsonQuery = 55256;
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;
@@ -153,6 +156,7 @@ extend google.protobuf.FieldOptions
   optional ForeignKeyOption FluxFldFk = 52156;
   optional bool FluxFldIndex = 52157;
   optional bool FluxFldWebSocket = 52158;
+  optional string FluxFldDateTimeFormat = 52159;
 
   //ORM options - 551
   optional bool FluxFldOrmNoUpdate = 55151;  //The field that gets persisted in create to ORM and subsequently can't be updated has this option set
@@ -172,6 +176,8 @@ extend google.protobuf.FieldOptions
   optional string FluxFldAlertBubbleColor = 55262; //x-path to any field with values bound to either of [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]. If this field is in a repeat group, the highest severity in order as defined in this comment of all in collection applies
   optional string FluxFldUIPlaceholder = 55263; //placeholder for UI to display in grayed out font as user action hint
   optional string FluxFldTitle = 55264; //Set this value to override default title value in schema
+  optional string FluxFldNameColor = 55265; // One of the color class supported: [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]
+  optional bool FluxFldElaborateTitle = 55267; //Set this value to override default title value of all sub-types with parents '.' seperated prefixed to child names
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

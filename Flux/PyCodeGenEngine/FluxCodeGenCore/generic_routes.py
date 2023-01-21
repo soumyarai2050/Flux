@@ -1,5 +1,6 @@
 # system imports
 import json
+import os
 from typing import List, Any, Tuple
 import logging
 import websockets
@@ -11,10 +12,12 @@ from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 # project specific imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
-
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 id_not_found = DefaultWebResponse(msg="Id not Found")
 del_success = DefaultWebResponse(msg="Deletion Successful")
+host_env_var = "127.0.0.1" if (env_host := os.getenv("HOST")) is None else env_host
+port_env_var = 8000 if (env_port := os.getenv("PORT")) is None else int(env_port)
 
 
 @http_except_n_log_error(status_code=500)
@@ -116,10 +119,26 @@ async def handle_ws(ws: WebSocket, is_new_ws: bool):
     return need_disconnect
 
 
+def get_all_ws_url(host: str, port: int, proto_package_name: str, pydantic_class_type) -> str:
+    return f"http://{host}:{port}/{proto_package_name}/" \
+              f"get-all-{convert_camel_case_to_specific_case(pydantic_class_type.__name__)}-ws/"
+
+
+def get_by_id_ws_url(host: str, port: int, proto_package_name: str, pydantic_class_type,
+                     pydantic_obj_id: Any) -> str:
+    return f"http://{host}:{port}/{proto_package_name}/" \
+              f"get-{convert_camel_case_to_specific_case(pydantic_class_type.__name__)}-ws/{pydantic_obj_id}"
+
+
 @http_except_n_log_error(status_code=500)
-async def generic_read_ws(ws: WebSocket, pydantic_class_type, filter_var_val_list: List[Tuple] | None = None):
+async def generic_read_ws(ws: WebSocket, proto_package_name: str,
+                          pydantic_class_type, filter_var_val_list: List[Tuple] | None = None):
     is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.\
         connect(ws)  # prevent duplicate addition
+
+    logging.debug(f"websocket client requested to connect: {ws.client}")
+    logging.debug(f"connected to websocket: "
+                  f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}")
     need_disconnect = False
     try:
         pydantic_list = await get_obj_list(pydantic_class_type, filter_var_val_list)
@@ -130,37 +149,48 @@ async def generic_read_ws(ws: WebSocket, pydantic_class_type, filter_var_val_lis
         need_disconnect = await handle_ws(ws, is_new_ws)
     except WebSocketException as e:
         need_disconnect = True
-        logging.info(f"WebSocketException: {e}")
+        logging.info(f"WebSocketException in url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
     except ConnectionClosedOK as e:
         need_disconnect = True
-        logging.info(f"ConnectionClosedOK: web socket connection closed gracefully within while loop: {e}")
+        logging.info(f"ConnectionClosedOK: web socket connection closed gracefully "
+                     f"within while loop in ws url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
     except ConnectionClosedError as e:
         need_disconnect = True
-        logging.info(f"ConnectionClosedError: eb socket connection closed with error within while loop: {e}")
+        logging.info(f"ConnectionClosedError: web socket connection closed with error "
+                     f"within while loop in ws url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
     except websockets.ConnectionClosed as e:
         need_disconnect = True
-        logging.info(f"generic_beanie_get_ws - connection closed by client: {e}")
+        logging.info(f"generic_beanie_get_ws - connection closed by client in ws url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
     except WebSocketDisconnect as e:
         need_disconnect = True
-        logging.exception(f"generic_beanie_get_ws - unexpected connection close: {e}")
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws url "
+                          f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
         need_disconnect = True
-        logging.info(f"RuntimeError: web socket raised runtime error within while loop: {e}")
+        logging.info(f"RuntimeError: web socket raised runtime error within while loop in ws url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         need_disconnect = True
-        logging.exception(f"generic_beanie_get_ws - unexpected connection close: {e}")
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws url "
+                          f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     finally:
         if need_disconnect:
             pydantic_class_type.read_ws_path_ws_connection_manager.disconnect(ws)
+            logging.debug(f"Disconnected to websocket: "
+                          f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}")
 
 
 @http_except_n_log_error(status_code=500)
 async def generic_read_by_id_http(pydantic_class_type, pydantic_obj_id,
                                   filter_var_val_list: List[Tuple] | None = None):
-    fetched_pydantic_obj: pydantic_class_type = get_obj(pydantic_class_type, pydantic_obj_id, filter_var_val_list)
+    fetched_pydantic_obj: pydantic_class_type = await get_obj(pydantic_class_type, pydantic_obj_id, filter_var_val_list)
     if not fetched_pydantic_obj:
         raise HTTPException(status_code=404,
                             detail=id_not_found.format_msg(pydantic_class_type.__name__, pydantic_obj_id))
@@ -169,10 +199,14 @@ async def generic_read_by_id_http(pydantic_class_type, pydantic_obj_id,
 
 
 @http_except_n_log_error(status_code=500)
-async def generic_read_by_id_ws(ws: WebSocket, pydantic_class_type, pydantic_obj_id,
+async def generic_read_by_id_ws(ws: WebSocket, proto_package_name: str, pydantic_class_type, pydantic_obj_id,
                                 filter_var_val_list: List[Tuple] | None = None):
     # prevent duplicate addition
     is_new_ws: bool = await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.connect(ws, pydantic_obj_id)
+
+    logging.debug(f"websocket client requested to connect: {ws.client}")
+    logging.debug(f"connected to websocket: "
+                  f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}")
     need_disconnect: bool = False
     try:
         fetched_pydantic_obj: pydantic_class_type = await get_obj(pydantic_class_type, pydantic_obj_id,
@@ -188,31 +222,44 @@ async def generic_read_by_id_ws(ws: WebSocket, pydantic_class_type, pydantic_obj
         need_disconnect = await handle_ws(ws, is_new_ws)
     except WebSocketException as e:
         need_disconnect = True
-        logging.info(f"WebSocketException: {e}")
+        logging.info(f"WebSocketException in ws url "
+                     f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}: {e}")
     except ConnectionClosedOK as e:
         need_disconnect = True
-        logging.info(f"ConnectionClosedOK: web socket connection closed gracefully within while loop: {e}")
+        logging.info(f"ConnectionClosedOK: web socket connection closed gracefully "
+                     f"within while loop in ws url "
+                     f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}: {e}")
     except ConnectionClosedError as e:
         need_disconnect = True
-        logging.info(f"ConnectionClosedError: eb socket connection closed with error within while loop: {e}")
+        logging.info(f"ConnectionClosedError: web socket connection closed with error "
+                     f"within while loop in ws url "
+                     f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}: {e}")
     except websockets.ConnectionClosed as e:
         need_disconnect = True
-        logging.info(f"generic_beanie_get_ws - connection closed by client: {e}")
+        logging.info(f"generic_beanie_get_ws - connection closed by client in ws url "
+                     f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}: {e}")
     except WebSocketDisconnect as e:
         need_disconnect = True
-        logging.exception(f"generic_beanie_get_ws - unexpected connection close: {e}")
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws url "
+                          f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}:"
+                          f" {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
         need_disconnect = True
-        logging.info(f"RuntimeError: web socket raised runtime error within while loop: {e}")
+        logging.info(f"RuntimeError: web socket raised runtime error within while loop in ws url "
+                     f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         need_disconnect = True
-        logging.exception(f"generic_beanie_get_ws - unexpected connection close: {e}")
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws url "
+                          f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}:"
+                          f" {e}")
         raise HTTPException(status_code=404, detail=str(e))
     finally:
         if need_disconnect:
             pydantic_class_type.read_ws_path_with_id_ws_connection_manager.disconnect(ws, pydantic_obj_id)
+            logging.debug(f"Disconnected to websocket: "
+                          f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}")
 
 
 async def get_obj(pydantic_class_type, pydantic_obj_id, filter_var_val_list: List[Tuple] | None = None):
@@ -238,7 +285,7 @@ async def get_obj_list(pydantic_class_type, filter_var_val_list: List[Tuple] | N
 
 
 async def get_filtered_obj_list(filter_var_val_list, pydantic_class_type, pydantic_obj_id=None):
-    pydantic_obj_id_field: str| None = None
+    pydantic_obj_id_field: str | None = None
     if pydantic_obj_id is not None:
         pydantic_obj_id_field = "_id"
     data_filter = get_data_filter(filter_var_val_list, pydantic_obj_id_field, pydantic_obj_id)

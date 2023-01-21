@@ -5,6 +5,7 @@ import _, { cloneDeep } from 'lodash';
 import { generateTreeStructure, generateObjectFromSchema, addxpath, getDataxpath, setTreeState, getXpathKeyValuePairFromObject } from '../utils';
 import Icon from './Icon';
 import { UnfoldMore, UnfoldLess, VisibilityOff, Visibility } from '@mui/icons-material';
+import { MenuItem, Checkbox, FormControlLabel, Select } from '@mui/material';
 import { makeStyles } from '@mui/styles';
 import Alert from './Alert';
 import PropTypes from 'prop-types';
@@ -17,6 +18,16 @@ const useStyles = makeStyles({
         '&:hover': {
             backgroundColor: '#ddd !important'
         }
+    },
+    dropdown: {
+        width: 0,
+        display: 'inherit',
+        '& .MuiSelect-outlined': {
+            padding: 0
+        },
+        '& .css-jedpe8-MuiSelect-select-MuiInputBase-input-MuiOutlinedInput-input': {
+            paddingRight: '0px !important'
+        }
     }
 })
 
@@ -26,6 +37,8 @@ const TreeWidget = (props) => {
     const [isOpen, setIsOpen] = useState(); // to set whether the node header is open or close.
     const [expand, setExpand] = useState(true);
     const [hide, setHide] = useState(true);
+    const [showDataType, setShowDataType] = useState(false);
+    const [openShowDropdown, setOpenShowDropdown] = useState(false);
     const classes = useStyles();
 
     useEffect(() => {
@@ -33,6 +46,7 @@ const TreeWidget = (props) => {
             'data': props.data,
             'isOpen': isOpen,
             'hide': hide,
+            'showDataType': showDataType,
             'originalData': props.originalData,
             'subtree': props.subtree,
             'mode': props.mode,
@@ -45,7 +59,11 @@ const TreeWidget = (props) => {
             'onDateTimeChange': props.onDateTimeChange ? props.onDateTimeChange : onDateTimeChange
         }))
         setIsOpen();
-    }, [props.schema, props.data, props.mode, props.subtree, props.xpath, isOpen, hide])
+    }, [props.schema, props.data, props.mode, props.subtree, props.xpath, isOpen, hide, showDataType])
+
+    const onClose = () => {
+        setOpenShowDropdown(false);
+    }
 
     const onTreeChange = (value) => {
         setExpand(value);
@@ -160,16 +178,50 @@ const TreeWidget = (props) => {
             ) : (
                 <Icon className={classes.icon} name="Expand" title='Expand All' onClick={() => onTreeChange(true)}><UnfoldMore fontSize='small' /></Icon>
             )}
-            {hide ? (
-                <Icon className={classes.icon} name="Show" title='Show hidden fields' onClick={() => setHide(false)}><Visibility fontSize='small' /></Icon>
+            <Icon className={classes.icon} name="Show" title='Show' onClick={() => setOpenShowDropdown(true)}><Visibility fontSize='small' /></Icon>
+            <Select
+                className={classes.dropdown}
+                size='small'
+                open={openShowDropdown}
+                value=''
+                onClose={onClose}>
+                <MenuItem dense={true}>
+                    <FormControlLabel size='small'
+                        label='Show hidden fields'
+                        control={
+                            <Checkbox
+                                size='small'
+                                checked={hide ? false : true}
+                                onChange={() => setHide(!hide)}
+                            />
+                        }
+                    />
+                </MenuItem>
+                <MenuItem dense={true}>
+                    <FormControlLabel size='small'
+                        label='Show data type'
+                        control={
+                            <Checkbox
+                                size='small'
+                                checked={showDataType}
+                                onChange={() => setShowDataType(!showDataType)}
+                            />
+                        }
+                    />
+                </MenuItem>
+            </Select>
+            {/* {hide ? (
+                
             ) : (
                 <Icon className={classes.icon} name="Hide" title='Hide hidden fields' onClick={() => setHide(true)}><VisibilityOff fontSize='small' /></Icon>
-            )}
+            )} */}
+
         </>
     )
 
     return (
         <WidgetContainer
+            name={props.headerProps.name}
             title={props.headerProps.title}
             mode={props.headerProps.mode}
             layout={props.headerProps.layout}

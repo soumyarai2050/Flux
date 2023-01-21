@@ -78,6 +78,7 @@ const TableWidget = (props) => {
     const [order, setOrder] = React.useState('asc');
     const [orderBy, setOrderBy] = React.useState('');
     const [openModalPopup, setOpenModalPopup] = useState(false);
+    const [selectAll, setSelectAll] = useState(false);
     const classes = useStyles();
 
     useEffect(() => {
@@ -142,6 +143,23 @@ const TableWidget = (props) => {
         setRowsPerPage(parseInt(event.target.value, 10));
         setPage(0);
     };
+
+    const onSelectAll = (e) => {
+        let updatedHeadCells = cloneDeep(headCells);
+        if (e.target.checked) {
+            updatedHeadCells = updatedHeadCells.map(cell => {
+                cell.hide = false;
+                return cell;
+            })
+        } else {
+            updatedHeadCells = updatedHeadCells.map(cell => {
+                cell.hide = true;
+                return cell;
+            })
+        }
+        setSelectAll(e.target.checked);
+        setHeadCells(updatedHeadCells);
+    }
 
     // This method is created for cross-browser compatibility, if you don't
     // need to support IE11, you can use Array.prototype.sort() directly
@@ -240,6 +258,9 @@ const TableWidget = (props) => {
     }
 
     const onSettingsItemChange = (e, key) => {
+        if (!e.target.checked) {
+            setSelectAll(false);
+        }
         let updatedHeadCells = headCells.map((cell) => cell.key === key ? { ...cell, hide: !e.target.checked } : cell)
         setHeadCells(updatedHeadCells);
     }
@@ -329,6 +350,18 @@ const TableWidget = (props) => {
                 value=''
                 onChange={() => { }}
                 size='small'>
+                <MenuItem dense={true}>
+                    <FormControlLabel size='small'
+                        label='Select All'
+                        control={
+                            <Checkbox
+                                size='small'
+                                checked={selectAll}
+                                onChange={onSelectAll}
+                            />
+                        }
+                    />
+                </MenuItem>
                 {headCells.map((cell, index) => {
                     return (
                         <MenuItem key={index} dense={true}>
@@ -357,6 +390,7 @@ const TableWidget = (props) => {
 
     return (
         <WidgetContainer
+            name={props.headerProps.name}
             title={props.headerProps.title}
             mode={props.headerProps.mode}
             layout={props.headerProps.layout}
@@ -384,77 +418,77 @@ const TableWidget = (props) => {
                                 {stableSort(rows, getComparator(order, orderBy))
                                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                                     .map((row, index) => {
-                                    // for respecting sequenceNumber provided in the schema.
-                                    // sorts the row keys based on sequenceNumber
-                                    if (props.collections.length > 0) {
-                                        row = Object.keys(row).sort(function (a, b) {
-                                            if (a.startsWith('xpath_') && b.startsWith('xpath_')) return 0;
-                                            else if (a.startsWith('xpath_') || a.startsWith(DB_ID)) return -1;
-                                            else if (b.startsWith('xpath_') || b.startsWith(DB_ID)) return 1;
-                                            else {
-                                                let colA = props.collections.filter(col => col.key === a)[0];
-                                                let colB = props.collections.filter(col => col.key === b)[0];
-                                                if (!colA || !colB) return 0;
-                                                if (colA.sequenceNumber < colB.sequenceNumber) return -1;
-                                                else return 1;
-                                            }
-                                        }).reduce(function (obj, key) {
-                                            obj[key] = row[key];
-                                            return obj;
-                                        }, {})
-                                    }
+                                        // for respecting sequenceNumber provided in the schema.
+                                        // sorts the row keys based on sequenceNumber
+                                        if (props.collections.length > 0) {
+                                            row = Object.keys(row).sort(function (a, b) {
+                                                if (a.startsWith('xpath_') && b.startsWith('xpath_')) return 0;
+                                                else if (a.startsWith('xpath_') || a.startsWith(DB_ID)) return -1;
+                                                else if (b.startsWith('xpath_') || b.startsWith(DB_ID)) return 1;
+                                                else {
+                                                    let colA = props.collections.filter(col => col.key === a)[0];
+                                                    let colB = props.collections.filter(col => col.key === b)[0];
+                                                    if (!colA || !colB) return 0;
+                                                    if (colA.sequenceNumber < colB.sequenceNumber) return -1;
+                                                    else return 1;
+                                                }
+                                            }).reduce(function (obj, key) {
+                                                obj[key] = row[key];
+                                                return obj;
+                                            }, {})
+                                        }
 
-                                    let tableRowClass = '';
-                                    if (row['data-add']) {
-                                        tableRowClass = classes.tableRowAdd;
-                                    } else if (row['data-remove']) {
-                                        tableRowClass = classes.tableRowRemove;
-                                    }
+                                        let tableRowClass = '';
+                                        if (row['data-add']) {
+                                            tableRowClass = classes.tableRowAdd;
+                                        } else if (row['data-remove']) {
+                                            tableRowClass = classes.tableRowRemove;
+                                        }
 
-                                    return (
-                                        <TableRow
-                                            key={index}
-                                            className={`${classes.tableRow} ${tableRowClass}`}
-                                            hover
-                                            selected={selectedRows.filter(id => id === row['data-id']).length > 0}
-                                            onDoubleClick={(e) => onRowDisselect(e, row['data-id'])}
-                                            onClick={(e) => onRowSelect(e, row['data-id'])}>
+                                        return (
+                                            <TableRow
+                                                key={index}
+                                                className={`${classes.tableRow} ${tableRowClass}`}
+                                                hover
+                                                selected={selectedRows.filter(id => id === row['data-id']).length > 0}
+                                                onDoubleClick={(e) => onRowDisselect(e, row['data-id'])}
+                                                onClick={(e) => onRowSelect(e, row['data-id'])}>
 
-                                            {/* {props.mode === Modes.EDIT_MODE &&
+                                                {/* {props.mode === Modes.EDIT_MODE &&
                                             <TableCell align='center' size='small'>
                                                 <Icon title="Expand" onClick={(e) => onRowClick(e, index)}><MoreHoriz /></Icon>
                                             </TableCell>
                                         } */}
 
-                                            {getFilteredCells().map((cell, i) => {
-                                                // don't show cells that are hidden
-                                                if (cell.hide) return;
-                                                return (
-                                                    <Cell
-                                                        key={i}
-                                                        row={row}
-                                                        rowindex={row['data-id']}
-                                                        propname={cell.key}
-                                                        proptitle={cell.tableTitle}
-                                                        mode={props.mode}
-                                                        data={props.data}
-                                                        originalData={props.originalData}
-                                                        collections={props.collections}
-                                                        onUpdate={props.onUpdate}
-                                                        onAbbreviatedFieldOpen={onAbbreviatedFieldOpen}
-                                                        onDoubleClick={onRowClick}
-                                                        onButtonClick={onButtonClick}
-                                                        onCheckboxChange={onCheckboxChange}
-                                                        onTextChange={onTextChange}
-                                                        onSelectItemChange={onSelectItemChange}
-                                                        onAutocompleteOptionChange={onAutocompleteOptionChange}
-                                                        onDateTimeChange={onDateTimeChange}
-                                                    />
-                                                )
-                                            })}
-                                        </TableRow>
-                                    );
-                                })}
+                                                {getFilteredCells().map((cell, i) => {
+                                                    // don't show cells that are hidden
+                                                    if (cell.hide) return;
+                                                    return (
+                                                        <Cell
+                                                            key={i}
+                                                            row={row}
+                                                            rowindex={row['data-id']}
+                                                            propname={cell.key}
+                                                            proptitle={cell.tableTitle}
+                                                            mode={props.mode}
+                                                            data={props.data}
+                                                            originalData={props.originalData}
+                                                            collections={props.collections}
+                                                            onUpdate={props.onUpdate}
+                                                            onAbbreviatedFieldOpen={onAbbreviatedFieldOpen}
+                                                            onDoubleClick={onRowClick}
+                                                            onButtonClick={onButtonClick}
+                                                            onCheckboxChange={onCheckboxChange}
+                                                            onTextChange={onTextChange}
+                                                            onSelectItemChange={onSelectItemChange}
+                                                            onAutocompleteOptionChange={onAutocompleteOptionChange}
+                                                            onDateTimeChange={onDateTimeChange}
+                                                        />
+                                                    )
+                                                })}
+                                            </TableRow>
+                                        );
+                                    })}
                             </TableBody>
                         </Table>
                     </TableContainer>

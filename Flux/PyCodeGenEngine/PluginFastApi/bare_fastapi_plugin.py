@@ -5,10 +5,22 @@ from typing import Dict
 import protogen
 
 # Project imports
-from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, main
+from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_file_handler import FastapiCallbackFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_client_file_handler import FastapiClientFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_launcher_file_handler import FastapiLauncherFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_routes_file_handler import FastapiRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_file_handler import FastapiCallbackOverrideFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_set_instance_handler import \
+    FastapiCallbackOverrideSetInstanceHandler
 
 
-class BareFastapiPlugin(BaseFastapiPlugin):
+class BareFastapiPlugin(FastapiCallbackFileHandler,
+                        FastapiCallbackOverrideSetInstanceHandler,
+                        FastapiClientFileHandler,
+                        FastapiRoutesFileHandler,
+                        FastapiLauncherFileHandler,
+                        FastapiCallbackOverrideFileHandler):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)

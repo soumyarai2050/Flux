@@ -42,7 +42,7 @@ fi
 rm -rf generated/*
 rm -rf generated_scripts/*
 rm -rf project/*
-rm -rf web_static/*
+rm -rf web_ui
 rm -rf temp/*
 find . \( -name .DS_Store -o -name .git -o -name .svn \) -print0 | xargs -0 rm -rf
 # replace any reference to old prj name with new prj name

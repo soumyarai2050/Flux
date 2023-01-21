@@ -2,6 +2,7 @@
 import os
 from typing import List, Dict
 import time
+import logging
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
         isinstance(debug_sleep_time := int(debug_sleep_time), int):
@@ -9,10 +10,22 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginFastApi.cache_fastapi_plugin import CacheFastApiPlugin, main
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_file_handler import FastapiCallbackFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_file_handler import FastapiCallbackOverrideFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_set_instance_handler import \
+    FastapiCallbackOverrideSetInstanceHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_routes_file_handler import FastapiRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_launcher_file_handler import FastapiLauncherFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_client_file_handler import FastapiClientFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
 
 
-class BeanieFastApiPlugin(CacheFastApiPlugin):
+class BeanieFastApiPlugin(FastapiCallbackFileHandler,
+                          FastapiCallbackOverrideSetInstanceHandler,
+                          FastapiClientFileHandler,
+                          FastapiRoutesFileHandler,
+                          FastapiLauncherFileHandler,
+                          FastapiCallbackOverrideFileHandler):
     """
     Plugin script to generate Beanie enabled fastapi app
     """
@@ -36,10 +49,22 @@ class BeanieFastApiPlugin(CacheFastApiPlugin):
                     self.non_root_message_list.append(message)
                 # else not required: avoiding repetition
 
+            if BeanieFastApiPlugin.flux_msg_json_query in str(message.proto.options):
+                if message in self.root_message_list:
+                    if message not in self.query_message_list:
+                        self.query_message_list.append(message)
+                    # else not required: avoiding repetition
+                else:
+                    err_str = "Query type message should be root message also to perform db queries, " \
+                              f"message {message.proto.name} is not JsonRoot"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+            # else not required: avoiding list append if msg is not having option for query
+
             self.load_dependency_messages_and_enums_in_dicts(message)
 
     def _get_msg_id_field_type(self, message: protogen.Message) -> str:
-        id_field_type: str = BeanieFastApiPlugin.default_id_type
+        id_field_type: str = BeanieFastApiPlugin.default_id_type_var_name
         if message in self.custom_id_primary_key_messages:
             for field in message.fields:
                 if field.proto.name == BeanieFastApiPlugin.default_id_field_name:

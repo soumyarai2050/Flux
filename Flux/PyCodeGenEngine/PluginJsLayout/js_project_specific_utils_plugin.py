@@ -11,13 +11,13 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 
 class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
     """
     Plugin script to generate projectSpecificUtils.js file from proto schema.
     """
-    flx_msg_widget_ui_data: str = "FluxMsgWidgetUIData"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -32,7 +32,6 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
             logging.exception(err_str)
             raise Exception(err_str)
 
-
     def generate(self, file: protogen.File) -> str:
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
@@ -42,16 +41,19 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         for index, message in enumerate(self.layout_msg_list):
             if JsProjectSpecificUtilsPlugin.flx_msg_widget_ui_data in str(message.proto.options):
                 widget_ui_data_options_value_list_of_dict = \
-                    self.get_complex_msg_option_values_as_list_of_dict(message,
-                                                                       JsProjectSpecificUtilsPlugin.flx_msg_widget_ui_data)
+                    self.get_complex_option_values_as_list_of_dict(message,
+                                                                   JsProjectSpecificUtilsPlugin.flx_msg_widget_ui_data)
                 # since widget_ui_data option is non-repeated type
                 widget_ui_data_options_value = widget_ui_data_options_value_list_of_dict[0]
 
-                output_str += '        {' + f' i: "{widget_ui_data_options_value["i"]}", ' \
-                                            f'x: {widget_ui_data_options_value["x"]}, ' \
-                                            f'y: {widget_ui_data_options_value["y"]}, ' \
-                                            f'w: {widget_ui_data_options_value["w"]}, ' \
-                                            f'h: {widget_ui_data_options_value["h"]}'+'},\n'
+                title_val = widget_ui_data_options_value["i"] \
+                    if "i" in widget_ui_data_options_value else convert_camel_case_to_specific_case(message.proto.name)
+                output_str += '        {' + f' i: "{title_val}", ' \
+                                            f'x: {widget_ui_data_options_value["x"].strip()}, ' \
+                                            f'y: {widget_ui_data_options_value["y"].strip()}, ' \
+                                            f'w: {widget_ui_data_options_value["w"].strip()}, ' \
+                                            f'h: {widget_ui_data_options_value["h"].strip()}, ' \
+                                            f'layout: "{widget_ui_data_options_value["layout"].strip()}"'+'},\n'
         output_str += "    ]\n"
         output_str += "    return layout;\n"
         output_str += "}\n\n"

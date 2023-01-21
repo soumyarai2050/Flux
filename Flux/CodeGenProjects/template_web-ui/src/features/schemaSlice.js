@@ -27,6 +27,7 @@ const schemaSlice = createSlice({
         },
         [getSchema.fulfilled]: (state, action) => {
             state.schema = action.payload;
+            state.loading = false;
             Object.keys(state.schema).map(schemaName => {
                 if ([SCHEMA_AUTOCOMPLETE_XPATH, SCHEMA_DEFINITIONS_XPATH].includes(schemaName)) return;
                 let schema = state.schema;
@@ -41,9 +42,8 @@ const schemaSlice = createSlice({
                     callerProps.mode = Modes.READ_MODE;
                 }
                 state.schemaCollections[schemaName] = createCollections(schema, currentSchema, callerProps, undefined, undefined, xpath);
+                return;
             });
-            state.loading = false;
-            return;
         },
         [getSchema.rejected]: (state, action) => {
             state.error = action.error.code + ': ' + action.error.message;

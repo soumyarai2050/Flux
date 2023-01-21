@@ -27,9 +27,21 @@ enum HoverTextType{
     HoverTextType_VALUE_AND_PERCENTAGE = 4;
 }
 
+enum UILayouts{
+  UI_ABBREVIATED_FILTER = 0;
+  UI_TABLE = 1;
+  UI_TREE = 2;
+  UI_GRAPH = 3;
+  UI_TABBED_TABLE = 4;
+}
+
+message WebPageUIData{
+  optional Theme theme = 1;
+}
+
 message WidgetUIData{
   // key string connects Widget with Model - future better name via: [(FluxFldAlias) = 'i']
-  required string i = 1;
+  optional string i = 1;
   // X coordinate magnitude (left most is 0)
   optional int32 x = 2;
   // Y coordinate magnitude (top most is 0)
@@ -38,6 +50,10 @@ message WidgetUIData{
   optional int32 w = 4;
   // height
   optional int32 h = 5;
+  // layout type
+  optional UILayouts layout = 6;
+  optional string alert_bubble_source = 7;
+  optional string alert_bubble_color = 8;
 }
 
 message UIButton{

@@ -24,12 +24,14 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
         self.insertion_point_key_list: List[str] = [
             "add_imports",
             "add_widget_list",
+            "handle_update_data",
             "add_root_in_jsx_layout",
             "add_show_widget"
         ]
         self.insertion_point_key_to_callable_list: List[Callable] = [
             self.handle_imports,
             self.handle_widget_list,
+            self.handle_update_data,
             self.handle_root_msg_addition_to_layout_templ,
             self.handle_show_widget
         ]
@@ -62,6 +64,25 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"{message_name_case_styled}: true\n"
         return output_str
 
+    def handle_update_data(self, file: protogen.File) -> str:
+        output_str = ""
+        if self.abbreviated_filter_layout_msg_list:
+            temp_str = ""
+            for message in self.abbreviated_filter_layout_msg_list:
+                message_name_camel_cased = convert_camel_case_to_specific_case(message.proto.name)
+                temp_str += f"name === '{message_name_camel_cased}' "
+                if message != self.abbreviated_filter_layout_msg_list[-1]:
+                    temp_str += "|| "
+            output_str += f"if ({temp_str}&& show[name]) " + "{\n"
+            for message in self.layout_msg_list:
+                if message not in self.root_msg_list and message not in self.abbreviated_filter_layout_msg_list:
+                    message_name_camel_cased = convert_camel_case_to_specific_case(message.proto.name)
+                    output_str += f"    updatedData['{message_name_camel_cased}'] = false;\n"
+                # else not required: avoiding other than dependent type layout messages
+            output_str += "}\n"
+
+        return output_str
+
     def handle_root_msg_addition_to_layout_templ(self, file: protogen.File):
         output_str = ""
         for index, message in enumerate(self.layout_msg_list):
@@ -82,9 +103,12 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += "{"+f"show.{message_name_case_styled} &&\n"
             output_str += "    <Paper key='"+f"{message_name_case_styled}' id='{message_name_case_styled}'" + \
                           " className={classes.widget} data-grid={getLayoutById("+f"'{message_name_case_styled}'"+")}>\n"
-            output_str += f'        <{message.proto.name} name="{message_name_case_styled}"\n'
+            output_str += f'        <{message.proto.name}\n'
+            output_str += f'            name="{message_name_case_styled}"\n'
+            output_str += "            layout={"+f"getLayoutById('{message_name_case_styled}').layout"+"}\n"
+            output_str += "            onChangeLayout={onWidgetLayoutChange}\n"
             output_str += f'        />\n'
-            output_str += f'   </Paper>\n'
+            output_str += f'    </Paper>\n'
             output_str += '}\n'
         return output_str
 

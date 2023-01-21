@@ -4,11 +4,12 @@ import { makeStyles } from '@mui/styles';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { DataTypes } from '../constants';
-import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType, getValueFromReduxStoreFromXpath } from '../utils';
+import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType, getValueFromReduxStoreFromXpath, getAlertBubbleCount, getAlertBubbleColor } from '../utils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import { Box } from '@mui/material';
+import AlertBubble from './AlertBubble';
 
 const useStyles = makeStyles({})
 
@@ -28,8 +29,26 @@ const DynamicMenu = (props) => {
         }
     }
 
+    let alertBubble = <></>;
+    let alertBubbleSourceXpath = props.currentSchema.widget_ui_data.alert_bubble_source;
+    let alertBubbleColorXpath = props.currentSchema.widget_ui_data.alert_bubble_color;
+    if (alertBubbleSourceXpath && alertBubbleColorXpath) {
+        alertBubbleSourceXpath = alertBubbleSourceXpath.substring(alertBubbleSourceXpath.indexOf('.') + 1);
+        alertBubbleColorXpath = alertBubbleColorXpath.substring(alertBubbleColorXpath.indexOf('.') + 1);
+
+        let count = getAlertBubbleCount(props.data, alertBubbleSourceXpath);
+        let color = getAlertBubbleColor(props.data, props.collections, alertBubbleSourceXpath, alertBubbleColorXpath);
+
+        if (count > 0) {
+            alertBubble = (
+                <AlertBubble content={count} color={color} />
+            )
+        }
+    }
+
     return (
         <Fragment>
+            {alertBubble}
             {props.commonKeyCollections && props.commonKeyCollections.filter(collection => ['button', 'progressBar'].includes(collection.type)).map((collection, index) => {
                 if (collection.value === undefined || collection.value === null) return;
 
@@ -49,7 +68,7 @@ const DynamicMenu = (props) => {
                     return (
                         <Box key={collection.tableTitle} sx={{ minWidth: 150, margin: '0 10px' }}>
                             <ValueBasedProgressBarWithHover
-                                collection={collection}                    
+                                collection={collection}
                                 value={value}
                                 min={min}
                                 max={max}

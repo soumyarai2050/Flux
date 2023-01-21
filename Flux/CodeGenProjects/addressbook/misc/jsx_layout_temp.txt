@@ -11,7 +11,6 @@ import { Responsive, WidthProvider } from "react-grid-layout";
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import { Paper, Box } from '@mui/material';
-import { Widgets } from '@mui/icons-material';
 # @@protoc_insertion_point(add_imports)
 import SideDrawer from './SideDrawer';
 import ToggleIcon from '../components/ToggleIcon';
@@ -19,7 +18,6 @@ import { DB_ID, API_ROOT_URL, COOKIE_NAME } from '../constants';
 import { Dialog, DialogContent, DialogActions, DialogContentText, TextField, Button, DialogTitle, Autocomplete } from '@mui/material';
 import Icon from './Icon';
 import { DashboardCustomize, SaveAs } from '@mui/icons-material';
-import Cookie from 'universal-cookie';
 import { getIconText } from '../utils';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
@@ -107,8 +105,7 @@ const Layout = (props) => {
     }, [websocket, uiLayoutArray])
 
     useEffect(() => {
-        let cookie = new Cookie();
-        cookie = cookie.get(COOKIE_NAME);
+        let cookie = sessionStorage.getItem(COOKIE_NAME);
         if (cookie) {
             cookie = parseInt(cookie);
             dispatch(setSelectedUILayoutId(cookie));
@@ -158,20 +155,26 @@ const Layout = (props) => {
         dispatch(setUILayout(layout));
         setOpenLoadLayout(false);
         setSearchValue('');
-        let cookie = new Cookie();
-        cookie.set(COOKIE_NAME, searchValue[DB_ID], { path: '/', maxAge: 2592000 })
+        sessionStorage.setItem(COOKIE_NAME, searchValue[DB_ID]);
     }
 
     const onToggleWidget = (name) => {
+        let updatedData = cloneDeep(show);
+        updatedData[name] = !updatedData[name];
+        # @@protoc_insertion_point(handle_update_data)
         if (!show[name]) {
             let layout = getLayoutById(name);
             setLayouts([...layouts, layout]);
         }
-        setShow({ ...show, [name]: !show[name] });
+        setShow(updatedData);
     }
 
-    const onLayoutChange = (layout) => {
-        setLayouts(layout);
+    const onLayoutChange = (updatedLayouts) => {
+        updatedLayouts = updatedLayouts.map(l => {
+            let layout = layouts.filter(widgetLayout => widgetLayout.i === l.i)[0];
+            return {i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, layout: layout.layout}
+        })
+        setLayouts(updatedLayouts);
     }
 
     const onSearchValueChange = (e, value) => {
@@ -197,8 +200,7 @@ const Layout = (props) => {
     const onResetLayout = () => {
         let defaultLayouts = getLayout();
         setLayouts(defaultLayouts);
-        let cookie = new Cookie();
-        cookie.remove(COOKIE_NAME, { path: '/' });
+        sessionStorage.removeItem(COOKIE_NAME);
         setProfileId('');
         setOpenLoadLayout(false);
         let updatedShow = cloneDeep(show);
@@ -220,7 +222,18 @@ const Layout = (props) => {
         }
         let xMax = Math.max(...layouts.map(widgetLayout => widgetLayout.x + widgetLayout.w));
         let yMax = Math.max(...layouts.map(widgetLayout => widgetLayout.y + widgetLayout.h));
-        return layout ? layout : { i: id, x: xMax, y: yMax, w: defaultLayout.w, h: defaultLayout.h };
+        return layout ? layout : { i: id, x: xMax, y: yMax, w: defaultLayout.w, h: defaultLayout.h, layout: defaultLayout.layout };
+    }
+
+    const onWidgetLayoutChange = (name, layoutType) => {
+        let updatedData = cloneDeep(layouts);
+        let updatedLayouts = updatedData.map(widgetLayout => {
+            if(widgetLayout.i === name) {
+                widgetLayout.layout = layoutType;
+            }
+            return widgetLayout
+        });
+        setLayouts(updatedLayouts);
     }
 
     return (

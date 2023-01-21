@@ -6,21 +6,21 @@ export const ConfirmSavePopup = (props) => {
 
     return (
         <Dialog open={props.open} onClose={props.onClose}>
-            <DialogTitle>Save Changes</DialogTitle>
+            <DialogTitle>Please confirm</DialogTitle>
             <DialogContent>
                 <ReactJson
                     displayDataTypes={false}
                     displayObjectSize={false}
                     indentWidth={6}
-                    enableClipboard={false}
+                    enableClipboard={true}
                     name={false}
                     iconStyle='square'
                     src={props.src}
                 />
             </DialogContent>
             <DialogActions>
-                <Button onClick={props.onClose} autoFocus>Discard Changes</Button>
-                <Button onClick={props.onSave} autoFocus>Save</Button>
+                <Button onClick={props.onClose} autoFocus>Discard</Button>
+                <Button onClick={props.onSave} autoFocus>Confirm</Button>
             </DialogActions>
         </Dialog>
     )
@@ -36,14 +36,11 @@ export const WebsocketUpdatePopup = (props) => {
                     displayDataTypes={false}
                     displayObjectSize={false}
                     indentWidth={6}
-                    enableClipboard={false}
+                    enableClipboard={true}
                     name={false}
                     iconStyle='square'
                     src={props.src}
                 />
-                {/* {Object.keys(discardedChanges).map(xpath => (
-                    <DialogContentText>{xpath}: {discardedChanges[xpath]}</DialogContentText>
-                ))} */}
             </DialogContent>
             <DialogActions>
                 <Button onClick={props.onClose} autoFocus>OK</Button>

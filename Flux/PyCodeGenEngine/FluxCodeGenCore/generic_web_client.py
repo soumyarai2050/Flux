@@ -22,42 +22,66 @@ def generic_http_get_all_client(url: str, pydantic_type):
 
 @log_n_except
 def generic_http_post_client(url: str, pydantic_obj, pydantic_type):
-    # create don't need to delete any field: model default should handle that, so: exclude_unset=True, exclude_none=True
-    json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+    # When used for routes
+    if pydantic_obj is not None:
+        # create don't need to delete any field: model default should handle that,
+        # so: exclude_unset=True, exclude_none=True
+        json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+
+    # When used for queries like get last date query, as there is no pydantic obj in case of query
+    else:
+        json_data = None
     response: requests.Response = requests.post(url, json=json_data)
     return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.POST)
 
 
 @log_n_except
 def generic_http_get_client(url: str, query_param: Any, pydantic_type):
-    if url.endswith("/"):
-        url = f"{url}{query_param}"
-    else:
-        url = f"{url}/{query_param}"
+    # When used for routes
+    if query_param is not None:
+        if url.endswith("/"):
+            url = f"{url}{query_param}"
+        else:
+            url = f"{url}/{query_param}"
+    # else not required: When used for queries like get last date query, as there is no query_param in case of query
     response: requests.Response = requests.get(url)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
 
 
 @log_n_except
 def generic_http_put_client(url: str, pydantic_obj, pydantic_type):
-    json_data = jsonable_encoder(pydantic_obj, by_alias=True)
+    if pydantic_obj is not None:
+        # When used for routes
+        json_data = jsonable_encoder(pydantic_obj, by_alias=True)
+    else:
+        # When used for queries like get last date query, as there is no pydantic obj in case of query
+        json_data = None
     response: requests.Response = requests.put(url, json=json_data)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PUT)
 
 
 @log_n_except
 def generic_http_patch_client(url: str, pydantic_obj, pydantic_type):
-    json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+    # When used for routes
+    if pydantic_obj is not None:
+        # When used for routes
+        json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+    else:
+        # When used for queries like get last date query, as there is no pydantic obj in case of query
+        json_data = None
     response: requests.Response = requests.patch(url, json=json_data)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
 
 
 @log_n_except
 def generic_http_delete_client(url: str, query_param: Any):
-    if url.endswith("/"):
-        url = f"{url}{query_param}"
-    else:
-        url = f"{url}/{query_param}"
+    # When used for routes
+    if query_param is not None:
+        if url.endswith("/"):
+            url = f"{url}{query_param}"
+        else:
+            url = f"{url}/{query_param}"
+    # else not required: When used for queries like get last date query, as there is no query_param in case of query
     response: requests.Response = requests.delete(url)
     response_json = response.json()
     return response_json
@@ -101,10 +125,13 @@ async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Call
 
 
 async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_callback: Callable):
-    if url.endswith("/"):
-        url = f"{url}{query_param}"
-    else:
-        url = f"{url}/{query_param}"
+    if query_param is not None:
+        if url.endswith("/"):
+            url = f"{url}{query_param}"
+        else:
+            url = f"{url}/{query_param}"
+    # else not required: if param not required then using url as is
+
     async with websockets.connect(url, ping_timeout=None) as ws:
         data = None
         while True:

@@ -30,7 +30,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             self.handle_jsx_file_convert
         ]
         # key message name is dependent on value message value name
-        self.dependent_message_relation_dict: Dict[str, str] = {}
+        self.dependent_to_abbreviated_message_relation_dict: Dict[str, str] = {}
         self.dependent_message_list: List[protogen.Message] = []
         self.independent_message_list: List[protogen.Message] = []
         self.current_message_is_dependent: bool | None = None  # True if dependent else false
@@ -44,45 +44,56 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             raise Exception(err_str)
 
     def load_root_message_to_data_member(self, file: protogen.File):
+        """
+        Adds root messages to class's data member
+        """
         super().load_root_message_to_data_member(file)
 
         for message in self.root_msg_list:
             for field in message.fields:
                 if field.message is not None and \
-                        JsSliceFileGenPlugin.flux_msg_layout in str(field.message.proto.options):
-                    self.dependent_message_list.append(message)
-                    break
-                # else not required: Avoid if any field of message type doesn't contain layout options
+                        JsSliceFileGenPlugin.flx_msg_widget_ui_data in str(field.message.proto.options):
+                    # If field of message datatype of this message is found having widget_ui_data option
+                    # with layout field then collecting those messages in dependent_message_list
+                    widget_ui_data_option_list_of_dict = \
+                        self.get_complex_option_values_as_list_of_dict(field.message,
+                                                                       JsSliceFileGenPlugin.flx_msg_widget_ui_data)[0]
+                    if "layout" in widget_ui_data_option_list_of_dict:
+                        self.dependent_message_list.append(message)
+                        break
+                    # else not required: Avoid if any field of message type doesn't contain layout options
+                # else not required: If couldn't find any field of message type with layout option then avoiding
+                # addition of message in dependent_message_list
 
                 # Checking abbreviated dependent relation
                 if JsSliceFileGenPlugin.flux_fld_abbreviated in str(field.proto.options):
                     abbreviated_option_value = \
                         self.get_non_repeated_valued_custom_option_value(field.proto.options,
                                                                          JsSliceFileGenPlugin.flux_fld_abbreviated)
-                    abbreviated_message_name = abbreviated_option_value.split(".")[0][1:]
-                    self.dependent_message_relation_dict[abbreviated_message_name] = message.proto.name
+                    dependent_message_name = abbreviated_option_value.split(".")[0][1:]
+                    self.dependent_to_abbreviated_message_relation_dict[dependent_message_name] = message.proto.name
                 # else not required: Avoid if field doesn't contain abbreviated option
             else:
                 self.independent_message_list.append(message)
 
     def handle_import_output(self, message: protogen.Message) -> str:
+        output_str = "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
+        output_str += "import axios from 'axios';\n"
+        output_str += "import _, { cloneDeep } from 'lodash';\n"
         if not self.current_message_is_dependent:
-            output_str = "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
-            output_str += "import axios from 'axios';\n"
             output_str += "import { API_ROOT_URL, DB_ID } from '../constants';\n"
-            if message.proto.name != self.__ui_layout_msg_name:
-                output_str += "import { getObjectWithLeastId } from '../utils';\n"
+            if message.proto.name not in self.dependent_to_abbreviated_message_relation_dict.values():
+                output_str += "import { clearxpath, getObjectWithLeastId } from '../utils';\n"
+            else:
+                output_str += "import { clearxpath, generateObjectFromSchema, getObjectWithLeastId } from '../utils';\n"
             output_str += "\n"
         else:
             dependent_message_name: str | None = None
             message_name = message.proto.name
-            if message_name in self.dependent_message_relation_dict:
-                dependent_message_name = self.dependent_message_relation_dict[message_name]
-            output_str = "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
-            output_str += "import axios from 'axios';\n"
-            output_str += "import _, { cloneDeep } from 'lodash';\n"
+            if message_name in self.dependent_to_abbreviated_message_relation_dict:
+                dependent_message_name = self.dependent_to_abbreviated_message_relation_dict[message_name]
             output_str += "import { API_ROOT_URL, DB_ID, Modes, NEW_ITEM_ID } from '../constants';\n"
-            output_str += "import { addxpath } from '../utils';\n"
+            output_str += "import { addxpath, clearxpath } from '../utils';\n"
             if dependent_message_name is not None:
                 output_str += "import { setModified"+f"{dependent_message_name}, "+"update"+f"{dependent_message_name}"+" } from './"+\
                               f"{capitalized_to_camel_case(dependent_message_name)}Slice';\n"
@@ -92,10 +103,27 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
 
     def handle_get_all_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll', () => " + "{\n"
-        output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
-        output_str += "        .then(res => res.data);\n"
-        output_str += "})\n\n"
+        if message_name not in self.dependent_to_abbreviated_message_relation_dict.values():
+            output_str = f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
+                         f" () => " + "{\n"
+            output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
+            output_str += "        .then(res => res.data);\n"
+            output_str += "})\n\n"
+        else:
+            output_str = f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/" \
+                         f"getAll', (payload,"+" {dispatch, getState}) => " + "{\n"
+            output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
+            output_str += "        .then(res => {\n"
+            output_str += "            if(res.data.length === 0) {\n"
+            output_str += "                let state = getState();\n"
+            output_str += "                let schema = state.schema.schema;\n"
+            output_str += f"                let currentSchema = _.get(schema, '{message_name_snake_cased}');\n"
+            output_str += f"                let updatedData = generateObjectFromSchema(schema, currentSchema);\n"
+            output_str += f"                dispatch(create{message_name}(updatedData));\n"
+            output_str += "            }\n"
+            output_str += "            return res.data;\n"
+            output_str += "        });\n"
+            output_str += "})\n\n"
         return output_str
 
     def handle_get_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
@@ -115,8 +143,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "})\n\n"
             return output_str
         else:
-            if message_name in self.dependent_message_relation_dict:
-                dependent_message_name = self.dependent_message_relation_dict[message_name]
+            if message_name in self.dependent_to_abbreviated_message_relation_dict:
+                dependent_message_name = self.dependent_to_abbreviated_message_relation_dict[message_name]
                 dependent_message_name_camel_cased = capitalized_to_camel_case(dependent_message_name)
                 output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', (payload, "+"{ dispatch, getState }) => " + "{\n"
                 output_str += "    let { data, abbreviated, loadedKeyName } = payload;\n"
@@ -197,14 +225,16 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"        [create{message_name}.fulfilled]: (state, action) => " + "{\n"
         output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
         output_str += f"            state.modified{message_name} = action.payload;\n"
-        if message_name in self.dependent_message_relation_dict.values():
-            output_str += f"            state.setSelected{message_name}Id = action.payload[DB_ID];\n"
+        if message_name in self.dependent_to_abbreviated_message_relation_dict.values():
+            output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
         elif not self.current_message_is_dependent and message_name != self.__ui_layout_msg_name:
             output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [create{message_name}.rejected]: (state, action) => " + "{\n"
-        output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
+        output_str += f"            let updatedData = clearxpath(cloneDeep(state.modified{message_name}));\n"
+        output_str += f"            state.error = action.error.code + ': ' + action.error.message + " \
+                      f"'- ' + JSON.stringify(updatedData);\n"
         output_str += "            state.loading = false;\n"
         output_str += "        },\n"
         return output_str
@@ -220,7 +250,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [update{message_name}.rejected]: (state, action) => " + "{\n"
-        output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
+        output_str += f"            let updatedData = clearxpath(cloneDeep(state.modified{message_name}));\n"
+        output_str += f"            state.error = action.error.code + ': ' + action.error.message + " \
+                      f"'- ' + JSON.stringify(updatedData);\n"
         output_str += f"            state.loading = false;\n"
         output_str += "        }\n"
         return output_str
@@ -234,8 +266,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"    {message_name_camel_cased}: " + "{},\n"
         output_str += f"    modified{message_name}: " + "{},\n"
         output_str += f"    selected{message_name}Id: null,\n"
-        output_str += "    loading: true,\n"
         if self.current_message_is_dependent:
+            output_str += "    loading: false,\n"
             output_str += "    error: null,\n"
             output_str += "    mode: Modes.READ_MODE,\n"
             output_str += "    createMode: false,\n"
@@ -243,6 +275,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    discardedChanges: {},\n"
             output_str += "    openConfirmSavePopup: false\n"
         else:
+            output_str += "    loading: true,\n"
             output_str += "    error: null\n"
         output_str += "}\n\n"
         output_str += self.handle_get_all_export_out_str(message_name, message_name_camel_cased)

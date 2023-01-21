@@ -3,7 +3,7 @@ set -e
 # we are in script DIR
 START_DIR=$PWD
 cd ../../../PyCodeGenEngine/FluxCodeGenCore
-rm -f flux_options_pb2.py ui_core_pb2.py
+rm -f flux_options_pb2.py ui_core_pb2.py flux_utils_pb2.py
 cd -
 cd ..
 # clean generated

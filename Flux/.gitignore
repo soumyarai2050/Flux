@@ -1,4 +1,5 @@
 # Byte-compiled / optimized / DLL files
+.idea/
 __pycache__/
 *.py[cod]
 *$py.class
@@ -130,7 +131,6 @@ dmypy.json
 
 *output/
 *generated/
-.idea
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 

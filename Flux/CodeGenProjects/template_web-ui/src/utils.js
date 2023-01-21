@@ -15,7 +15,8 @@ const complexFieldProps = [
     { propertyName: "server_populate", usageName: "serverPopulate" },
     { propertyName: "ui_update_only", usageName: "uiUpdateOnly" },
     { propertyName: "orm_no_update", usageName: "ormNoUpdate" },
-    { propertyName: "auto_complete", usageName: "autocomplete" }
+    { propertyName: "auto_complete", usageName: "autocomplete" },
+    { propertyName: "elaborate_title", usageName: "elaborateTitle" }
 ]
 
 const fieldProps = [
@@ -38,7 +39,9 @@ const fieldProps = [
     { propertyName: "index", usageName: "index" },
     { propertyName: "sticky", usageName: "sticky" },
     { propertyName: "size_max", usageName: "sizeMax" },
-    { propertyName: "progress_bar", usageName: "progressBar" }
+    { propertyName: "progress_bar", usageName: "progressBar" },
+    { propertyName: "elaborate_title", usageName: "elaborateTitle" },
+    { propertyName: "name_color", usageName: "nameColor" }
 ]
 
 // properties supported explicitly on the array types
@@ -74,7 +77,12 @@ function setAutocompleteValue(schema, object, autocompleteDict, propname, usageN
         if (schema.autocomplete.hasOwnProperty(object[usageName])) {
             object.options = schema.autocomplete[autocomplete];
         } else {
-            object.options = [autocomplete];
+            if (autocomplete === 'server_populate') {
+                object.serverPopulate = true;
+                delete object[usageName];
+            } else {
+                object.options = [autocomplete];
+            }
         }
     }
 }
@@ -134,6 +142,9 @@ export function createCollections(schema, currentSchema, callerProps, collection
                     if (propertyName === 'auto_complete') {
                         let autocompleteDict = getAutocompleteDict(collection[usageName]);
                         setAutocompleteValue(schema, collection, autocompleteDict, k, usageName);
+                        if (!collection.hasOwnProperty('options')) {
+                            delete collection[usageName];
+                        }
                     }
                 }
             })
@@ -261,7 +272,11 @@ export function generateObjectFromSchema(schema, currentSchema) {
 
                 if (autocompleteDict.hasOwnProperty(propname)) {
                     if (!schema.autocomplete.hasOwnProperty(autocompleteDict[propname])) {
-                        object[propname] = autocompleteDict[propname];
+                        if (autocompleteDict[propname] === 'server_populate') {
+                            delete object[propname];
+                        } else {
+                            object[propname] = autocompleteDict[propname];
+                        }
                     }
                 }
             }
@@ -280,7 +295,11 @@ export function generateObjectFromSchema(schema, currentSchema) {
 
                 if (autocompleteDict.hasOwnProperty(propname)) {
                     if (!schema.autocomplete.hasOwnProperty(autocompleteDict[propname])) {
-                        object[propname] = autocompleteDict[propname];
+                        if (autocompleteDict[propname] === 'server_populate') {
+                            delete object[propname];
+                        } else {
+                            object[propname] = autocompleteDict[propname];
+                        }
                     }
                 }
             }
@@ -402,6 +421,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
         node.customComponent = Node;
         node.onTextChange = callerProps.onTextChange;
         node.mode = callerProps.mode;
+        node.showDataType = callerProps.showDataType;
 
         fieldProps.map(({ propertyName, usageName }) => {
             if (attributes.hasOwnProperty(propertyName)) {
@@ -433,8 +453,12 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
                 if (propertyName === 'auto_complete') {
                     let autocompleteDict = getAutocompleteDict(node[usageName]);
                     setAutocompleteValue(schema, node, autocompleteDict, propname, usageName);
-                    node.customComponentType = 'autocomplete';
-                    node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
+                    if (node.hasOwnProperty('options')) {
+                        node.customComponentType = 'autocomplete';
+                        node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
+                    } else {
+                        delete node[usageName];
+                    }
                 }
             }
         })
@@ -1043,6 +1067,7 @@ export function getShapeFromValue(value) {
 }
 
 export function isValidJsonString(jsonString) {
+    if (typeof (jsonString) !== DataTypes.STRING) return false;
     jsonString = jsonString.replace(/\\/g, '');
     try {
         JSON.parse(jsonString);

@@ -6,6 +6,7 @@ import os
 from random import randint, choices, getrandbits, choice, random
 import string
 import time
+from datetime import datetime
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
         isinstance(debug_sleep_time := int(debug_sleep_time), int):
@@ -60,8 +61,11 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
             field_name_case_styled = field_name
         match field.kind.name.lower():
             case "int32" | "int64":
-                random_int = randint(*JsonSampleGenPlugin.random_int_range)
-                json_sample_output += " "*indent_space_count + f'"{field_name_case_styled}": {random_int}'
+                if JsonSampleGenPlugin.flux_fld_val_is_datetime in str(field.proto.options):
+                    json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": "{datetime.utcnow()}"'
+                else:
+                    random_int = randint(*JsonSampleGenPlugin.random_int_range)
+                    json_sample_output += " "*indent_space_count + f'"{field_name_case_styled}": {random_int}'
             case "float" | "double":
                 random_int_or_float = choice([randint(*JsonSampleGenPlugin.random_int_range),
                                               round(random(), 2)])
@@ -89,11 +93,15 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         else:
             field_name_case_styled = field_name
         match field.kind.name.lower():
-            case "int32" | "int64" | "float":
-                random_int = randint(*JsonSampleGenPlugin.random_int_range)
-                json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": [{random_int}\n' + \
-                                      " " * indent_space_count + ']'
-            case "float":
+            case "int32" | "int64":
+                if JsonSampleGenPlugin.flux_fld_val_is_datetime in str(field.proto.options):
+                    json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": ' \
+                                          f'["{datetime.utcnow()}"\n' + " " * indent_space_count + ']'
+                else:
+                    random_int = randint(*JsonSampleGenPlugin.random_int_range)
+                    json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": [{random_int}\n' + \
+                                          " " * indent_space_count + ']'
+            case "float" | "double":
                 random_int_or_float = choice([randint(*JsonSampleGenPlugin.random_int_range),
                                              random()])
                 json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": [{random_int_or_float}\n' + \

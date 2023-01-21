@@ -10,10 +10,22 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, main
+from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_file_handler import FastapiCallbackFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_client_file_handler import FastapiClientFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_launcher_file_handler import FastapiLauncherFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_routes_file_handler import FastapiRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_file_handler import FastapiCallbackOverrideFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_set_instance_handler import \
+    FastapiCallbackOverrideSetInstanceHandler
 
 
-class CacheFastApiPlugin(BaseFastapiPlugin):
+class CacheFastApiPlugin(FastapiCallbackFileHandler,
+                         FastapiCallbackOverrideSetInstanceHandler,
+                         FastapiClientFileHandler,
+                         FastapiRoutesFileHandler,
+                         FastapiLauncherFileHandler,
+                         FastapiCallbackOverrideFileHandler):
     """
     Plugin script to generate
     """

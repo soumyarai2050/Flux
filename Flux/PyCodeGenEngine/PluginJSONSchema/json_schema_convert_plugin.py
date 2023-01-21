@@ -20,6 +20,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
+    # Used to be added as property
     flx_fld_simple_attribute_options: List[str] = [
         "FluxFldHelp",
         "FluxFldHide",
@@ -38,8 +39,11 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         "FluxFldUIPlaceholder",
         "FluxFldUIUpdateOnly",
         "FluxFldValMax",
-        "FluxFldValMin"
+        "FluxFldValMin",
+        "FluxFldElaborateTitle",
+        "FluxFldNameColor"
     ]
+    # Used to be added as property
     flx_fld_complex_attribute_options: List[str] = [
         "FluxFldButton",
         "FluxFldProgressBar"
@@ -50,8 +54,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         "FluxFldAlertBubbleColor",
         "FluxFldValMax"
     ]
-    flx_msg_attribute_options: List[str] = [
-        "FluxMsgLayout",
+    # Used to be added as property
+    flx_msg_simple_attribute_options: List[str] = [
         "FluxMsgServerPopulate"
     ]
 
@@ -90,10 +94,18 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     self.__enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if JsonSchemaConvertPlugin.flux_msg_json_layout in str(field.message.proto.options):
-                    if field.message not in self.__json_layout_message_list:
-                        self.__json_layout_message_list.append(field.message)
-                    # else not required: avoiding repetition
+                if JsonSchemaConvertPlugin.flx_msg_widget_ui_data in str(field.message.proto.options):
+                    widget_ui_data_option_list_of_dict = \
+                        self.get_complex_option_values_as_list_of_dict(field.message,
+                                                                       JsonSchemaConvertPlugin.flx_msg_widget_ui_data)[0]
+                    if "layout" in widget_ui_data_option_list_of_dict:
+                        if field.message not in self.__json_layout_message_list:
+                            self.__json_layout_message_list.append(field.message)
+                        # else not required: avoiding repetition
+                    else:
+                        if field.message not in self.__json_non_layout_message_list:
+                            self.__json_non_layout_message_list.append(field.message)
+                        # else not required: avoiding repetition
                 else:
                     if field.message not in self.__json_non_layout_message_list:
                         self.__json_non_layout_message_list.append(field.message)
@@ -103,10 +115,18 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
     def __load_json_layout_and_non_layout_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if JsonSchemaConvertPlugin.flux_msg_json_layout in str(message.proto.options):
-                if message not in self.__json_layout_message_list:
-                    self.__json_layout_message_list.append(message)
-                # else not required: avoiding repetition
+            if JsonSchemaConvertPlugin.flx_msg_widget_ui_data in str(message.proto.options):
+                widget_ui_data_option_list_of_dict = \
+                    self.get_complex_option_values_as_list_of_dict(message,
+                                                                   JsonSchemaConvertPlugin.flx_msg_widget_ui_data)[0]
+                if "layout" in widget_ui_data_option_list_of_dict:
+                    if message not in self.__json_layout_message_list:
+                        self.__json_layout_message_list.append(message)
+                    # else not required: avoiding repetition
+                else:
+                    if message not in self.__json_non_layout_message_list:
+                        self.__json_non_layout_message_list.append(message)
+                    # else not required: avoiding repetition
             else:
                 if message not in self.__json_non_layout_message_list:
                     self.__json_non_layout_message_list.append(message)
@@ -205,7 +225,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         return json_msg_str
 
-    def __parse_other_than_string_value(self, value: str) -> str | int | bool | float:
+    def __parse_string_to_original_types(self, value: str) -> str | int | bool | float:
         """
         Returns int if value string contains only numbers, bool if value contains string parsed bool
         and returns same value if both cases are not matched
@@ -223,7 +243,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         else:
             return '"' + value.strip() + '"'
 
-    def __unnderlying_handle_options_value_having_msg_fld_name(self, option_val: str) -> str:
+    def __underlying_handle_options_value_having_msg_fld_name(self, option_val: str) -> str:
         temp_list = []
         option_value_dot_separated = option_val.split(".")
         for option_val_str in option_value_dot_separated:
@@ -248,6 +268,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         # checking if option_value is not float type and is relevant to be used here
         if type(option_value).__name__ == "str" and \
                 (("-" in option_value or "." in option_value) and any(char.isalpha() for char in option_value)):
+
             option_value_hyphen_separated = option_value[1:-1].split("-")
             temp_list_1 = []
 
@@ -256,12 +277,12 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     option_val_dollar_separated = option_val.split('$')
                     temp_list_2 = []
                     for option_val in option_val_dollar_separated:
-                        temp_str = self.__unnderlying_handle_options_value_having_msg_fld_name(option_val)
+                        temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val)
                         temp_list_2.append(temp_str)
                     temp_str_dollar_joined = "$".join(temp_list_2)
                     temp_list_1.append(temp_str_dollar_joined)
                 else:
-                    temp_str = self.__unnderlying_handle_options_value_having_msg_fld_name(option_val)
+                    temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val)
                     temp_list_1.append(temp_str)
             return '"' + "-".join(temp_list_1) + '"'
         else:
@@ -288,7 +309,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                                                                 option)
                 if '"' in option_value[-1]:
                     # stripping extra '"' in value
-                    option_value = self.__parse_other_than_string_value(option_value[1:-1])
+                    option_value = self.__parse_string_to_original_types(option_value[1:-1])
                 # else not required: Avoiding if value is not of string type
 
                 if option in JsonSchemaConvertPlugin.options_having_msg_fld_names:
@@ -311,7 +332,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         for option in options_list:
             if option in str(field_or_message_obj.proto.options):
                 option_value_list_of_dict = \
-                    self.get_complex_fld_option_values_as_list_of_dict(field_or_message_obj, option)
+                    self.get_complex_option_values_as_list_of_dict(field_or_message_obj, option)
                 # converting flux_option into json attribute name
                 flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
                 flux_prefix_removed_option_name_case_styled = \
@@ -321,7 +342,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 for key, value in option_value_list_of_dict[0].items():
                     if isinstance(value, str):
                         # stripping extra '"' in value
-                        value = self.__parse_other_than_string_value(value)
+                        value = self.__parse_string_to_original_types(value)
                     elif isinstance(value, bool):
                         value = "true" if value else "false"
                     # else not required: Avoiding if value is not of string or bool type as other types can be
@@ -343,7 +364,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
     def __handle_fld_default_value(self, field: protogen.Field, init_space_count: int) -> str:
         if default_value := field.proto.default_value:
-            default_value = self.__parse_other_than_string_value(default_value)
+            default_value = self.__parse_string_to_original_types(default_value)
             return ' ' * init_space_count + f'"default": {default_value},\n'
         else:
             return ""
@@ -473,7 +494,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return json_msg_str
 
     def __handle_underlying_message_part(self, message: protogen.Message, indent_space_count: int):
-        json_msg_str = self.__handle_simple_proto_option_attributes(JsonSchemaConvertPlugin.flx_msg_attribute_options,
+        json_msg_str = self.__handle_simple_proto_option_attributes(JsonSchemaConvertPlugin.flx_msg_simple_attribute_options,
                                                                     message, indent_space_count)
         json_msg_str += self.__handle_msg_leading_comment_as_attribute(message, indent_space_count)
         # Handling json root attribute
@@ -483,6 +504,34 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             json_root_prefix_stripped_case_styled = self.__case_style_convert_method(json_root_prefix_stripped)
             json_msg_str += " " * indent_space_count + f'"{json_root_prefix_stripped_case_styled}": true,\n'
         json_msg_str += self.__underlying_json_output_handler(message, indent_space_count)
+        return json_msg_str
+
+    def __handle_widget_ui_data_option_output(self, message: protogen.Message) -> str:
+        widget_ui_data_prefix_stripped = \
+            JsonSchemaConvertPlugin.flx_msg_widget_ui_data.lstrip(JsonSchemaConvertPlugin.msg_options_standard_prefix)
+        json_msg_str = f'    "{self.__case_style_convert_method(widget_ui_data_prefix_stripped)}": '+'{\n'
+        widget_ui_data_option_value = \
+            self.get_complex_option_values_as_list_of_dict(message,
+                                                           JsonSchemaConvertPlugin.flx_msg_widget_ui_data)[0]
+        if 'i' in widget_ui_data_option_value:
+            json_msg_str += f'        "i": {widget_ui_data_option_value["i"]},\n'
+        else:
+            json_msg_str += f'        "i": "{self.__case_style_convert_method(message.proto.name)}",\n'
+        widget_ui_data_option_fields_list = ['x', 'y', 'w', 'h', 'layout', 'alert_bubble_source', 'alert_bubble_color']
+        for option_fld in widget_ui_data_option_fields_list:
+            if option_fld in widget_ui_data_option_value:
+                if option_fld not in widget_ui_data_option_fields_list[-2:]:
+                    json_msg_str += f'        "{option_fld}": ' \
+                                    f'{self.__parse_string_to_original_types(widget_ui_data_option_value[option_fld].strip())}'
+                else:
+                    # handling option field value having msg name
+                    json_msg_str += f'        "{option_fld}": ' \
+                                    f'"{self.__underlying_handle_options_value_having_msg_fld_name(widget_ui_data_option_value[option_fld])}"'
+            if option_fld != list(widget_ui_data_option_value)[-1]:
+                json_msg_str += ", \n"
+            else:
+                json_msg_str += "\n    },\n"
+                break
         return json_msg_str
 
     def __handle_json_layout_message_schema(self, message: protogen.Message) -> str:
@@ -497,6 +546,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             raise Exception(err_str)
         json_msg_str += f'  "{message_name}": ' + '{\n'
         json_msg_str += '    "$schema": "http://json-schema.org/draft-04/schema#",\n'
+        json_msg_str += self.__handle_widget_ui_data_option_output(message)
         json_msg_str += self.__handle_underlying_message_part(message, 4)
         if message != self.__json_layout_message_list[-1] or self.__enum_list:
             json_msg_str += '  },\n'

@@ -148,11 +148,11 @@ const AbbreviatedFilterWidget = (props) => {
 
                                     let min = collection.min;
                                     if (typeof (min) === DataTypes.STRING) {
-                                        min = getValueFromReduxStoreFromXpath(state, min)
+                                        min = _.get(metadata, min.substring(min.indexOf('.') + 1));
                                     }
                                     let max = collection.max;
                                     if (typeof (max) === DataTypes.STRING) {
-                                        max = getValueFromReduxStoreFromXpath(state, max);
+                                        max = _.get(metadata, max.substring(max.indexOf('.') + 1));
                                     }
                                     let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 

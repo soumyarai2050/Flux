@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import os
-import re
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
@@ -43,10 +42,10 @@ class BaseProtoPlugin(ABC):
     """
     msg_options_standard_prefix = "FluxMsg"
     fld_options_standard_prefix = "FluxFld"
-    flux_msg_json_layout: str = "FluxMsgLayout"
     flux_fld_val_is_datetime: ClassVar[str] = "FluxFldValIsDateTime"
     flux_fld_alias: ClassVar[str] = "FluxFldAlias"
     flux_msg_json_root: ClassVar[str] = "FluxMsgJsonRoot"
+    flux_msg_json_query: ClassVar[str] = "FluxMsgJsonQuery"
     flux_json_root_create_field: ClassVar[str] = "CreateDesc"
     flux_json_root_read_field: ClassVar[str] = "ReadDesc"
     flux_json_root_update_field: ClassVar[str] = "UpdateDesc"
@@ -60,7 +59,6 @@ class BaseProtoPlugin(ABC):
     flux_file_cmnt: ClassVar[str] = "FluxFileCmnt"
     flux_fld_index: ClassVar[str] = "FluxFldIndex"
     flux_fld_web_socket: ClassVar[str] = "FluxFldWebSocket"
-    flux_msg_layout: str = "FluxMsgLayout"
     flux_fld_abbreviated: str = "FluxFldAbbreviated"
     flux_fld_auto_complete: str = "FluxFldAutoComplete"
     flux_fld_sequence_number: str = "FluxFldSequenceNumber"
@@ -71,8 +69,13 @@ class BaseProtoPlugin(ABC):
     flux_fld_val_max: str = "FluxFldValMax"
     flux_fld_val_min: str = "FluxFldValMin"
     flux_msg_nested_fld_val_filter_param: str = "FluxMsgNestedFldValFilterParam"
+    flux_fld_date_time_format: str = "FluxFldDateTimeFormat"
+    flux_fld_elaborated_title: str = "FluxFldElaborateTitle"
+    flux_fld_name_color: str = "FluxFldNameColor"
+    flx_msg_widget_ui_data: str = "FluxMsgWidgetUIData"
     default_id_field_name: ClassVar[str] = "id"
-    default_id_type: str = "DefaultIdType"  # to be used in models as default type variable name
+    default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name
+    proto_package_var_name: str = "ProtoPackageName"  # to be used in models as proto_package_name variable name
     proto_type_to_py_type_dict: ClassVar[Dict[str, str]] = {
         "int32": "int",
         "int64": "int",
@@ -242,17 +245,15 @@ class BaseProtoPlugin(ABC):
         return option_value_list_of_dict
 
     @staticmethod
-    def get_complex_msg_option_values_as_list_of_dict(message: protogen.Message, option_name: str) -> List[Dict]:
-        message_options_temp_str = str(message.proto.options)
+    def get_complex_option_values_as_list_of_dict(proto_entity: protogen.Message | protogen.Field | protogen.File,
+                                                  option_name: str) -> List[Dict]:
+        """
+        Returns list of dictionaries containing each complex option's value tree on each index.
+        If Option is repeated type returns list of option value tree dicts else returns only one for non-repeated.
+        """
+        proto_entity_options_str = str(proto_entity.proto.options)
         option_value_list_of_dict = \
-            BaseProtoPlugin._get_complex_option_value_as_list_of_dict(message_options_temp_str, option_name)
-        return option_value_list_of_dict
-
-    @staticmethod
-    def get_complex_fld_option_values_as_list_of_dict(field: protogen.Field, option_name: str) -> List[Dict]:
-        fld_options_temp_str = str(field.proto.options)
-        option_value_list_of_dict = \
-            BaseProtoPlugin._get_complex_option_value_as_list_of_dict(fld_options_temp_str, option_name)
+            BaseProtoPlugin._get_complex_option_value_as_list_of_dict(proto_entity_options_str, option_name)
         return option_value_list_of_dict
 
     def get_flux_msg_cmt_option_value(self, message: protogen.Message) -> str:

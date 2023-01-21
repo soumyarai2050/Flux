@@ -1,10 +1,10 @@
-export const API_ROOT_URL = 'http://127.0.0.1:8000/addressbook';
+export const API_ROOT_URL = 'http://127.0.0.1:8000/template_project_name';
 export const API_PUBLIC_URL = 'http://127.0.0.1:3000';
 export const DB_ID = '_id';
 export const SCHEMA_DEFINITIONS_XPATH = 'definitions';
 export const SCHEMA_AUTOCOMPLETE_XPATH = 'autocomplete';
 export const NEW_ITEM_ID = 999999;
-export const COOKIE_NAME = 'addressbook';
+export const COOKIE_NAME = 'template_project_name';
 
 export const Modes = {
     EDIT_MODE: 'edit',
@@ -13,9 +13,9 @@ export const Modes = {
 }
 
 export const Layouts = {
-    TREE_LAYOUT: 'Tree',
-    TABLE_LAYOUT: 'Table',
-    ABBREVIATED_FILTER_LAYOUT: 'AbbreviatedFilter',
+    TREE_LAYOUT: 'UI_TREE',
+    TABLE_LAYOUT: 'UI_TABLE',
+    ABBREVIATED_FILTER_LAYOUT: 'UI_ABBREVIATED_FILTER',
     UNSPECIFIED: 'UNSPECIFIED'
 }
 
