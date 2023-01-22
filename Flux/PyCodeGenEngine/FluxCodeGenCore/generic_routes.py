@@ -30,38 +30,35 @@ async def generic_post_http(pydantic_class_type, pydantic_obj):
     return pydantic_obj
 
 
-async def _underlying_patch_n_put(pydantic_class_type, pydantic_obj_updated, request_obj,
+async def _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj, pydantic_obj_updated, request_obj,
                                   filter_var_val_list: List[Tuple] | None = None):
-    stored_obj = await pydantic_class_type.get(pydantic_obj_updated.id)
-    if stored_obj is None:
-        raise HTTPException(status_code=404, detail=id_not_found.format_msg(pydantic_class_type.__name__,
-                                                                            pydantic_obj_updated.id))
-    else:
-        await stored_obj.update(request_obj)
-        stored_obj = await get_obj(pydantic_class_type, pydantic_obj_updated.id, filter_var_val_list)
-        if pydantic_class_type.read_ws_path_ws_connection_manager is not None:
-            json_data = jsonable_encoder(stored_obj, by_alias=True, exclude_unset=True, exclude_none=True)
-            json_str = json.dumps(json_data)
-            await pydantic_class_type.read_ws_path_ws_connection_manager.broadcast(json_str)
-            await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast(json_str,
-                                                                                           pydantic_obj_updated.id)
-        return stored_obj
+    await stored_pydantic_obj.update(request_obj)
+    stored_obj = await get_obj(pydantic_class_type, pydantic_obj_updated.id, filter_var_val_list)
+    if pydantic_class_type.read_ws_path_ws_connection_manager is not None:
+        json_data = jsonable_encoder(stored_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+        json_str = json.dumps(json_data)
+        await pydantic_class_type.read_ws_path_ws_connection_manager.broadcast(json_str)
+        await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast(json_str,
+                                                                                       pydantic_obj_updated.id)
+    return stored_obj
 
 
 @http_except_n_log_error(status_code=500)
-async def generic_put_http(pydantic_class_type, pydantic_obj_updated,
+async def generic_put_http(pydantic_class_type, stored_pydantic_obj, pydantic_obj_updated,
                            filter_var_val_list: List[Tuple] | None = None):
     request_obj = {'$set': pydantic_obj_updated.dict().items()}
-    return await _underlying_patch_n_put(pydantic_class_type, pydantic_obj_updated, request_obj, filter_var_val_list)
+    return await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
+                                         pydantic_obj_updated, request_obj, filter_var_val_list)
 
 
 @http_except_n_log_error(status_code=500)
-async def generic_patch_http(pydantic_class_type, pydantic_obj_updated,
+async def generic_patch_http(pydantic_class_type, stored_pydantic_obj, pydantic_obj_updated,
                              filter_var_val_list: List[Tuple] | None = None):
     req_dict_without_none_val = {k: v for k, v in
                                  pydantic_obj_updated.dict(exclude_unset=True, exclude_none=True).items()}
     request_obj = {'$set': req_dict_without_none_val.items()}
-    return await _underlying_patch_n_put(pydantic_class_type, pydantic_obj_updated, request_obj, filter_var_val_list)
+    return await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
+                                         pydantic_obj_updated, request_obj, filter_var_val_list)
 
 
 @http_except_n_log_error(status_code=500)

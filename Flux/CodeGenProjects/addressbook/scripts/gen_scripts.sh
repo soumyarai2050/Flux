@@ -2,9 +2,9 @@
 set -e
 # 1. copy scripts from template_scripts folder
 # 2. execute helper script to prepare project scripts:
-#    - search_replace template_project_name with project_name inferring project name from project directory name
-#    - search and replace template_model_service with inferring actual model service name form model
-# 4. revert script prepare_project by copying over again this specific script from template folder
+#    - search_replace template project name with actual project name inferring project name from project directory name
+#    - search and replace template project model service name with inferring actual model service name form project model
+# 4. remove helper_gen_script.sh, subsequent iterations getting it again while copying all scripts from template folder
 
 cp -p ../../template_scripts/* .
 source helper_gen_script.sh

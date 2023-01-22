@@ -1,7 +1,20 @@
 #!/bin/bash
 set -e
 
-# while inside scripts folder , run:
+# we are in scripts folder
+# test if web-ui present - if not present - generate gen_web_ui.sh
+cd ..
+PROJECT_NAME=${PWD##*/}          # assign project name to a variable
+PROJECT_NAME=${PROJECT_NAME:-/}  # correct project name for case where PWD=/
+if [ -d "web-ui" ] ; then
+  echo "Can't create web-ui project, Directory already exists!"
+else
+  cd -  # back in script folder
+  $PWD/gen_web_ui.sh
+  cd -  # restore PWD state to pre if state
+fi
+cd - # back in script folder
+
 cd ../../../PyCodeGenEngine/FluxCodeGenCore
 python gen_core_proto_pb2.py
 cd -
@@ -18,4 +31,4 @@ python gen_js_layouts.py
 python gen_json_schema.py
 
 cd ../../
-"$PWD"/gen_web_project.sh template_project_name
+"$PWD"/gen_web_project.sh "$PROJECT_NAME"

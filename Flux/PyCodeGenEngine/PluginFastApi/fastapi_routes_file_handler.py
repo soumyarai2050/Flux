@@ -121,10 +121,12 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         filter_list = self._get_list_from_filter_option(message)
         if filter_list:
             output_str += f"    updated_{message_name_snake_cased}_obj = await generic_put_http(" \
-                          f"{message.proto.name}, {message_name_snake_cased}_updated, {filter_list})\n"
+                          f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                          f"{message_name_snake_cased}_updated, {filter_list})\n"
         else:
             output_str += f"    updated_{message_name_snake_cased}_obj = await generic_put_http(" \
-                          f"{message.proto.name}, {message_name_snake_cased}_updated)\n"
+                          f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                          f"{message_name_snake_cased}_updated)\n"
         output_str += f"    callback_class.update_{message_name_snake_cased}_post(" \
                       f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
         output_str += f"    return updated_{message_name_snake_cased}_obj\n"
@@ -148,10 +150,12 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                       f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
         filter_list = self._get_list_from_filter_option(message)
         if filter_list:
-            output_str += f"    updated_{message_name_snake_cased}_obj =  await generic_patch_http({message.proto.name}, " \
+            output_str += f"    updated_{message_name_snake_cased}_obj =  await generic_patch_http(" \
+                          f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
                           f"{message_name_snake_cased}_updated, {filter_list})\n"
         else:
-            output_str += f"    updated_{message_name_snake_cased}_obj =  await generic_patch_http({message.proto.name}, " \
+            output_str += f"    updated_{message_name_snake_cased}_obj =  await generic_patch_http(" \
+                          f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
                           f"{message_name_snake_cased}_updated)\n"
 
         output_str += f"    callback_class.partial_update_{message_name_snake_cased}_post(" \
