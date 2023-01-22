@@ -301,7 +301,7 @@ async def get_filtered_obj(filter_tuple_list, pydantic_class_type, pydantic_obj_
     return pydantic_list[0]
 
 
-def get_data_filter(filter_tuple_list: list[Tuple], match_variable_name: str | None = None,
+def get_data_filter(filter_tuple_list: List[Tuple], match_variable_name: str | None = None,
                     match_variable_value: Any = None):
     match_data_filter = \
         [{"$match": {}}]

@@ -3,6 +3,14 @@ import "flux_options.proto";
 
 package addressbook;
 
+
+enum OrderEventType{
+  OE_UNSPECIFIED = 0;
+  OE_FILL = 1;
+  OE_ACK = 2;
+  OE_REJ = 3;
+}
+
 enum SecurityType{
   SEC_TYPE_UNSPECIFIED = 0;
   RIC = 1;
@@ -88,20 +96,20 @@ message Position{
     action: "flux_toggle",
     pressed_value_as_text: "true"
   }];
-  required PositionType position_type = 2;
-  // available size for consumption
-  required int64 available_position_size = 3;
-  // committed but not consumed (portfolio to strat; day-2: maybe strat to open order)
-  required int64 allocated_position_size = 4;
-  // actual consumption
-  required int64 consumed_position_size = 5;
+  required PositionType type = 2;
+  // available position size for consumption
+  required int64 available_size = 3;
+  // position committed but not consumed (portfolio to strat; day-2: maybe strat to open order)
+  required int64 allocated_size = 4;
+  // actual position consumption
+  required int64 consumed_size = 5;
   // cost of using this position type
   optional float acquire_cost = 6;
   // un-avoidable charge due to this position type (irrespective of use / no-use)
   optional float incurred_cost = 7;
   // T+1 and onwards recurring daily cost
   optional float carry_cost = 8;
-  optional int32 position_priority = 9 [default = 10, (FluxFldHelp) = "default priority: 10,  orders to respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional int32 priority = 9 [default = 10, (FluxFldHelp) = "default priority: 10,  orders to respect specified priority (lower value is higher priority), duplicates allowed"];
   optional float premium_percentage = 10 [default = 2];
 }
 
@@ -124,8 +132,8 @@ message Broker{
   // per security positions
   repeated SecPosition sec_positions = 2;
   // broker identifier
-  required string broker_code = 3;
-  optional int32 broker_priority = 9 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; orders respect specified priority (lower value is higher priority), duplicates allowed"];
+  required string broker = 3;
+  optional int32 bkr_priority = 9 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; orders respect specified priority (lower value is higher priority), duplicates allowed"];
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
@@ -135,7 +143,11 @@ message Security{
 }
 
 message MaxNotional{
-
+  required float max_per_side_notional = 1 [(FluxFldHelp) = "non-changeable from UI: used as cap on max_b_notional as time of strat creation"];
+  required float max_b_notional = 2 [ (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
+  required float sod = 3;
+  required float available_pths = 4;
+  required float available_locates = 5;
 }
 
 message ResidualRestriction{
@@ -150,8 +162,9 @@ message OrderBrief{
   optional float px = 4;
   optional int64 qty = 5;
   required string underlying_account = 6;
-  optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true, (FluxFldHide) = "True"];
+  optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true];
   optional float computed_notional = 8 [(FluxFldHide) = "True"];
+  optional OrderEventType order_event_type = 9;
 }
 
 message CumulativeOrderBrief{
@@ -183,13 +196,17 @@ message Residual{
   required float notional = 2;
 }
 
-message MarketParticipation{
-    required float participation_rate = 1 [(FluxFldHelp) = "max % participation allowed"];
-    required int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement"];
+message MarketTradeVolumeParticipation{
+    required float participation_rate = 1 [(FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
+    optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, unset value implies seconds from SOD till time of checking"];
+}
+
+message OpenInterestParticipation{
+required float participation_rate = 1 [ (FluxFldHelp) = 'max % participation size allowed within side specific volume of Top (depth_levels) of BBBO'];
+required int32 depth_levels = 2 [(FluxFldHelp) = "allowed depth levels participating in allowed size computation - not to be confused with tick levels which may be missing depending on liquidity at specific tick level"];
 }
 
 message CancelRate{
-  required int32 allowed_order_rate = 1 [default = 30, (FluxFldSequenceNumber) = 1, (FluxFldHelp) = "Allowed Cancel Orders as % of New-Orders "];
-  required int32 allowed_size_rate = 2 [default = 50, (FluxFldSequenceNumber) = 2, (FluxFldHelp) = "% of total size sent to market [BUY+SELL]"];
-  required int32 applicable_period_seconds = 3 [default = 60, (FluxFldSequenceNumber) = 3, (FluxFldHelp) = "sliding window interval of above rate enforcement"];
+  required int32 allowed_size_rate = 1 [(FluxFldHelp) = "% of total size sent to market [BUY+SELL]"];
+  required int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement"];
 }

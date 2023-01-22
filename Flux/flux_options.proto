@@ -177,7 +177,7 @@ extend google.protobuf.FieldOptions
   optional string FluxFldUIPlaceholder = 55263; //placeholder for UI to display in grayed out font as user action hint
   optional string FluxFldTitle = 55264; //Set this value to override default title value in schema
   optional string FluxFldNameColor = 55265; // One of the color class supported: [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]
-  optional bool FluxFldElaborateTitle = 55267; //Set this value to override default title value of all sub-types with parents '.' seperated prefixed to child names
+  optional bool FluxFldElaborateTitle = 55266; //Set this value to override default title value of all sub-types with parents '.' seperated prefixed to child names
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;
