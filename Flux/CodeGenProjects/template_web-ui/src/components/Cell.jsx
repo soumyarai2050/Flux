@@ -118,7 +118,7 @@ const Cell = (props) => {
     let collection = collections.filter(col => col.tableTitle === proptitle)[0];
     let type = DataTypes.STRING;
     let enumValues = [];
-    let xpath = proptitle ? proptitle.indexOf('.') > 0 ? row[proptitle.split('.')[0] + '.xpath_' + propname] : row['xpath_' + propname] : row['xpath_' + propname];
+    let xpath = proptitle ? row[proptitle.substring(0, proptitle.lastIndexOf('.')) + '.xpath_' + propname] : row['xpath_' + propname];
     let dataxpath = getDataxpath(data, xpath)
     let disabled = false;
 
