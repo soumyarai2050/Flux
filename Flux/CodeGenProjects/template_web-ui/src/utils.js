@@ -796,9 +796,13 @@ export function addxpath(jsondata, xpath) {
         } else if (_.isNull(v)) {
             jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
         } else if (Array.isArray(v)) {
-            for (let i = 0; i < v.length; i++) {
-                let childxpath = xpath ? `${xpath}.${k}[${i}]` : `${k}[${i}]`;
-                addxpath(jsondata[k][i], childxpath);
+            if (v.length > 0 && _.isObject(v[0])) {
+                for (let i = 0; i < v.length; i++) {
+                    let childxpath = xpath ? `${xpath}.${k}[${i}]` : `${k}[${i}]`;
+                    addxpath(jsondata[k][i], childxpath);
+                }
+            } else {
+                jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
             }
         } else if (_.isObject(v)) {
             jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
@@ -817,8 +821,10 @@ export function clearxpath(jsondata) {
                 delete jsondata[k];
             }
         } else if (Array.isArray(v)) {
-            for (let i = 0; i < v.length; i++) {
-                clearxpath(jsondata[k][i]);
+            if (v.length > 0 && _.isObject(v[0])) {
+                for (let i = 0; i < v.length; i++) {
+                    clearxpath(jsondata[k][i]);
+                }
             }
         } else if (_.isObject(v)) {
             clearxpath(jsondata[k])
@@ -851,14 +857,22 @@ function flattenObject(jsondata, object, collections, xpath, parentxpath) {
             }
         } else if (Array.isArray(v)) {
             if (collections.filter((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
-                object[k] = v;
+                if (parentxpath) {
+                    object[parentxpath + '.' + k] = v;
+                } else {
+                    object[k] = v;
+                }
             } else if (v.length > 0) {
                 let updatedParentxpath = parentxpath ? parentxpath + '.' + k : k;
                 flattenObject(jsondata[k][0], object, collections, xpath, updatedParentxpath);
             }
         } else if (_.isObject(v)) {
             if (collections.filter((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
-                object[k] = v;
+                if (parentxpath) {
+                    object[parentxpath + '.' + k] = v;
+                } else {
+                    object[k] = v;
+                }
             } else {
                 let updatedParentxpath = parentxpath ? parentxpath + '.' + k : k;
                 flattenObject(jsondata[k], object, collections, xpath, updatedParentxpath);

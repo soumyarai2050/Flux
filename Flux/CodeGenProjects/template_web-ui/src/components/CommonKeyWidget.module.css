@@ -1,0 +1,73 @@
+.container {
+    padding: 5px 10px;
+    display: flex;
+    justify-content: flex-start;
+    background-color: cadetblue;
+    flex-wrap: wrap;
+}
+
+.item {
+    margin-right: 10px;
+    color: white;
+}
+
+.key {
+    color: yellow;
+    padding-right: 5px;
+}
+
+.critical {
+    color: #9C0006 !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.error {
+    color: #9C0006 !important;
+}
+
+.warning {
+    color: #9c6500 !important;
+}
+
+.info {
+    color: blue !important;
+}
+
+.debug {
+    color: #444 !important;
+}
+
+.success {
+    color: green !important;
+}
+
+.default {
+    color: white;
+}
+
+.abbreviated_json {
+    max-width: 150px;
+    display: inline-flex;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: underline;
+    color: blue;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1
+    }
+
+    50% {
+        opacity: 0.8
+    }
+
+    to {
+        opacity: 1
+    }
+}
+

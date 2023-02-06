@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import _, { cloneDeep } from 'lodash';
-import { makeStyles } from '@mui/styles';
 import {
     getAllUILayout, getUILayout, createUILayout, updateUILayout,
     setUILayoutArray, setUILayout, resetUILayout, setModifiedUILayout, setSelectedUILayoutId, resetSelectedUILayoutId, resetError
@@ -13,40 +12,14 @@ import 'react-resizable/css/styles.css';
 import { Paper, Box } from '@mui/material';
 # @@protoc_insertion_point(add_imports)
 import SideDrawer from './SideDrawer';
-import ToggleIcon from '../components/ToggleIcon';
 import { DB_ID, API_ROOT_URL, COOKIE_NAME } from '../constants';
 import { Dialog, DialogContent, DialogActions, DialogContentText, TextField, Button, DialogTitle, Autocomplete } from '@mui/material';
-import Icon from './Icon';
+import { Icon, ToggleIcon } from './Icon';
 import { DashboardCustomize, SaveAs } from '@mui/icons-material';
 import { getIconText } from '../utils';
+import classes from './Layout.module.css';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
-
-const useStyles = makeStyles({
-    layout: {
-        display: 'flex'
-    },
-    grid: {
-        flex: 1,
-        overflow: 'auto'
-    },
-    widget: {
-        background: 'whitesmoke !important',
-    },
-    icon: {
-        color: 'inherit !important',
-    },
-    iconButton: {
-        backgroundColor: '#ccc !important',
-        margin: '5px !important',
-        '&:hover': {
-            backgroundColor: '#ddd !important'
-        }
-    },
-    dialogContentText: {
-        margin: '10px 0 !important'
-    }
-})
 
 const Layout = (props) => {
     const { uiLayoutArray, uiLayout, modifiedUILayout, selectedUILayoutId, loading, error } = useSelector(state => state.uiLayout);
@@ -60,8 +33,6 @@ const Layout = (props) => {
     const [show, setShow] = useState({
         # @@protoc_insertion_point(add_widget_list)
     });
-
-    const classes = useStyles();
     const dispatch = useDispatch();
 
     const defaultProps = {
@@ -71,7 +42,7 @@ const Layout = (props) => {
         breakpoints: { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 },
         cols: { lg: 18, md: 12, sm: 6, xs: 4, xxs: 2 },
         className: 'layout',
-        rowHeight: 50,
+        rowHeight: 25,
         margin: { lg: [8, 8], md: [5, 5] },
         preventCollision: true,
         allowOverlap: false,
@@ -172,7 +143,7 @@ const Layout = (props) => {
     const onLayoutChange = (updatedLayouts) => {
         updatedLayouts = updatedLayouts.map(l => {
             let layout = layouts.filter(widgetLayout => widgetLayout.i === l.i)[0];
-            return {i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, layout: layout.layout}
+            return { i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, layout: layout.layout }
         })
         setLayouts(updatedLayouts);
     }
@@ -228,7 +199,7 @@ const Layout = (props) => {
     const onWidgetLayoutChange = (name, layoutType) => {
         let updatedData = cloneDeep(layouts);
         let updatedLayouts = updatedData.map(widgetLayout => {
-            if(widgetLayout.i === name) {
+            if (widgetLayout.i === name) {
                 widgetLayout.layout = layoutType;
             }
             return widgetLayout
@@ -239,10 +210,10 @@ const Layout = (props) => {
     return (
         <Box className={classes.layout}>
             <SideDrawer draggable={draggable} onToggleDrag={onToggleDrag}>
-                <Icon className={classes.iconButton} name="LoadLayout" title='Load Layout' onClick={() => setOpenLoadLayout(true)}>
+                <Icon className={classes.icon} name="LoadLayout" title='Load Layout' onClick={() => setOpenLoadLayout(true)}>
                     <DashboardCustomize fontSize='medium' />
                 </Icon>
-                <Icon className={classes.iconButton} name="SaveLayout" title='Save Layout' onClick={() => setOpenSaveLayout(true)}>
+                <Icon className={classes.icon} name="SaveLayout" title='Save Layout' onClick={() => setOpenSaveLayout(true)}>
                     <SaveAs fontSize='medium' />
                 </Icon>
                 # @@protoc_insertion_point(add_root_in_jsx_layout)
@@ -262,7 +233,7 @@ const Layout = (props) => {
                 onClose={onCloseSaveLayout}>
                 <DialogTitle>Save Layout</DialogTitle>
                 <DialogContent>
-                    <DialogContentText className={classes.dialogContentText}>
+                    <DialogContentText className={classes.dialog_text}>
                         To save the layout, please enter profile id. If profile id already exists, layout will be overwritten.
                     </DialogContentText>
                     <TextField
@@ -284,7 +255,7 @@ const Layout = (props) => {
                 onClose={onCloseLoadLayout}>
                 <DialogTitle>Load Layout</DialogTitle>
                 <DialogContent>
-                    <DialogContentText className={classes.dialogContentText}>
+                    <DialogContentText className={classes.dialog_text}>
                         To load the layout, select the profile id, or <Button color='error' onClick={onResetLayout}>Reset Layout</Button>
                     </DialogContentText>
                     <Autocomplete
@@ -297,7 +268,7 @@ const Layout = (props) => {
                         onChange={onSearchValueChange}
                         renderInput={(params) => <TextField {...params} label="Profile id" />}
                     />
-                    <DialogContentText className={classes.dialogContentText}>
+                    <DialogContentText className={classes.dialog_text}>
 
                     </DialogContentText>
                 </DialogContent>

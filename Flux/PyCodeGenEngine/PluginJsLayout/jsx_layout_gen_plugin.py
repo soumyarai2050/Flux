@@ -2,6 +2,7 @@
 import os
 from typing import List, Callable
 import time
+from pathlib import PurePath
 import logging
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
@@ -36,13 +37,15 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             self.handle_show_widget
         ]
         template_file_name = None
+        py_code_gen_engine_path = None
         if (output_file_name := os.getenv("OUTPUT_FILE_NAME")) is not None and \
-                (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None:
+                (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and \
+                (py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None:
             self.output_file_name = output_file_name
-            self.template_file_path = os.path.join(self.base_dir_path, "misc", template_file_name)
+            self.template_file_path = PurePath(py_code_gen_engine_path) / PurePath(__file__).parent / template_file_name
         else:
-            err_str = f"Env var 'OUTPUT_FILE_NAME' and 'TEMPLATE_FILE_NAME' " \
-                      f"received as {output_file_name} and {template_file_name}"
+            err_str = f"Env var 'OUTPUT_FILE_NAME', 'TEMPLATE_FILE_NAME' and 'PY_CODE_GEN_ENGINE_PATH'" \
+                      f"received as {output_file_name}, {template_file_name} and {py_code_gen_engine_path}"
             logging.exception(err_str)
             raise Exception(err_str)
 

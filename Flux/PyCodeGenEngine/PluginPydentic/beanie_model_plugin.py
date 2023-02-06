@@ -29,7 +29,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         match field.cardinality.name.lower():
             case "optional":
                 if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
-                    output_str = f"{field.proto.name}: Indexed({field_type} | None)"
+                    output_str = f"{field.proto.name}: Indexed({field_type}) | None"
                 else:
                     output_str = f"{field.proto.name}: {field_type} | None"
             case "repeated":
@@ -146,6 +146,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         output_str, is_msg_root = self._handle_pydantic_class_declaration(message)
 
         output_str += self._handle_class_docstring(message)
+        output_str += self._handle_reentrant_lock(message)
 
         output_str += self._handle_cache_n_ws_connection_manager_data_members_override(message, is_msg_root)
 
@@ -163,7 +164,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         output_str = "from beanie import Indexed, Document, PydanticObjectId\n"
         output_str += "from pydantic import BaseModel, Field, validator\n"
         output_str += "import pendulum\n"
-        output_str += "from threading import Lock\n"
+        output_str += "from threading import Lock, RLock\n"
         output_str += "from typing import List, ClassVar, Dict\n"
         ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
                                                                    "ws_connection_manager")

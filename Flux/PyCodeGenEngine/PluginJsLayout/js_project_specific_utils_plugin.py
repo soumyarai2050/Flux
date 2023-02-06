@@ -39,10 +39,10 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         output_str = "export function getLayout() {\n"
         output_str += "    const layout = [\n"
         for index, message in enumerate(self.layout_msg_list):
-            if JsProjectSpecificUtilsPlugin.flx_msg_widget_ui_data in str(message.proto.options):
+            if JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data in str(message.proto.options):
                 widget_ui_data_options_value_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(message,
-                                                                   JsProjectSpecificUtilsPlugin.flx_msg_widget_ui_data)
+                                                                   JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data)
                 # since widget_ui_data option is non-repeated type
                 widget_ui_data_options_value = widget_ui_data_options_value_list_of_dict[0]
 

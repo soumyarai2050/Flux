@@ -1,36 +1,14 @@
 import React from 'react';
 import { Paper } from '@mui/material';
-import Icon from './Icon';
-import { makeStyles } from '@mui/styles';
+import {Icon} from './Icon';
 import { DoNotTouch, PanTool, Save } from '@mui/icons-material';
 import PropTypes from 'prop-types';
-
-const useStyles = makeStyles({
-    sideDrawer: {
-        width: '45px',
-        height: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        padding: '10px 0',
-        background: 'rgba(0,0,0,0.85) !important',
-        borderRadius: '0 !important'
-    },
-    icon: {
-        backgroundColor: '#ccc !important',
-        margin: '5px !important',
-        '&:hover': {
-            backgroundColor: '#ddd !important'
-        }
-    }
-})
+import classes from './SideDrawer.module.css';
 
 const SideDrawer = (props) => {
 
-    const classes = useStyles();
-
     return (
-        <Paper className={classes.sideDrawer} elevation={3}>
+        <Paper className={classes.side_drawer} elevation={3}>
             {props.draggable ? (
                 <Icon className={classes.icon} name="DisableDrag" title='Disable Drag' onClick={props.onToggleDrag}>
                     <DoNotTouch fontSize='medium' />

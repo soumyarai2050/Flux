@@ -1,0 +1,19 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.menu_container {
+    display: flex;
+    margin: 20px 0px;
+}
+
+.skeleton {
+    margin: 2px;
+    border-radius: 5px;
+}
+
+.skeleton_body {
+    padding: 0px 20px;
+}

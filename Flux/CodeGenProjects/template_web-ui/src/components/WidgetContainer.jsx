@@ -1,46 +1,14 @@
 import React, { Fragment, useState, useCallback } from 'react';
 import { Typography, Box } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import { Save, Cached, Edit, AccountTree, TableView } from '@mui/icons-material';
-import Icon from './Icon';
+import {Icon} from './Icon';
 import { Modes, Layouts } from '../constants';
 import PropTypes from 'prop-types';
 import CommonKeyWidget from './CommonKeyWidget';
-
-const useStyles = makeStyles({
-    widgetHeader: {
-        background: '#0097a7',
-        color: 'white',
-        minHeight: 40,
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 20px',
-        justifyContent: 'space-between'
-    },
-    widgetBody: {
-        padding: 10,
-        height: 'calc(100% - 40px)',
-        overflow: 'auto'
-    },
-    widgetBodyEdit: {
-        background: 'beige'
-    },
-    icon: {
-        backgroundColor: '#ccc !important',
-        marginRight: '5px !important',
-        '&:hover': {
-            backgroundColor: '#ddd !important'
-        }
-    },
-    menuContainer: {
-        display: 'inline-flex',
-        alignItems: 'center'
-    }
-})
+import classes from './WidgetContainer.module.css';
 
 const WidgetContainer = (props) => {
     const [commonkeyHeight, setCommonkeyHeight] = useState(0);
-    const classes = useStyles();
 
     const commonkey = useCallback(node => {
         if (node !== null) {
@@ -67,10 +35,10 @@ const WidgetContainer = (props) => {
     return (
         <Fragment>
             <Typography variant='h6'>
-                <div className={classes.widgetHeader}>
+                <div className={classes.widget_header}>
                     <span>{props.title}</span>
                     <span>{props.centerText}</span>
-                    <div className={classes.menuContainer}>
+                    <div className={classes.menu_container}>
                         {props.menu}
                         {modeMenu}
                         {layoutMenu}
@@ -80,7 +48,7 @@ const WidgetContainer = (props) => {
                 </div>
             </Typography>
             {props.commonkeys && Object.keys(props.commonkeys).length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkey} commonkeys={props.commonkeys} />}
-            <Box style={{ height: `calc(100% - 40px - ${commonkeyHeight}px` }} className={`${classes.widgetBody} ${props.mode === Modes.EDIT_MODE ? classes.widgetBodyEdit : ''}`}>
+            <Box style={{ height: `calc(100% - 40px - ${commonkeyHeight}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
                 {props.children}
             </Box>
         </Fragment >

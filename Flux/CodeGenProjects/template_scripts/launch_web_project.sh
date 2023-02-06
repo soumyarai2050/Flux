@@ -141,3 +141,9 @@ fi
 # additional run notes when running UI in Dev/Debug mode Only
 # go inside web-ui directory and run:
 # - npm start
+
+
+# gotchas :
+# 1. proto file with comment containing ' will break UI (generator needs fix)
+# 2. only for dependent widget , the field name should be direct snake case of type name (UI depends on that)
+# 3. don't forget export DEBUG=1 if starting via NPM

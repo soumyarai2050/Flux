@@ -123,7 +123,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
     def _handle_callback_example_1(self, first_msg_name: str, first_msg_name_snake_cased: str,
                                    json_sample_content, required_root_msg: List[protogen.Message]) -> str:
         output_str = f"    # Example 1 of 5: intercept web calls via callback example\n"
-        output_str += f"    def create_{first_msg_name_snake_cased}_pre(self, " \
+        output_str += f"    async def create_{first_msg_name_snake_cased}_pre(self, " \
                       f"{first_msg_name_snake_cased}_obj: {first_msg_name}):\n"
         output_str += f'        logging.debug(f"{first_msg_name} From Ui: ' + '{' + \
                       f'{first_msg_name_snake_cased}_obj' + '}' + '")\n'
@@ -131,7 +131,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                       f'{self._handle_field_data_manipulation(json_sample_content, required_root_msg[0], single_field=True)}\n'
         output_str += f'        logging.debug(f"{first_msg_name} pre test: ' + '{' + \
                       f'{first_msg_name_snake_cased}_obj' + '}' + '")\n\n'
-        output_str += f'    def create_{first_msg_name_snake_cased}_post(self, ' \
+        output_str += f'    async def create_{first_msg_name_snake_cased}_post(self, ' \
                       f'{first_msg_name_snake_cased}_obj: {first_msg_name}):\n'
         output_str += f'        logging.debug(f"{first_msg_name} from DB: ' + '{' + \
                       f'{first_msg_name_snake_cased}_obj' + '}' + '")\n'
@@ -155,7 +155,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         main_msg = required_root_msg[1]
         main_msg_name = main_msg.proto.name
         main_msg_name_snake_cased = convert_camel_case_to_specific_case(main_msg_name)
-        output_str += f'    def create_{main_msg_name_snake_cased}_pre(self, ' \
+        output_str += f'    async def create_{main_msg_name_snake_cased}_pre(self, ' \
                       f'{main_msg_name_snake_cased}: {main_msg_name}):\n'
         output_str += f'        logging.debug(f"{main_msg_name} from UI: ' + '{' + f'{main_msg_name_snake_cased}' + '}' + '")\n'
         output_str += f'        # To avoid deadlock triggering another thread to execute another document creation\n'
@@ -163,7 +163,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'        new_thread = threading.Thread(target=self._http_create_{first_msg_name_snake_cased}' \
                       f'_thread_func, args=({main_msg_name_snake_cased},), daemon=True)\n'
         output_str += f'        new_thread.start()\n\n'
-        output_str += f'    def create_{main_msg_name_snake_cased}_post(self, {main_msg_name_snake_cased}: ' \
+        output_str += f'    async def create_{main_msg_name_snake_cased}_post(self, {main_msg_name_snake_cased}: ' \
                       f'{main_msg_name}):\n'
         output_str += f'        logging.debug(f"{main_msg_name} From Db: ' + '{' + f'{main_msg_name_snake_cased}' + '}' + '")\n'
         output_str += f'        {main_msg_name_snake_cased}.' \
@@ -179,7 +179,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         main_msg_name_snake_cased = convert_camel_case_to_specific_case(main_msg_name)
         output_str = f'    # Example 3 of 5: intercept web calls via callback and invoke ' \
                       f'another service on different web server example\n'
-        output_str += f'    def create_{main_msg_name_snake_cased}_pre(self, ' \
+        output_str += f'    async def create_{main_msg_name_snake_cased}_pre(self, ' \
                       f'{main_msg_name_snake_cased}_obj: {main_msg_name}):\n'
         output_str += f'        logging.debug(f"{main_msg_name} from UI: ' + \
                       '{' + f'{main_msg_name_snake_cased}_obj' + '}' + '")\n'
@@ -191,7 +191,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                       f'create_{first_msg_name_snake_cased}_client({first_msg_name_snake_cased}_obj)\n'
         output_str += f'        logging.debug(f"Created {first_msg_name} obj from Another Document: ' + \
                       '{' + f'{first_msg_name_snake_cased}_obj' + '}' + '")\n\n'
-        output_str += f'    def create_{main_msg_name_snake_cased}_post(self, ' \
+        output_str += f'    async def create_{main_msg_name_snake_cased}_post(self, ' \
                       f'{main_msg_name_snake_cased}_obj: {main_msg_name}):\n'
         output_str += f'        logging.debug(f"{main_msg_name} From Db: ' + \
                       '{' + f'{main_msg_name_snake_cased}_obj' + '}' + '")\n'
@@ -215,7 +215,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         main_msg = required_root_msg[3]
         main_msg_name = main_msg.proto.name
         main_msg_name_snake_cased = convert_camel_case_to_specific_case(main_msg_name)
-        output_str += f'    def read_by_id_ws_{main_msg_name_snake_cased}_pre(self, obj_id: int):\n'
+        output_str += f'    async def read_by_id_ws_{main_msg_name_snake_cased}_pre(self, obj_id: int):\n'
         output_str += f'        logging.debug(f"read_by_id_ws_{main_msg_name_snake_cased}_pre:' \
                       f' {main_msg_name} id from UI: ' + '{' + 'obj_id' + '}' + '")\n'
         output_str += f'        ws_get_{first_msg_name_snake_cased}_by_id_callback: ' \
@@ -225,7 +225,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                       f'{first_msg_name_snake_cased}_by_id_thread_func(obj_id, ws_get_{first_msg_name_snake_cased}' \
                       f'_by_id_callback),), daemon=True)\n'
         output_str += f'        new_thread.start()\n'
-        output_str += f'    def read_by_id_ws_{main_msg_name_snake_cased}_post(self):\n'
+        output_str += f'    async def read_by_id_ws_{main_msg_name_snake_cased}_post(self):\n'
         output_str += f'        logging.debug(f"closing {main_msg_name_snake_cased} read ws ' \
                       f'in read_by_id_ws_{main_msg_name_snake_cased}_post")\n\n'
         return output_str
@@ -243,7 +243,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                       f'Connecting another server {first_msg_name_snake_cased} get_all ws:")\n'
         output_str += f'        await {self.proto_file_name}_web_client_external.get_all_' \
                       f'{first_msg_name_snake_cased}_client_ws(ws_get_{first_msg_name_snake_cased}_callback)\n\n'
-        output_str += f'    def read_all_ws_{main_msg_name_snake_cased}_pre(self):\n'
+        output_str += f'    async def read_all_ws_{main_msg_name_snake_cased}_pre(self):\n'
         output_str += f'        logging.debug(f"triggered read_all_ws_{main_msg_name_snake_cased}_pre")\n'
         output_str += f'        ws_get_{first_msg_name_snake_cased}_callback: WsGet{first_msg_name}Callback ' \
                       f'= WsGet{first_msg_name}Callback()\n'
@@ -252,7 +252,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                       f'{first_msg_name_snake_cased}_thread_func(ws_get_{first_msg_name_snake_cased}_callback),),' \
                       f' daemon=True)\n'
         output_str += f'        new_thread.start()\n\n'
-        output_str += f'    def read_all_ws_{main_msg_name_snake_cased}_post(self):\n'
+        output_str += f'    async def read_all_ws_{main_msg_name_snake_cased}_post(self):\n'
         output_str += f'        logging.debug(f"closing {main_msg_name_snake_cased} read all ws in ' \
                       f'read_all_ws_{main_msg_name_snake_cased}_post")\n'
         return output_str

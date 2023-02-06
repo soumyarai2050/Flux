@@ -19,10 +19,10 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_POST_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    def create_{message_name_snake_cased}_pre(self, " \
+        output_str = f"    async def create_{message_name_snake_cased}_pre(self, " \
                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
-        output_str += f"    def create_{message_name_snake_cased}_post(self, " \
+        output_str += f"    async def create_{message_name_snake_cased}_post(self, " \
                       f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
@@ -30,22 +30,22 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
     def handle_GET_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if id_field_type is None:
-            output_str = f"    def read_by_id_{message_name_snake_cased}_pre(self, obj_id: int):\n"
+            output_str = f"    async def read_by_id_{message_name_snake_cased}_pre(self, obj_id: int):\n"
         else:
-            output_str = f"    def read_by_id_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
+            output_str = f"    async def read_by_id_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
         output_str += "        pass\n\n"
-        output_str += f"    def read_by_id_{message_name_snake_cased}_post(self, " \
+        output_str += f"    async def read_by_id_{message_name_snake_cased}_post(self, " \
                       f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
 
     def handle_PUT_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    def update_{message_name_snake_cased}_pre(self, " \
+        output_str = f"    async def update_{message_name_snake_cased}_pre(self, " \
                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
-        output_str += f"    def update_{message_name_snake_cased}_post(self, " \
+        output_str += f"    async def update_{message_name_snake_cased}_post(self, " \
                       f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                       f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
@@ -53,11 +53,11 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_PATCH_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    def partial_update_{message_name_snake_cased}_pre(self, " \
+        output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
-        output_str += f"    def partial_update_{message_name_snake_cased}_post(self, " \
+        output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
                       f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                       f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
@@ -65,13 +65,11 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_DELETE_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        if id_field_type is None:
-            output_str = f"    def delete_{message_name_snake_cased}_pre(self, obj_id: int):\n"
-        else:
-            output_str = f"    def delete_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
+        output_str = f"    async def delete_{message_name_snake_cased}_pre(self, pydantic_obj_to_be_deleted: " \
+                     f"{message.proto.name}):\n"
         output_str += "        pass\n\n"
-        output_str += f"    def delete_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
+        output_str += f"    async def delete_{message_name_snake_cased}_post(self, " \
+                      f"delete_web_response):\n"
         output_str += "        pass\n\n"
         return output_str
 
@@ -79,37 +77,37 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                                                          id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if id_field_type is None:
-            output_str = f"    def read_by_id_ws_{message_name_snake_cased}_pre(self, obj_id: int):\n"
+            output_str = f"    async def read_by_id_ws_{message_name_snake_cased}_pre(self, obj_id: int):\n"
         else:
-            output_str = f"    def read_by_id_ws_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
+            output_str = f"    async def read_by_id_ws_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
         output_str += "        pass\n\n"
-        output_str += f"    def read_by_id_ws_{message_name_snake_cased}_post(self):\n"
+        output_str += f"    async def read_by_id_ws_{message_name_snake_cased}_post(self):\n"
         output_str += "        pass\n\n"
         return output_str
 
     def handle_get_all_message_http_callback_methods(self, message: protogen.Message) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    def read_all_{message_name_snake_cased}_pre(self):\n"
+        output_str = f"    async def read_all_{message_name_snake_cased}_pre(self):\n"
         output_str += "        pass\n\n"
-        output_str += f"    def read_all_{message_name_snake_cased}_post(self, " \
+        output_str += f"    async def read_all_{message_name_snake_cased}_post(self, " \
                       f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
+    def handle_index_callback_methods_gen(self, message: protogen.Message) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    async def index_of_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    async def index_of_{message_name_snake_cased}_post(self, " \
+                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
         return output_str
 
     def handle_get_all_message_ws_callback_methods(self, message: protogen.Message) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    def read_all_ws_{message_name_snake_cased}_pre(self):\n"
+        output_str = f"    async def read_all_ws_{message_name_snake_cased}_pre(self):\n"
         output_str += "        pass\n\n"
-        output_str += f"    def read_all_ws_{message_name_snake_cased}_post(self):\n"
-        output_str += "        pass\n\n"
-        return output_str
-
-    def handle_index_callback_methods_gen(self, message: protogen.Message, field: protogen.Field) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    def index_of_{field.proto.name}_{message_name_snake_cased}_pre(self):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    def index_of_{field.proto.name}_{message_name_snake_cased}_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
+        output_str += f"    async def read_all_ws_{message_name_snake_cased}_post(self):\n"
         output_str += "        pass\n\n"
         return output_str
 
@@ -260,8 +258,10 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
             for field in message.fields:
                 if self.is_bool_option_enabled(field, FastapiCallbackFileHandler.flux_fld_index):
-                    output_str += self.handle_index_callback_methods_gen(message, field)
+                    output_str += self.handle_index_callback_methods_gen(message)
+                    break
                 # else not required: Avoiding field if index option is not enabled
+
         return output_str
 
     def handle_callback_query_methods_output(self) -> str:

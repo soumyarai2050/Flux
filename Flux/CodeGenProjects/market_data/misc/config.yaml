@@ -1,0 +1,55 @@
+host: "127.0.0.1"
+port: 7497
+client_id: 0
+log_level: "debug"
+
+contracts:
+    # USA
+#  - symbol: "AAPL"
+#    secType: "STK"
+#    exchange: "SMART"
+#    currency: "USD"
+#  - symbol: "AMZN"
+#    secType: "STK"
+#    exchange: "SMART"
+#    currency: "USD"
+    # CANADA
+  - symbol: "RY"
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "CM"
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+    #SINGAPORE
+#  - symbol: "Z74"
+#    secType: "STK"
+#    exchange: "SGX"
+#    currency: "SGD"
+
+# Historical Data
+duration_str: "1 M"
+bar_size_setting: "1 day"
+what_to_show: "TRADES"
+use_rth: 1
+format_date: 1
+keep_up_to_date: False
+
+# Live Market Data Bars (L1)
+generic_tick_list: "233"
+snapshot: False
+regulatory_snapshot: False
+
+# Tick By Tick Market Data
+tick_types:   # supported tick_types: "Last", "AllLast", "BidAsk"
+  - tick_type: "BidAsk"
+    number_of_ticks: 0
+    ignore_size: False
+  - tick_type: "AllLast"
+    number_of_ticks: 0
+    ignore_size: False
+
+# Live Market Depth
+num_rows: 10
+is_smart_depth: False

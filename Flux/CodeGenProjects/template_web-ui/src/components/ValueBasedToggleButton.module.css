@@ -1,0 +1,48 @@
+.button {
+    margin: 0px 10px !important;
+    padding: 5px 10px !important;
+    color: white !important;
+}
+
+.critical {
+    background-color: #9C0006 !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.error {
+    background-color: #9C0006 !important;
+}
+
+.warning {
+    background-color: #99942c !important;
+}
+
+.info {
+    background-color: blue !important;
+}
+
+.debug {
+    background-color: #444 !important;
+}
+
+.default {
+    background-color: black !important;
+}
+
+.success {
+    background-color: green !important;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1
+    }
+
+    50% {
+        opacity: 0.8
+    }
+
+    to {
+        opacity: 1
+    }
+}

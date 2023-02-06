@@ -7,24 +7,13 @@ import { ThemeProvider } from '@mui/material/styles';
 import Layout from './components/Layout';
 import { HashLoader } from 'react-spinners';
 import { Box } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import { theme } from './theme';
 import ErrorBoundary from './components/ErrorBoundary';
-
-const useStyles = makeStyles({
-  root: {
-    height: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  }
-})
 
 function App() {
 
   const dispatch = useDispatch();
   const { schema, loading } = useSelector((state) => state.schema);
-  const classes = useStyles();
 
   useEffect(() => {
     dispatch(getSchema());
@@ -32,10 +21,9 @@ function App() {
 
   if (loading) {
     return (
-      <Box className={classes.root}>
+      <Box className="app">
         <HashLoader />
       </Box>
-
     )
   }
 

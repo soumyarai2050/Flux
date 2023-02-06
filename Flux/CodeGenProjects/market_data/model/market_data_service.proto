@@ -1,0 +1,154 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "market_data_core.proto";
+package market_data_tech;
+
+message Quote{
+  optional double px = 1;
+  optional int64 qty = 2;
+}
+
+message TopOfBook {
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  required string symbol = 2 [(FluxFldIndex) = true];
+  required int64 time = 3 [(FluxFldValIsDateTime) = true];
+  optional Quote bid_quote = 4;
+  optional Quote ask_quote = 5;
+}
+
+message BarData {
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgJsonQuery) = {
+    ReadDesc: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1;
+  required string symbol = 2 [(FluxFldIndex) = true];
+  optional int64 date = 3 [(FluxFldValIsDateTime) = true, (FluxFldDateTimeFormat) = "%Y%m%d"];
+  required float open = 4;
+  required float high = 5;
+  required float low = 6;
+  required float close = 7;
+  required int32 volume = 8;
+  required int32 barCount = 9;
+}
+
+message BBO {
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1;
+  required string symbol = 2 [(FluxFldIndex) = true];
+  required TickTypeEnum tick_type = 3;
+  required int64 date_time = 4 [(FluxFldValIsDateTime) = true];
+  optional float px = 5;
+  optional float qty = 6;
+}
+
+message TickByTickBidAsk {
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1;
+  required string symbol = 2 [(FluxFldIndex) = true];
+  required int64 time = 3 [(FluxFldValIsDateTime) = true];
+  required float bid_px = 4;
+  required float ask_px = 5;
+  required float bid_qty = 6;
+  required float ask_qty = 7;
+}
+
+message TickByTickAllLast {
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UpdateAggregate,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UpdateAggregate,
+    PatchDesc: AggregateType_UpdateAggregate,
+    DeleteDesc: AggregateType_UpdateAggregate,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgJsonQuery) = {
+    ReadDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgAggregateQueryVarName) = "last_n_sec_tick_by_tick_all_last_agg_query";
+  required int32 id = 1;
+  required string symbol = 2 [(FluxFldIndex) = true];
+  required TickTypeEnum tick_type = 3;
+  required int64 time = 4 [(FluxFldValIsDateTime) = true];
+  required float px = 5;
+  required float qty = 6;
+  required string exchange = 7;
+  required string special_conditions = 8;
+  required bool past_limit = 9;
+  required bool unreported = 10;
+  optional float last_n_sec_avg_px = 11;
+  optional float last_n_sec_total_qty = 12;
+}
+
+message MarketDepth {
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UpdateAggregate,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UpdateAggregate,
+    PatchDesc: AggregateType_UpdateAggregate,
+    DeleteDesc: AggregateType_UpdateAggregate,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgAggregateQueryVarName) = "cum_px_qty_aggregate_query";
+  required int32 id = 1;
+  required string symbol = 2 [(FluxFldIndex) = true];
+  required int64 time = 3 [(FluxFldValIsDateTime) = true];
+  required TickTypeEnum side = 4;
+  required float px = 5;
+  required float qty = 6;
+  required int32 position = 7;
+  optional string market_maker = 8;
+  optional bool is_smart_depth = 9;
+  optional float cumulative_avg_px = 10;
+  optional float cumulative_total_qty = 11;
+}
+
+message MarketDepthHistory {
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1;
+  required string symbol = 2 [(FluxFldIndex) = true];
+  required int64 time = 3 [(FluxFldValIsDateTime) = true];
+  required int32 position = 4;
+  required int32 operation = 5;
+  required TickTypeEnum side = 6;
+  required float px = 7;
+  required float qty = 8;
+  optional string market_maker = 9;
+  optional bool is_smart_depth = 10;
+}

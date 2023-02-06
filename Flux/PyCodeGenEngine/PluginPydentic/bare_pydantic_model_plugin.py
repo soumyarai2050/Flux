@@ -99,7 +99,7 @@ class PydanticModelPlugin(BasePydanticModelPlugin):
         output_str = "from pydantic import Field, BaseModel, validator\n"
         output_str += "import pendulum\n"
         output_str += "from typing import Dict, List, ClassVar, Any\n"
-        output_str += "from threading import Lock\n"
+        output_str += "from threading import Lock, RLock\n"
         ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
                                                                    "ws_connection_manager")
         output_str += f"from {ws_connection_manager_path} import PathWSConnectionManager, " \

@@ -1,6 +1,5 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { makeStyles } from '@mui/styles';
 import { ColorTypes, DataTypes, Modes } from '../constants';
 import { Select, MenuItem, TextField, Autocomplete, Checkbox } from '@mui/material';
 import PropTypes from 'prop-types';
@@ -8,91 +7,10 @@ import { NumericFormat } from 'react-number-format';
 import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue } from '../utils';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-
-const useStyles = makeStyles({
-    autocomplete: {
-        background: 'white',
-        '& .Mui-disabled': {
-            cursor: 'not-allowed !important',
-            background: 'rgba(0,0,0,0.1)',
-            '-webkit-text-fill-color': '#444 !important',
-            fontWeight: 'bold'
-        },
-        // '& .Mui-error': {
-        //     background: 'rgba(242, 121, 129, 0.4)'
-        // }
-    },
-    checkbox: {
-        padding: '6px !important'
-    },
-    select: {
-        background: 'white',
-        '& .MuiSelect-outlined': {
-            padding: '6px 10px'
-        },
-        '& .Mui-disabled': {
-            cursor: 'not-allowed !important',
-            background: 'rgba(0,0,0,0.1)',
-            '-webkit-text-fill-color': '#444 !important',
-            fontWeight: 'bold'
-        }
-    },
-    textField: {
-        background: 'white',
-        '& .Mui-disabled': {
-            cursor: 'not-allowed',
-            background: 'rgba(0,0,0,0.05)',
-            '-webkit-text-fill-color': '#444 !important',
-            fontWeight: 'bold'
-        },
-        // '& .Mui-error': {
-        //     background: 'rgba(242, 121, 129, 0.4)'
-        // }
-    },
-    nodeFieldRemove: {
-        textDecoration: 'line-through'
-    },
-    nodeFieldCritical: {
-        color: '#9C0006 !important',
-        background: '#ffc7ce',
-        animation: `$blink 0.5s step-start infinite`
-    },
-    nodeFieldError: {
-        color: '#9C0006 !important',
-        background: '#ffc7ce'
-    },
-    nodeFieldWarning: {
-        color: '#9c6500 !important',
-        background: '#ffeb9c'
-    },
-    nodeFieldInfo: {
-        color: 'blue !important',
-        background: '#c2d1ff'
-    },
-    nodeFieldSuccess: {
-        color: 'darkgreen !important',
-        background: '#c6efce !important'
-    },
-    nodeFieldDebug: {
-        color: 'black !important',
-        background: '#ccc'
-    },
-    "@keyframes blink": {
-        "from": {
-            opacity: 1
-        },
-        "50%": {
-            opacity: 0.8
-        },
-        "to": {
-            opacity: 1
-        }
-    }
-})
+import classes from './NodeField.module.css';
 
 const NodeField = (props) => {
     const state = useSelector(state => state);
-    const classes = useStyles();
 
     let disabled = true;
     if (props.data.mode === Modes.EDIT_MODE) {
@@ -125,18 +43,12 @@ const NodeField = (props) => {
     }
 
     let color = '';
-    let colorClass = '';
     if (props.data.color) {
         color = getColorTypeFromValue(props.data, props.data.value);
     }
-    if (color === ColorTypes.CRITICAL) colorClass = classes.nodeFieldCritical;
-    else if (color === ColorTypes.ERROR) colorClass = classes.nodeFieldError;
-    else if (color === ColorTypes.WARNING) colorClass = classes.nodeFieldWarning;
-    else if (color === ColorTypes.INFO) colorClass = classes.nodeFieldInfo;
-    else if (color === ColorTypes.DEBUG) colorClass = classes.nodeFieldDebug;
-    else if (color === ColorTypes.SUCCESS) colorClass = classes.nodeFieldSuccess;
+    let colorClass = classes[color];
 
-    let nodeFieldRemove = props.data['data-remove'] ? classes.nodeFieldRemove : '';
+    let nodeFieldRemove = props.data['data-remove'] ? classes.remove : '';
 
     if (props.data.customComponentType === 'autocomplete') {
         return (
@@ -149,7 +61,7 @@ const NodeField = (props) => {
                 variant='outlined'
                 size='small'
                 sx={{ minWidth: 160 }}
-                className={`${classes.textField} ${nodeFieldRemove} ${colorClass}`}
+                className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                 required={props.data.required}
                 value={props.data.value ? props.data.value : null}
                 onChange={(e, v) => props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath)}
@@ -207,7 +119,7 @@ const NodeField = (props) => {
         let value = props.data.value ? props.data.value : 0;
         return (
             <NumericFormat
-                className={`${classes.textField} ${nodeFieldRemove} ${colorClass}`}
+                className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                 customInput={TextField}
                 id={props.data.key}
                 name={props.data.key}
@@ -237,7 +149,7 @@ const NodeField = (props) => {
         return (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DateTimePicker
-                    className={`${classes.textField} ${nodeFieldRemove} ${colorClass}`}
+                    className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                     disabled={disabled}
                     error={error}
                     value={value}
@@ -256,7 +168,7 @@ const NodeField = (props) => {
         let value = props.data.value ? props.data.value : '';
         return (
             <TextField
-                className={`${classes.textField} ${nodeFieldRemove} ${colorClass}`}
+                className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                 id={props.data.key}
                 name={props.data.key}
                 size='small'

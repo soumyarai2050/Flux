@@ -1,6 +1,7 @@
 import os
 import time
 from abc import ABC
+from typing import List
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
         isinstance(debug_sleep_time := int(debug_sleep_time), int):
@@ -63,16 +64,17 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                       f"_client_url, {message_name_snake_cased}_id)"
         return output_str
 
-    def handle_index_client_gen(self, message: protogen.Message, field: protogen.Field) -> str:
+    def handle_index_client_gen(self, message: protogen.Message) -> str:
         message_name = message.proto.name
-        field_name = field.proto.name
-        field_type = self.proto_to_py_datatype(field)
+        index_fields: List[protogen.Field] = [field for field in message.fields
+                                              if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_index)]
+        field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = " "*4 + f"def get_{message_name_snake_cased}_from_{field_name}_client(self, {field_name}: " \
-                     f"{field_type}) -> {message_name}:\n"
-        output_str += " "*4 + f"    return generic_http_get_client(" \
-                      f"self.get_{message_name_snake_cased}_from_{field_name}_client_url, " \
-                      f"{field_name}, {message_name}BaseModel)\n\n"
+        output_str = " "*4 + f"def get_{message_name_snake_cased}_from_index_client(self, {field_params}) " \
+                             f"-> {message_name}:\n"
+        output_str += " "*4 + f"    return generic_http_index_client(" \
+                      f"self.get_{message_name_snake_cased}_from_index_fields_client_url, " \
+                      f"[{', '.join([f'{field.proto.name}' for field in index_fields])}], {message_name}BaseModel)\n\n"
         return output_str
 
     def handle_get_all_message_http_client(self, message: protogen.Message):
@@ -152,6 +154,9 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
     def _import_model_in_client_file(self) -> str:
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
         output_str = f"from {model_file_path} import {BaseFastapiPlugin.default_id_type_var_name}, "
+        for enum in self.enum_list:
+            output_str += enum.proto.name
+            output_str += ", "
         for message in self.root_message_list:
             output_str += message.proto.name
             output_str += ", "
@@ -215,10 +220,12 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
         for field in message.fields:
             if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_index):
-                output_str += " " * 8 + f"self.get_{message_name_snake_cased}_from_{field.proto.name}_client_url: " \
+                output_str += " " * 8 + f"self.get_{message_name_snake_cased}_from_index_fields_client_url: " \
                                         f"str = f'http://" + "{self.host}:{self.port}/" + \
-                              f"{self.proto_file_package}/get-{message_name_snake_cased}-from-{field.proto.name}/'\n"
+                              f"{self.proto_file_package}/get-{message_name_snake_cased}-from-index-fields/'\n"
+                break
             # else not required: Avoiding field if index option is not enabled
+
         return output_str
 
     def _handle_client_query_url(self, message: protogen.Message, message_name_snake_cased: str):
@@ -331,8 +338,10 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
         for field in message.fields:
             if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_index):
-                output_str += self.handle_index_client_gen(message, field)
+                output_str += self.handle_index_client_gen(message)
+                break
             # else not required: Avoiding field if index option is not enabled
+
         return output_str
 
     def handle_client_methods(self, message: protogen.Message) -> str:
@@ -350,7 +359,8 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
         output_str += f'from {generic_web_client_path} import generic_http_get_all_client, ' + "\\\n" \
                       f'\tgeneric_http_post_client, generic_http_get_client, generic_http_put_client, ' \
-                      f'generic_http_patch_client, \\\n\tgeneric_http_delete_client, generic_ws_get_client, ' \
+                      f'generic_http_patch_client, generic_http_index_client,' \
+                      f'\\\n\tgeneric_http_delete_client, generic_ws_get_client, ' \
                       f'generic_ws_get_all_client\n'
         output_str += self._import_model_in_client_file()
         output_str += "\n\n"

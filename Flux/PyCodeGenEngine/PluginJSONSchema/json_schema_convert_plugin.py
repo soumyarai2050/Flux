@@ -78,6 +78,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         self.__json_non_layout_message_list: List[protogen.Message] = []
         self.__enum_list: List[protogen.Enum] = []
         self.__case_style_convert_method: Callable[[str], str] | None = None
+        self.__add_autocomplete_dict: bool = False
 
     def __proto_data_type_to_json(self, field: protogen.Field) -> Tuple[str, str]:
         underlying_type = field.kind.name.lower()
@@ -94,10 +95,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     self.__enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if JsonSchemaConvertPlugin.flx_msg_widget_ui_data in str(field.message.proto.options):
+                if JsonSchemaConvertPlugin.flux_msg_widget_ui_data in str(field.message.proto.options):
                     widget_ui_data_option_list_of_dict = \
                         self.get_complex_option_values_as_list_of_dict(field.message,
-                                                                       JsonSchemaConvertPlugin.flx_msg_widget_ui_data)[0]
+                                                                       JsonSchemaConvertPlugin.flux_msg_widget_ui_data)[0]
                     if "layout" in widget_ui_data_option_list_of_dict:
                         if field.message not in self.__json_layout_message_list:
                             self.__json_layout_message_list.append(field.message)
@@ -113,12 +114,17 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 self.__load_dependency_messages_and_enums_in_dicts(field.message)
             # else not required: avoiding other kinds than message or enum
 
+            if JsonSchemaConvertPlugin.flux_fld_auto_complete in str(field.proto.options):
+                self.__add_autocomplete_dict = True
+            # else not required: If AutoComplete option is not set then __add_autocomplete_dict's default
+            # value will be used while generation check
+
     def __load_json_layout_and_non_layout_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if JsonSchemaConvertPlugin.flx_msg_widget_ui_data in str(message.proto.options):
+            if JsonSchemaConvertPlugin.flux_msg_widget_ui_data in str(message.proto.options):
                 widget_ui_data_option_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(message,
-                                                                   JsonSchemaConvertPlugin.flx_msg_widget_ui_data)[0]
+                                                                   JsonSchemaConvertPlugin.flux_msg_widget_ui_data)[0]
                 if "layout" in widget_ui_data_option_list_of_dict:
                     if message not in self.__json_layout_message_list:
                         self.__json_layout_message_list.append(message)
@@ -508,11 +514,11 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
     def __handle_widget_ui_data_option_output(self, message: protogen.Message) -> str:
         widget_ui_data_prefix_stripped = \
-            JsonSchemaConvertPlugin.flx_msg_widget_ui_data.lstrip(JsonSchemaConvertPlugin.msg_options_standard_prefix)
+            JsonSchemaConvertPlugin.flux_msg_widget_ui_data.lstrip(JsonSchemaConvertPlugin.msg_options_standard_prefix)
         json_msg_str = f'    "{self.__case_style_convert_method(widget_ui_data_prefix_stripped)}": '+'{\n'
         widget_ui_data_option_value = \
             self.get_complex_option_values_as_list_of_dict(message,
-                                                           JsonSchemaConvertPlugin.flx_msg_widget_ui_data)[0]
+                                                           JsonSchemaConvertPlugin.flux_msg_widget_ui_data)[0]
         if 'i' in widget_ui_data_option_value:
             json_msg_str += f'        "i": {widget_ui_data_option_value["i"]},\n'
         else:
@@ -646,13 +652,18 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         # else not required: Avoiding if non-root messages are not available
 
         # Handling autocomplete json list
-        if (autocomplete_file_path := os.getenv("AUTOCOMPLETE_FILE_PATH")) is not None:
-            json_msg_str += '  },\n'
+        if self.__add_autocomplete_dict:
+            if (autocomplete_file_path := os.getenv("AUTOCOMPLETE_FILE_PATH")) is not None:
+                json_msg_str += '  },\n'
 
-            with open(autocomplete_file_path) as json_fl:
-                json_content = json.load(json_fl)
+                with open(autocomplete_file_path) as json_fl:
+                    json_content = json.load(json_fl)
 
-            json_msg_str += self.__handle_auto_complete_output(json_content)
+                json_msg_str += self.__handle_auto_complete_output(json_content)
+            else:
+                err_str = "Env var AUTOCOMPLETE_FILE_PATH received as None"
+                logging.exception(err_str)
+                raise Exception(err_str)
         else:
             json_msg_str += '  }\n'
 

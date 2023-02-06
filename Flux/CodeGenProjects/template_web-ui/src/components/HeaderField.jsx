@@ -1,45 +1,12 @@
 import React, { useState } from 'react';
-import { makeStyles } from "@mui/styles";
 import { Typography, Box, ClickAwayListener } from "@mui/material";
 import { IndeterminateCheckBox, AddBox, AddCircle, RemoveCircle, Menu, LiveHelp } from "@mui/icons-material";
 import { DataTypes, Modes } from '../constants';
-import Icon from './Icon';
+import {Icon} from './Icon';
 import PropTypes from 'prop-types';
-
-const useStyles = makeStyles({
-    headerContainer: {
-        display: 'flex'
-    },
-    header: {
-        background: '#0097a7',
-        color: 'white',
-        padding: 5,
-        borderRadius: 5,
-        width: '250px',
-        display: 'flex',
-        alignItems: 'center',
-        margin: '1px 0',
-        boxShadow: '0 0 1px 0 #999'
-    },
-    icon: {
-        marginRight: 10,
-        display: 'inline-flex'
-    },
-    options: {
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: '0 3px',
-        borderRadius: 5,
-        background: '#ccc',
-        boxShadow: '0 0 1px 0 black',
-        margin: '2px 0',
-        marginLeft: 1
-    }
-})
+import classes from './HeaderField.module.css';
 
 const HeaderField = (props) => {
-
-    const classes = useStyles();
     const [showOptions, setShowOptions] = useState(false);
 
     const onClick = (e) => {
@@ -55,7 +22,7 @@ const HeaderField = (props) => {
     }
 
     return (
-        <Box className={classes.headerContainer} data-xpath={props.data.xpath}>
+        <Box className={classes.container} data-xpath={props.data.xpath}>
             <Typography variant="subtitle1" >
                 <div className={classes.header} data-xpath={props.data.xpath} onDoubleClick={() => props.data.onNodeDblClick(props.name)} >
                     <span className={classes.icon}>
@@ -67,7 +34,7 @@ const HeaderField = (props) => {
             </Typography>
             {allowCreate ? showOptions ? (
                 <ClickAwayListener onClickAway={() => setShowOptions(false)}>
-                    <div className={classes.options}>
+                    <div className={classes.menu}>
                         <AddCircle data-add={props.data.xpath} data-ref={props.data.ref} onClick={onClick} />
                         <RemoveCircle data-remove={props.data.xpath} onClick={onClick} />
                     </div>

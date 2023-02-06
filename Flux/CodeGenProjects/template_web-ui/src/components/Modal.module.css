@@ -1,0 +1,9 @@
+.modal {
+    max-height: 100vh;
+    min-width: 30%;
+}
+
+.modal :global .MuiDialog-container>.MuiPaper-root {
+    margin: 0px;
+    min-width: 30%;
+}

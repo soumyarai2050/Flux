@@ -1,0 +1,91 @@
+.container {
+    display: flex;
+    align-items: center;
+}
+
+.dash {
+    border-left: 1px solid #444;
+    padding: 5px 0px;
+}
+
+.node_container {
+    display: flex;
+    align-items: center;
+    padding: 0px 5px;
+    padding-left: 0px;
+    width: max-content;
+    border-radius: 5px;
+}
+
+.node_container:hover {
+    background-color: #618685;
+}
+
+.node {
+    margin-right: 5px;
+    padding: 5px 14px;
+    background-color: #fefbd8;
+    border-radius: 5px;
+    box-shadow: 0px 0px 1px 0px #999;
+}
+
+.add {
+    background-color: #b3e0e5;
+}
+
+.remove {
+    background-color: #f27981;
+    text-decoration: line-through;
+}
+
+.modified {
+    background-color: #ccc;
+}
+
+.type {
+    font-weight: bold;
+    margin-left: 20px;
+}
+
+.critical {
+    color: #9C0006 !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.error {
+    color: #9C0006 !important;
+}
+
+.warning {
+    color: #9c6500 !important;
+}
+
+.info {
+    color: blue !important;
+}
+
+.debug {
+    color: #444 !important;
+}
+
+.success {
+    color: green !important;
+}
+
+.default {
+    color: black;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1
+    }
+
+    50% {
+        opacity: 0.8
+    }
+
+    to {
+        opacity: 1
+    }
+}

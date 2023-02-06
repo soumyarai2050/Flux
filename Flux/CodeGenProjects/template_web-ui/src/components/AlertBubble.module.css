@@ -1,0 +1,47 @@
+.alert_bubble {
+    margin: 0px 10px;
+    color: white !important;
+}
+
+.critical :global .MuiBadge-badge {
+    background-color: #9C0006 !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.error :global .MuiBadge-badge {
+    background-color: #9C0006 !important;
+}
+
+.warning :global .MuiBadge-badge {
+    background-color: #99942c !important;
+}
+
+.info :global .MuiBadge-badge {
+    background-color: blue !important;
+}
+
+.debug :global .MuiBadge-badge {
+    background-color: #444 !important;
+}
+
+.success :global .MuiBadge-badge {
+    background-color: green !important;
+}
+
+.default :global .MuiBadge-badge {
+    background-color: black !important;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1
+    }
+
+    50% {
+        opacity: 0.8
+    }
+
+    to {
+        opacity: 1
+    }
+}

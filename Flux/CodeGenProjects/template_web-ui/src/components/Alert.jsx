@@ -1,20 +1,12 @@
 import React from 'react';
+import classes from './Alert.module.css';
 import { Snackbar, Alert as AlertComponent, IconButton } from '@mui/material';
 import { Close } from '@mui/icons-material';
 import PropTypes from 'prop-types';
-import { makeStyles } from '@mui/styles';
-
-const useStyles = makeStyles({
-    alert: {
-        alignItems: 'center'
-    }
-})
 
 const Alert = (props) => {
-    const classes = useStyles();
-
     return (
-        <Snackbar open={props.open} onClose={props.onClose}>
+        <Snackbar open={props.open}>
             <AlertComponent
                 className={classes.alert}
                 variant='filled'

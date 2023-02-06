@@ -1,0 +1,25 @@
+.icon {
+    background-color: #ccc !important;
+    margin-right: 5px !important;
+}
+
+.icon:hover {
+    background-color: #aaa !important;
+}
+
+.toggle_icon {
+    padding: 2px !important;
+    border-radius: 50%;
+    color: #444 !important;
+}
+
+.toggle_icon_container :global .Mui-selected>.MuiAvatar-root {
+    color: white !important;
+    background-color: blue !important;
+}
+
+.avatar {
+    color: inherit !important;
+    height: 35px !important;
+    width: 35px !important;
+}

@@ -1,11 +1,9 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
 import { Autocomplete, Box, TextField, Button, Divider, List, ListItem, ListItemButton, ListItemText, Chip, Badge } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import WidgetContainer from './WidgetContainer';
 import { Download, Delete } from '@mui/icons-material';
 import PropTypes from 'prop-types';
-import Icon from './Icon';
+import { Icon } from './Icon';
 import _ from 'lodash';
 import { DB_ID, Modes, DataTypes } from '../constants';
 import Alert from './Alert';
@@ -17,33 +15,9 @@ import {
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
-
-const useStyles = makeStyles({
-    autocompleteDropdownContainer: {
-        display: 'flex',
-        margin: '10px 0'
-    },
-    autocomplete: {
-        flex: 1,
-        background: 'white'
-    },
-    button: {
-        margin: '0 5px !important'
-    },
-    listItem: {
-        padding: '0px 10px 10px'
-    },
-    badge: {
-        margin: '0 10px'
-    },
-    listItemSelected: {
-        background: 'rgba(25, 118, 210, 0.2) !important'
-    }
-})
+import classes from './AbbreviatedFilterWidget.module.css';
 
 const AbbreviatedFilterWidget = (props) => {
-    const state = useSelector(state => state);
-    const classes = useStyles();
 
     const onButtonClick = (e, action, xpath, value) => {
         if (action === 'flux_toggle') {
@@ -66,31 +40,36 @@ const AbbreviatedFilterWidget = (props) => {
             onSave={props.headerProps.onSave}
             onReload={props.headerProps.onReload}
         >
-            <Box className={classes.autocompleteDropdownContainer}>
+            <Box className={classes.dropdown_container}>
                 <Autocomplete
-                    className={classes.autocomplete}
-                    options={props.options}
-                    getOptionLabel={(option) => option}
+                    className={classes.autocomplete_dropdown}
                     disableClearable
-                    variant='outlined'
+                    getOptionLabel={(option) => option}
+                    options={props.options}
                     size='small'
+                    variant='outlined'
                     value={props.searchValue ? props.searchValue : null}
                     onChange={props.onChange}
                     renderInput={(params) => <TextField {...params} label={props.bufferedLabel} />}
                 />
-                <Button className={classes.button} variant='contained' disableElevation disabled={props.searchValue ? false : true} onClick={props.onLoad}>
+                <Button
+                    className={classes.button}
+                    disabled={props.searchValue ? false : true}
+                    disableElevation
+                    variant='contained'
+                    onClick={props.onLoad}>
                     <Download fontSize='small' />
                 </Button>
             </Box>
             <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
-            <List className={classes.list}>
+            <List>
                 {props.items && props.items.map((item, i) => {
                     let id = getIdFromAbbreviatedKey(props.abbreviated, item);
                     let disabled = props.mode === Modes.EDIT_MODE && props.selected !== id ? true : false;
                     let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
                     let alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
                     let alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
-                    let selectedClass = props.selected === id ? classes.listItemSelected : '';
+                    let selectedClass = props.selected === id ? classes.list_item_selected : '';
 
                     let extraProps = [];
                     if (props.abbreviated.indexOf('$') !== -1) {
@@ -104,7 +83,7 @@ const AbbreviatedFilterWidget = (props) => {
                     }
 
                     return (
-                        <ListItem key={i} className={`${classes.listItem} ${selectedClass}`} selected={props.selected === id} disablePadding >
+                        <ListItem key={i} className={`${classes.list_item} ${selectedClass}`} selected={props.selected === id} disablePadding >
                             {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
                             <ListItemButton disabled={disabled} onClick={() => props.onSelect(id)}>
                                 <ListItemText>

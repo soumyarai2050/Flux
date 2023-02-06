@@ -3,6 +3,7 @@ import os
 from typing import List, Dict
 import time
 import logging
+from pathlib import PurePath
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
         isinstance(debug_sleep_time := int(debug_sleep_time), int):
@@ -38,6 +39,18 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
             if BeanieFastApiPlugin.flux_msg_json_root in str(message.proto.options):
+                json_root_msg_option_val_dict = \
+                    self.get_complex_option_values_as_list_of_dict(message, BeanieFastApiPlugin.flux_msg_json_root)
+                # taking first obj since json root is of non-repeated option
+                if (is_reentrant_required := json_root_msg_option_val_dict[0].get(
+                        BeanieFastApiPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
+                    if not is_reentrant_required:
+                        self.reentrant_lock_non_required_msg.append(message)
+                    # else not required: If reentrant field of json root has True then
+                    # avoiding its append to reentrant lock non-required list
+                # else not required: If json root option don't have reentrant field then considering it requires
+                # reentrant lock as default and avoiding its append to reentrant lock non-required list
+
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
@@ -80,11 +93,17 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str = "async def init_db():\n"
         output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := os.getenv("MONGO_SERVER")) ' \
                       'is None else mongo_env\n'
-        output_str += f'    client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server)\n'
+        output_str += f'    if (db_name := os.getenv("DB_NAME")) is not None:\n'
+        output_str += f'        mongo_server += "/" + db_name\n'
+        output_str += f'        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server)\n'
+        output_str += f'        db = client.get_default_database()\n'
+        output_str += f'    else:\n'
+        output_str += f'        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server)\n'
+        output_str += f'        db = client.{self.proto_file_package}\n'
         output_str += f'    await init_beanie(\n'
-        output_str += f'              database=client.{self.proto_file_package},\n'
-        output_str += f'              document_models=[{model_names}]\n'
-        output_str += f'              )\n'
+        output_str += f'        database=db,\n'
+        output_str += f'        document_models=[{model_names}]\n'
+        output_str += f'        )\n'
         return output_str
 
     def handle_database_file_gen(self) -> str:
@@ -174,8 +193,8 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
             self.callback_override_set_instance_file_name + ".py":
                 self.handle_callback_override_set_instance_file_gen(),
 
-            # Adding callback override class file
-            self.routes_callback_class_name + "_override.py": self.handle_callback_override_file_gen(),
+            # Adding dummy callback override class file
+            "dummy_" + self.routes_callback_class_name_override + ".py": self.handle_callback_override_file_gen(),
 
             # Adding project's routes.py
             self.routes_file_name+".py": self.handle_routes_file_gen(),

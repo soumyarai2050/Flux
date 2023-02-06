@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 from typing import Dict
+from pathlib import PurePath
+import os
+import logging
 
 # third-party modules
 import protogen
@@ -66,8 +69,8 @@ class BareFastapiPlugin(FastapiCallbackFileHandler,
             self.callback_override_set_instance_file_name + ".py":
                 self.handle_callback_override_set_instance_file_gen(),
 
-            # Adding callback override class file
-            self.routes_callback_class_name_override + ".py": self.handle_callback_override_file_gen(),
+            # Adding dummy callback override class file
+            "dummy_" + self.routes_callback_class_name_override + ".py": self.handle_callback_override_file_gen(),
 
             # Adding project's routes.py
             self.routes_file_name + ".py": self.handle_routes_file_gen(),

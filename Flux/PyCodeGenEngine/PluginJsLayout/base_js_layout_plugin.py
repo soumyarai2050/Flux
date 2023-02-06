@@ -38,10 +38,10 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                 self.root_msg_list.append(message)
             # else not required: Avoiding non ORM root messages
 
-            if BaseJSLayoutPlugin.flx_msg_widget_ui_data in options_str:
+            if BaseJSLayoutPlugin.flux_msg_widget_ui_data in options_str:
                 widget_ui_data_option_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(message,
-                                                                   BaseJSLayoutPlugin.flx_msg_widget_ui_data)[0]
+                                                                   BaseJSLayoutPlugin.flux_msg_widget_ui_data)[0]
                 if "layout" in widget_ui_data_option_list_of_dict:
                     self.layout_msg_list.append(message)
                     layout_type: str = widget_ui_data_option_list_of_dict["layout"].strip()

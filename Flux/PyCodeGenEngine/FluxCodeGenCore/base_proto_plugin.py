@@ -53,6 +53,7 @@ class BaseProtoPlugin(ABC):
     flux_json_root_delete_field: ClassVar[str] = "DeleteDesc"
     flux_json_root_read_websocket_field: ClassVar[str] = "ReadWebSocketDesc"
     flux_json_root_update_websocket_field: ClassVar[str] = "UpdateWebSocketDesc"
+    flux_json_root_set_reentrant_lock_field: ClassVar[str] = "SetReentrantLock"
     flux_fld_is_required: ClassVar[str] = "FluxFldIsRequired"
     flux_fld_cmnt: ClassVar[str] = "FluxFldCmnt"
     flux_msg_cmnt: ClassVar[str] = "FluxMsgCmnt"
@@ -72,7 +73,12 @@ class BaseProtoPlugin(ABC):
     flux_fld_date_time_format: str = "FluxFldDateTimeFormat"
     flux_fld_elaborated_title: str = "FluxFldElaborateTitle"
     flux_fld_name_color: str = "FluxFldNameColor"
-    flx_msg_widget_ui_data: str = "FluxMsgWidgetUIData"
+    flux_msg_widget_ui_data: str = "FluxMsgWidgetUIData"
+    flux_msg_aggregate_query_var_name: str = "FluxMsgAggregateQueryVarName"
+    aggregation_type_update: str = "AggregateType_UpdateAggregate"
+    aggregation_type_filter: str = "AggregateType_FilterAggregate"
+    aggregation_type_both: str = "AggregateType_FilterNUpdate"
+    aggregation_type_unspecified: str = "AggregateType_UNSPECIFIED"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: str = "ProtoPackageName"  # to be used in models as proto_package_name variable name
@@ -224,6 +230,7 @@ class BaseProtoPlugin(ABC):
                             # For string value: removing extra quotation marks
                             processed_field_val = str(field_val[2:-1])
                         else:
+                            # For bool value
                             if ' true' == field_val or ' false' == field_val:
                                 processed_field_val = True if field_val == ' true' else False
                             else:

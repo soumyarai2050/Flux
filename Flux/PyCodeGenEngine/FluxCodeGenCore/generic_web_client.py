@@ -15,9 +15,7 @@ from FluxPythonUtils.scripts.utility_functions import log_n_except, http_respons
 @log_n_except
 def generic_http_get_all_client(url: str, pydantic_type):
     response: requests.Response = requests.get(url)
-    response_json = response.json()
-    pydantic_obj_list = [pydantic_type(**json_obj) for json_obj in response_json]
-    return pydantic_obj_list
+    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
 
 
 @log_n_except
@@ -43,7 +41,7 @@ def generic_http_get_client(url: str, query_param: Any, pydantic_type):
             url = f"{url}{query_param}"
         else:
             url = f"{url}/{query_param}"
-    # else not required: When used for queries like get last date query, as there is no query_param in case of query
+    # else not required: When used for queries, like get last date query, there is no query_param in case of query
     response: requests.Response = requests.get(url)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
 
@@ -163,3 +161,13 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
                     print('\n', "Update: ", pydantic_type_obj)
                 except KeyError:
                     continue
+
+@log_n_except
+def generic_http_index_client(url: str, query_params: List[Any], pydantic_type):
+    query_params = "/".join(query_params)
+    if url.endswith("/"):
+        url = f"{url}{query_params}"
+    else:
+        url = f"{url}/{query_params}"
+    response: requests.Response = requests.get(url)
+    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)

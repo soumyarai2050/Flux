@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, Fragment, memo } from 'react';
-import _, { cloneDeep, isEqual } from 'lodash';
-import { makeStyles } from '@mui/styles';
+import _, { cloneDeep } from 'lodash';
 import {
     TableContainer, Table, TableBody, TableRow, TableCell, DialogTitle, DialogContent, DialogContentText,
     DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination
@@ -11,52 +10,13 @@ import { DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
 import TableHead from './TableHead';
-import FullScreenModal from './FullScreenModal';
+import FullScreenModal from './Modal';
 import Cell from './Cell';
-import Icon from './Icon';
+import { Icon } from './Icon';
 import Alert from './Alert';
-import AbbreviatedJsonWidget from './AbbreviatedJsonWidget';
+import AbbreviatedJsonWidget from './AbbreviatedJson';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
-
-const useStyles = makeStyles({
-    tableContainer: {
-        background: 'white'
-    },
-    table: {
-        minWidth: 750
-    },
-    tableRow: {
-        '&:nth-of-type(even)': {
-            background: '#eee'
-        }
-    },
-    tableRowAdd: {
-        background: '#c6efce !important'
-    },
-    tableRowRemove: {
-        background: '#ffc7ce !important'
-    },
-    icon: {
-        backgroundColor: '#ccc !important',
-        marginRight: '5px !important',
-        '&:hover': {
-            backgroundColor: '#ddd !important'
-        }
-    },
-    settings: {
-        width: 0,
-        display: 'inherit',
-        '& .MuiSelect-outlined': {
-            padding: 0
-        },
-        '& .css-jedpe8-MuiSelect-select-MuiInputBase-input-MuiOutlinedInput-input': {
-            paddingRight: '0px !important'
-        }
-    },
-    nodeContainerHighlighted: {
-        background: 'orange'
-    }
-})
+import classes from './TableWidget.module.css';
 
 const TableWidget = (props) => {
 
@@ -79,7 +39,6 @@ const TableWidget = (props) => {
     const [orderBy, setOrderBy] = React.useState('');
     const [openModalPopup, setOpenModalPopup] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
-    const classes = useStyles();
 
     useEffect(() => {
         setData(props.data);
@@ -204,7 +163,7 @@ const TableWidget = (props) => {
                     modalId = props.name + '_' + props.xpath + '_modal';
                 }
                 document.getElementById(modalId).querySelectorAll("[data-xpath='" + xpath + "']").forEach(el => {
-                    el.classList.add(classes.nodeContainerHighlighted)
+                    el.classList.add(classes.highlight)
                 })
             }, 500)
         }
@@ -261,7 +220,7 @@ const TableWidget = (props) => {
         if (!e.target.checked) {
             setSelectAll(false);
         }
-        let updatedHeadCells = headCells.map((cell) => cell.key === key ? { ...cell, hide: !e.target.checked } : cell)
+        let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: !e.target.checked } : cell)
         setHeadCells(updatedHeadCells);
     }
 
@@ -343,7 +302,7 @@ const TableWidget = (props) => {
             )}
             <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
             <Select
-                className={classes.settings}
+                className={classes.dropdown}
                 open={showSettings}
                 onOpen={onSettingsOpen}
                 onClose={onSettingsClose}
@@ -366,12 +325,12 @@ const TableWidget = (props) => {
                     return (
                         <MenuItem key={index} dense={true}>
                             <FormControlLabel size='small'
-                                label={cell.title}
+                                label={cell.elaborateTitle ? cell.tableTitle : cell.key}
                                 control={
                                     <Checkbox
                                         size='small'
                                         checked={cell.hide ? false : true}
-                                        onChange={(e) => onSettingsItemChange(e, cell.key)}
+                                        onChange={(e) => onSettingsItemChange(e, cell.tableTitle)}
                                     />
                                 }
                             />
@@ -403,7 +362,7 @@ const TableWidget = (props) => {
 
             {getFilteredCells().length > 0 && rows.length > 0 &&
                 <Fragment>
-                    <TableContainer className={classes.tableContainer}>
+                    <TableContainer className={classes.container}>
                         <Table
                             className={classes.table}
                             size='medium'>
@@ -440,25 +399,19 @@ const TableWidget = (props) => {
 
                                         let tableRowClass = '';
                                         if (row['data-add']) {
-                                            tableRowClass = classes.tableRowAdd;
+                                            tableRowClass = classes.add;
                                         } else if (row['data-remove']) {
-                                            tableRowClass = classes.tableRowRemove;
+                                            tableRowClass = classes.remove;
                                         }
 
                                         return (
                                             <TableRow
                                                 key={index}
-                                                className={`${classes.tableRow} ${tableRowClass}`}
+                                                className={`${classes.row} ${tableRowClass}`}
                                                 hover
                                                 selected={selectedRows.filter(id => id === row['data-id']).length > 0}
                                                 onDoubleClick={(e) => onRowDisselect(e, row['data-id'])}
                                                 onClick={(e) => onRowSelect(e, row['data-id'])}>
-
-                                                {/* {props.mode === Modes.EDIT_MODE &&
-                                            <TableCell align='center' size='small'>
-                                                <Icon title="Expand" onClick={(e) => onRowClick(e, index)}><MoreHoriz /></Icon>
-                                            </TableCell>
-                                        } */}
 
                                                 {getFilteredCells().map((cell, i) => {
                                                     // don't show cells that are hidden
@@ -492,15 +445,17 @@ const TableWidget = (props) => {
                             </TableBody>
                         </Table>
                     </TableContainer>
-                    <TablePagination
-                        rowsPerPageOptions={[25, 50]}
-                        component="div"
-                        count={rows.length}
-                        rowsPerPage={rowsPerPage}
-                        page={page}
-                        onPageChange={handleChangePage}
-                        onRowsPerPageChange={handleChangeRowsPerPage}
-                    />
+                    {rows.length > 6 &&
+                        <TablePagination
+                            rowsPerPageOptions={[25, 50]}
+                            component="div"
+                            count={rows.length}
+                            rowsPerPage={rowsPerPage}
+                            page={page}
+                            onPageChange={handleChangePage}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
+                        />
+                    }
                 </Fragment>
             }
 

@@ -44,12 +44,19 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         self.__case_style_convert_method: Callable[[str], str] | None = None
         self.auto_complete_data: Dict | None = None
         self.root_msg_list: List[protogen.Message] = []
+        self.__is_req_autocomplete: bool = False
 
     def __load_root_json_msg(self, file: protogen.File):
         for message in file.messages:
             if JsonSampleGenPlugin.flux_msg_json_root in str(message.proto.options):
                 self.root_msg_list.append(message)
             # else not required: avoiding non-json msg append to list
+
+            for field in message.fields:
+                if JsonSampleGenPlugin.flux_fld_auto_complete in str(field.proto.options):
+                    self.__is_req_autocomplete = True
+            # else not required: If no field of any message has autocomplete option then using default
+            # value of __is_req_autocomplete data member where required
 
     def __json_non_repeated_field_sample_gen(self, field: protogen.Field, indent_space_count: int) -> str:
         json_sample_output = ""
@@ -200,14 +207,16 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         return json_sample_output
 
     def __load_auto_complete_json(self) -> Dict:
-        if (autocomplete_file_path := os.getenv("AUTOCOMPLETE_FILE_PATH")) is not None:
-            with open(autocomplete_file_path) as fl:
-                auto_complete_data = json.load(fl)
-                return auto_complete_data
-        else:
-            err_str = "Could not find env variable AUTOCOMPLETE_FILE_PATH"
-            logging.exception(err_str)
-            raise Exception(err_str)
+        if self.__is_req_autocomplete:
+            if (autocomplete_file_path := os.getenv("AUTOCOMPLETE_FILE_PATH")) is not None:
+                with open(autocomplete_file_path) as fl:
+                    auto_complete_data = json.load(fl)
+                    return auto_complete_data
+            else:
+                err_str = "Could not find env variable AUTOCOMPLETE_FILE_PATH"
+                logging.exception(err_str)
+                raise Exception(err_str)
+        # else not required: If no field of any message has autocomplete option then avoiding file's content load
 
     def __handle_replacement_of_autocomplete_list_wth_value(self, option_value: str) -> str:
         option_fields = option_value.split(",")

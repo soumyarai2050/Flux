@@ -47,6 +47,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.proto_package_name: str = ""
         self.model_file_name: str = ""
         self.model_import_file_name: str = ""
+        self.reentrant_lock_non_required_msg: List[protogen.Message] = []
 
     def enum_type_validator(self):
         match self.enum_type:
@@ -92,6 +93,17 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
             if BasePydanticModelPlugin.flux_msg_json_root in str(message.proto.options):
+                json_root_msg_option_val_dict = \
+                    self.get_complex_option_values_as_list_of_dict(message, BasePydanticModelPlugin.flux_msg_json_root)
+                # taking first obj since json root is of non-repeated option
+                if (is_reentrant_required := json_root_msg_option_val_dict[0].get(
+                        BasePydanticModelPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
+                    if not is_reentrant_required:
+                        self.reentrant_lock_non_required_msg.append(message)
+                    # else not required: If reentrant field of json root has True then
+                    # avoiding its append to reentrant lock non-required list
+                # else not required: If json root option don't have reentrant field then considering it requires
+                # reentrant lock as default and avoiding its append to reentrant lock non-required list
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
@@ -238,6 +250,13 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             output_str += '    """\n'
         # else not required: empty string will be sent
         return output_str
+
+    def _handle_reentrant_lock(self, message: protogen.Message) -> str:
+        # taking first obj since json root is of non-repeated option
+        if message in self.root_message_list and message not in self.reentrant_lock_non_required_msg:
+            return "    reentrant_lock: ClassVar[Lock] = RLock()\n"
+        else:
+            return ""
 
     def _handle_cache_n_ws_connection_manager_data_members_override(self, message: protogen.Message, is_msg_root: bool):
         output_str = ""

@@ -58,13 +58,13 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
 
             self.load_dependency_messages_and_enums_in_dicts(message)
 
-    def handle_POST_gen(self, message: protogen.Message, method_desc: str | None = None) -> str:
+    def handle_POST_gen(self, message: protogen.Message, aggregation_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = f'@{self.fastapi_app_name}.post("/create-{message_name_snake_cased}' + f'", response_model={message.proto.name} | DefaultWebResponse)\n'
         output_str += f"async def create_{message_name_snake_cased}({message_name_snake_cased}: {message.proto.name}, session: AsyncSession = Depends(get_session)):\n"
-        if method_desc:
+        if aggregation_type:
             output_str += f'    """\n'
-            output_str += f'    {method_desc}\n'
+            output_str += f'    {aggregation_type}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
         output_str += f"    try:\n"
@@ -80,13 +80,13 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
         output_str += '        return something_went_wrong\n'
         return output_str
 
-    def handle_GET_gen(self, message: protogen.Message, method_desc: str | None = None) -> str:
+    def handle_GET_gen(self, message: protogen.Message, aggregate_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = f'@{self.fastapi_app_name}.get("/get-{message_name_snake_cased}/' + '{'+f'{message_name_snake_cased}'+'_id}' + f'", response_model={message.proto.name} | DefaultWebResponse)\n'
         output_str += f"async def read_{message_name_snake_cased}({message_name_snake_cased}_id: int, session: AsyncSession = Depends(get_session)):\n"
-        if method_desc:
+        if aggregate_type:
             output_str += f'    """\n'
-            output_str += f'    {method_desc}\n'
+            output_str += f'    {aggregate_type}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
         output_str += f"    try:\n"
@@ -192,7 +192,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
         output_str += '        return something_went_wrong\n\n\n'
         return output_str
 
-    def handle_get_all_message_request(self, message: protogen.Message) -> str:
+    def handle_GET_ALL_gen(self, message: protogen.Message) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         # @@@ TODO: use response model in this case (throwing error for now)
         output_str = f'@{self.fastapi_app_name}.get("/get-all-{message_name_snake_cased}/' + f'")\n'
@@ -225,7 +225,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
             SQLModelFastApiPlugin.flux_json_root_delete_field: self.handle_DELETE_gen
         }
 
-        output_str = self.handle_get_all_message_request(message)
+        output_str = self.handle_GET_ALL_gen(message)
         for crud_option_field_name, crud_operation_method in crud_field_name_to_method_call_dict.items():
             if crud_option_field_name in option_dict:
                 method_disc = option_dict[crud_option_field_name]

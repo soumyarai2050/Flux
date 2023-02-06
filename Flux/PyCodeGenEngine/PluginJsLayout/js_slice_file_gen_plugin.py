@@ -52,12 +52,12 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         for message in self.root_msg_list:
             for field in message.fields:
                 if field.message is not None and \
-                        JsSliceFileGenPlugin.flx_msg_widget_ui_data in str(field.message.proto.options):
+                        JsSliceFileGenPlugin.flux_msg_widget_ui_data in str(field.message.proto.options):
                     # If field of message datatype of this message is found having widget_ui_data option
                     # with layout field then collecting those messages in dependent_message_list
                     widget_ui_data_option_list_of_dict = \
                         self.get_complex_option_values_as_list_of_dict(field.message,
-                                                                       JsSliceFileGenPlugin.flx_msg_widget_ui_data)[0]
+                                                                       JsSliceFileGenPlugin.flux_msg_widget_ui_data)[0]
                     if "layout" in widget_ui_data_option_list_of_dict:
                         self.dependent_message_list.append(message)
                         break

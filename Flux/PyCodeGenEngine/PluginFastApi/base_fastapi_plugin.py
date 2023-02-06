@@ -54,6 +54,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.routes_callback_class_name_capital_camel_cased: str = ""
         self.int_id_message_list: List[protogen.Message] = []
         self.callback_override_set_instance_file_name: str = ""
+        self.reentrant_lock_non_required_msg: List[protogen.Message] = []
 
     def load_dependency_messages_and_enums_in_dicts(self, message: protogen.Message):
         for field in message.fields:
@@ -89,6 +90,18 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
             if BaseFastapiPlugin.flux_msg_json_root in str(message.proto.options):
+                json_root_msg_option_val_dict = \
+                    self.get_complex_option_values_as_list_of_dict(message, BaseFastapiPlugin.flux_msg_json_root)
+                # taking first obj since json root is of non-repeated option
+                if (is_reentrant_required := json_root_msg_option_val_dict[0].get(
+                        BaseFastapiPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
+                    if not is_reentrant_required:
+                        self.reentrant_lock_non_required_msg.append(message)
+                    # else not required: If reentrant field of json root has True then
+                    # avoiding its append to reentrant lock non-required list
+                # else not required: If json root option don't have reentrant field then considering it requires
+                # reentrant lock as default and avoiding its append to reentrant lock non-required list
+
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition

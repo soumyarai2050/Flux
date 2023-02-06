@@ -1,36 +1,15 @@
-import React from 'react'
-import { Skeleton, Box } from '@mui/material'
-import { makeStyles } from '@mui/styles'
-import WidgetContainer from './WidgetContainer'
-
-const useStyles = makeStyles({
-    skeletonContainer: {
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-    },
-    skeletionMenuContainer: {
-        display: 'flex',
-        margin: '20px 0',
-    },
-    skeletonBody: {
-        padding: '0 20px'
-    },
-    skeleton: {
-        margin: 2,
-        borderRadius: 5
-    }
-})
+import React from 'react';
+import { Skeleton, Box } from '@mui/material';
+import WidgetContainer from './WidgetContainer';
+import classes from './SkeletonField.module.css';
 
 const SkeletonField = (props) => {
 
-    const classes = useStyles();
-
     return (
-        <Box className={classes.skeletonContainer}>
+        <Box className={classes.container}>
             <WidgetContainer title={props.title}>
-                <Box className={classes.skeletonBody}>
-                    <Box className={classes.skeletionMenuContainer}>
+                <Box className={classes.skeleton_body}>
+                    <Box className={classes.menu_container}>
                         <Skeleton className={classes.skeleton} variant='circular' width={35} height={35} />
                         <Skeleton className={classes.skeleton} variant='circular' width={35} height={35} />
                     </Box>
@@ -46,4 +25,4 @@ const SkeletonField = (props) => {
     )
 }
 
-export default SkeletonField
+export default SkeletonField;

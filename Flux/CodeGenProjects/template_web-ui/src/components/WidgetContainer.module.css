@@ -1,0 +1,33 @@
+.widget_header {
+    background-color: #0097a7;
+    color: white;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0px 20px;
+    justify-content: space-between;
+}
+
+.widget_body {
+    padding: 10px;
+    height: calc(100% - 40px);
+    overflow: auto;
+}
+
+.edit {
+    background-color: beige;
+}
+
+.icon {
+    background-color: #ccc !important;
+    margin-right: 5px !important; 
+}
+
+.icon:hover {
+    background-color: #ddd !important;
+}
+ 
+.menu_container {
+    display: inline-flex;
+    align-items: center;
+}

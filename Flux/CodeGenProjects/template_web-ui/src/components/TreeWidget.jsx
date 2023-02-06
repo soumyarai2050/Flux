@@ -3,33 +3,13 @@ import WidgetContainer from './WidgetContainer';
 import InfinityMenu from 'react-infinity-menu-plus';
 import _, { cloneDeep } from 'lodash';
 import { generateTreeStructure, generateObjectFromSchema, addxpath, getDataxpath, setTreeState, getXpathKeyValuePairFromObject } from '../utils';
-import Icon from './Icon';
+import {Icon} from './Icon';
 import { UnfoldMore, UnfoldLess, VisibilityOff, Visibility } from '@mui/icons-material';
 import { MenuItem, Checkbox, FormControlLabel, Select } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import Alert from './Alert';
 import PropTypes from 'prop-types';
 import { DataTypes } from '../constants';
-
-const useStyles = makeStyles({
-    icon: {
-        backgroundColor: '#ccc !important',
-        marginRight: '5px !important',
-        '&:hover': {
-            backgroundColor: '#ddd !important'
-        }
-    },
-    dropdown: {
-        width: 0,
-        display: 'inherit',
-        '& .MuiSelect-outlined': {
-            padding: 0
-        },
-        '& .css-jedpe8-MuiSelect-select-MuiInputBase-input-MuiOutlinedInput-input': {
-            paddingRight: '0px !important'
-        }
-    }
-})
+import classes from './TreeWidget.module.css';
 
 const TreeWidget = (props) => {
 
@@ -39,7 +19,6 @@ const TreeWidget = (props) => {
     const [hide, setHide] = useState(true);
     const [showDataType, setShowDataType] = useState(false);
     const [openShowDropdown, setOpenShowDropdown] = useState(false);
-    const classes = useStyles();
 
     useEffect(() => {
         setTreeStructure(generateTreeStructure(cloneDeep(props.schema), props.name, {

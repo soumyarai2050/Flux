@@ -8,6 +8,12 @@ import "ui_core.proto";
 // 1. Leading comment are accessible via plugin and can be used for code generation
 // 2. Trailing comments private to model files and not accessible in plugin
 
+enum AggregateType{
+    AggregateType_UNSPECIFIED = 0;
+    AggregateType_FilterAggregate = 1;
+    AggregateType_UpdateAggregate = 3;
+    AggregateType_FilterNUpdate = 4;
+}
 
 message FluxMsgNestedFldValFilter{
   required string field_name = 1;
@@ -39,13 +45,14 @@ message UsageParamNameOption{
 }
 
 message MessageJsonRoot{
-  optional string CreateDesc = 1;
-  optional string ReadDesc = 2;
-  optional string UpdateDesc = 3;
-  optional string PatchDesc = 4;
-  optional string DeleteDesc = 5;
-  optional string ReadWebSocketDesc = 6;
-  optional string UpdateWebSocketDesc = 7;
+  optional AggregateType CreateDesc = 1;
+  optional AggregateType ReadDesc = 2;
+  optional AggregateType UpdateDesc = 3;
+  optional AggregateType PatchDesc = 4;
+  optional AggregateType DeleteDesc = 5;
+  optional AggregateType ReadWebSocketDesc = 6;
+  optional AggregateType UpdateWebSocketDesc = 7;
+  optional bool SetReentrantLock = 8 [default=true];
 }
 
 extend google.protobuf.FileOptions 
@@ -77,6 +84,7 @@ extend google.protobuf.MessageOptions
   repeated DBOnlyFieldOption FluxDbOnlyField = 52156;
   repeated UsageParamNameOption FluxMsgOrmUsageParam = 52157;
   repeated FluxMsgNestedFldValFilter FluxMsgNestedFldValFilterParam = 52158;
+  optional string FluxMsgAggregateQueryVarName = 52159;
 
 
   //Service Options - 53

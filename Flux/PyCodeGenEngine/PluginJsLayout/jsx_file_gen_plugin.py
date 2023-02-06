@@ -40,7 +40,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str = "import React, { Fragment, useEffect, useState, memo } from 'react';\n"
         output_str += "import { useSelector, useDispatch } from 'react-redux';\n"
         output_str += "import _, { cloneDeep, isEqual } from 'lodash';\n"
-        output_str += "import { makeStyles } from '@mui/styles';\n"
         if layout_type == JsxFileGenPlugin.root_type:
             message_name = message.proto.name
             output_str += "import { Modes, Layouts, DB_ID, SCHEMA_DEFINITIONS_XPATH, DataTypes, API_ROOT_URL } " \
@@ -83,7 +82,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import AbbreviatedFilterWidget from '../components/AbbreviatedFilterWidget';\n"
             output_str += "import { Divider, List, ListItem, ListItemButton, ListItemText, Chip, Box } from " \
                           "'@mui/material';\n"
-            output_str += "import Icon from '../components/Icon';\n"
+            output_str += "import {Icon} from '../components/Icon';\n"
             output_str += "import { Add, Delete } from '@mui/icons-material';\n"
             output_str += "import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } " \
                           "from '@mui/material';\n"
@@ -103,7 +102,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import SkeletonField from '../components/SkeletonField';\n"
             output_str += "import TreeWidget from '../components/TreeWidget';\n"
             output_str += "import TableWidget from '../components/TableWidget';\n"
-            output_str += "import Icon from '../components/Icon';\n"
+            output_str += "import {Icon} from '../components/Icon';\n"
             output_str += "import { Add } from '@mui/icons-material';\n"
             output_str += "import DynamicMenu from '../components/DynamicMenu';\n"
             output_str += "import { Button, Dialog, DialogActions, DialogContent, DialogContentText, " \
@@ -172,7 +171,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           "} disabled={mode !== Modes.EDIT_MODE} onButtonToggle={onButtonToggle}>\n"
             output_str += "            {mode === Modes.READ_MODE && _.keys("+f"{message_name_camel_cased})." \
                           f"length === 0 && _.keys(modified{message_name}).length === 0 &&\n"
-            output_str += "                <Icon className={classes.icon} name='Create' title='Create' " \
+            output_str += "                <Icon name='Create' title='Create' " \
                           "onClick={onCreate}><Add fontSize='small' /></Icon>}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
@@ -398,7 +397,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "    }\n\n"
         output_str += "    let createMenu = '';\n"
         output_str += "    if (mode === Modes.READ_MODE) {\n"
-        output_str += "        createMenu = <Icon className={classes.icon} title='Create' " \
+        output_str += "        createMenu = <Icon title='Create' " \
                       "onClick={onCreate}><Add fontSize='small' /></Icon>;\n"
         output_str += "    }\n\n"
         output_str += "    let alertBubbleSource = null;\n"
@@ -428,7 +427,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                            let id = getIdFromAbbreviatedKey(abbreviated, item);\n"
         output_str += "                            if (id !== NEW_ITEM_ID) return;\n"
         output_str += "                            return (\n"
-        output_str += "                                <ListItem key={index} className={classes.listItem} " \
+        output_str += "                                <ListItem key={index} " \
                       "selected={selected"+f"{dependent_msg_name}"+"Id === id} disablePadding>\n"
         output_str += "                                    <ListItemButton>\n"
         output_str += "                                        <ListItemText>{item}</ListItemText>\n"
@@ -501,22 +500,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
     def handle_jsx_const(self, message: protogen.Message, layout_type: str) -> str:
         output_str = self.handle_import_output(message, layout_type)
-        output_str += "const useStyles = makeStyles({\n"
-        output_str += "    icon: {\n"
-        output_str += "        backgroundColor: '#ccc !important',\n"
-        output_str += "        marginRight: '5px !important',\n"
-        output_str += "        '&:hover': {\n"
-        output_str += "            backgroundColor: '#ddd !important'\n"
-        output_str += "        }\n"
-        output_str += "    }\n"
-        output_str += "})\n\n"
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         message_name_camel_cased = message_name[0].lower() + message_name[1:]
         output_str += f"const {message_name} = (props) => " + "{\n\n"
         output_str += self.__handle_const_on_layout(message_name, layout_type)
-        output_str += "    const dispatch = useDispatch();\n"
-        output_str += "    const classes = useStyles();\n\n"
+        output_str += "    const dispatch = useDispatch();\n\n"
         output_str += "    let currentSchema = _.get(schema, props.name);\n"
         if layout_type != JsxFileGenPlugin.root_type:
             output_str += "    let currentSchemaXpath = null;\n"

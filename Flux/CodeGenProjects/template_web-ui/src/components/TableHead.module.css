@@ -1,0 +1,54 @@
+.head {
+    background-color: #0097a7;
+    color: white !important;
+    white-space: nowrap;
+}
+
+.cell {
+    color: white !important;
+    padding: 4px 2px !important;
+}
+
+.critical {
+    color: #9C0006 !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.error {
+    color: #9C0006 !important;
+}
+
+.warning {
+    color: #9c6500 !important;
+}
+
+.info {
+    color: blue !important;
+}
+
+.debug {
+    color: #444 !important;
+}
+
+.success {
+    color: green !important;
+}
+
+.default {
+    color: black !important;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1
+    }
+
+    50% {
+        opacity: 0.8
+    }
+
+    to {
+        opacity: 1
+    }
+}
+

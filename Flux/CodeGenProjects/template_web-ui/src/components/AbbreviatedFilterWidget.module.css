@@ -1,0 +1,25 @@
+.dropdown_container {
+    display: flex;
+    margin: 10px 0px;
+}
+
+.autocomplete_dropdown {
+    flex: 1;
+    background-color: white;
+}
+
+.button {
+    margin: 0px 5px !important;
+}
+
+.list_item {
+    padding: 0px 10px 10px;
+}
+
+.alert {
+    margin: 0px 10px;
+}
+
+.list_item_selected {
+    background-color: rgba(25, 118, 210, 0.2) !important;
+}

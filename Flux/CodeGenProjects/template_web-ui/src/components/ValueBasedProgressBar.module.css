@@ -1,0 +1,48 @@
+.progress_bar {
+    height: 10px !important;
+    border-radius: 10px;
+    width: 100%;
+}
+
+.critical :global .MuiLinearProgress-bar1Determinate {
+    background-color: #9C0006 !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.error :global .MuiLinearProgress-bar1Determinate {
+    background-color: #9C0006 !important;
+}
+
+.warning :global .MuiLinearProgress-bar1Determinate {
+    background-color: #99943c !important;
+}
+
+.info :global .MuiLinearProgress-bar1Determinate {
+    background-color: blue !important;
+}
+
+.debug :global .MuiLinearProgress-bar1Determinate {
+    background-color: #444 !important;
+}
+
+.success :global .MuiLinearProgress-bar1Determinate {
+    background-color: green !important;
+}
+
+.default :global .MuiLinearProgress-bar1Determinate {
+    background-color: black !important;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1
+    }
+
+    50% {
+        opacity: 0.8
+    }
+
+    to {
+        opacity: 1
+    }
+}

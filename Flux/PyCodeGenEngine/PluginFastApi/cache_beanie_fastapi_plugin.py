@@ -25,20 +25,20 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
-    def handle_POST_gen(self, message: protogen.Message, method_desc: str | None = None, id_field_type: str | None = None) -> str:
+    def handle_POST_gen(self, message: protogen.Message, aggregation_type: str | None = None, id_field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + f'", response_model={message_name}, status_code=201)\n'
         output_str += f"async def create_{message_name_snake_cased}({message_name_snake_cased}: {message_name}) -> {message_name}:\n"
-        if method_desc:
+        if aggregation_type:
             output_str += f'    """\n'
-            output_str += f'    {method_desc}\n'
+            output_str += f'    {aggregation_type}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
         output_str += f"    return await generic_cache_beanie_post({message_name}, {message_name_snake_cased})\n"
         return output_str
 
-    def handle_GET_gen(self, message: protogen.Message, method_desc: str | None = None,
+    def handle_GET_gen(self, message: protogen.Message, aggregate_type: str | None = None,
                        id_field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
@@ -51,9 +51,9 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
         else:
             output_str += f"async def read_{message_name_snake_cased}({message_name_snake_cased}_id: " \
                           f"PydanticObjectId) -> {message_name}:\n"
-        if method_desc:
+        if aggregate_type:
             output_str += f'    """\n'
-            output_str += f'    {method_desc}\n'
+            output_str += f'    {aggregate_type}\n'
             output_str += f'    """\n'
         # else not required: avoiding if method desc not provided
         output_str += f"    return await generic_cache_beanie_get({message_name}, {message_name_snake_cased}_id)\n"
@@ -122,7 +122,7 @@ class CacheBeanieFastApiPlugin(BeanieFastApiPlugin):
         output_str += f"    return await generic_cache_beanie_index({message_name}, '{field_name}', {field_name})\n"
         return output_str
 
-    def handle_get_all_message_request(self, message: protogen.Message) -> str:
+    def handle_GET_ALL_gen(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}/' + \

@@ -1,0 +1,16 @@
+host: "127.0.0.1"
+port: 7497
+client_id: 0
+log_level: "debug"
+symbol: "AAPL"
+secType: "STK"
+exchange: "SMART"
+currency: "USD"
+req_id: 1
+duration_str: "1 M"
+bar_size_setting: "1 day"
+what_to_show: "TRADES"
+use_rth: 1
+format_date: 1
+keep_up_to_date: False
+chart_options: []

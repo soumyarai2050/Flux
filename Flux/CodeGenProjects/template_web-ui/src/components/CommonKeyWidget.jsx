@@ -1,89 +1,13 @@
 import React, { useState } from 'react';
 import { Box, Tooltip, ClickAwayListener } from '@mui/material';
-import { makeStyles } from '@mui/styles';
 import PropTypes from 'prop-types';
 import { clearxpath, getColorTypeFromValue, isValidJsonString } from '../utils';
 import { ColorTypes, DataTypes } from '../constants';
-import AbbreviatedJsonWidget, { AbbreviatedJsonTooltip } from './AbbreviatedJsonWidget';
+import AbbreviatedJson from './AbbreviatedJson';
 import _, { cloneDeep } from 'lodash';
-
-const useStyles = makeStyles({
-    widgetContainer: {
-        padding: '5px 10px',
-        display: 'flex',
-        justifyContent: 'flex-start',
-        background: 'cadetblue',
-        flexWrap: 'wrap'
-    },
-    commonkey: {
-        marginRight: 10,
-        color: 'white'
-    },
-    commonkeyTitle: {
-        color: 'yellow',
-        paddingRight: 5
-    },
-    commonkeyCritical: {
-        color: '#9C0006 !important',
-        animation: `$blink 0.5s step-start infinite`
-    },
-    commonkeyError: {
-        color: '#9C0006 !important'
-    },
-    commonkeyWarning: {
-        color: '#9c6500 !important'
-    },
-    commonkeyInfo: {
-        color: 'blue !important'
-    },
-    commonkeyDebug: {
-        color: 'black !important'
-    },
-    abbreviatedJsonClass: {
-        maxWidth: 150,
-        display: 'inline-flex',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-        textDecoration: 'underline',
-        color: 'blue',
-        fontWeight: 'bold',
-        cursor: 'pointer'
-    },
-    keyCritical: {
-        color: '#9C0006 !important',
-        animation: `$blink 0.5s step-start infinite`
-    },
-    keyError: {
-        color: '#9C0006 !important'
-    },
-    keyInfo: {
-        color: 'blue !important'
-    },
-    keyWarning: {
-        color: '#9c6500 !important'
-    },
-    keySuccess: {
-        color: 'darkgreen !important'
-    },
-    keyDebug: {
-        color: 'black !important'
-    },
-    "@keyframes blink": {
-        "from": {
-            opacity: 1
-        },
-        "50%": {
-            opacity: 0.8
-        },
-        "to": {
-            opacity: 1
-        }
-    }
-})
+import classes from './CommonKeyWidget.module.css';
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
-    const classes = useStyles();
 
     let commonkeys = props.commonkeys.sort(function (a, b) {
         if (a.sequenceNumber < b.sequenceNumber) return -1;
@@ -91,7 +15,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
     })
 
     return (
-        <Box ref={ref} className={classes.widgetContainer}>
+        <Box ref={ref} className={classes.container}>
             {commonkeys.map((collection, i) => {
                 if (collection.value === undefined || collection.value === null) return;
                 if (collection.type === 'button') return;
@@ -114,8 +38,6 @@ const CommonKey = (props) => {
     const [open, setOpen] = useState(false);
     const { collection } = props;
 
-    const classes = useStyles();
-
     const onOpenAbbreviatedField = () => {
         setOpen(true);
     }
@@ -126,7 +48,7 @@ const CommonKey = (props) => {
 
     let abbreviatedJsonClass = '';
     if (collection.abbreviated && collection.abbreviated === "JSON") {
-        abbreviatedJsonClass = classes.abbreviatedJsonClass;
+        abbreviatedJsonClass = classes.abbreviated_json;
     }
 
     let abbreviatedField;
@@ -139,11 +61,11 @@ const CommonKey = (props) => {
                 updatedData = updatedData.replace(/\\/g, '');
                 updatedData = JSON.parse(updatedData);
             }
-            abbreviatedField = (<AbbreviatedJsonTooltip open={open} onClose={onCloseAbbreviatedField} src={updatedData} />)
+            abbreviatedField = (<AbbreviatedJson open={open} onClose={onCloseAbbreviatedField} src={updatedData} />)
         } else if (collection.type === DataTypes.STRING && !isValidJsonString(updatedData)) {
             abbreviatedField = (
                 <ClickAwayListener onClickAway={onCloseAbbreviatedField}>
-                    <div className={classes.abbreviatedJsonClass}>
+                    <div className={classes.abbreviated_json}>
                         <Tooltip
                             title={updatedData}
                             open={open}
@@ -165,31 +87,21 @@ const CommonKey = (props) => {
         value = JSON.parse(value);
     }
 
-    let color = '';
-    let commonkeyColorClass = '';
+    let color;
     if (collection.color) {
         color = getColorTypeFromValue(collection, collection.value);
     }
-    if (color === ColorTypes.CRITICAL) commonkeyColorClass = classes.commonkeyCritical;
-    else if (color === ColorTypes.ERROR) commonkeyColorClass = classes.commonkeyError;
-    else if (color === ColorTypes.WARNING) commonkeyColorClass = classes.commonkeyWarning;
-    else if (color === ColorTypes.INFO) commonkeyColorClass = classes.commonkeyInfo;
-    else if (color === ColorTypes.DEBUG) commonkeyColorClass = classes.commonkeyDebug;
-
+    let commonkeyColorClass = classes[color];
+    
     let commonkeyTitleColorClass = '';
     if (collection.nameColor) {
         let nameColor = collection.nameColor.toLowerCase();
-        if (nameColor === ColorTypes.CRITICAL) commonkeyTitleColorClass = classes.keyCritical;
-        else if (nameColor === ColorTypes.ERROR) commonkeyTitleColorClass = classes.keyError;
-        else if (nameColor === ColorTypes.WARNING) commonkeyTitleColorClass = classes.keyWarning;
-        else if (nameColor === ColorTypes.INFO) commonkeyTitleColorClass = classes.keyInfo;
-        else if (nameColor === ColorTypes.DEBUG) commonkeyTitleColorClass = classes.keyDebug;
-        else if (nameColor === ColorTypes.SUCCESS) commonkeyTitleColorClass = classes.keySuccess;
+        commonkeyTitleColorClass = classes[nameColor];
     }
 
     return (
-        <Box className={classes.commonkey}>
-            <span className={`${classes.commonkeyTitle} ${commonkeyTitleColorClass}`}>
+        <Box className={classes.item}>
+            <span className={`${classes.key} ${commonkeyTitleColorClass}`}>
                 {collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}:
             </span>
             {collection.abbreviated && collection.abbreviated === "JSON" ? (

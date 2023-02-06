@@ -1,0 +1,41 @@
+.container {
+    background-color: white;
+}
+
+.table {
+    min-width: 400px;
+}
+
+.row:nth-of-type(even) {
+    background-color: #eee;
+}
+
+.add {
+    background-color: #c6efce !important;
+}
+
+.remove {
+    background-color: #ffc7ce !important;
+}
+
+.icon {
+    background-color: #ccc !important;
+    margin-right: 5px !important;
+}
+
+.icon:hover {
+    background-color: #ddd !important;
+}
+
+.dropdown {
+    width: 0px;
+    display: inherit;
+}
+
+.dropdown :global .MuiSelect-outlined {
+    padding: 0px;
+}
+
+.highlight {
+    background-color: orange;
+}

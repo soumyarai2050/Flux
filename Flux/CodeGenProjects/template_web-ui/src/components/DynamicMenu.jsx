@@ -1,6 +1,5 @@
 import React, { Fragment } from 'react';
 import { useSelector } from 'react-redux';
-import { makeStyles } from '@mui/styles';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { DataTypes } from '../constants';
@@ -11,11 +10,8 @@ import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import { Box } from '@mui/material';
 import AlertBubble from './AlertBubble';
 
-const useStyles = makeStyles({})
-
 const DynamicMenu = (props) => {
     const state = useSelector(state => state);
-    const classes = useStyles();
 
     const onClick = (e, action, xpath, value) => {
         if (action === 'flux_toggle') {

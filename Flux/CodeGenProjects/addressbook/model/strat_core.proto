@@ -6,9 +6,21 @@ package addressbook;
 
 enum OrderEventType{
   OE_UNSPECIFIED = 0;
-  OE_FILL = 1;
+  OE_NEW = 1;
   OE_ACK = 2;
-  OE_REJ = 3;
+  OE_CXL = 3;
+  OE_CXL_ACK = 4;
+  OE_CXL_REJ = 5;
+  OE_REJ = 6;
+}
+
+enum OrderStatusType{
+  OE_UNACK = 0;
+  OE_ACKED = 1;
+  OE_CXL_UNACK = 2;
+  OE_DOD = 3;
+  OE_FILLED = 4;
+  OE_OVER_FILLED = 5;
 }
 
 enum SecurityType{
@@ -143,8 +155,8 @@ message Security{
 }
 
 message MaxNotional{
-  required float max_per_side_notional = 1 [(FluxFldHelp) = "non-changeable from UI: used as cap on max_b_notional as time of strat creation"];
-  required float max_b_notional = 2 [ (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
+  required float max_per_side_notional = 1 [(FluxFldHelp) = "non-changeable from UI: used as cap on max per side notional at time of strat creation"];
+  required float max_primary_notional = 2 [ (FluxFldHelp) = "runtime consumption: open+executed, max eqt notional derived applying hedge ratio"];
   required float sod = 3;
   required float available_pths = 4;
   required float available_locates = 5;
@@ -156,21 +168,14 @@ message ResidualRestriction{
 }
 
 message OrderBrief{
-  required string order_brief_id = 1;
+  required string order_id = 1;
   required Security security = 2;
   required Side side = 3;
   optional float px = 4;
   optional int64 qty = 5;
-  required string underlying_account = 6;
-  optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true];
-  optional float computed_notional = 8 [(FluxFldHide) = "True"];
-  optional OrderEventType order_event_type = 9;
-}
-
-message CumulativeOrderBrief{
-  repeated OrderBrief order_brief = 1;
-  optional float overall_buy_notional = 5;
-  optional float overall_sell_notional = 6;
+  optional float order_notional = 6;
+  required string underlying_account = 7;
+  repeated string text = 8 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
 }
 
 message Alert{
@@ -202,11 +207,11 @@ message MarketTradeVolumeParticipation{
 }
 
 message OpenInterestParticipation{
-required float participation_rate = 1 [ (FluxFldHelp) = 'max % participation size allowed within side specific volume of Top (depth_levels) of BBBO'];
-required int32 depth_levels = 2 [(FluxFldHelp) = "allowed depth levels participating in allowed size computation - not to be confused with tick levels which may be missing depending on liquidity at specific tick level"];
+  required float participation_rate = 1 [ (FluxFldHelp) = 'max % participation size allowed within side specific volume of Top (depth_levels) of BBBO'];
+  required int32 depth_levels = 2 [(FluxFldHelp) = "allowed depth levels participating in allowed size computation - not to be confused with tick levels which may be missing depending on liquidity at specific tick level"];
 }
 
 message CancelRate{
   required int32 allowed_size_rate = 1 [(FluxFldHelp) = "% of total size sent to market [BUY+SELL]"];
-  required int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement"];
+  optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement"];
 }
