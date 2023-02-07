@@ -7,6 +7,7 @@ package market_data_tech;
 message Quote{
   optional double px = 1;
   optional int64 qty = 2;
+  optional int64 last_update_date_time = 3[(FluxFldValIsDateTime) = true];
 }
 
 message TopOfBook {
@@ -18,10 +19,11 @@ message TopOfBook {
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  required string symbol = 2 [(FluxFldIndex) = true];
-  required int64 time = 3 [(FluxFldValIsDateTime) = true];
-  optional Quote bid_quote = 4;
-  optional Quote ask_quote = 5;
+  required string symbol = 1 [(FluxFldIndex) = true];
+  optional Quote bid_quote = 2;
+  optional Quote ask_quote = 3;
+  optional Quote last_trade = 4;
+  optional int64 last_update_date_time = 5[(FluxFldValIsDateTime) = true];
 }
 
 message BarData {

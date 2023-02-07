@@ -22,11 +22,85 @@ contracts:
     secType: "STK"
     exchange: "TSE"
     currency: "CAD"
+  - symbol: "AAV"   # Advantage Oil & Gas Ltd
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "ABX"   # 	Barrick Gold Corp
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "AC"   # 	Air Canada
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "ACB"   # 	Aurora Cannabis Inc
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "AEM"   #	Agnico Eagle Mines Ltd
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "AGI"   #	Alamos Gold Inc Cls A
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "AQN"   #	Algonquin Power and Utilities Corp
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "AR"   #	Argonaut Gold Inc
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "ARX"   #	Arc Resources Ltd
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "ATD"   #	Alimentation Couche-Tard Inc.
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "ATH"   #	Athabasca Oil Corp
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "BAM"   #Brookfield Asset Management Ltd
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "BCE"   #	BCE Inc
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "BIR"   #	Birchcliff Energy Ltd
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "BITF"   #   Bitfarms Ltd
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "BLDP"   #	Ballard Power Systems Inc
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "BMO"   #	Bank of Montreal
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+  - symbol: "BN"   #	Brookfield Corporation
+    secType: "STK"
+    exchange: "TSE"
+    currency: "CAD"
+
     #SINGAPORE
 #  - symbol: "Z74"
 #    secType: "STK"
 #    exchange: "SGX"
 #    currency: "SGD"
+
 
 # Historical Data
 duration_str: "1 M"

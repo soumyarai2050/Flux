@@ -68,6 +68,20 @@ last_n_sec_tick_by_tick_all_last_agg_query = {"aggregate": [
     }
 ]}
 
+def get_pair_side_brief_from_side(symbol: str):
+    return {"aggregate": [
+        {
+            "$unwind": {
+                "path": "$pair_side_brief"
+            }
+        },
+        {
+            "$match": {
+                "pair_side_brief.security.sec_id": symbol
+            }
+        }
+    ]}
+
 # {
 #     "$merge": {
 #         "into": "MarketDepth",
