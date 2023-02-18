@@ -71,6 +71,18 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
                     self.non_root_message_list.append(message)
                 # else not required: avoiding repetition
 
+            if CacheFastApiPlugin.flux_msg_json_query in str(message.proto.options):
+                if message in self.root_message_list:
+                    if message not in self.query_message_dict:
+                        self.query_message_dict[message] = self.get_query_option_message_values(message)
+                    # else not required: avoiding repetition
+                else:
+                    err_str = "Query type message should be root message also to perform db queries, " \
+                              f"message {message.proto.name} is not JsonRoot"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+            # else not required: avoiding list append if msg is not having option for query
+
             self.load_dependency_messages_and_enums_in_dicts(message)
 
     def proto_to_py_datatype(self, field: protogen.Field) -> str:
@@ -138,10 +150,10 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
             self.routes_file_name + ".py": self.handle_routes_file_gen(),
 
             # Adding project's run file
-            self.launch_file_name + ".py": self.handle_launch_file_gen(),
+            self.launch_file_name + ".py": self.handle_launch_file_gen(file),
 
             # Adding client file
-            self.client_file_name + ".py": self.handle_client_file_gen()
+            self.client_file_name + ".py": self.handle_client_file_gen(file)
         }
 
         return output_dict

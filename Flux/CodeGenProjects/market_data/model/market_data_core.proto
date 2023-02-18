@@ -1,7 +1,31 @@
 syntax = "proto2";
+import "flux_options.proto"; // needed by Security (if that moves out this is not needed either)
 
-package market_data_tech;
+package market_data;
 
+//Duplicate DS - Needed by MarketDataBrief (find a way to move this to multi-project common model)
+enum SecurityType{
+  SEC_TYPE_UNSPECIFIED = 0;
+  RIC = 1;
+  SEDOL = 2;
+  TICKER = 3;
+}
+
+//Duplicate DS - Needed by MarketDataBrief (find a way to move this to multi-project common model)
+enum Side{
+    SIDE_UNSPECIFIED = 0;
+    BUY = 1;
+    SELL = 3;
+    BTC = 2;  // Buy to Cover - Use Buy, set this only if downstream need's BTC awareness
+    SS = 4;  // Short Sell - Use Sell, set this only if downstream need's Short Sell awareness
+}
+
+//Duplicate DS - Needed by MarketDataBrief (find a way to move this to multi-project common model)
+// Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
+message Security{
+    required string sec_id = 1 [(FluxFldUIPlaceholder) = "SelectSecurity", (FluxFldSticky) = true];
+    optional SecurityType sec_type = 2 [default = SEC_TYPE_UNSPECIFIED];
+}
 
 enum TickTypeEnum {
   BID_SIZE = 1;

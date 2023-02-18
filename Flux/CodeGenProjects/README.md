@@ -138,3 +138,8 @@ option pertaining error, regenerating pb2 file of
 flux_option.proto can solve it.
 2. Endpoint should end with /
 3. If behind proxy, set no proxy to make request to APIs
+
+## Others:
+1. Tested and supported on Google Chrome
+2. Dark Mode Support: Set-dark mode 
+```chrome://flags/#enable-force-dark```

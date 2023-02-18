@@ -1,8 +1,10 @@
 syntax = "proto2";
-
+import "ui_core.proto";
 import "flux_options.proto";
 import "market_data_core.proto";
-package market_data_tech;
+package market_data;
+
+option (FluxFileCRUDPortOffset) = 40;
 
 message Quote{
   optional double px = 1;
@@ -19,12 +21,59 @@ message TopOfBook {
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgWidgetUIData) = {
+    x: 0,
+    y: 9,
+    w: 18,
+    h: 9,
+    layout: UI_TABLE
+  };
+  option (FluxMsgJsonQuery) = {
+    AggregateVarName: "get_top_of_book_from_symbol",
+    AggregateParams: "symbol",
+    AggregateParamsDataType: "str"
+  };
   required string symbol = 1 [(FluxFldIndex) = true];
-  optional Quote bid_quote = 2;
-  optional Quote ask_quote = 3;
-  optional Quote last_trade = 4;
-  optional int64 last_update_date_time = 5[(FluxFldValIsDateTime) = true];
+  optional Quote bid_quote = 2 [(FluxFldElaborateTitle) = true];
+  optional Quote ask_quote = 3 [(FluxFldElaborateTitle) = true];
+  optional Quote last_trade = 4 [(FluxFldElaborateTitle) = true];
+  // total_trading_security_size is not expected to change intra-day - log error critical if this is noticed to change intra-day
+  optional int64 total_trading_security_size = 5;
+  repeated MarketTradeVolume market_trade_volume = 6;
+  optional int64 last_update_date_time = 7 [(FluxFldValIsDateTime) = true];
 }
+
+
+message SideSpecificMarketDataBrief{
+  optional float allowed_px_by_max_basis_points = 1 [(FluxFldHelp) = "(bbo_aggressive / 100) * (max_basis_points/100) + bbo_aggressive"];
+  optional float allowed_px_by_max_deviation = 2 [(FluxFldHelp) = "last_px (+/-) (last_px/100 * max_px_deviation) : Sell Order use - , buy + "];
+  optional float allowed_px_by_max_level = 3 [(FluxFldHelp) = "Price at max level in order book (capped at depth level availability - 10) "];
+  optional float allowed_max_px = 4 [(FluxFldHelp) = "Min/Max of allowed_px_by_basis_point_limit, allowed_px_by_deviation_limit, allowed_px_by_level_limit depending on buy or sell"];
+}
+
+message MarketDataBrief{
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIData) = {
+    x: 0,
+    y: 18,
+    w: 18,
+    h: 12,
+    layout: UI_TABLE
+  };
+  required Security security = 1;
+  required Side side = 2;
+  required int64 last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
+  optional SideSpecificMarketDataBrief buy_market_data_brief = 4;
+  optional SideSpecificMarketDataBrief sell_market_data_brief = 5;
+}
+
 
 message BarData {
   option (FluxMsgJsonRoot) = {
@@ -34,9 +83,6 @@ message BarData {
     PatchDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
-  };
-  option (FluxMsgJsonQuery) = {
-    ReadDesc: AggregateType_UNSPECIFIED
   };
   required int32 id = 1;
   required string symbol = 2 [(FluxFldIndex) = true];
@@ -84,31 +130,31 @@ message TickByTickBidAsk {
   required float ask_qty = 7;
 }
 
-message TickByTickAllLast {
+message LastTrade {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UpdateAggregate,
+    CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UpdateAggregate,
-    PatchDesc: AggregateType_UpdateAggregate,
-    DeleteDesc: AggregateType_UpdateAggregate,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgJsonQuery) = {
-    ReadDesc: AggregateType_UNSPECIFIED
+    option (FluxMsgJsonQuery) = {
+    AggregateVarName: "get_last_n_sec_total_qty",
+    AggregateParams: "symbol",
+    AggregateParams: "last_n_sec",
+    AggregateParamsDataType: "str",
+    AggregateParamsDataType: "float"
   };
-  option (FluxMsgAggregateQueryVarName) = "last_n_sec_tick_by_tick_all_last_agg_query";
-  required int32 id = 1;
-  required string symbol = 2 [(FluxFldIndex) = true];
-  required TickTypeEnum tick_type = 3;
-  required int64 time = 4 [(FluxFldValIsDateTime) = true];
-  required float px = 5;
-  required float qty = 6;
-  required string exchange = 7;
-  required string special_conditions = 8;
-  required bool past_limit = 9;
-  required bool unreported = 10;
-  optional float last_n_sec_avg_px = 11;
-  optional float last_n_sec_total_qty = 12;
+  required string symbol = 1 [(FluxFldIndex) = true];
+  required int64 time = 2 [(FluxFldValIsDateTime) = true];
+  required float px = 3;
+  required int64 qty = 4;
+  optional string exchange = 5;
+  optional string special_conditions = 6;
+  optional bool past_limit = 7;
+  optional bool unreported = 8;
+  optional MarketTradeVolume market_trade_volume = 9;
 }
 
 message MarketDepth {
@@ -120,21 +166,33 @@ message MarketDepth {
     DeleteDesc: AggregateType_UpdateAggregate,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgWidgetUIData) = {
+    x: 0,
+    y: 0,
+    w: 18,
+    h: 9,
+    layout: UI_TABLE
+  };
   option (FluxMsgAggregateQueryVarName) = "cum_px_qty_aggregate_query";
-  required int32 id = 1;
   required string symbol = 2 [(FluxFldIndex) = true];
   required int64 time = 3 [(FluxFldValIsDateTime) = true];
   required TickTypeEnum side = 4;
   required float px = 5;
-  required float qty = 6;
+  required int64 qty = 6;
   required int32 position = 7;
   optional string market_maker = 8;
   optional bool is_smart_depth = 9;
-  optional float cumulative_avg_px = 10;
-  optional float cumulative_total_qty = 11;
+  optional float cumulative_notional = 10;
+  optional int64 cumulative_qty = 11;
+  optional float cumulative_avg_px = 12;
 }
 
-message MarketDepthHistory {
+message MarketTradeVolume{
+  optional int64 participation_period_last_trade_qty_sum = 1;
+  optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
+}
+
+message RawMarketDepthHistory {
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
@@ -150,7 +208,23 @@ message MarketDepthHistory {
   required int32 operation = 5;
   required TickTypeEnum side = 6;
   required float px = 7;
-  required float qty = 8;
+  required int64 qty = 8;
   optional string market_maker = 9;
   optional bool is_smart_depth = 10;
+}
+
+message UILayout{
+    option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+
+    //Server generated unique Id
+    required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+    required string profile_id = 2 [(FluxFldIndex) = true];
+    repeated WidgetUIData widget_ui_data = 3;
+    optional Theme theme = 4;
 }

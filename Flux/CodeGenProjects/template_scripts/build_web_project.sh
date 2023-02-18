@@ -7,19 +7,23 @@ cd ..
 PROJECT_NAME=${PWD##*/}          # assign project name to a variable
 PROJECT_NAME=${PROJECT_NAME:-/}  # correct project name for case where PWD=/
 if [ -d "web-ui" ] ; then
-  echo "Can't create web-ui project, Directory already exists!"
+  echo "Can't create web-ui project, Directory already exists, updating instead"
+  cd -  # back in script folder
+  "$PWD"/gen_web_ui.sh "update"
+  cd -  # restore PWD state to pre if state
 else
   cd -  # back in script folder
-  $PWD/gen_web_ui.sh
+  "$PWD"/gen_web_ui.sh
   cd -  # restore PWD state to pre if state
 fi
 cd - # back in script folder
 
 cd ../../../PyCodeGenEngine/FluxCodeGenCore
 python gen_core_proto_pb2.py
-cd -
+cd - # back in script folder
 mkdir -p static
 mkdir -p templates
+mkdir -p  ../log
 mkdir -p ../generated
 mkdir -p ../web-ui/src/widgets
 python gen_json_sample.py

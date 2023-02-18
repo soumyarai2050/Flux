@@ -198,11 +198,11 @@ message Alert{
 
 message Residual{
   required Security security = 1;
-  required float notional = 2;
+  required float max_residual_notional = 2;
 }
 
 message MarketTradeVolumeParticipation{
-    required float participation_rate = 1 [(FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
+    required float max_participation_rate = 1 [(FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
     optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, unset value implies seconds from SOD till time of checking"];
 }
 
@@ -212,6 +212,6 @@ message OpenInterestParticipation{
 }
 
 message CancelRate{
-  required int32 allowed_size_rate = 1 [(FluxFldHelp) = "% of total size sent to market [BUY+SELL]"];
-  optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement"];
+  required int32 max_cancel_rate = 1 [(FluxFldHelp) = "% of total size sent to market [BUY+SELL] - ignoring what happened to the qty on exchange (e.g. reject / cancelled are also counted)"];
+  optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
 }

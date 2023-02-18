@@ -77,7 +77,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         model_path = \
             self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_file_name}")
         pydantic_models_comma_sep = ", ".join([msg.proto.name for msg in required_root_msg_list])
-        pydantic_query_models_comma_sep = ", ".join([msg.proto.name for msg in self.query_message_list])
+        pydantic_query_models_comma_sep = ", ".join([msg.proto.name for msg in self.query_message_dict])
         if pydantic_query_models_comma_sep:
             pydantic_models_comma_sep = pydantic_models_comma_sep + ", " + pydantic_query_models_comma_sep
         output_str += f"from {model_path} import " \
@@ -259,22 +259,63 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_callback_query_example(self) -> str:
         output_str = ""
-        if self.query_message_list:
+        if self.query_message_dict:
             output_str += f"\n"
             output_str += "    # Example: Soft API Query Interfaces\n"
-        for message in self.query_message_list:
+            output_str += f"\n"
+        for message in self.query_message_dict:
             msg_name = message.proto.name
             msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
-            output_str += f"\n"
-            output_str += f"    async def read_by_id_{msg_name_snake_cased}_query_pre(self, {msg_name_snake_cased}_class_type: " \
-                          f"Type[{msg_name}]):\n"
-            output_str += f"        max_date_time = await {msg_name_snake_cased}_class_type.find_all().max('date')\n"
-            output_str += f"        if max_date_time is not None:\n"
-            output_str += f"            max_date_obj = await {msg_name_snake_cased}_class_type.find(" \
-                          f"{msg_name_snake_cased}_class_type.date == max_date_time).first_or_none()\n"
-            output_str += f"            return max_date_obj\n"
-            output_str += f"        else:\n"
-            output_str += f'            raise HTTPException(status_code=404, detail="No Data available for query in {msg_name}")\n'
+
+            # Testing query requisites in message
+            option_list_of_dict_values = \
+                self.get_complex_option_values_as_list_of_dict(message,
+                                                               FastapiCallbackOverrideFileHandler.flux_msg_json_root)
+            # Since JsonRoot option is non-repeated
+            option_dict_value = option_list_of_dict_values[0]
+
+            if option_dict_value.get(FastapiCallbackOverrideFileHandler.flux_json_root_read_field) is None:
+                err_str = f"Message should have read impl enabled in root option to use query, " \
+                          f"{msg_name} message has no read impl to generate read routes"
+                logging.exception(err_str)
+                raise Exception(err_str)
+            # else not required: If message contains read routes then proceeding further
+
+            aggregate_value_list = self.query_message_dict[message]
+
+            for aggregate_value in aggregate_value_list:
+                aggregate_var_name = aggregate_value[FastapiCallbackOverrideFileHandler.aggregate_var_name_key]
+                aggregate_params = aggregate_value[FastapiCallbackOverrideFileHandler.aggregate_params_key]
+                aggregate_params_data_types = aggregate_value[
+                    FastapiCallbackOverrideFileHandler.aggregate_params_data_types_key]
+
+                routes_import_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
+                aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
+
+                if aggregate_params:
+                    agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
+                                                          for param, param_type in zip(aggregate_params,
+                                                                                       aggregate_params_data_types)])
+                    agg_params_str = ", ".join(aggregate_params)
+
+                    output_str += f"    async def {aggregate_var_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
+                                  f"Type[{msg_name}], {agg_params_with_type_str}):\n"
+                    output_str += f"        from {routes_import_path} import " \
+                                  f"underlying_read_{msg_name_snake_cased}_http\n"
+                    output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
+                    output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
+                                  f"{aggregate_var_name}({agg_params_str}))\n"
+                    output_str += "\n\n"
+                else:
+                    output_str += f"    async def {aggregate_var_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
+                                  f"Type[{msg_name}]):\n"
+                    output_str += f"        from {routes_import_path} import " \
+                                  f"underlying_read_{msg_name_snake_cased}_http\n"
+                    output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
+                    output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
+                                  f"{aggregate_var_name})\n"
+                    output_str += "\n\n"
+
         return output_str
 
     def handle_callback_override_file_gen(self) -> str:

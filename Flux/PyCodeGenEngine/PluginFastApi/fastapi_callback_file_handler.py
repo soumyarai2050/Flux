@@ -111,65 +111,6 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "        pass\n\n"
         return output_str
 
-    def handle_query_POST_callback_methods_gen(self, message: protogen.Message) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def create_{message_name_snake_cased}_query_pre(self, " \
-                     f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    async def create_{message_name_snake_cased}_query_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
-        return output_str
-
-    def handle_query_GET_callback_methods_gen(self, message: protogen.Message) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def read_by_id_{message_name_snake_cased}_query_pre(self, " \
-                     f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    async def read_by_id_{message_name_snake_cased}_query_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
-        return output_str
-
-    def handle_query_PUT_callback_methods_gen(self, message: protogen.Message) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def update_{message_name_snake_cased}_query_pre(self, " \
-                     f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    async def update_{message_name_snake_cased}_query_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
-        return output_str
-
-    def handle_query_PATCH_callback_methods_gen(self, message: protogen.Message) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def partial_update_{message_name_snake_cased}_query_pre(self, " \
-                     f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    async def partial_update_{message_name_snake_cased}_query_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
-        return output_str
-
-    def handle_query_DELETE_callback_methods_gen(self, message: protogen.Message) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def delete_{message_name_snake_cased}_query_pre(self, " \
-                     f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    async def delete_{message_name_snake_cased}_query_post(self, " \
-                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
-        return output_str
-
-    def handle_query_read_by_id_WEBSOCKET_callback_methods_gen(self, message: protogen.Message) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def read_by_id_ws_{message_name_snake_cased}_query_pre(self, " \
-                     f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
-        output_str += "        pass\n\n"
-        output_str += f"    async def read_by_id_ws_{message_name_snake_cased}_query_post(self):\n"
-        output_str += "        pass\n\n"
-        return output_str
-
     def handle_launch_pre_and_post_callback(self) -> str:
         output_str = "    def app_launch_pre(self):\n"
         output_str += '        logging.debug("Pre launch Fastapi app")\n\n'
@@ -266,28 +207,35 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_callback_query_methods_output(self) -> str:
         output_str = ""
-        for message in self.query_message_list:
-            options_list_of_dict = \
-                self.get_complex_option_values_as_list_of_dict(message,
-                                                               FastapiCallbackFileHandler.flux_msg_json_query)
 
-            # Since json_root option is of non-repeated type
-            option_dict = options_list_of_dict[0]
+        for message in self.query_message_dict:
+            aggregate_value_list = self.query_message_dict[message]
 
-            crud_field_name_to_method_call_dict = {
-                FastapiCallbackFileHandler.flux_json_root_create_field: self.handle_query_POST_callback_methods_gen,
-                FastapiCallbackFileHandler.flux_json_root_read_field: self.handle_query_GET_callback_methods_gen,
-                FastapiCallbackFileHandler.flux_json_root_update_field: self.handle_query_PUT_callback_methods_gen,
-                FastapiCallbackFileHandler.flux_json_root_patch_field: self.handle_query_PATCH_callback_methods_gen,
-                FastapiCallbackFileHandler.flux_json_root_delete_field: self.handle_query_DELETE_callback_methods_gen,
-                FastapiCallbackFileHandler.flux_json_root_read_websocket_field:
-                    self.handle_query_read_by_id_WEBSOCKET_callback_methods_gen
-            }
+            message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+            for aggregate_value in aggregate_value_list:
+                aggregate_var_name = aggregate_value[FastapiCallbackFileHandler.aggregate_var_name_key]
+                aggregate_params = aggregate_value[FastapiCallbackFileHandler.aggregate_params_key]
+                aggregate_params_data_types = aggregate_value[FastapiCallbackFileHandler.aggregate_params_data_types_key]
 
-            for crud_option_field_name, crud_operation_method in crud_field_name_to_method_call_dict.items():
-                if crud_option_field_name in option_dict:
-                    output_str += crud_operation_method(message)
-                # else not required: Avoiding method creation if desc not provided in option
+                if aggregate_params:
+                    agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
+                                                          for param, param_type in zip(aggregate_params,
+                                                                                       aggregate_params_data_types)])
+                    output_str += f"    async def {aggregate_var_name}_query_pre(self, " \
+                                  f"{message_name_snake_cased}_class_type: Type[{message.proto.name}], " \
+                                  f"{agg_params_with_type_str}):\n"
+                    output_str += "        pass\n\n"
+                    output_str += f"    async def {aggregate_var_name}_query_post(self, " \
+                                  f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
+                    output_str += "        pass\n\n"
+                else:
+                    output_str += f"    async def {aggregate_var_name}_query_pre(self, " \
+                                  f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
+                    output_str += "        pass\n\n"
+                    output_str += f"    async def {aggregate_var_name}_query_post(self, " \
+                                  f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
+                    output_str += "        pass\n\n"
+
         return output_str
 
     def handle_callback_class_file_gen(self) -> str:

@@ -7,6 +7,13 @@ how_to_use()
   exit 1
 }
 
+find_rename_regex() (
+  set -eu
+  find_and_replace="$1"
+  PATH="$(echo "$PATH" | gsed -E 's/(^|:)[^\/][^:]*//g')" \
+  LC_ALL=C find . -depth -execdir rename "${2:--n}" "s/${find_and_replace}" '{}' \;
+)
+
 if [ $# -lt 1 ] ; then
   how_to_use
 elif [ -d "$1" ] ; then
@@ -47,15 +54,18 @@ rm -rf temp/*
 find . \( -name .DS_Store -o -name .git -o -name .svn \) -print0 | xargs -0 rm -rf
 # replace any reference to old prj name with new prj name
 echo "replacing any text occurrence of: $2 with: $1 in new project"
+find_rename_regex "$2/$1/g" -v
 find . -type f -exec gsed -i -E "s#$2#$1#g" {} +
 NewProjectCamelCaseName=$(echo "$1" | gsed -r 's/(^|_)([a-z])/\U\2/g' | xargs)
 ExistingProjectCamelCaseName=$(echo "$2" | gsed -r 's/(^|_)([a-z])/\U\2/g' | xargs)
 NewProjectTitleCaseName=$(echo "$1" |  gsed -E "s/(^|_)([a-z])/ \u\2/g" | xargs)  # xargs cleans up extra spaces
 ExistingProjectTitleCaseName=$(echo "$2" |  gsed -E "s/(^|_)([a-z])/ \u\2/g" | xargs)  # xargs cleans up extra spaces
 echo "replacing any CapitalizedCamelCase text occurrence of: $ExistingProjectCamelCaseName with: $NewProjectCamelCaseName in new project"
+find_rename_regex "$ExistingProjectCamelCaseName/$NewProjectCamelCaseName/g" -v
 find . -type f -exec gsed -i -E "s#$ExistingProjectCamelCaseName#$NewProjectCamelCaseName#g" {} +
 if [ "$ExistingProjectCamelCaseName" != "$ExistingProjectTitleCaseName" ]; then
   echo "replacing any Title Case Text occurrence of: $ExistingProjectTitleCaseName with: $NewProjectTitleCaseName in new project"
+  find_rename_regex "$ExistingProjectTitleCaseName/$NewProjectTitleCaseName/g" -v
   find . -type f -exec gsed -i -E "s#$ExistingProjectTitleCaseName#$NewProjectTitleCaseName#g" {} +
 fi
 cd "$START_DIR" || (echo "cd $START_DIR failed"; exit 1)

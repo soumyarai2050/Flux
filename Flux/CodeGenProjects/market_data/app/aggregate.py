@@ -1,25 +1,30 @@
 # Market Depth cumulative average
 cum_px_qty_aggregate_query = {"aggregate": [
     {
-        "$setWindowFields": {
+        "$setWindowFields" : {
             "partitionBy": {"symbol": "$symbol", "side": "$side"},
-            "sortBy": {
-                "position": 1.0
+            "sortBy" : {
+                "position" : 1.0
             },
-            "output": {
-                "cumulative_avg_px": {
-                    "$avg": {"$multiply": ["$px", "$qty"]},
-                    "window": {
-                        "documents": [
+            "output" : {
+                "cumulative_notional" : {
+                    "$sum" : {
+                        "$multiply" : [
+                            "$px",
+                            "$qty"
+                        ]
+                    },
+                    "window" : {
+                        "documents" : [
                             "unbounded",
                             "current"
                         ]
                     }
                 },
-                "cumulative_total_qty": {
-                    "$sum": "$qty",
-                    "window": {
-                        "documents": [
+                "cumulative_qty" : {
+                    "$sum" : "$qty",
+                    "window" : {
+                        "documents" : [
                             "unbounded",
                             "current"
                         ]
@@ -27,48 +32,21 @@ cum_px_qty_aggregate_query = {"aggregate": [
                 }
             }
         }
-    }
-]}
-
-
-# Last n sec average px and total size (last n sec from every document)
-last_n_sec_tick_by_tick_all_last_agg_query = {"aggregate": [
+    },
     {
-        "$setWindowFields": {
-            "partitionBy": {
-                "symbol": "$symbol",
-                "tick_type": "$tick_type"
-            },
-            "sortBy": {
-                "time": 1.0
-            },
-            "output": {
-                "last_n_sec_avg_px": {
-                    "$avg": {"$multiply": ["$px", "$qty"]},
-                    "window": {
-                        "range": [
-                            -10.0,
-                            "current"
-                        ],
-                        "unit": "second"
-                    }
-                },
-                "last_n_sec_total_qty": {
-                    "$sum": "$qty",
-                    "window": {
-                        "range": [
-                            -10.0,
-                            "current"
-                        ],
-                        "unit": "second"
-                    }
-                }
+        "$addFields" : {
+            "cumulative_avg_px" : {
+                "$divide" : [
+                    "$cumulative_notional",
+                    "$cumulative_qty"
+                ]
             }
         }
     }
 ]}
 
-def get_pair_side_brief_from_side(symbol: str):
+
+def get_pair_side_brief_from_side(symbol: str):     # NOQA
     return {"aggregate": [
         {
             "$unwind": {
@@ -78,6 +56,67 @@ def get_pair_side_brief_from_side(symbol: str):
         {
             "$match": {
                 "pair_side_brief.security.sec_id": symbol
+            }
+        },
+        {
+            "$sort": {
+                "pair_side_brief.last_update_date_time": -1.0
+            }
+        }
+    ]}
+
+def get_max_market_depth_obj(symbol: str, side: str):     # NOQA
+    return {"aggregate": [
+        {
+            "$match": {
+                "$and": [
+                    {
+                        "symbol": symbol
+                    },
+                    {
+                        "side": side
+                    }
+                ]
+            }
+        },
+        {
+            "$sort": {
+                "position": -1.0
+            }
+        }
+    ]}
+
+def get_last_n_sec_total_qty(symbol: str,last_n_sec: float):   # NOQA
+    return [
+        {
+            "$setWindowFields": {
+                "partitionBy": {
+                    "symbol": f"${symbol}"
+                },
+                "sortBy": {
+                    "time": 1.0
+                },
+                "output": {
+                    "market_trade_volume.participation_period_last_trade_qty_sum": {
+                        "$sum": "$qty",
+                        "window": {
+                            "range": [
+                                -last_n_sec,
+                                "current"
+                            ],
+                            "unit": "second"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+
+def get_top_of_book_from_symbol(symbol: str):   # NOQA
+    return {"aggregate": [
+        {
+            "$match": {
+                "symbol": symbol
             }
         }
     ]}

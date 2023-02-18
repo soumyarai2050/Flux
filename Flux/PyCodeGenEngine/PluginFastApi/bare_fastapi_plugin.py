@@ -76,10 +76,10 @@ class BareFastapiPlugin(FastapiCallbackFileHandler,
             self.routes_file_name + ".py": self.handle_routes_file_gen(),
 
             # Adding project's run file
-            self.launch_file_name + ".py": self.handle_launch_file_gen(),
+            self.launch_file_name + ".py": self.handle_launch_file_gen(file),
 
             # Adding client file
-            self.client_file_name + ".py": self.handle_client_file_gen()
+            self.client_file_name + ".py": self.handle_client_file_gen(file)
         }
 
         return output_dict

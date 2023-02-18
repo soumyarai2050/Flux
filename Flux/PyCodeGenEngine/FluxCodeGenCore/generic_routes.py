@@ -1,7 +1,7 @@
 # system imports
 import json
 import os
-from typing import List, Any, Tuple
+from typing import List, Any, Tuple, Final
 import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException
@@ -23,10 +23,10 @@ from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_spec
 5. Delete : UpdateAggregate for massaging data post delete
 """
 
-id_not_found = DefaultWebResponse(msg="Id not Found")
-del_success = DefaultWebResponse(msg="Deletion Successful")
-host_env_var = "127.0.0.1" if (env_host := os.getenv("HOST")) is None else env_host
-port_env_var = 8000 if (env_port := os.getenv("PORT")) is None else int(env_port)
+id_not_found: Final[DefaultWebResponse] = DefaultWebResponse(msg="Id not Found")
+del_success: Final[DefaultWebResponse] = DefaultWebResponse(msg="Deletion Successful")
+host_env_var: Final[str] = "127.0.0.1" if (env_host := os.getenv("HOST")) is None else env_host
+port_env_var: Final[int] = 8000 if (env_port := os.getenv("PORT")) is None else int(env_port)
 
 
 async def publish_ws(pydantic_class_type, stored_obj, stored_obj_id=None):

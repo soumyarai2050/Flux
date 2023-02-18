@@ -2,6 +2,8 @@ import os
 import time
 from abc import ABC
 
+import protogen
+
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
         isinstance(debug_sleep_time := int(debug_sleep_time), int):
     time.sleep(debug_sleep_time)
@@ -29,14 +31,29 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
 
         return output_str
 
-    def handle_launch_file_gen(self) -> str:
+    def handle_launch_file_gen(self, file: protogen.File) -> str:
+        if FastapiLauncherFileHandler.flux_file_crud_host in str(file.proto.options):
+            host = self.get_non_repeated_valued_custom_option_value(file.proto.options,
+                                                                    FastapiLauncherFileHandler.flux_file_crud_host)
+        else:
+            host = '"127.0.0.1"'
+
+        if FastapiLauncherFileHandler.flux_file_crud_port_offset in str(file.proto.options):
+            port_offset = \
+                self.get_non_repeated_valued_custom_option_value(file.proto.options,
+                                                                 FastapiLauncherFileHandler.flux_file_crud_port_offset)
+            port = 8000 + int(port_offset)
+        else:
+            port = 8000
+
         output_str = "import os\n"
         output_str += "import uvicorn\n"
         output_str += "import logging\n"
         output_str += self._handle_callback_override_set_instance_import()
         routes_callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += f"from FluxPythonUtils.scripts.utility_functions import configure_logger\n\n"
-        output_str += f'configure_logger(os.getenv("LOG_LEVEL"), log_file_name=os.getenv("LOG_FILE_PATH"))\n'
+        output_str += f'configure_logger(os.getenv("LOG_LEVEL"), log_file_dir_path=os.getenv("LOG_FILE_DIR_PATH"), \n'
+        output_str += f'                 log_file_name=os.getenv("LOG_FILE_NAME"))\n'
         output_str += "\n\n"
         output_str += f'def {self.launch_file_name}():\n'
         output_str += f'    callback_instance = {routes_callback_class_name_camel_cased}().get_instance()\n'
@@ -52,8 +69,8 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'    # WARNING: 30\n'
         output_str += f'    # ERROR: 40\n'
         output_str += f'    # CRITICAL: 50\n'
-        output_str += f'    host = "127.0.0.1" if (env_host := os.getenv("HOST")) is None else env_host\n'
-        output_str += f'    port = 8000 if (env_port := os.getenv("PORT")) is None else int(env_port)\n'
+        output_str += f'    host = {host} if (env_host := os.getenv("HOST")) is None else env_host\n'
+        output_str += f'    port = {port} if (env_port := os.getenv("PORT")) is None else int(env_port)\n'
         output_str += f'    if (fastapi_file_name := os.getenv("FASTAPI_FILE_NAME")) is None:\n'
         output_str += f'        err_str = "Env Var FASTAPI_FILE_NAME received as None"\n'
         output_str += f'        logging.exception(err_str)\n'

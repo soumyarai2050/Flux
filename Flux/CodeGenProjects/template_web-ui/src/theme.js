@@ -17,8 +17,12 @@ export const theme = createTheme({
         MuiTooltip: {
             styleOverrides: {
                 tooltip: {
-                    fontSize: '0.9em'
-                }
+                    fontSize: '1em',
+                    maxWidth: '600px !important',
+                    maxHeight: "400px !important",
+                    overflow: 'auto',
+                    background: '#444'
+                },
             }
         }
     }

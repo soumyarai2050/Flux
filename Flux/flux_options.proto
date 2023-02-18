@@ -55,6 +55,12 @@ message MessageJsonRoot{
   optional bool SetReentrantLock = 8 [default=true];
 }
 
+message MessageJsonQuery{
+  required string AggregateVarName = 1; // name of variable from file to be used
+  repeated string AggregateParams = 2;  // list of params required for aggregation
+  repeated string AggregateParamsDataType = 3;  // list of data types of respective params in AggregateParams field
+}
+
 extend google.protobuf.FileOptions 
 {
   //General Options - 51
@@ -63,6 +69,8 @@ extend google.protobuf.FileOptions
 
   // UI Options 552
   optional WebPageUIData FluxFileWebPageUIData = 55251;
+  optional string FluxFileCRUDHost = 55253;
+  optional int32 FluxFileCRUDPortOffset = 55254;
 }
 
 extend google.protobuf.MessageOptions
@@ -132,7 +140,8 @@ extend google.protobuf.MessageOptions
   optional bool FluxMsgServerPopulate = 55253; // Use this to signal msg not to populate from UI, populate from server
   optional WidgetUIData FluxMsgWidgetUIData = 55254; // Use this to populate ui widget data for layout messages
   optional string FluxMsgTitle = 55255; //Set this value to override default title value in schema
-  optional MessageJsonRoot FluxMsgJsonQuery = 55256;
+  repeated MessageJsonQuery FluxMsgJsonQuery = 55256;
+  optional string FluxMsgCRUDSharedLock = 55257; // Name of shared lock to be used in multiple models in CRUD operations
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;

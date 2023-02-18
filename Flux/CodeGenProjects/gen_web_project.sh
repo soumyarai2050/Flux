@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # packaging notes (automated in this script)
+# 0. cp package.json to web-ui/.
 # 1. rename strat_manager_service_json_schema.json to schema.json ; then copy to web-ui/public/.
 # 2.cp Layout.jsx to web-ui/src/components/.
 # 3. cp *.jsx to web-ui/src/widgets/.   # excluding Layout -
-# 4. cp store.js web-ui/src/.
+# 4. cp store.js and constants.js to web-ui/src/.
 # 4.5. cp projectSpecificUtils.js web-ui/src/.
-# 5. cp *.js web-ui/src/features/.   # excluding store.js, projectSpecificUtils.js
+# 5. cp *.js web-ui/src/features/.   # excluding store.js, projectSpecificUtils.js, constants.js
 # 6. If second parameter was supplied:
 # - 6.1 optionally replace old project name with new project name
 # - 6.2 optionally search for capitalized space case of old project name in file web-ui/public/index.html and replace with capitalized space case of new project name
@@ -50,6 +51,8 @@ else  # test WebUi exist in the current project
   fi
 fi
 
+# 0. cp package.json to web-ui/.
+cp -p "$PWD"/generated/package.json "$PWD"/web-ui/.
 # 1. rename strat_manager_service_json_schema.json to schema.json ; then copy to web-ui/public/.
 FILES_TO_COPY=$(ls "$PWD"/generated/*_json_schema.json)
 cp -p "$FILES_TO_COPY" "$PWD"/web-ui/public/schema.json
@@ -58,14 +61,16 @@ cp -p "$PWD"/generated/Layout.jsx "$PWD"/web-ui/src/components/.
 # 3. cp *.jsx to web-ui/src/widgets/.   # excluding Layout -
 find "$PWD"/generated/ -type f -name "*.jsx" -exec cp {} "$PWD"/web-ui/src/widgets/. \;
 rm -f "$PWD"/web-ui/src/widgets/Layout.jsx
-# 4. cp store.js web-ui/src/.
+# 4. cp store.js and constants.js to web-ui/src/.
 cp -p "$PWD"/generated/store.js "$PWD"/web-ui/src/.
+cp -p "$PWD"/generated/constants.js "$PWD"/web-ui/src/.
 # 4.5 cp projectSpecificUtils.js web-ui/src/.
 cp -p "$PWD"/generated/projectSpecificUtils.js "$PWD"/web-ui/src/.
-# 5. cp *.js web-ui/src/features/.   # excluding store.js, projectSpecificUtils.js
+# 5. cp *.js web-ui/src/features/.   # excluding store.js, projectSpecificUtils.js, constants.js
 find "$PWD"/generated/ -type f -name "*.js" -exec cp {} "$PWD"/web-ui/src/features/. \;
 rm -f "$PWD"/web-ui/src/features/store.js
 rm -f "$PWD"/web-ui/src/features/projectSpecificUtils.js
+rm -f "$PWD"/web-ui/src/features/constants.js
 # 6. replace old project name with new project name
 # replace any reference to old prj name with new prj name
 if [ $# -eq 2 ] ; then

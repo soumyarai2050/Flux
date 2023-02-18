@@ -64,8 +64,8 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
 
             if BeanieFastApiPlugin.flux_msg_json_query in str(message.proto.options):
                 if message in self.root_message_list:
-                    if message not in self.query_message_list:
-                        self.query_message_list.append(message)
+                    if message not in self.query_message_dict:
+                        self.query_message_dict[message] = self.get_query_option_message_values(message)
                     # else not required: avoiding repetition
                 else:
                     err_str = "Query type message should be root message also to perform db queries, " \
@@ -91,8 +91,11 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         root_msg_list = [message.proto.name for message in self.root_message_list]
         model_names = ", ".join(root_msg_list)
         output_str = "async def init_db():\n"
-        output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := os.getenv("MONGO_SERVER")) ' \
-                      'is None else mongo_env\n'
+        output_str += '    config_file_path: PurePath = PurePath(__file__).parent.parent / "data" / "config.yaml"\n'
+        output_str += '    config_dict = load_yaml_configurations(str(config_file_path))\n'
+        output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := ' \
+                      'config_dict.get("mongo_server")) is None else mongo_env\n'
+        output_str += '    logging.debug(f"mongo_server: {mongo_server}")\n'
         output_str += f'    if (db_name := os.getenv("DB_NAME")) is not None:\n'
         output_str += f'        mongo_server += "/" + db_name\n'
         output_str += f'        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server)\n'
@@ -100,6 +103,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += f'    else:\n'
         output_str += f'        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server)\n'
         output_str += f'        db = client.{self.proto_file_package}\n'
+        output_str += '    logging.debug(f"db_name: {db_name}")\n'
         output_str += f'    await init_beanie(\n'
         output_str += f'        database=db,\n'
         output_str += f'        document_models=[{model_names}]\n'
@@ -111,7 +115,10 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += "from beanie import init_beanie\n"
         output_str += "import motor\n"
         output_str += "import motor.motor_asyncio\n"
+        output_str += "from pathlib import PurePath\n"
+        output_str += "import logging\n"
 
+        output_str += f"from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
         output_str += f'from {model_file_path} import '
         for message in self.root_message_list:
@@ -200,10 +207,10 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
             self.routes_file_name+".py": self.handle_routes_file_gen(),
 
             # Adding project's launch file
-            self.launch_file_name + ".py": self.handle_launch_file_gen(),
+            self.launch_file_name + ".py": self.handle_launch_file_gen(file),
 
             # Adding client file
-            self.client_file_name + ".py": self.handle_client_file_gen()
+            self.client_file_name + ".py": self.handle_client_file_gen(file)
         }
 
         return output_dict

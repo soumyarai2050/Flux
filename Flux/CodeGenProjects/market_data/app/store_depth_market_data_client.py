@@ -17,7 +17,7 @@ from FluxPythonUtils.scripts.utility_functions import yaml_loader, configure_log
 os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client import MarketDataServiceWebClient
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import MarketDepthBaseModel, \
-    MarketDepthHistoryBaseModel
+    RawMarketDepthHistoryBaseModel
 
 
 class StoreDepthMarketDataClient(IbApiClient):
@@ -103,7 +103,6 @@ class StoreDepthMarketDataClient(IbApiClient):
                 # operation 2: Delete
                 logging.debug(f"{market_depth_base_model}: received with operation code 2(Delete)")
 
-
     def _get_document_id_value(self, ticker_id: TickerId, side: int, position: int):
         """
         Returns Document ID assigned to document according to its side(Ask or Bid) and number of required levels
@@ -137,13 +136,14 @@ class StoreDepthMarketDataClient(IbApiClient):
         logging.debug(f"Adding {market_depth_base_model} in MarketDepth collection")
 
         if self.preserve_history:
-            market_depth_history_base_model = MarketDepthHistoryBaseModel(symbol=self.contracts[ticker_id].symbol,
-                                                                          time=current_time, position=position,
-                                                                          operation=operation,
-                                                                          side=self.get_side_str_from_side_int(side),
-                                                                          px=price, qty=size)
-            self.market_data_service_web_client.create_market_depth_history_client(market_depth_history_base_model)
-            logging.debug(f"Adding {market_depth_history_base_model} in MarketDepthHistory collection")
+            raw_market_depth_history_base_model = \
+                RawMarketDepthHistoryBaseModel(symbol=self.contracts[ticker_id].symbol, time=current_time,
+                                               position=position, operation=operation,
+                                               side=self.get_side_str_from_side_int(side),
+                                               px=price, qty=size)
+            self.market_data_service_web_client.create_raw_market_depth_history_client(
+                raw_market_depth_history_base_model)
+            logging.debug(f"Adding {raw_market_depth_history_base_model} in MarketDepthHistory collection")
 
     def updateMktDepthL2(self, ticker_id: TickerId, position: int, market_maker: str, operation: int, side: int,
                          price: float, size: Decimal, is_smart_depth: bool):
@@ -159,15 +159,15 @@ class StoreDepthMarketDataClient(IbApiClient):
         logging.debug(f"Adding {market_depth_base_model} in MarketDepth collection")
 
         if self.preserve_history:
-            market_depth_history_base_model = MarketDepthHistoryBaseModel(symbol=self.contracts[ticker_id].symbol,
-                                                                          time=current_time, position=position,
-                                                                          operation=operation,
-                                                                          side=self.get_side_str_from_side_int(side),
-                                                                          px=price, qty=size,
-                                                                          market_maker=market_maker,
-                                                                          is_smart_depth=is_smart_depth)
-            self.market_data_service_web_client.create_market_depth_history_client(market_depth_history_base_model)
-            logging.debug(f"Adding {market_depth_history_base_model} in MarketDepthHistory collection")
+            raw_market_depth_history_base_model = \
+                RawMarketDepthHistoryBaseModel(symbol=self.contracts[ticker_id].symbol, time=current_time,
+                                               position=position, operation=operation,
+                                               side=self.get_side_str_from_side_int(side),
+                                               px=price, qty=size, market_maker=market_maker,
+                                               is_smart_depth=is_smart_depth)
+            self.market_data_service_web_client.create_raw_market_depth_history_client(
+                raw_market_depth_history_base_model)
+            logging.debug(f"Adding {raw_market_depth_history_base_model} in MarketDepthHistory collection")
 
 
 if __name__ == "__main__":

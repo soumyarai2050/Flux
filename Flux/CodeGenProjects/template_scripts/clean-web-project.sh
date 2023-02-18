@@ -9,8 +9,12 @@ cd .. # parent of script dir
 # clean generated
 cd generated
 find . -type f ! \( -name "data.py" -o -name "forward_notification_ws_server.py" -o -name "get_all_from_ws_client.py" -o -name "get_from_ws_client.py" \) -print0 | xargs -0 -n1 rm
-cd -
-rm -rf web-ui
+cd - # parent of generated (same as parent of script DIR)
+if [ -d "web-ui" ] ; then
+  # clean web-ui excluding node_modules install folder
+  cd web-ui
+  # can provide | seperated param list to grep with -E and -v options set
+  ls | grep -E -v "node_modules" | xargs rm -rf
+fi
 rm -rf scripts/static and scripts/templates
-#Back to dir where we started
-cd "$START_DIR"
+cd "$START_DIR" # Back to dir where we started

@@ -83,9 +83,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if not self.current_message_is_dependent:
             output_str += "import { API_ROOT_URL, DB_ID } from '../constants';\n"
             if message.proto.name not in self.dependent_to_abbreviated_message_relation_dict.values():
-                output_str += "import { clearxpath, getObjectWithLeastId } from '../utils';\n"
+                output_str += "import { addxpath, clearxpath, getObjectWithLeastId } from '../utils';\n"
             else:
-                output_str += "import { clearxpath, generateObjectFromSchema, getObjectWithLeastId } from '../utils';\n"
+                output_str += "import { addxpath, clearxpath, generateObjectFromSchema, getObjectWithLeastId } from '../utils';\n"
             output_str += "\n"
         else:
             dependent_message_name: str | None = None
@@ -236,6 +236,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.error = action.error.code + ': ' + action.error.message + " \
                       f"'- ' + JSON.stringify(updatedData);\n"
         output_str += "            state.loading = false;\n"
+        output_str += f"            state.modified{message_name} = addxpath(cloneDeep(state.{message_name_camel_cased}));\n"
         output_str += "        },\n"
         return output_str
 
@@ -254,6 +255,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.error = action.error.code + ': ' + action.error.message + " \
                       f"'- ' + JSON.stringify(updatedData);\n"
         output_str += f"            state.loading = false;\n"
+        output_str += f"            state.modified{message_name} = addxpath(cloneDeep(state.{message_name_camel_cased}));\n"
         output_str += "        }\n"
         return output_str
 

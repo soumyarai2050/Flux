@@ -1,10 +1,10 @@
-export const API_ROOT_URL = 'http://127.0.0.1:8000/template_project_name';
-export const API_PUBLIC_URL = 'http://127.0.0.1:3000';
+# @@protoc_insertion_point(api_root_url)
+# @@protoc_insertion_point(api_public_url)
 export const DB_ID = '_id';
 export const SCHEMA_DEFINITIONS_XPATH = 'definitions';
 export const SCHEMA_AUTOCOMPLETE_XPATH = 'autocomplete';
 export const NEW_ITEM_ID = 999999;
-export const COOKIE_NAME = 'template_project_name';
+# @@protoc_insertion_point(cookie_name)
 
 export const Modes = {
     EDIT_MODE: 'edit',

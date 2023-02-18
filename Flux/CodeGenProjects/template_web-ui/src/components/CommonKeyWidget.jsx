@@ -68,6 +68,7 @@ const CommonKey = (props) => {
                     <div className={classes.abbreviated_json}>
                         <Tooltip
                             title={updatedData}
+                            placement="bottom-start"
                             open={open}
                             onClose={onCloseAbbreviatedField}
                             disableFocusListener

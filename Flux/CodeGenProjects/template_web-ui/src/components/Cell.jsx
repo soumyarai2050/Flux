@@ -193,7 +193,7 @@ const Cell = (props) => {
             return (
                 <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
                     <TextField
-                        className={classes.textField}
+                        className={classes.text_field}
                         size='small'
                         autoFocus
                         value={value}
@@ -319,7 +319,7 @@ const Cell = (props) => {
                             <Tooltip
                                 title={updatedData}
                                 open={open}
-                                placement='bottom-start'
+                                placement="bottom-start"
                                 onClose={onCloseTooltip}
                                 disableFocusListener
                                 disableHoverListener

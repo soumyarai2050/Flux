@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import logging
 import os
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, ClassVar
 import time
 from abc import abstractmethod
 
@@ -21,6 +21,9 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     """
     Plugin script to convert proto schema to json schema
     """
+    aggregate_var_name_key: ClassVar[str] = "aggregate_var_name"
+    aggregate_params_key: ClassVar[str] = "aggregate_params"
+    aggregate_params_data_types_key: ClassVar[str] = "aggregate_params_data_types"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -36,7 +39,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         # Since output file name for this plugin will be created at runtime
         self.output_file_name_suffix = ""
         self.root_message_list: List[protogen.Message] = []
-        self.query_message_list: List[protogen.Message] = []
+        self.query_message_dict: Dict[protogen.Message, List[Dict]] = {}
         self.non_root_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
         self.fastapi_app_name: str = ""
@@ -75,8 +78,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
 
                 if BaseFastapiPlugin.flux_msg_json_query in str(message.proto.options):
                     if message in self.root_message_list:
-                        if message not in self.query_message_list:
-                            self.query_message_list.append(message)
+                        if message not in self.query_message_dict:
+                            self.query_message_dict[message] = self.get_query_option_message_values(message)
                         # else not required: avoiding repetition
                     else:
                         err_str = "Query type message should be root message also to perform db queries, " \
@@ -119,8 +122,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
 
             if BaseFastapiPlugin.flux_msg_json_query in str(message.proto.options):
                 if message in self.root_message_list:
-                    if message not in self.query_message_list:
-                        self.query_message_list.append(message)
+                    if message not in self.query_message_dict:
+                        self.query_message_dict[message] = self.get_query_option_message_values(message)
                     # else not required: avoiding repetition
                 else:
                     err_str = "Query type message should be root message also to perform db queries, " \
@@ -130,6 +133,37 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             # else not required: avoiding list append if msg is not having option for query
 
             self.load_dependency_messages_and_enums_in_dicts(message)
+
+    def get_query_option_message_values(self, message: protogen.Message) -> List[Dict]:
+        list_of_agg_value_dict = []
+        options_list_of_dict = \
+            self.get_complex_option_values_as_list_of_dict(message, BaseFastapiPlugin.flux_msg_json_query)
+        # print("##### ", options_list_of_dict)
+        for option_dict in options_list_of_dict:
+            agg_value_dict = {}
+            agg_value_dict[BaseFastapiPlugin.aggregate_var_name_key] = \
+                option_dict[BaseFastapiPlugin.flux_json_query_aggregate_var_name_field]
+            if (aggregate_params := option_dict.get(
+                    BaseFastapiPlugin.flux_json_query_aggregate_params_field)) is not None:
+                aggregate_params_data_types = \
+                    option_dict.get(BaseFastapiPlugin.flux_json_query_aggregate_params_data_type_field)
+                aggregate_params = aggregate_params if isinstance(aggregate_params, list) else [aggregate_params]
+                aggregate_params_data_types = aggregate_params_data_types \
+                    if isinstance(aggregate_params_data_types, list) else [aggregate_params_data_types]
+                if len(aggregate_params) != len(aggregate_params_data_types):
+                    err_str = f"{BaseFastapiPlugin.flux_msg_json_query} option should have equal numbers of" \
+                              f"{BaseFastapiPlugin.flux_json_query_aggregate_params_field} and " \
+                              f"{BaseFastapiPlugin.flux_json_query_aggregate_params_data_type_field}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+                else:
+                    agg_value_dict[BaseFastapiPlugin.aggregate_params_key] = aggregate_params
+                    agg_value_dict[BaseFastapiPlugin.aggregate_params_data_types_key] = aggregate_params_data_types
+            else:
+                agg_value_dict[BaseFastapiPlugin.aggregate_params_key] = []
+                agg_value_dict[BaseFastapiPlugin.aggregate_params_data_types_key] = []
+            list_of_agg_value_dict.append(agg_value_dict)
+        return list_of_agg_value_dict
 
     def proto_to_py_datatype(self, field: protogen.Field) -> str:
         match field.kind.name.lower():

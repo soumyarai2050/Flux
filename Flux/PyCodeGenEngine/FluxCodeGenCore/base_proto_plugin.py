@@ -54,6 +54,9 @@ class BaseProtoPlugin(ABC):
     flux_json_root_read_websocket_field: ClassVar[str] = "ReadWebSocketDesc"
     flux_json_root_update_websocket_field: ClassVar[str] = "UpdateWebSocketDesc"
     flux_json_root_set_reentrant_lock_field: ClassVar[str] = "SetReentrantLock"
+    flux_json_query_aggregate_var_name_field: ClassVar[str] = "AggregateVarName"
+    flux_json_query_aggregate_params_field: ClassVar[str] = "AggregateParams"
+    flux_json_query_aggregate_params_data_type_field: ClassVar[str] = "AggregateParamsDataType"
     flux_fld_is_required: ClassVar[str] = "FluxFldIsRequired"
     flux_fld_cmnt: ClassVar[str] = "FluxFldCmnt"
     flux_msg_cmnt: ClassVar[str] = "FluxMsgCmnt"
@@ -79,6 +82,10 @@ class BaseProtoPlugin(ABC):
     aggregation_type_filter: str = "AggregateType_FilterAggregate"
     aggregation_type_both: str = "AggregateType_FilterNUpdate"
     aggregation_type_unspecified: str = "AggregateType_UNSPECIFIED"
+    flux_msg_crud_shared_lock: str = "FluxMsgCRUDSharedLock"
+    flux_file_crud_host: str = "FluxFileCRUDHost"
+    flux_file_crud_port_offset: str = "FluxFileCRUDPortOffset"
+    flux_fld_help: str = "FluxFldHelp"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: str = "ProtoPackageName"  # to be used in models as proto_package_name variable name

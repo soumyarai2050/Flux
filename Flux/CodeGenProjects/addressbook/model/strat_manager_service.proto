@@ -8,6 +8,8 @@ option (FluxFileWebPageUIData) = {
   theme: THEME_LIGHT
 };
 
+option (FluxFileCRUDPortOffset) = 20;
+
 message StratLeg{
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   required Security sec = 2;
@@ -95,7 +97,7 @@ message StratStatus{
 }
 
 // Widget - 4
-message StratOrderJournal{
+message OrderJournal{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
@@ -109,13 +111,14 @@ message StratOrderJournal{
     h: 12,
     layout: UI_TABLE
   };
+  option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional OrderBrief order = 2;
   optional int64 order_event_date_time = 3 [(FluxFldValIsDateTime) = true];
   optional OrderEventType order_event = 4;
 }
 
-message StratOrderSnapshot{
+message OrderSnapshot{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
@@ -143,10 +146,51 @@ message StratOrderSnapshot{
   optional int64 cxled_notional = 10;
   optional int64 last_update_date_time = 11 [(FluxFldValIsDateTime) = true];
   optional OrderStatusType order_status = 12 ;
+  optional int64 last_n_sec_total_qty = 13 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec order qty
+}
+
+message SymbolSideSnapshot{
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgJsonQuery) = {
+      AggregateVarName: "get_symbol_side_snapshot_from_symbol_side",
+      AggregateParams: "security_id",
+      AggregateParams: "side",
+      AggregateParamsDataType: "str",
+      AggregateParamsDataType: "str",
+  };
+  option (FluxMsgWidgetUIData) = {
+    x: 0,
+    y: 31,
+    w: 10,
+    h: 12,
+    layout: UI_TABLE
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required Security security = 2;
+  required Side side = 3;
+  optional float avg_px = 4;
+  optional int64 total_qty = 5;
+  optional int64 total_filled_qty = 6;
+  optional float avg_fill_px = 7;
+  optional float total_fill_notional = 8;
+  optional int64 last_update_fill_qty = 9;
+  optional float last_update_fill_px = 10;
+  optional int64 total_cxled_qty = 11;
+  optional float avg_cxled_px = 12;
+  optional int64 total_cxled_notional = 13;
+  optional int64 last_update_date_time = 14 [(FluxFldValIsDateTime) = true];
+  optional int32 frequency = 15;
 }
 
 // Widget - 5
-message StratFillsJournal{
+message FillsJournal{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
@@ -160,6 +204,8 @@ message StratFillsJournal{
     h: 12,
     layout: UI_TABLE
   };
+  option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
+  
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string order_id = 2;
   optional float fill_px = 3;
@@ -169,7 +215,6 @@ message StratFillsJournal{
   optional int64 fill_date_time = 7 [(FluxFldValIsDateTime) = true];
   required string fill_id = 8;
 }
-
 
 //Widget - 6
 message StratLimits{
@@ -185,10 +230,10 @@ message StratLimits{
   optional float max_cb_notional = 2 [(FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
   optional float max_open_cb_notional = 3 [(FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
   optional int32 max_net_filled_notional = 4  [(FluxFldHelp) = "absolute [buy - sell] maximum notional allowed for this strat"];
-  optional float max_concentration = 5 [(FluxFldHelp) = "concentration against total trading security offering"];
+  optional float max_concentration = 5 [(FluxFldHelp) = "max symbol specific concentration % (w.r.t. market total for the symbol)"];
   optional float limit_up_down_volume_participation_rate = 6 [(FluxFldHelp) = "At limit up down: % participation allowed against open interest on specific side of outstanding queue"];
   optional CancelRate cancel_rate = 7 [(FluxFldHelp) = "Allowed cxl size (side agnostic) as % of (open + executed + cxlled) volume (per broker per symbol) within configured interval; no time window implies SOD: window-start & checking-time as end"];
-  optional MarketTradeVolumeParticipation market_trade_volume_participation = 8 [(FluxFldHelp) = "% participation against market traded volume within configured interval; no time window implies SOD: window-start & checking-time as end"];
+  optional MarketTradeVolumeParticipation market_trade_volume_participation = 8 [(FluxFldHelp) = "% participation against market traded volume within configured interval (sent with top of the book); no time window implies SOD: window-start & checking-time as end"];
   optional OpenInterestParticipation market_depth = 9 [(FluxFldHelp) = "% participation against open interest on specific side across specified depth levels"];
   optional ResidualRestriction residual_restriction = 10 [(FluxFldHelp) = "Max executed unhedged notional"];
   // same as portfolio eligible_brokers except filtered by server [strat specific symbol(s)] + user allowed to mod down
@@ -215,7 +260,7 @@ message OrderLimits{
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 max_basis_points = 2 [(FluxFldValMax) = "15", (FluxFldHelp) = "basis-points a single order can consume, if set to 1, it's 1/100 of: (1% of BBO), or 0.01% of BBO"];
+  optional int32 max_basis_points = 2 [(FluxFldValMax) = "15", (FluxFldHelp) = "basis-points a single order can consume, if set to 1, it`s 1/100 of: (1% of BBO), or 0.01% of BBO"];
   optional float max_px_deviation = 3 [default = 2, (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "max % deviation allowed from Last Traded px (if no last trading px, use closing px)"];
   optional int32 max_px_levels = 4 [(FluxFldHelp) = "max orderbook levels allowed to be consumed by single order"];
   optional int32 max_order_qty = 5;
@@ -305,6 +350,11 @@ message PairStrat{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_FilterAggregate
   };
+    option (FluxMsgJsonQuery) = {
+      AggregateVarName: "get_pair_strat_sec_filter_json",
+      AggregateParams: "security_id",
+      AggregateParamsDataType: "str"
+  };
     option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
 
     //Server generated unique Id
@@ -366,6 +416,7 @@ message StratBrief{
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
     UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
@@ -376,32 +427,35 @@ message StratBrief{
     h: 12,
     layout: UI_TABLE
   };
-  required int32 id = 1;
-  repeated PairSideBrief pair_side_brief = 2;
-  optional float consumable_nett_filled_notional = 3 [ (FluxFldHelp) = "max_net_filled_notional - Absolute (filled_cb_notional - filled_egt_notional)"];
+  option (FluxMsgJsonQuery) = {
+      AggregateVarName: "get_strat_brief_from_symbol",
+      AggregateParams: "security_id",
+      AggregateParamsDataType: "str"
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional PairSideTradingBrief pair_buy_side_trading_brief = 2;
+  optional PairSideTradingBrief pair_sell_side_trading_brief = 3;
+  optional float consumable_nett_filled_notional = 4 [ (FluxFldHelp) = "max_net_filled_notional - Absolute (filled_cb_notional - filled_egt_notional)"];
 }
 
-message PairSideBrief{
+message PairSideTradingBrief{
   required Security security = 1;
   required Side side = 2;
-  optional float allowed_px_by_max_basis_points = 3 [ (FluxFldHelp) = "(bbo_aggressive / 100) * (max_basis_points/100) + bbo_aggressive"];
-  optional float allowed_px_by_max_deviation = 4 [(FluxFldHelp) = "last_px (+/-) (last_px/100 * max_px_deviation) : Sell Order use - , buy + "];
-  optional float allowed_px_by_max_level = 5 [(FluxFldHelp) = "Price at max level in order book (capped at depth level availability - 10) "];
-  optional float cb_allowed_max_px = 6 [ (FluxFldHelp) = "Min of cb_allowed_px_by_basis_point_limit, cb_allowed_px_by_deviation_limit, cb_allowed_px_by_level_limit"];
-  optional float consumable_open_orders = 7 [(FluxFldHelp) = "max_open_order_per_side - open_cb_qty"];
-  optional float consumable_notional = 8 [ (FluxFldHelp) = "max_cb_notional - filled_cb_notional - open_cb_notional"];
-  optional float consumable_open_notional = 9 [(FluxFldHelp) = "max_open_cb_notional - open_cb_notional"];
-  optional float consumable_concentration = 10 [(FluxFldHelp) = "max_concentration - open_cb_notional - filled_cb_notional"];
-  optional float consumable_cxl_qty = 11 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
-  optional float consumable_participation_qty = 12 [(FluxFldHelp) = "((participation_period_last_qty_sum / 100) * max_trade_volume_participation) - participation_period_order_qty_sum"];
-  optional float consumable_residual = 13 [(FluxFldHelp) = "max_residual - (residual_qty*last_px) + (other_leg_residual_qty * other_leg_last_px)"];
-  optional float residual_qty = 14 [(FluxFldHelp) = "0 or if non negative value of (cxlled_qty - (other_leg_all_bkr_cxlled_qty)) * last px"];
-  optional float all_bkr_cxlled_qty = 15 [(FluxFldHelp) = "sum of all bkr cancels for this leg"];
-  optional float open_notional = 16 [(FluxFldHelp) = ""];
-  optional float open_qty = 17 [(FluxFldHelp) = "sum of all open order qty for this leg: reduce if order is filled / rejected / cancelled"];
-  optional float filled_notional = 18 [(FluxFldHelp) = "sum of all bkr fills for this leg"];
-  optional float filled_qty = 19 [ (FluxFldHelp) = "sum of all filled order qty for this leg: reduce if order is filled / rejected / cancelled"];
-  optional float participation_period_order_qty_sum = 20 [(FluxFldHelp) = "aggregate sum of all order aty in the last defined period irrespective of how the order fared in the market: open, filled , cancelled"];
+  required int64 last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
+  optional float consumable_open_orders = 4 [(FluxFldHelp) = "max_open_order_per_side - open_qty"];
+  optional float consumable_notional = 5 [ (FluxFldHelp) = "max_cb_notional - filled_notional - open_notional"];
+  optional float consumable_open_notional = 6 [(FluxFldHelp) = "max_open_cb_notional - open_notional"];
+  optional float consumable_concentration = 7 [(FluxFldHelp) = "(total_trading_security_size/100*max_concentration) - open_notional - filled_notional"];
+  optional float participation_period_order_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all order qty in the MarketTradeVolumeParticipation.applicable_period_seconds irrespective of how the order fared in the market: open, filled , cancelled; if applicable_period_seconds is 0 , directly use SymbolSideSnapshot.total_tty"];
+  optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
+  //True hybrid field - depends on both market data and order / fill update (order trigger re-evaluates these in-process (no DB update) to avoid otherwise race condition between trading and market data updates trying to update same value in DB). This means the value in DB only accounts for Trading updates - market data updates are only applied at the time of trading updates - i.e. no RT market data based recmpute and settign of value in DB
+  optional float indicative_consumable_participation_qty = 10 [(FluxFldHelp) = "((participation_period_last_trade_qty_sum / 100) * MarketTradeVolumeParticipation.max_participation_rate) - participation_period_order_qty_sum"];
+  optional float residual_qty = 15 [(FluxFldHelp) = "0 or if non negative value of total_open_qty - other_leg_total_open_qty"];
+  // Another hybrid total_trading_security_size (refer total_trading_security_size description to understand handling of such hybrids)
+  optional float indicative_consumable_residual = 11 [(FluxFldHelp) = "max_residual_notional - ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px))"];
+  optional float all_bkr_cxlled_qty = 12 [(FluxFldHelp) = "sum of all bkr cancels for this leg"];
+  optional float open_notional = 13 [(FluxFldHelp) = "(symbol specific total qty * symbol_avg_px) - fill notional - (cxlled/rejected qty * symbol_avg_px)"];
+  optional float open_qty = 14 [(FluxFldHelp) = "sum of all open order qty for this leg: reduce if order is filled / rejected / cancelled (symbol side snapshot based compute)"];
 }
 
 message TestSample{
@@ -414,9 +468,6 @@ message TestSample{
     ReadWebSocketDesc: AggregateType_UNSPECIFIED,
     SetReentrantLock: false
   };
-    option (FluxMsgJsonQuery) = {
-      ReadDesc: AggregateType_UNSPECIFIED
-    };
 
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true];
@@ -424,6 +475,7 @@ message TestSample{
     required int64 date = 3 [(FluxFldValIsDateTime) = true];
 }
 
+//Not used , maybe deleted in future
 message TradeBrief{
   required string trade_id = 1;
   required Security security = 2;

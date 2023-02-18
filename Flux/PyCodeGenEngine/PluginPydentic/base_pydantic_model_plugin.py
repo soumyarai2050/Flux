@@ -167,7 +167,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str = ""
         if not has_id_field:
             output_str += f"    {BasePydanticModelPlugin.default_id_field_name}: " \
-                          f"{BasePydanticModelPlugin.default_id_type_var_name} = " \
+                          f"{BasePydanticModelPlugin.default_id_type_var_name} | None = " \
                           f"Field(alias='_id')\n"
         # else not required: if id field is present already then will be handled in next for loop
 

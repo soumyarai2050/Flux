@@ -14,17 +14,17 @@ class TestStoreDepthMarketDataClient:
         self.store_depth_market_data_client = StoreDepthMarketDataClient(config_yaml=None, preserve_history=False)
 
     def test_update_mkt_depth(self):
-        market_depth_history_objs = self.market_data_service_web_client.get_all_market_depth_history_client()
+        raw_market_depth_history_objs = self.market_data_service_web_client.get_all_raw_market_depth_history_client()
 
-        for market_depth_history_obj in market_depth_history_objs:
+        for raw_market_depth_history_obj in raw_market_depth_history_objs:
             ticker_id, operation, position, price, side, size = \
                 self.store_depth_market_data_client.get_ticker_id_from_symbol(
-                    market_depth_history_obj.symbol), \
-                    market_depth_history_obj.operation, \
-                    market_depth_history_obj.position, \
-                    market_depth_history_obj.px, \
-                    market_depth_history_obj.side, \
-                    market_depth_history_obj.qty
+                    raw_market_depth_history_obj.symbol), \
+                raw_market_depth_history_obj.operation, \
+                raw_market_depth_history_obj.position, \
+                raw_market_depth_history_obj.px, \
+                raw_market_depth_history_obj.side, \
+                raw_market_depth_history_obj.qty
 
             self.store_depth_market_data_client.updateMktDepth(int(ticker_id), int(position), int(operation),
                                                                StoreDepthMarketDataClient.get_side_str_to_side_int(

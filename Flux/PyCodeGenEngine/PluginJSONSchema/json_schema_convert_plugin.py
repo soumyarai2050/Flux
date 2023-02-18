@@ -313,6 +313,18 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             if option in str(field_or_message_obj.proto.options):
                 option_value = self.get_non_repeated_valued_custom_option_value(field_or_message_obj.proto.options,
                                                                                 option)
+
+                if option == JsonSchemaConvertPlugin.flux_fld_help:
+                    if "'" in option_value:
+                        err_str = "FluxFldHelp must have string without singe quotation mark ('), found in " \
+                                  f"{option_value} option value of field {field_or_message_obj} of message " \
+                                  f"{field_or_message_obj.message}"
+                        logging.exception(err_str)
+                        raise Exception(err_str)
+                    # else not required: If help option value contains string without "'" (single quotation mark),
+                    # then proceeding for further processing, since "'" causes issues with json once generated
+                # else not required: if option is not flux_fld_help then avoiding check
+
                 if '"' in option_value[-1]:
                     # stripping extra '"' in value
                     option_value = self.__parse_string_to_original_types(option_value[1:-1])

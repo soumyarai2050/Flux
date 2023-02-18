@@ -81,11 +81,11 @@ class StoreTickByTickData(IbApiClient):
         # todo: Lazy: tick_attrib_last and special_conditions
         tick_by_tick_all_last: TickByTickAllLastBaseModel = \
             TickByTickAllLastBaseModel(symbol=self._get_contract_symbol_from_ticker_id(ticker_id),
-                                       tick_type=tick_type_str, time=DateTime.fromtimestamp(time),
+                                       time=DateTime.fromtimestamp(time),
                                        px=floatMaxString(price), qty=decimalMaxString(size),
                                        exchange=exchange, special_conditions=special_conditions,
                                        past_limit=tick_attrib_last.pastLimit, unreported=tick_attrib_last.unreported)
-        logging.debug(f"Adding {tick_by_tick_all_last} in TickByTickBidAsk Collection")
+        logging.debug(f"Adding {tick_by_tick_all_last} in TickByTickBidAsk Collection, with tick_type: {tick_type_str}")
         self.market_data_service_web_client.create_tick_by_tick_all_last_client(tick_by_tick_all_last)
 
 

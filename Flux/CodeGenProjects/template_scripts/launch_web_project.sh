@@ -1,8 +1,30 @@
 #!/bin/bash
 set -e
+
 DEFAULT_API_PUBLIC_URL="http://127.0.0.1:3000"
 DEFAULT_MONGO_DB_URI="mongodb://localhost:27017"
 
+while [ $# -gt 0 ]; do
+  case "$1" in
+    DEPLOY=*)
+      DEPLOY="${1#*=}"
+      ;;
+    INSTALL=*)
+      INSTALL="${1#*=}"
+      ;;
+    PUBLIC_URL=*)
+      PUBLIC_URL="${1#*=}"
+      ;;
+    MONGO_DB_URL=*)
+      MONGO_DB_URL="${1#*=}"
+      ;;
+    *)
+      echo "Invalid argument: $1"
+      how_to_use
+      exit 1
+  esac
+  shift
+done
 
 [ -z "$DEPLOY" ] && DEPLOY="dev"
 DEPLOY=$( tr '[:upper:]' '[:lower:]' <<<"$DEPLOY" )
@@ -50,23 +72,54 @@ validate_and_update_uri() {
 }
 
 install_dev() {
-  echo "install_dev Not supported yet!"
-  exit 1
+  if [ ! -d "../web-ui" ]; then
+    echo "Web project does not exist. Run 'build_web_project' to build the web project"
+    exit 1
+  fi
+  cd ../web-ui
+  npm install
+  npm install react-json-view -f
+  cd - || (echo "cd - failed from dir: $PWD"; exit 1)
+  echo "Installed npm packages."
 }
 
 install_prod() {
-  echo "install_prod Not supported yet!"
-  exit 1
+  install_dev
+  if [[ $PUBLIC_URL == "default" ]]; then
+    PUBLIC_URL=$DEFAULT_API_PUBLIC_URL
+  fi
+  # set PUBLIC_URL to "static" URL of Fast API server
+  export PUBLIC_URL=$PUBLIC_URL/static
+  npm run build
+  cd - || (echo "cd - failed from dir: $PWD"; exit 1)
+  # cleanup the previous builds and copy the build distribution to static and templates directory
+  rm -rf static/* templates/*
+  cp -pr ../web-ui/build/* static/.
+  mv static/index.html templates/index.html
+  echo "Build distribution created and copied to static and templates directory"
 }
 
 launch_dev() {
-  echo "launch_dev Not supported yet!"
-  exit 1
+  export DEBUG=1
+  python launch_beanie_fastapi.py &
+  echo "FastAPI project starting in background."
+  if [ ! -d "../web-ui" ]; then
+    echo "Web project does not exist. Run 'build_web_project' to build the web project"
+    exit 1
+  fi
+  cd ../web-ui
+  if [ ! -d "node_modules" ]; then
+    echo "node_modules does not exist. Run launch_web_project with INSTALL=<non-zero> to install the project first"
+    exit 1
+  fi
+  npm start &
+  echo "React project starting in background"
+  cd - || (echo "cd - failed from dir: $PWD"; exit 1)
 }
 
 launch_prod() {
-  echo "launch_prod Not supported yet!"
-  exit 1
+  python launch_beanie_fastapi.py &
+  echo "FastAPI project starting in background."
 }
 
 run() {
@@ -83,16 +136,16 @@ run() {
       install_dev
     else
       echo "Script mode: launch Dev"
-    launch_dev
     fi
+    launch_dev
   elif [[ $DEPLOY == "prod" ]]; then
     if [[ $INSTALL != "0" ]] ; then
       echo "Script mode: install & launch Prod"
       install_prod
     else
       echo "Script mode: launch Prod"
-    launch_prod
     fi
+    launch_prod
   else
     echo "unexpected parameter values found in DEPLOY: $DEPLOY, unable to proceed"
     how_to_use
@@ -100,11 +153,13 @@ run() {
   fi
 }
 
-if [ "$#" -lt 1 ] ; then
-  how_to_use
-else
-  run
-fi
+#if [ "$#" -lt 1 ] ; then
+#  how_to_use
+#else
+#  run
+#fi
+
+run
 
 # install notes (execute on execution server - external packaging TBD)
 # configure fastapi url in variable API_ROOT_URL of file web-ui/src/constants.js (used for dev and prod both)
@@ -113,7 +168,7 @@ fi
 #cd web-ui
 #npm install  # everytime any project file changes - this can be simplified TBD
 # some dependencies are not supported by react-18 and thus we need to force install them:
-#npm install @mui/styles react-json-view  -f
+#npm install react-json-view  -f
 
 # usage notes:
 # 1. In web in Dev / Debug mode (schema is serviced via react dev server):

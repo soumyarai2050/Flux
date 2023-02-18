@@ -6,7 +6,13 @@ import PropTypes from 'prop-types';
 
 const Alert = (props) => {
     return (
-        <Snackbar open={props.open}>
+        <Snackbar
+            open={props.open}
+            className={classes.snackbar}
+            anchorOrigin={{
+                vertical: "top",
+                horizontal: "left",
+            }}>
             <AlertComponent
                 className={classes.alert}
                 variant='filled'

@@ -1,0 +1,2 @@
+mongo_server: "mongodb://localhost:27017"
+min_refresh_interval: 30
