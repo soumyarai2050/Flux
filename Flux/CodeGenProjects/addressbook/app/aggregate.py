@@ -134,3 +134,61 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
         }
     ]}
 
+
+def get_open_order_snapshots_by_order_status(order_status: str):
+    return {"aggregate": [
+            {
+                "$match": {
+                    "order_status": order_status
+                }
+            }
+        ]}
+
+
+def get_last_n_sec_orders_by_event(symbol: str | None, last_n_sec: int, order_event: str):
+    agg_query = {"aggregate": [
+        {
+            "$match": {},
+        },
+        {
+            "$setWindowFields": {
+                "sortBy": {
+                    "order_event_date_time": 1.0
+                },
+                "output": {
+                    "current_period_order_count": {
+                        "$count": {},
+                        "window": {
+                            "range": [
+                                -last_n_sec,
+                                "current"
+                            ],
+                            "unit": "second"
+                        }
+                    }
+                }
+            }
+        }
+    ]}
+    if symbol is not None:
+        match_agg = {
+                "$and": [
+                    {
+                        "order.security.sec_id": symbol
+                    },
+                    {
+                        "order_event": order_event
+                    }
+                ]
+            }
+    else:
+        match_agg = {"order_event": order_event}
+    agg_query["aggregate"][0]["$match"] = match_agg
+    return agg_query
+
+
+if __name__ == '__main__':
+    with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
+    print(with_symbol_agg_query)
+    without_symbol_agg_query = get_last_n_sec_orders_by_event(None, 5, "OE_NEW")
+    print(without_symbol_agg_query)

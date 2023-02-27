@@ -52,8 +52,9 @@ message WidgetUIData{
   optional int32 h = 5;
   // layout type
   optional UILayouts layout = 6;
-  optional string alert_bubble_source = 7;
-  optional string alert_bubble_color = 8;
+  optional bool is_repeated = 7 [default = false];
+  optional string alert_bubble_source = 8;
+  optional string alert_bubble_color = 9;
 }
 
 message UIButton{

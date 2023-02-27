@@ -22,41 +22,42 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     """
     # Used to be added as property
     flx_fld_simple_attribute_options: List[str] = [
-        "FluxFldHelp",
-        "FluxFldHide",
-        "FluxFldValSortWeight",
-        "FluxFldAbbreviated",
-        "FluxFldSticky",
-        "FluxFldSizeMax",
-        "FluxFldOrmNoUpdate",
-        "FluxFldSwitch",
-        "FluxFldAutoComplete",
-        "FluxFldServerPopulate",
-        "FluxFldColor",
-        "FluxFldAlertBubbleSource",
-        "FluxFldAlertBubbleColor",
-        "FluxFldDefaultValuePlaceholderString",
-        "FluxFldUIPlaceholder",
-        "FluxFldUIUpdateOnly",
-        "FluxFldValMax",
-        "FluxFldValMin",
-        "FluxFldElaborateTitle",
-        "FluxFldNameColor"
+        BaseProtoPlugin.flux_fld_help,
+        BaseProtoPlugin.flux_fld_hide,
+        BaseProtoPlugin.flux_fld_val_sort_weight,
+        BaseProtoPlugin.flux_fld_abbreviated,
+        BaseProtoPlugin.flux_fld_sticky,
+        BaseProtoPlugin.flux_fld_size_max,
+        BaseProtoPlugin.flux_fld_orm_no_update,
+        BaseProtoPlugin.flux_fld_switch,
+        BaseProtoPlugin.flux_fld_auto_complete,
+        BaseProtoPlugin.flux_fld_server_populate,
+        BaseProtoPlugin.flux_fld_color,
+        BaseProtoPlugin.flux_fld_alert_bubble_source,
+        BaseProtoPlugin.flux_fld_alert_bubble_color,
+        BaseProtoPlugin.flux_fld_default_value_placeholder_string,
+        BaseProtoPlugin.flux_fld_ui_placeholder,
+        BaseProtoPlugin.flux_fld_ui_update_only,
+        BaseProtoPlugin.flux_fld_val_max,
+        BaseProtoPlugin.flux_fld_val_min,
+        BaseProtoPlugin.flux_fld_elaborated_title,
+        BaseProtoPlugin.flux_fld_name_color,
+        BaseProtoPlugin.flux_fld_filter_enable
     ]
     # Used to be added as property
     flx_fld_complex_attribute_options: List[str] = [
-        "FluxFldButton",
-        "FluxFldProgressBar"
+        BaseProtoPlugin.flux_fld_button,
+        BaseProtoPlugin.flux_fld_progress_bar,
     ]
     options_having_msg_fld_names: List[str] = [
-        "FluxFldAbbreviated",
-        "FluxFldAlertBubbleSource",
-        "FluxFldAlertBubbleColor",
-        "FluxFldValMax"
+        BaseProtoPlugin.flux_fld_abbreviated,
+        BaseProtoPlugin.flux_fld_alert_bubble_color,
+        BaseProtoPlugin.flux_fld_alert_bubble_source,
+        BaseProtoPlugin.flux_fld_val_max
     ]
     # Used to be added as property
     flx_msg_simple_attribute_options: List[str] = [
-        "FluxMsgServerPopulate"
+        BaseProtoPlugin.flux_msg_server_populate
     ]
 
     def __init__(self, base_dir_path: str):
@@ -535,21 +536,26 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             json_msg_str += f'        "i": {widget_ui_data_option_value["i"]},\n'
         else:
             json_msg_str += f'        "i": "{self.__case_style_convert_method(message.proto.name)}",\n'
-        widget_ui_data_option_fields_list = ['x', 'y', 'w', 'h', 'layout', 'alert_bubble_source', 'alert_bubble_color']
+        widget_ui_data_option_fields_list = ['x', 'y', 'w', 'h', 'layout', 'is_repeated',
+                                             'alert_bubble_source', 'alert_bubble_color']
         for option_fld in widget_ui_data_option_fields_list:
             if option_fld in widget_ui_data_option_value:
                 if option_fld not in widget_ui_data_option_fields_list[-2:]:
-                    json_msg_str += f'        "{option_fld}": ' \
-                                    f'{self.__parse_string_to_original_types(widget_ui_data_option_value[option_fld].strip())}'
+                    if isinstance(widget_ui_data_option_value[option_fld], bool):
+                        json_msg_str += f'        "{option_fld}": ' \
+                                        f'{"true" if widget_ui_data_option_value[option_fld] else "false"}'
+                    else:
+                        json_msg_str += f'        "{option_fld}": ' \
+                                        f'{self.__parse_string_to_original_types(widget_ui_data_option_value[option_fld].strip())}'
                 else:
                     # handling option field value having msg name
                     json_msg_str += f'        "{option_fld}": ' \
                                     f'"{self.__underlying_handle_options_value_having_msg_fld_name(widget_ui_data_option_value[option_fld])}"'
-            if option_fld != list(widget_ui_data_option_value)[-1]:
-                json_msg_str += ", \n"
-            else:
-                json_msg_str += "\n    },\n"
-                break
+                if option_fld != list(widget_ui_data_option_value)[-1]:
+                    json_msg_str += ", \n"
+                else:
+                    json_msg_str += "\n    },\n"
+                    break
         return json_msg_str
 
     def __handle_json_layout_message_schema(self, message: protogen.Message) -> str:

@@ -26,14 +26,15 @@ message TopOfBook {
     y: 9,
     w: 18,
     h: 9,
-    layout: UI_TABLE
+    layout: UI_TABLE,
+    is_repeated: true
   };
   option (FluxMsgJsonQuery) = {
     AggregateVarName: "get_top_of_book_from_symbol",
     AggregateParams: "symbol",
     AggregateParamsDataType: "str"
   };
-  required string symbol = 1 [(FluxFldIndex) = true];
+  required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional Quote bid_quote = 2 [(FluxFldElaborateTitle) = true];
   optional Quote ask_quote = 3 [(FluxFldElaborateTitle) = true];
   optional Quote last_trade = 4 [(FluxFldElaborateTitle) = true];
@@ -139,14 +140,22 @@ message LastTrade {
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-    option (FluxMsgJsonQuery) = {
+  option (FluxMsgWidgetUIData) = {
+    x: 0,
+    y: 0,
+    w: 18,
+    h: 9,
+    layout: UI_TABLE,
+    is_repeated: true
+  };
+  option (FluxMsgJsonQuery) = {
     AggregateVarName: "get_last_n_sec_total_qty",
     AggregateParams: "symbol",
     AggregateParams: "last_n_sec",
     AggregateParamsDataType: "str",
     AggregateParamsDataType: "float"
   };
-  required string symbol = 1 [(FluxFldIndex) = true];
+  required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   required int64 time = 2 [(FluxFldValIsDateTime) = true];
   required float px = 3;
   required int64 qty = 4;
@@ -171,10 +180,11 @@ message MarketDepth {
     y: 0,
     w: 18,
     h: 9,
-    layout: UI_TABLE
+    layout: UI_TABLE,
+    is_repeated: true
   };
   option (FluxMsgAggregateQueryVarName) = "cum_px_qty_aggregate_query";
-  required string symbol = 2 [(FluxFldIndex) = true];
+  required string symbol = 2 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   required int64 time = 3 [(FluxFldValIsDateTime) = true];
   required TickTypeEnum side = 4;
   required float px = 5;

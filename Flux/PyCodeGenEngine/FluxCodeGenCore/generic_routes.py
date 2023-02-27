@@ -5,6 +5,7 @@ from typing import List, Any, Tuple, Final
 import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException
+from copy import deepcopy
 # other package imports
 from pydantic import ValidationError
 from beanie.odm.bulk import BulkWriter
@@ -293,13 +294,15 @@ async def get_obj_list(pydantic_class_type, filter_agg_pipeline: Any = None):
 
 
 async def get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, pydantic_obj_id=None):
+    # prevent polluting caller provided filter_agg_pipeline
+    filter_agg_pipeline_copy = deepcopy(filter_agg_pipeline)
     if pydantic_obj_id is not None:
         pydantic_obj_id_field: str = "_id"
-        if (match := filter_agg_pipeline.get("match")) is not None:
+        if (match := filter_agg_pipeline_copy.get("match")) is not None:
             match.append((pydantic_obj_id_field, pydantic_obj_id))
         else:
-            filter_agg_pipeline["match"] = [(pydantic_obj_id_field, pydantic_obj_id)]
-    agg_pipeline = get_aggregate_pipeline(filter_agg_pipeline)
+            filter_agg_pipeline_copy["match"] = [(pydantic_obj_id_field, pydantic_obj_id)]
+    agg_pipeline = get_aggregate_pipeline(filter_agg_pipeline_copy)
     find_all_resp = pydantic_class_type.find_all()
     pydantic_list = await find_all_resp.aggregate(
         aggregation_pipeline=agg_pipeline,

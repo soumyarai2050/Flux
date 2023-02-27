@@ -408,7 +408,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                       f"indexed_filter)\n"
         output_str += " "*indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_post(" \
                       f"{message_name_snake_cased}_obj)\n"
-        output_str += " "*indent_count + f"    return {message_name_snake_cased}_obj\n\n\n"
+        output_str += " "*indent_count + f"    return {message_name_snake_cased}_obj\n\n"
         return output_str
 
     def handle_index_req_gen(self, message: protogen.Message, shared_lock_list: List[str] | None = None) -> str:
@@ -427,7 +427,57 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                       f"-> List[{message.proto.name}]:\n"
         field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
         output_str += \
-            f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params})\n\n"
+            f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params})\n\n\n"
+        return output_str
+
+    def handle_underlying_index_ws_req_gen(self, message: protogen.Message,
+                                        shared_lock_list: List[str] | None = None) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        index_fields: List[protogen.Field] = [field for field in message.fields
+                                              if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_index)]
+
+        field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
+        output_str = f"async def underlying_get_{message_name_snake_cased}_from_index_fields_ws(websocket: WebSocket," \
+                     f" {field_params}, filter_agg_pipeline: Any = None):\n"
+        output_str += f'    """ Index route of {message.proto.name} """\n'
+        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+        output_str += mutex_handling_str
+        output_str += " "*indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_ws_pre()\n"
+        filter_configs_var_name = self._get_filter_configs_var_name(message)
+        if filter_configs_var_name:
+            output_str += " "*indent_count + f"    indexed_filter = copy.deepcopy({filter_configs_var_name})\n"
+            output_str += " "*indent_count + f"    indexed_filter['match'] = [{self._get_filter_tuple_str(index_fields)}]\n"
+        else:
+            output_str += " "*indent_count + "    indexed_filter = {'match': " + f"[{self._get_filter_tuple_str(index_fields)}]" + "}\n"
+        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+        output_str += " " * indent_count + \
+                      f"        await generic_read_ws(websocket, {BaseFastapiPlugin.proto_package_var_name}, " \
+                      f"{message.proto.name}, filter_agg_pipeline)\n"
+        output_str += " " * indent_count + "    else:\n"
+        output_str += " "*indent_count + \
+                      f"        await generic_read_ws(websocket, {BaseFastapiPlugin.proto_package_var_name}, " \
+                      f"{message.proto.name}, indexed_filter)\n"
+        output_str += " "*indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_ws_post()\n\n"
+        return output_str
+
+    def handle_index_ws_req_gen(self, message: protogen.Message, shared_lock_list: List[str] | None = None) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = self.handle_underlying_index_ws_req_gen(message, shared_lock_list)
+        output_str += "\n"
+        index_fields: List[protogen.Field] = [field for field in message.fields
+                                              if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_index)]
+
+        field_query = "/".join(["{" + f"{field.proto.name}" + "}" for field in index_fields])
+        field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
+
+        output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-index-fields-ws/' + \
+                     f'{field_query}' + f'")\n'
+        output_str += f"async def get_{message_name_snake_cased}_from_index_fields_ws(websocket: WebSocket, " \
+                      f"{field_params}):\n"
+        field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
+        output_str += \
+            f"    await underlying_get_{message_name_snake_cased}_from_index_fields_ws(websocket, {field_params})\n\n\n"
         return output_str
 
     def handle_underlying_GET_gen(self, message: protogen.Message, aggregation_type: str | None = None,
@@ -720,7 +770,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
 
         if filter_list:
             var_name = self._get_filter_configs_var_name(message)
-            return f"{var_name} = " + "{'redact': " + f"{filter_list}" + "}\n"
+            return f"{var_name}: Final[Dict[str, Any]] = " + "{'redact': " + f"{filter_list}" + "}\n"
         else:
             return ""
 
@@ -812,6 +862,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         for field in message.fields:
             if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_index):
                 output_str += self.handle_index_req_gen(message, shared_mutex_list)
+                output_str += self.handle_index_ws_req_gen(message, shared_mutex_list)
                 break
             # else not required: Avoiding field if index option is not enabled
 
@@ -819,6 +870,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_query_methods(self, message: protogen.Message) -> str:
         output_str = ""
+        shared_mutex_list = self._get_list_of_shared_lock_for_message(message)
 
         aggregate_value_list = self.query_message_dict[message]
 
@@ -828,6 +880,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             aggregate_params = aggregate_value[FastapiRoutesFileHandler.aggregate_params_key]
             aggregate_params_data_types = aggregate_value[FastapiRoutesFileHandler.aggregate_params_data_types_key]
 
+            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_mutex_list)
             if aggregate_params:
                 agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
                                                       for param, param_type in zip(aggregate_params,
@@ -835,33 +888,42 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 agg_params_str = ", ".join(aggregate_params)
 
                 agg_params_url_query_str = "/".join(["{"+f"{param}"+"}" for param in aggregate_params])
-                output_str = f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}/' \
-                             f'{agg_params_url_query_str}' + \
-                             f'", response_model=List[{message.proto.name}], status_code=200)\n'
+                output_str = f"async def underlying_{aggregate_var_name}_query_http({agg_params_with_type_str}) -> " \
+                             f"List[{message.proto.name}]:\n"
+                output_str += mutex_handling_str
+                output_str += " "*indent_count + f"    {message_name_snake_cased}_obj = await " \
+                              f"callback_class.{aggregate_var_name}_query_pre({message.proto.name}, {agg_params_str})\n"
+                output_str += " "*indent_count + f"    {message_name_snake_cased}_obj = await " \
+                              f"callback_class.{aggregate_var_name}_query_post({message_name_snake_cased}_obj)\n"
+                output_str += " "*indent_count + f"    return {message_name_snake_cased}_obj\n\n\n"
+                output_str += f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}/' \
+                              f'{agg_params_url_query_str}' + \
+                              f'", response_model=List[{message.proto.name}], status_code=200)\n'
                 output_str += f"async def {aggregate_var_name}_query_http({agg_params_with_type_str}) -> " \
                               f"List[{message.proto.name}]:\n"
                 output_str += f'    """\n'
                 output_str += f'    Query of {message.proto.name} with aggregate - {aggregate_var_name}\n'
                 output_str += f'    """\n'
-                output_str += f"    {message_name_snake_cased}_obj = await callback_class.{aggregate_var_name}_" \
-                              f"query_pre({message.proto.name}, {agg_params_str})\n"
-                output_str += f"    await callback_class.{aggregate_var_name}_query_post(" \
-                              f"{message_name_snake_cased}_obj)\n"
-                output_str += f"    return {message_name_snake_cased}_obj\n"
-                output_str += "\n\n"
+                output_str += f"    return await underlying_{aggregate_var_name}_query_http({agg_params_str})"
+                output_str += "\n\n\n"
             else:
-                output_str = f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}/' + \
-                             f'", response_model=List[{message.proto.name}], status_code=200)\n'
+                output_str += f"async def underlying_{aggregate_var_name}_query_http() -> " \
+                              f"List[{message.proto.name}]:\n"
+                output_str += mutex_handling_str
+                output_str += " "*indent_count + f"    {message_name_snake_cased}_obj = await callback_class.{aggregate_var_name}_" \
+                              f"query_pre({message.proto.name})\n"
+                output_str += " "*indent_count + f"    await callback_class.{aggregate_var_name}_query_post(" \
+                              f"{message_name_snake_cased}_obj)\n"
+                output_str += " "*indent_count + f"    return {message_name_snake_cased}_obj\n\n\n"
+                output_str += f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}/' + \
+                              f'", response_model=List[{message.proto.name}], status_code=200)\n'
                 output_str += f"async def {aggregate_var_name}_query_http() -> " \
                               f"List[{message.proto.name}]:\n"
                 output_str += f'    """\n'
                 output_str += f'    Query of {message.proto.name} with aggregate - {aggregate_var_name}\n'
                 output_str += f'    """\n'
-                output_str += f"    {message_name_snake_cased}_obj = await callback_class.{aggregate_var_name}_" \
-                              f"query_pre({message.proto.name})\n"
-                output_str += f"    await callback_class.{aggregate_var_name}_query_post(" \
-                              f"{message_name_snake_cased}_obj)\n"
-                output_str += f"    return {message_name_snake_cased}_obj\n"
+                output_str += f'    return await underlying_{aggregate_var_name}_query_http()\n'
+
                 output_str += "\n\n"
 
         return output_str
@@ -899,7 +961,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         self._set_shared_lock_name_to_pydentic_class_dict()
 
         output_str = "# python standard modules\n"
-        output_str += "from typing import List, Any\n"
+        output_str += "from typing import List, Any, Dict, Final\n"
         output_str += "from threading import RLock\n"
         output_str += "import copy\n"
         output_str += "# third-party modules\n"

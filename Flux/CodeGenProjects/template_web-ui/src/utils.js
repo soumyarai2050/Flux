@@ -41,7 +41,8 @@ const fieldProps = [
     { propertyName: "size_max", usageName: "sizeMax" },
     { propertyName: "progress_bar", usageName: "progressBar" },
     { propertyName: "elaborate_title", usageName: "elaborateTitle" },
-    { propertyName: "name_color", usageName: "nameColor" }
+    { propertyName: "name_color", usageName: "nameColor" },
+    { propertyName: "filter_enable", usageName: "filterEnable" }
 ]
 
 // properties supported explicitly on the array types
@@ -528,17 +529,37 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps) {
     if (schema === undefined || schema === null || Object.keys(schema).length === 0) return tree;
 
     let currentSchema = _.get(schema, currentSchemaName);
-    let childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, currentSchemaName, currentSchemaName);
-    Object.keys(currentSchema.properties).map((propname) => {
-        if (callerProps.xpath && callerProps.xpath !== propname) return;
-        let metadataProp = currentSchema.properties[propname];
-        if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
-            addSimpleNode(childNode, schema, currentSchema, propname, callerProps);
+    let childNode;
+    if (currentSchema.widget_ui_data && currentSchema.widget_ui_data.is_repeated) {
+        childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.ARRAY, callerProps, currentSchemaName, currentSchemaName);
+        for (let i = 0; i < callerProps.data.length; i++) {
+            let dataxpath = "[" + i + "]";
+            let node = addHeaderNode(childNode, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, dataxpath, dataxpath);
+            Object.keys(currentSchema.properties).map((propname) => {
+                if (callerProps.xpath && callerProps.xpath !== propname) return;
+                let metadataProp = currentSchema.properties[propname];
+                if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
+                    addSimpleNode(node, schema, currentSchema, propname, callerProps, dataxpath, null, dataxpath);
+                }
+                else {
+                    dataxpath += dataxpath + "." + propname;
+                    addNode(node, schema, metadataProp, propname, callerProps, dataxpath, null, dataxpath);
+                }
+            });
         }
-        else {
-            addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
-        }
-    });
+    } else {
+        childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, currentSchemaName, currentSchemaName);
+        Object.keys(currentSchema.properties).map((propname) => {
+            if (callerProps.xpath && callerProps.xpath !== propname) return;
+            let metadataProp = currentSchema.properties[propname];
+            if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
+                addSimpleNode(childNode, schema, currentSchema, propname, callerProps);
+            }
+            else {
+                addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
+            }
+        });
+    }
     return tree;
 }
 
@@ -641,6 +662,8 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
 
             }
         }
+    } else if(currentSchema.type === DataTypes.ARRAY) {
+        // TODO: add support for array for primitive data types
     }
 }
 
@@ -704,31 +727,50 @@ export function generateRowTrees(jsondata, collections, xpath) {
     if (!jsondata) return trees;
 
     while (true) {
-        let tree = {};
-        Object.entries(jsondata).map(([k, v]) => {
-            if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
-                tree[k] = v;
-            } else if (_.isNull(v)) {
-                tree[k] = null;
-            } else if (Array.isArray(v)) {
-                tree[k] = [];
-                createTree(tree, jsondata[k], k, { delete: 1 }, collections);
-            } else if (_.isObject(v)) {
-                tree[k] = {};
-                createTree(tree, jsondata[k], k, { delete: 1 }, collections)
+        if (_.isArray(jsondata)) {
+            for (let i = 0; i < jsondata.length; i++) {
+                let tree = {};
+                createTree(tree, jsondata[i], null, { delete: 1 }, collections);
+
+                if (Object.keys(tree).length === 0) break;
+
+                if (!hasArrayField(tree)) {
+                    tree['data-id'] = i;
+                }
+
+                if (trees.length > 0 && _.isEqual(trees[trees.length - 1], tree)) {
+                    continue;
+                }
+                trees.push(tree);
             }
-        })
-
-        if (Object.keys(tree).length === 0) break;
-
-        if (!hasArrayField(tree)) {
-            tree['data-id'] = 0;
-        }
-
-        if (trees.length > 0 && _.isEqual(trees[trees.length - 1], tree)) {
             break;
+        } else {
+            let tree = {};
+            Object.entries(jsondata).map(([k, v]) => {
+                if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+                    tree[k] = v;
+                } else if (_.isNull(v)) {
+                    tree[k] = null;
+                } else if (Array.isArray(v)) {
+                    tree[k] = [];
+                    createTree(tree, jsondata[k], k, { delete: 1 }, collections);
+                } else if (_.isObject(v)) {
+                    tree[k] = {};
+                    createTree(tree, jsondata[k], k, { delete: 1 }, collections)
+                }
+            })
+
+            if (Object.keys(tree).length === 0) break;
+
+            if (!hasArrayField(tree)) {
+                tree['data-id'] = 0;
+            }
+
+            if (trees.length > 0 && _.isEqual(trees[trees.length - 1], tree)) {
+                break;
+            }
+            trees.push(tree);
         }
-        trees.push(tree);
     }
     return trees;
 }
@@ -773,6 +815,9 @@ function createTree(tree, currentjson, propname, count, collections) {
             tree[propname] = currentjson;
         } else {
             let node = tree[propname];
+            if (!node) {
+                node = tree;
+            }
             Object.entries(currentjson).map(([k, v]) => {
                 if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
                     node[k] = v;
@@ -790,6 +835,21 @@ function createTree(tree, currentjson, propname, count, collections) {
 
 
 export function addxpath(jsondata, xpath) {
+    if (_.isArray(jsondata)) {
+        for (let i = 0; i < jsondata.length; i++) {
+            let dataxpath = "[" + i + "]";
+            if (xpath) {
+                dataxpath = xpath + dataxpath;
+            }
+            _addxpath(jsondata[i], dataxpath)
+        }
+    } else {
+        _addxpath(jsondata, xpath);
+    }
+    return jsondata;
+}
+
+function _addxpath(jsondata, xpath) {
     Object.entries(jsondata).map(([k, v]) => {
         if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
             jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
@@ -811,7 +871,6 @@ export function addxpath(jsondata, xpath) {
         }
         return;
     });
-    return jsondata;
 }
 
 export function clearxpath(jsondata) {

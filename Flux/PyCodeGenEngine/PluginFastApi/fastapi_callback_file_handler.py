@@ -101,6 +101,11 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"    async def index_of_{message_name_snake_cased}_post(self, " \
                       f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
+
+        output_str += f"    async def index_of_{message_name_snake_cased}_ws_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    async def index_of_{message_name_snake_cased}_ws_post(self):\n"
+        output_str += "        pass\n\n"
         return output_str
 
     def handle_get_all_message_ws_callback_methods(self, message: protogen.Message) -> str:
@@ -224,17 +229,17 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                     output_str += f"    async def {aggregate_var_name}_query_pre(self, " \
                                   f"{message_name_snake_cased}_class_type: Type[{message.proto.name}], " \
                                   f"{agg_params_with_type_str}):\n"
-                    output_str += "        pass\n\n"
+                    output_str += "        return []\n\n"
                     output_str += f"    async def {aggregate_var_name}_query_post(self, " \
-                                  f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-                    output_str += "        pass\n\n"
+                                  f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+                    output_str += "        return []\n\n"
                 else:
                     output_str += f"    async def {aggregate_var_name}_query_pre(self, " \
                                   f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
-                    output_str += "        pass\n\n"
+                    output_str += "        return []\n\n"
                     output_str += f"    async def {aggregate_var_name}_query_post(self, " \
-                                  f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
-                    output_str += "        pass\n\n"
+                                  f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
+                    output_str += "        return []\n\n"
 
         return output_str
 

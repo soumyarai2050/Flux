@@ -21,7 +21,9 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
         self.root_msg_list: List[protogen.Message] = []
         self.layout_msg_list: List[protogen.Message] = []
         self.tree_layout_msg_list: List[protogen.Message] = []
+        self.repeated_tree_layout_msg_list: List[protogen.Message] = []
         self.table_layout_msg_list: List[protogen.Message] = []
+        self.repeated_table_layout_msg_list: List[protogen.Message] = []
         self.abbreviated_filter_layout_msg_list: List[protogen.Message] = []
         if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
             self.response_field_case_style: str = response_field_case_style
@@ -46,9 +48,21 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                     self.layout_msg_list.append(message)
                     layout_type: str = widget_ui_data_option_list_of_dict["layout"].strip()
                     if BaseJSLayoutPlugin.flux_msg_tree_layout_value == layout_type:
-                        self.tree_layout_msg_list.append(message)
+                        is_repeated: bool = widget_ui_data_option_list_of_dict.get("is_repeated")
+                        if is_repeated is not None and is_repeated:
+                            self.repeated_tree_layout_msg_list.append(message)
+                        # if is_repeated field is not present in option val or is false both signifies message is not
+                        # repeated view of tree layout
+                        else:
+                            self.tree_layout_msg_list.append(message)
                     elif BaseJSLayoutPlugin.flux_msg_table_layout_value == layout_type:
-                        self.table_layout_msg_list.append(message)
+                        is_repeated: bool = widget_ui_data_option_list_of_dict.get("is_repeated")
+                        if is_repeated is not None and is_repeated:
+                            self.repeated_table_layout_msg_list.append(message)
+                        # if is_repeated field is not present in option val or is false both signifies message is not
+                        # repeated view of tree layout
+                        else:
+                            self.table_layout_msg_list.append(message)
                     elif BaseJSLayoutPlugin.flux_msg_abbreviated_filter_layout_value == layout_type:
                         self.abbreviated_filter_layout_msg_list.append(message)
                     else:

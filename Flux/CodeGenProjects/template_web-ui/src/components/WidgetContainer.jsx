@@ -1,7 +1,7 @@
 import React, { Fragment, useState, useCallback } from 'react';
 import { Typography, Box } from '@mui/material';
 import { Save, Cached, Edit, AccountTree, TableView } from '@mui/icons-material';
-import {Icon} from './Icon';
+import { Icon } from './Icon';
 import { Modes, Layouts } from '../constants';
 import PropTypes from 'prop-types';
 import CommonKeyWidget from './CommonKeyWidget';
@@ -32,6 +32,12 @@ const WidgetContainer = (props) => {
         layoutMenu = <Icon className={classes.icon} name="Table" title="Table View" onClick={() => props.onChangeLayout(props.name, Layouts.TABLE_LAYOUT)} ><TableView fontSize='small' /></Icon>
     }
 
+    let commonkeys = props.commonkeys ? props.commonkeys.filter(commonkey => {
+        if (commonkey.value === null || commonkey.value === undefined) return false;
+        if (commonkey.value == {} || commonkey.value == []) return false;
+        return true;
+    }) : [];
+
     return (
         <Fragment>
             <Typography variant='h6'>
@@ -47,7 +53,7 @@ const WidgetContainer = (props) => {
                     </div>
                 </div>
             </Typography>
-            {props.commonkeys && Object.keys(props.commonkeys).length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkey} commonkeys={props.commonkeys} />}
+            {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkey} commonkeys={commonkeys} />}
             <Box style={{ height: `calc(100% - 40px - ${commonkeyHeight}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
                 {props.children}
             </Box>

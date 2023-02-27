@@ -1,4 +1,4 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useState } from 'react';
 import { useSelector } from 'react-redux';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
@@ -9,9 +9,14 @@ import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import { Box } from '@mui/material';
 import AlertBubble from './AlertBubble';
+import { Icon } from './Icon';
+import { FilterAlt } from '@mui/icons-material';
+import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button, TextField } from '@mui/material';
+import classes from './DynamicMenu.module.css';
 
 const DynamicMenu = (props) => {
     const state = useSelector(state => state);
+    const [showFilter, setShowFilter] = useState(false);
 
     const onClick = (e, action, xpath, value) => {
         if (action === 'flux_toggle') {
@@ -23,6 +28,40 @@ const DynamicMenu = (props) => {
                 props.onButtonToggle(e, xpath, updatedData);
             }
         }
+    }
+
+    const onFilterToggle = () => {
+        setShowFilter(!showFilter);
+    }
+
+    const onTextChange = (e, key, value) => {
+        if (props.onFilterChange) {
+            let updatedFilter = {
+                ...props.filter,
+                [key]: value
+            }
+            props.onFilterChange(updatedFilter);
+        }
+    }
+
+    const onApplyFilter = () => {
+        onFilterToggle();
+        if (props.onApplyFilter) {
+            props.onApplyFilter();
+        }
+    }
+
+    const onClearFilter = () => {
+        onFilterToggle();
+        if (props.onClearFilter) {
+            props.onFilterChange({});
+            props.onClearFilter();
+        }
+    }
+
+    const onCloseFilter = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        onFilterToggle();
     }
 
     let alertBubble = <></>;
@@ -41,6 +80,8 @@ const DynamicMenu = (props) => {
             )
         }
     }
+
+    let filterCollections = props.collections.filter(collection => collection.filterEnable === true);
 
     return (
         <Fragment>
@@ -137,15 +178,45 @@ const DynamicMenu = (props) => {
                     )
                 })
             }
-
-
+            {props.filter && filterCollections.length > 0 && (
+                <Fragment>
+                    <Icon name='Filter' title='Filter' onClick={onFilterToggle}><FilterAlt fontSize='small' /></Icon>
+                    <Dialog open={showFilter} onClose={onCloseFilter}>
+                        <DialogTitle>Filters</DialogTitle>
+                        <DialogContent>
+                            {filterCollections.map((collection, index) => (
+                                <Box key={index} className={classes.filter}>
+                                    <span className={classes.filter_name}>{collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}</span>
+                                    <TextField
+                                        className={classes.text_field}
+                                        id={collection.key}
+                                        name={collection.key}
+                                        size='small'
+                                        value={props.filter[collection.xpath] ? props.filter[collection.xpath] : ""}
+                                        onChange={(e) => onTextChange(e, collection.xpath, e.target.value)}
+                                        variant='outlined'
+                                        placeholder="Comma separated values"
+                                        inputProps={{
+                                            style: { padding: '6px 10px' }
+                                        }}
+                                    />
+                                </Box>
+                            ))}
+                        </DialogContent>
+                        <DialogActions>
+                            <Button color='error' onClick={onClearFilter} autoFocus>Clear</Button>
+                            <Button  onClick={onApplyFilter} autoFocus>Apply</Button>
+                        </DialogActions>
+                    </Dialog>
+                </Fragment>
+            )}
             {props.children}
         </Fragment >
     )
 }
 
 DynamicMenu.propTypes = {
-    data: PropTypes.object,
+    data: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     collections: PropTypes.array,
     disabled: PropTypes.bool,
     onSwitchToggle: PropTypes.func

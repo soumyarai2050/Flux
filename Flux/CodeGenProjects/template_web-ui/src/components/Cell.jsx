@@ -359,8 +359,8 @@ const Cell = (props) => {
 }
 
 Cell.propTypes = {
-    data: PropTypes.object.isRequired,
-    originalData: PropTypes.object.isRequired,
+    data: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
+    originalData: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     row: PropTypes.object.isRequired,
     propname: PropTypes.string.isRequired,
     proptitle: PropTypes.string,

@@ -195,6 +195,7 @@ extend google.protobuf.FieldOptions
   optional string FluxFldTitle = 55264; //Set this value to override default title value in schema
   optional string FluxFldNameColor = 55265; // One of the color class supported: [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]
   optional bool FluxFldElaborateTitle = 55266; //Set this value to override default title value of all sub-types with parents '.' seperated prefixed to child names
+  optional bool FluxFldFilterEnable = 55267;
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;
