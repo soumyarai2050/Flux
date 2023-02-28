@@ -46,6 +46,7 @@ class TradeSimulator:
     def process_order_ack(cls, px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
                           text: List[str] | None = None):
         """simulate order's Ack """
+        cls.order_id_counter += 1
         order_id = f"O{cls.order_id_counter}"
 
         security = Security(sec_id=sec_id)
@@ -61,16 +62,9 @@ class TradeSimulator:
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal_obj)
 
     @classmethod
-    def process_fill(cls, px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
-                     text: List[str] | None = None):
+    def process_fill(cls, px: float, qty: int, underlying_account: str):
         """Simulates Order's fills"""
         order_id = f"O{cls.order_id_counter}"
-
-        security = Security(sec_id=sec_id)
-        order_brief_obj = OrderBrief(order_id=order_id, security=security, side=side, px=px, qty=qty,
-                                     underlying_account=underlying_account)
-        msg = f"SIM: ACK received for {sec_id}, qty {qty} and px {px}"
-        add_to_texts(order_brief_obj, msg)
 
         # simulate fill
         fill_journal = FillsJournalBaseModel(order_id=order_id, fill_px=px, fill_qty=qty,
@@ -79,8 +73,8 @@ class TradeSimulator:
                                              fill_id=f"F{order_id[1:]}")
         TradeSimulator.strat_manager_service_web_client.create_fills_journal_client(fill_journal)
 
-    @staticmethod
-    def place_cxl_order(order_id: str, side: Side, sec_id: str, underlying_account: str):
+    @classmethod
+    def place_cxl_order(cls, order_id: str, side: Side, sec_id: str, underlying_account: str):
         """simulate cancel order's Ack"""
         security = Security(sec_id=sec_id)
         # query order

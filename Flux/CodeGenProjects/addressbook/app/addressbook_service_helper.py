@@ -6,13 +6,11 @@ from pendulum import DateTime
 from threading import Lock
 
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_pair_strat_sec_filter_json
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import \
-    Broker, Severity, Alert, OrderBrief, PortfolioLimitsBaseModel, \
-    PortfolioStatusBaseModel, OrderLimitsBaseModel, Side, PairStrat, CancelRate, \
-    MarketTradeVolumeParticipation, OpenInterestParticipation, ResidualRestriction, StratLimits, StratStatus, \
-    PairStratOptional, StratState, RollingMaxOrderCount, PairStratBaseModel
+from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import  *
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
     StratManagerServiceWebClient
+
+# TODO: read host and port from env
 
 strat_manager_service_web_client_internal = StratManagerServiceWebClient()
 

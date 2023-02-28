@@ -130,7 +130,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         # If order_journal is not new then we don't care about px, we care about event_type and if order is new
         # and px is not 0 then using provided px
 
-        order_journal_obj.order.order_notional = order_journal_obj.order.px * order_journal_obj.order.qty
+        if order_journal_obj.order.px is not None and order_journal_obj.order.qty is not None:
+            order_journal_obj.order.order_notional = order_journal_obj.order.px * order_journal_obj.order.qty
+        else:
+            order_journal_obj.order.order_notional = 0
 
     async def create_order_journal_post(self, order_journal_obj: OrderJournal):
         with OrderSnapshot.reentrant_lock:

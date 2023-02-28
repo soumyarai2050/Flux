@@ -43,19 +43,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
     def handle_import_output(self, message: protogen.Message, layout_type: str) -> str:
         output_str = "import React, { Fragment, useEffect, useState, memo } from 'react';\n"
         output_str += "import { useSelector, useDispatch } from 'react-redux';\n"
-        output_str += "import _, { cloneDeep, isEqual } from 'lodash';\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             message_name = message.proto.name
-            output_str += "import { Modes, Layouts, DB_ID, API_ROOT_URL } from '../constants';\n"
-        elif layout_type == JsxFileGenPlugin.repeated_non_root_type:
-            message_name = message.proto.name
+            output_str += "import _, { cloneDeep, isEqual, update } from 'lodash';\n"
             output_str += "import { Modes, Layouts, DB_ID, API_ROOT_URL } from '../constants';\n"
         elif layout_type == JsxFileGenPlugin.root_type:
             message_name = message.proto.name
+            output_str += "import _, { cloneDeep, isEqual } from 'lodash';\n"
             output_str += "import { Modes, Layouts, DB_ID, SCHEMA_DEFINITIONS_XPATH, DataTypes, API_ROOT_URL } " \
                           "from '../constants';\n"
         else:
             message_name = self.root_message.proto.name
+            output_str += "import _, { cloneDeep, isEqual } from 'lodash';\n"
             output_str += "import { Modes, Layouts, DB_ID, SCHEMA_DEFINITIONS_XPATH, DataTypes, " \
                           "API_ROOT_URL, NEW_ITEM_ID } from " \
                           "'../constants';\n"
@@ -675,22 +674,22 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            getAllWebsocket.onmessage = (event) => {\n"
             output_str += "                let updatedData = JSON.parse(event.data);\n"
             output_str += "                if (Array.isArray(updatedData)) {\n"
-            if layout_type == JsxFileGenPlugin.repeated_root_type or \
-                    layout_type == JsxFileGenPlugin.repeated_non_root_type:
+            if layout_type == JsxFileGenPlugin.repeated_root_type:
                 output_str += f"                    dispatch(set{message_name}(updatedData));\n"
                 output_str += f"                    dispatch(set{message_name}Array(updatedData));\n"
                 output_str += "                } else if (_.isObject(updatedData)) {\n"
-                output_str += f"                    let updatedArray = {message_name_camel_cased}.filter(object => " \
-                              f"object[DB_ID] !== updatedData[DB_ID]);\n"
-                output_str += "                    updatedArray = [...updatedArray, updatedData];\n"
-                output_str += f"                    dispatch(set{message_name}(updatedArray));\n"
-                output_str += f"                    updatedArray = {message_name_camel_cased}Array.filter(object => " \
-                              f"object[DB_ID !== updatedData[DB_ID]]);\n"
-                output_str += f"                    updatedArray = [...updatedArray, updatedData];\n"
-                output_str += f"                    dispatch(set{message_name}Array(updatedArray));\n"
+                output_str += f"                    let filteredData = {message_name_camel_cased}." \
+                              f"filter(object => object[DB_ID] !== updatedData[DB_ID]);\n"
+                output_str += f"                    let filteredArray = {message_name_camel_cased}Array." \
+                              f"filter(object => object[DB_ID] !== updatedData[DB_ID]);\n"
+                output_str += "                    if (Object.keys(updatedData).length !== 1) {\n"
+                output_str += "                        filteredData = [...filteredData, updatedData];\n"
+                output_str += "                        filteredArray = [...filteredArray, updatedData];\n"
+                output_str += "                    }\n"
+                output_str += f"                    dispatch(set{message_name}(filteredData));\n"
+                output_str += f"                    dispatch(set{message_name}Array(filteredArray));\n"
                 output_str += "                }\n"
-                output_str += "                onApplyFilter();\n"
-                output_str += "            }\n"
+                output_str += "            }\n\n"
             else:
                 output_str += "                    if (updatedData.length === 0) {\n"
                 output_str += f"                        dispatch(resetSelected{message_name}Id());\n"

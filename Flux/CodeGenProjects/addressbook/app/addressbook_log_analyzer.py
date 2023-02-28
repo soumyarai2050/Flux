@@ -36,7 +36,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
         created: bool = False
         while not created:
             try:
-                portfolio_status_obj_list: List[PortfolioStatus] = \
+                portfolio_status_obj_list: List[PortfolioStatusBaseModel] = \
                     self.strat_manager_service_web_client.get_all_portfolio_status_client()
                 if len(portfolio_status_obj_list) == 1:
                     portfolio_status_base_model = PortfolioStatusBaseModel(**portfolio_status_obj_list[0].dict())
