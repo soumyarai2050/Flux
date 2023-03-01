@@ -22,6 +22,9 @@ class TradingDataManager:
         self.portfolio_status_ws_cont = WSReader(f"{trading_base_url}/get-all-portfolio_status-ws/",
                                                  PortfolioStatusBaseModel,
                                                  PortfolioStatusBaseModelList, self.handle_portfolio_status_ws, False)
+        self.portfolio_limits_ws_cont = WSReader(f"{trading_base_url}/get-all-portfolio_limits-ws/",
+                                                 PortfolioLimitsBaseModel,
+                                                 PortfolioLimitsBaseModelList, self.handle_portfolio_limits_ws, False)
         self.order_limits_ws_cont = WSReader(f"{trading_base_url}/get-all-order_limits-ws/", OrderLimitsBaseModel,
                                              OrderLimitsBaseModelList, self.handle_order_limits_ws, False)
         self.order_journal_ws_cont = WSReader(f"{trading_base_url}/get-all-order_journal-ws/", OrderJournalBaseModel,
@@ -65,6 +68,25 @@ class TradingDataManager:
                                   f"current portfolio_status: {portfolio_status}, "
                                   f"found portfolio_status: {portfolio_status_} ")
 
+    def handle_portfolio_limits_ws(self, portfolio_limits_: PortfolioLimitsBaseModel):
+        # handle kill switch in portfolio limits handler directly
+        with self.portfolio_limits_ws_cont.single_obj_lock:
+            portfolio_limits, _ = self.trading_cache.get_portfolio_limits()
+            if portfolio_limits is None:
+                self.trading_cache.set_portfolio_limits(portfolio_limits_)
+                logging.info(f"Added portfolio status with id: {portfolio_limits_.id}")
+            else:
+                if portfolio_limits.id == portfolio_limits_.id:
+                    self.trading_cache.set_portfolio_limits(portfolio_limits_)
+                    if self.portfolio_limits_ws_cont.notify:
+                        StratCache.notify_all()
+                    logging.debug(f"updated portfolio limits with id: {portfolio_limits_.id}")
+                else:
+                    logging.error(f"received non unique portfolio_limits, current id: "
+                                  f"{portfolio_limits.id} found: {portfolio_limits_.id};;;"
+                                  f"current portfolio_limits: {portfolio_limits}, "
+                                  f"found portfolio_limits: {portfolio_limits_} ")
+
     def handle_strat_brief_ws(self, strat_brief_: StratBriefBaseModel):
         key1, key2 = StratCache.get_key_from_strat_brief(strat_brief_)
         strat_cache: StratCache = StratCache.guaranteed_get_by_key(key1, key2)
@@ -86,6 +108,7 @@ class TradingDataManager:
                 logging.info(f"Added order limits with id: {order_limits_.id}")
             else:
                 if order_limits.id == order_limits_.id:
+                    self.trading_cache.set_order_limits(order_limits_)
                     if self.order_limits_ws_cont.notify:
                         StratCache.notify_all()
                     logging.debug(f"updated order limits with id: {order_limits_.id}")

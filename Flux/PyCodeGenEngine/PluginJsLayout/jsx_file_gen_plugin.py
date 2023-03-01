@@ -286,6 +286,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    xpath={currentSchemaXpath}\n"
         output_str += "                    onUserChange={onUserChange}\n"
         output_str += "                    onButtonToggle={onButtonToggle}\n"
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "                    compare={false}\n"
         output_str += "                />\n"
         output_str += "            ) : props.layout === Layouts.TREE_LAYOUT ? (\n"
         output_str += "                <TreeWidget\n"
@@ -669,6 +671,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        })\n"
                 output_str += f"        dispatch(set{message_name}(updatedData));\n"
                 output_str += "    }\n\n"
+                output_str += "    const applyWebSocketUpdate = (arr, obj) => {\n"
+                output_str += "        let updatedArr = arr.filter(o => o[DB_ID] !== obj[DB_ID]);\n"
+                output_str += "        if (Object.keys(obj) !== 1) {\n"
+                output_str += "            let index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);\n"
+                output_str += "            if (index !== -1) {\n"
+                output_str += "                updatedArr.splice(index, 0, obj);\n"
+                output_str += "            } else {\n"
+                output_str += "                updatedArr.push(obj);\n"
+                output_str += "            }\n"
+                output_str += "        }\n"
+                output_str += "        return updatedArr;\n"
+                output_str += "    }\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += "        if (getAllWebsocket) {\n"
             output_str += "            getAllWebsocket.onmessage = (event) => {\n"
@@ -678,18 +692,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"                    dispatch(set{message_name}(updatedData));\n"
                 output_str += f"                    dispatch(set{message_name}Array(updatedData));\n"
                 output_str += "                } else if (_.isObject(updatedData)) {\n"
-                output_str += f"                    let filteredData = {message_name_camel_cased}." \
-                              f"filter(object => object[DB_ID] !== updatedData[DB_ID]);\n"
-                output_str += f"                    let filteredArray = {message_name_camel_cased}Array." \
-                              f"filter(object => object[DB_ID] !== updatedData[DB_ID]);\n"
-                output_str += "                    if (Object.keys(updatedData).length !== 1) {\n"
-                output_str += "                        filteredData = [...filteredData, updatedData];\n"
-                output_str += "                        filteredArray = [...filteredArray, updatedData];\n"
-                output_str += "                    }\n"
-                output_str += f"                    dispatch(set{message_name}(filteredData));\n"
-                output_str += f"                    dispatch(set{message_name}Array(filteredArray));\n"
+                output_str += f"                    let updated{message_name} = applyWebSocketUpdate(" \
+                              f"{message_name_camel_cased}, updatedData);\n"
+                output_str += f"                    let updated{message_name}Array = applyWebSocketUpdate(" \
+                              f"{message_name_camel_cased}Array, updatedData);\n"
+                output_str += f"                    dispatch(set{message_name}(updated{message_name}));\n"
+                output_str += f"                    dispatch(set{message_name}Array(updated{message_name}Array));\n"
                 output_str += "                }\n"
-                output_str += "            }\n\n"
+                output_str += "            }\n"
             else:
                 output_str += "                    if (updatedData.length === 0) {\n"
                 output_str += f"                        dispatch(resetSelected{message_name}Id());\n"
@@ -710,14 +720,17 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "            }\n"
             output_str += "\n"
             output_str += "            getAllWebsocket.onclose = (event) => {\n"
-            if layout_type == self.root_type or layout_type == self.repeated_root_type or \
-                    layout_type == self.repeated_non_root_type:
+            if layout_type == self.root_type or layout_type == self.repeated_root_type:
                 output_str += "                setMode(Modes.DISABLED_MODE);\n"
+                output_str += "            }\n"
+                output_str += "        }\n"
+                output_str += "    }, "+f"[getAllWebsocket, {message_name_camel_cased}, " \
+                                        f"{message_name_camel_cased}Array])\n\n"
             else:
                 output_str += "                dispatch(setMode(Modes.DISABLED_MODE));\n"
-            output_str += "            }\n"
-            output_str += "        }\n"
-            output_str += "    }, [getAllWebsocket])\n\n"
+                output_str += "            }\n"
+                output_str += "        }\n"
+                output_str += "    }, [getAllWebsocket])\n\n"
 
         if layout_type == JsxFileGenPlugin.abbreviated_type:
             output_str += "    useEffect(() => {\n"

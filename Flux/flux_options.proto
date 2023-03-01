@@ -21,6 +21,11 @@ message FluxMsgNestedFldValFilter{
   repeated bool bool_val_filters = 3;
 }
 
+message FluxMsgAggAfterFilter{
+  required string agg_var_name = 1;
+  repeated string agg_params = 2; // string of all params, case conversion is required where it's used
+}
+
 message ForeignKeyOption
 {
   required string JoiningTableName = 1;
@@ -93,6 +98,7 @@ extend google.protobuf.MessageOptions
   repeated UsageParamNameOption FluxMsgOrmUsageParam = 52157;
   repeated FluxMsgNestedFldValFilter FluxMsgNestedFldValFilterParam = 52158;
   optional string FluxMsgAggregateQueryVarName = 52159;
+  optional FluxMsgAggAfterFilter FluxMsgAdditionalAggAfterFilter = 52160;
 
 
   //Service Options - 53

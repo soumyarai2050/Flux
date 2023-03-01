@@ -1,7 +1,7 @@
 # system imports
 import json
 import os
-from typing import List, Any, Tuple, Final
+from typing import List, Any, Dict, Final
 import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException
@@ -93,6 +93,8 @@ async def generic_patch_http(pydantic_class_type, stored_pydantic_obj, pydantic_
 @http_except_n_log_error(status_code=500)
 async def generic_delete_http(pydantic_class_type, pydantic_dummy_model, pydantic_obj,
                               update_agg_pipeline: Any = None):
+    id_is_int_type = isinstance(pydantic_obj.id, int)
+
     await pydantic_obj.delete()
     await execute_update_agg_pipeline(pydantic_class_type, update_agg_pipeline)
     try:
@@ -101,6 +103,15 @@ async def generic_delete_http(pydantic_class_type, pydantic_dummy_model, pydanti
         raise HTTPException(status_code=404, detail=str(e))
     await publish_ws(pydantic_class_type, pydantic_base_model, pydantic_base_model.id)
     del_success.id = pydantic_obj.id
+
+    # Setting back incremental is to 0 if collection gets empty
+    if id_is_int_type:
+        pydantic_objs_count = await pydantic_class_type.count()
+        if pydantic_objs_count == 0:
+            pydantic_class_type.init_max_id(0)
+        # else not required: all good
+    # else not required: if id is not int then it must be of PydanticObjectId so no handling required
+
     return del_success
 
 
@@ -321,9 +332,10 @@ async def get_filtered_obj(filter_agg_pipeline, pydantic_class_type, pydantic_ob
         return None
 
 
-def get_aggregate_pipeline(encap_agg_pipeline):
+def get_aggregate_pipeline(encap_agg_pipeline: Dict):
     filter_tuple_list = encap_agg_pipeline.get("redact")
     match_tuple_list = encap_agg_pipeline.get("match")  # [(key1: value1), (key2: value2)]
+    additional_agg = encap_agg_pipeline.get("agg")
     agg_pipeline = []
     if match_tuple_list is not None:
         agg_pipeline.append({"$match": {}})
@@ -367,6 +379,9 @@ def get_aggregate_pipeline(encap_agg_pipeline):
             redact_data_filter["$redact"]["$cond"]["if"]["$or"][0]["$in"].append(filter_list)
             redact_data_filter["$redact"]["$cond"]["if"]["$or"][1]["$not"] = updated_filtered_variable_name
             agg_pipeline.append(redact_data_filter)
+
+    if additional_agg is not None:
+        agg_pipeline.extend(additional_agg)
         return agg_pipeline
     elif len(agg_pipeline) != 0:
         return agg_pipeline

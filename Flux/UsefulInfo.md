@@ -24,6 +24,11 @@
 * [protobuf 2 vs 3 benchmark](https://github.com/thekvs/protobuf-2-vs-3-benchmark)
 * [proto2 vs proto3](https://www.hackingnote.com/en/versus/proto2-vs-proto3)
 
+## Useful cmds:
+
+* Linux cmd to make .sh files to unix compatible 
+`find . -type d -name "node_modules" -prune -o -name "*.sh" | xargs dos2unix'` 
+
 ## MongoDb Utils
 * Export complete db: 
     ``mongodump --db  SrcDBName``

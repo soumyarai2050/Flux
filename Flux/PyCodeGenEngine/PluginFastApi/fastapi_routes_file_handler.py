@@ -10,7 +10,8 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, \
+    parse_string_to_original_types
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin
 
 
@@ -730,7 +731,15 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 field_name = filter_option_dict["field_name"]
                 field_name_list.append(field_name)
         if field_name_list:
-            return "_n_".join(field_name_list) + "_filter_config"
+            return_str = "_n_".join(field_name_list)
+            if BaseFastapiPlugin.flux_msg_additional_agg_after_filter in str(message.proto.options):
+                additional_agg_option_val_list_of_dict = \
+                    self.get_complex_option_values_as_list_of_dict(message,
+                                                                   BaseFastapiPlugin.flux_msg_additional_agg_after_filter)
+                additional_agg_name = additional_agg_option_val_list_of_dict[0]["agg_var_name"]
+                return_str += f"_n_{additional_agg_name}"
+            return_str += "_filter_config"
+            return return_str
         else:
             return ""
 
@@ -768,9 +777,30 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 logging.exception(err_str)
                 raise Exception(err_str)
 
+        additional_agg_str = ""
+        if self.flux_msg_additional_agg_after_filter in str(message.proto.options):
+            additional_agg_option_val_list_of_dict = \
+                self.get_complex_option_values_as_list_of_dict(message,
+                                                               BaseFastapiPlugin.flux_msg_additional_agg_after_filter)[0]
+
+            agg_params = additional_agg_option_val_list_of_dict["agg_params"]
+            if isinstance(agg_params, list):
+                type_casted_agg_params = [str(parse_string_to_original_types(param)) for param in agg_params]
+                agg_params = ", ".join(type_casted_agg_params)
+            else:
+                agg_params = parse_string_to_original_types(agg_params)
+
+            additional_agg_str = f"{additional_agg_option_val_list_of_dict['agg_var_name']}({agg_params})"
+        # else not required: by-passing if option not used
+
         if filter_list:
             var_name = self._get_filter_configs_var_name(message)
-            return f"{var_name}: Final[Dict[str, Any]] = " + "{'redact': " + f"{filter_list}" + "}\n"
+            return_str = f"{var_name}: Final[Dict[str, Any]] = " + "{'redact': " + f"{filter_list}"
+            if additional_agg_str:
+                return_str += f", 'agg': {additional_agg_str}"
+            return_str += "}\n"
+
+            return return_str
         else:
             return ""
 
@@ -979,10 +1009,8 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         default_web_response_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "default_web_response")
         output_str += f'from {default_web_response_file_path} import DefaultWebResponse\n'
 
-        if agg_query_var_list := self._get_aggregate_query_var_list():
-            aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
-            agg_query_var_list_str = ', '.join(agg_query_var_list)
-            output_str += f'from {aggregate_file_path} import {agg_query_var_list_str}'
+        aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
+        output_str += f'from {aggregate_file_path} import *'
 
         output_str += f"\n\n"
         temp_list = []  # used to prevent code repetition

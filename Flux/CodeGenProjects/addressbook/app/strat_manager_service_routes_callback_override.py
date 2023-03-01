@@ -645,13 +645,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
     async def _get_max_order_counts(self, order_journal_obj: OrderJournal) -> int | None:  # NOQA
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_read_portfolio_limits_http, underlying_get_last_n_sec_orders_by_event_query_http
-        portfolio_limits_objs = await underlying_read_portfolio_limits_http()
-        if len(portfolio_limits_objs) == 1:
-            portfolio_limits_obj = portfolio_limits_objs[0]
-        else:
-            raise Exception(f"PortfolioStatus must be only one object, "
-                            f"received {portfolio_limits_objs}")
+            underlying_read_portfolio_limits_by_id_http, underlying_get_last_n_sec_orders_by_event_query_http
+        portfolio_limits_obj = await underlying_read_portfolio_limits_by_id_http(1)
 
         order_count_period_seconds = \
             portfolio_limits_obj.rolling_max_order_count.order_count_period_seconds
@@ -675,73 +670,62 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
     async def _update_portfolio_status_from_order_journal(self, order_journal_obj: OrderJournal,
                                                           order_snapshot_obj: OrderSnapshot):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_read_portfolio_status_http, underlying_partial_update_portfolio_status_http
+            underlying_read_portfolio_status_by_id_http, underlying_partial_update_portfolio_status_http
 
-        portfolio_status_objs = await underlying_read_portfolio_status_http()
-        if len(portfolio_status_objs) == 1:
-            portfolio_status_obj = portfolio_status_objs[0]
-            match order_journal_obj.order.side:
-                case Side.BUY:
-                    match order_journal_obj.order_event:
-                        case OrderEventType.OE_NEW:
-                            portfolio_status_obj.overall_buy_notional += \
-                                order_journal_obj.order.px * order_journal_obj.order.qty
-                            current_period_available_buy_order_count = \
-                                await self._get_max_order_counts(order_journal_obj)
-                            if current_period_available_buy_order_count is not None:
-                                portfolio_status_obj.current_period_available_buy_order_count = \
-                                    current_period_available_buy_order_count
-                            else:
-                                logging.error("error: Couldn't update current_period_available_buy_order_count field "
-                                              "of PortfolioStatus since something went wrong in _get_max_order_counts "
-                                              "function call")
+        portfolio_status_obj = await underlying_read_portfolio_status_by_id_http(1)
 
-                        case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
-                            total_buy_unfilled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
-                            portfolio_status_obj.overall_buy_notional -= \
-                                (order_snapshot_obj.order_brief.px * total_buy_unfilled_qty)
-                case Side.SELL:
-                    match order_journal_obj.order_event:
-                        case OrderEventType.OE_NEW:
-                            portfolio_status_obj.overall_sell_notional += \
-                                order_journal_obj.order.px * order_journal_obj.order.qty
-                            current_period_available_sell_order_count = \
-                                await self._get_max_order_counts(order_journal_obj)
-                            if current_period_available_sell_order_count is not None:
-                                portfolio_status_obj.current_period_available_sell_order_count = \
-                                    current_period_available_sell_order_count
-                            else:
-                                logging.error("error: Couldn't update current_period_available_buy_order_count field "
-                                              "of PortfolioStatus since something went wrong in _get_max_order_counts "
-                                              "function call")
-                        case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
-                            total_sell_unfilled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
-                            portfolio_status_obj.overall_sell_notional -= \
-                                (order_snapshot_obj.order_brief.px * total_sell_unfilled_qty)
-                case other:
-                    err_str = f"Unsupported Side Type {other} received in order journal {order_journal_obj} " \
-                              f"while updating strat_status"
-                    await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
-                                                                   order_journal_obj.order.side, err_str)
-                    return
-            updated_portfolio_status = PortfolioStatusOptional(
-                _id=portfolio_status_obj.id,
-                overall_buy_notional=portfolio_status_obj.overall_buy_notional,
-                overall_sell_notional=portfolio_status_obj.overall_sell_notional,
-                current_period_available_buy_order_count=portfolio_status_obj.current_period_available_buy_order_count,
-                current_period_available_sell_order_count=portfolio_status_obj.current_period_available_sell_order_count
-            )
-            await underlying_partial_update_portfolio_status_http(updated_portfolio_status)
+        match order_journal_obj.order.side:
+            case Side.BUY:
+                match order_journal_obj.order_event:
+                    case OrderEventType.OE_NEW:
+                        portfolio_status_obj.overall_buy_notional += \
+                            order_journal_obj.order.px * order_journal_obj.order.qty
+                        current_period_available_buy_order_count = \
+                            await self._get_max_order_counts(order_journal_obj)
+                        if current_period_available_buy_order_count is not None:
+                            portfolio_status_obj.current_period_available_buy_order_count = \
+                                current_period_available_buy_order_count
+                        else:
+                            logging.error("error: Couldn't update current_period_available_buy_order_count field "
+                                          "of PortfolioStatus since something went wrong in _get_max_order_counts "
+                                          "function call")
 
-        else:
-            if len(portfolio_status_objs) > 1:
-                err_str = f"Portfolio Status collection should have only one document, received {portfolio_status_objs}"
+                    case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
+                        total_buy_unfilled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
+                        portfolio_status_obj.overall_buy_notional -= \
+                            (order_snapshot_obj.order_brief.px * total_buy_unfilled_qty)
+            case Side.SELL:
+                match order_journal_obj.order_event:
+                    case OrderEventType.OE_NEW:
+                        portfolio_status_obj.overall_sell_notional += \
+                            order_journal_obj.order.px * order_journal_obj.order.qty
+                        current_period_available_sell_order_count = \
+                            await self._get_max_order_counts(order_journal_obj)
+                        if current_period_available_sell_order_count is not None:
+                            portfolio_status_obj.current_period_available_sell_order_count = \
+                                current_period_available_sell_order_count
+                        else:
+                            logging.error("error: Couldn't update current_period_available_buy_order_count field "
+                                          "of PortfolioStatus since something went wrong in _get_max_order_counts "
+                                          "function call")
+                    case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
+                        total_sell_unfilled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
+                        portfolio_status_obj.overall_sell_notional -= \
+                            (order_snapshot_obj.order_brief.px * total_sell_unfilled_qty)
+            case other:
+                err_str = f"Unsupported Side Type {other} received in order journal {order_journal_obj} " \
+                          f"while updating strat_status"
                 await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
                                                                order_journal_obj.order.side, err_str)
-            else:
-                err_str = f"Received Empty Portfolio Status from db while updating order journal relate fields"
-                await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
-                                                               order_journal_obj.order.side, err_str)
+                return
+        updated_portfolio_status = PortfolioStatusOptional(
+            _id=portfolio_status_obj.id,
+            overall_buy_notional=portfolio_status_obj.overall_buy_notional,
+            overall_sell_notional=portfolio_status_obj.overall_sell_notional,
+            current_period_available_buy_order_count=portfolio_status_obj.current_period_available_buy_order_count,
+            current_period_available_sell_order_count=portfolio_status_obj.current_period_available_sell_order_count
+        )
+        await underlying_partial_update_portfolio_status_http(updated_portfolio_status)
 
     async def create_fills_journal_pre(self, fills_journal_obj: FillsJournal):
         if not self.service_ready:
@@ -758,47 +742,36 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
     async def _update_portfolio_status_from_fill_journal(self, order_snapshot_obj: OrderSnapshot):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_read_portfolio_status_http, underlying_partial_update_portfolio_status_http
+            underlying_read_portfolio_status_by_id_http, underlying_partial_update_portfolio_status_http
 
-        portfolio_status_objs = await underlying_read_portfolio_status_http()
-        if len(portfolio_status_objs) == 1:
-            portfolio_status_obj = portfolio_status_objs[0]
-            match order_snapshot_obj.order_brief.side:
-                case Side.BUY:
-                    portfolio_status_obj.overall_buy_notional += \
-                        (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.last_update_fill_px) - \
-                        (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.order_brief.px)
-                    portfolio_status_obj.overall_buy_fill_notional += \
-                        order_snapshot_obj.last_update_fill_px * order_snapshot_obj.last_update_fill_qty
-                case Side.SELL:
-                    portfolio_status_obj.overall_sell_notional += \
-                        (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.last_update_fill_px) - \
-                        (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.order_brief.px)
-                    portfolio_status_obj.overall_sell_fill_notional += \
-                        order_snapshot_obj.last_update_fill_px * order_snapshot_obj.last_update_fill_qty
-                case other:
-                    err_str = f"Unsupported Side Type {other} received in order snapshot {order_snapshot_obj} " \
-                              f"while updating strat_status"
-                    await update_strat_alert_by_sec_and_side_async(order_snapshot_obj.order_brief.security.sec_id,
-                                                                   order_snapshot_obj.order_brief.side, err_str)
-                    return
-            updated_portfolio_status = PortfolioStatusOptional(
-                _id=portfolio_status_obj.id,
-                overall_buy_notional=portfolio_status_obj.overall_buy_notional,
-                overall_buy_fill_notional=portfolio_status_obj.overall_buy_fill_notional,
-                overall_sell_notional=portfolio_status_obj.overall_sell_notional,
-                overall_sell_fill_notional=portfolio_status_obj.overall_sell_fill_notional
-            )
-            await underlying_partial_update_portfolio_status_http(updated_portfolio_status)
-        else:
-            if len(portfolio_status_objs) > 1:
-                err_str = f"Portfolio Status collection should have only one document, received {portfolio_status_objs}"
+        portfolio_status_obj = await underlying_read_portfolio_status_by_id_http(1)
+        match order_snapshot_obj.order_brief.side:
+            case Side.BUY:
+                portfolio_status_obj.overall_buy_notional += \
+                    (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.last_update_fill_px) - \
+                    (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.order_brief.px)
+                portfolio_status_obj.overall_buy_fill_notional += \
+                    order_snapshot_obj.last_update_fill_px * order_snapshot_obj.last_update_fill_qty
+            case Side.SELL:
+                portfolio_status_obj.overall_sell_notional += \
+                    (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.last_update_fill_px) - \
+                    (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.order_brief.px)
+                portfolio_status_obj.overall_sell_fill_notional += \
+                    order_snapshot_obj.last_update_fill_px * order_snapshot_obj.last_update_fill_qty
+            case other:
+                err_str = f"Unsupported Side Type {other} received in order snapshot {order_snapshot_obj} " \
+                          f"while updating strat_status"
                 await update_strat_alert_by_sec_and_side_async(order_snapshot_obj.order_brief.security.sec_id,
                                                                order_snapshot_obj.order_brief.side, err_str)
-            else:
-                err_str = f"Received Empty Portfolio Status from db while updating order journal relate fields"
-                await update_strat_alert_by_sec_and_side_async(order_snapshot_obj.order_brief.security.sec_id,
-                                                               order_snapshot_obj.order_brief.side, err_str)
+                return
+        updated_portfolio_status = PortfolioStatusOptional(
+            _id=portfolio_status_obj.id,
+            overall_buy_notional=portfolio_status_obj.overall_buy_notional,
+            overall_buy_fill_notional=portfolio_status_obj.overall_buy_fill_notional,
+            overall_sell_notional=portfolio_status_obj.overall_sell_notional,
+            overall_sell_fill_notional=portfolio_status_obj.overall_sell_fill_notional
+        )
+        await underlying_partial_update_portfolio_status_http(updated_portfolio_status)
 
     async def _update_fill_update_in_snapshot(self, fills_journal_obj: FillsJournal):
         # importing routes here otherwise at the time of launch callback's set instance is called by
@@ -1051,11 +1024,11 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
     async def _create_portfolio_status_if_not_exists(self) -> None:  # NOQA
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_read_portfolio_status_http, underlying_create_portfolio_status_http
+            underlying_create_portfolio_status_http
 
-        portfolio_status_obj_list = await underlying_read_portfolio_status_http()
+        portfolio_status_obj_count = await PortfolioStatus.count()
 
-        if len(portfolio_status_obj_list) == 0:
+        if portfolio_status_obj_count == 0:
             portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, kill_switch=False,
                                                                 portfolio_alerts=[], overall_buy_notional=0,
                                                                 overall_sell_notional=0, overall_buy_fill_notional=0,
@@ -1064,11 +1037,11 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                                                 current_period_available_sell_order_count=0)
             created_portfolio_status = await underlying_create_portfolio_status_http(portfolio_status)
             logging.debug(f"Created empty PortfolioStatus {created_portfolio_status}")
-        elif len(portfolio_status_obj_list) == 1:
+        elif portfolio_status_obj_count == 1:
             # expected result therefor passing
             pass
         else:
-            err_str = f"PortfolioStatus must have only one document, received {portfolio_status_obj_list}"
+            err_str = f"PortfolioStatus must have only one document, received {portfolio_status_obj_count}"
             logging.exception(err_str)
             raise Exception(err_str)
 
@@ -1296,32 +1269,27 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
     async def get_open_order_snapshots_by_order_status_query_post(self, order_snapshot_obj_list_: List[OrderSnapshot]):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_order_snapshot_http, underlying_partial_update_portfolio_status_http, \
-            underlying_read_portfolio_status_http, underlying_read_portfolio_limits_http
-        from Flux.CodeGenProjects.addressbook.app.aggregate import get_open_order_snapshots_by_order_status, \
-            get_last_n_sec_orders_by_event
+            underlying_read_portfolio_limits_by_id_http
+        from Flux.CodeGenProjects.addressbook.app.aggregate import get_last_n_sec_orders_by_event
 
         # 1. cancel any expired from passed open orders
         await self.cxl_expired_open_orders(order_snapshot_obj_list_)
 
         # 2. If specified interval rejected orders count exceed threshold - trigger kill switch
         # get limit from portfolio limits
-        portfolio_limits_list: List[PortfolioLimits] = await underlying_read_portfolio_limits_http()
-        if len(portfolio_limits_list) == 1:
-            max_allowed_rejection_within_period = portfolio_limits_list[0].rolling_max_reject_count.max_order_count
-            period_in_sec = portfolio_limits_list[0].rolling_max_reject_count.order_count_period_seconds
-            ack_order_snapshot_obj_list: List[OrderSnapshot] = \
-                await underlying_read_order_snapshot_http(get_last_n_sec_orders_by_event(None, period_in_sec, "OE_REJ"))
-            if len(ack_order_snapshot_obj_list) > max_allowed_rejection_within_period:
-                logging.debug(f"max_allowed_rejection_within_period breached found : {len(ack_order_snapshot_obj_list)} "
-                              f"rejections in past period - initiating auto-kill switch")
-                # single top level objects are hardcoded id=1 , saves the query portfolio status, if always id=1
-                portfolio_status: PortfolioStatusOptional = PortfolioStatusOptional(id=1,
-                                                                                    kill_switch=True)
-                await underlying_partial_update_portfolio_status_http(portfolio_status)
-            # else not required -
-        else:
-            logging.critical(f"expected 1 portfolio limits obj found: {len(portfolio_limits_list)}, "
-                             f"unable to trigger reject order control")
+        portfolio_limits_obj: PortfolioLimits = await underlying_read_portfolio_limits_by_id_http(1)
+        max_allowed_rejection_within_period = portfolio_limits_obj.rolling_max_reject_count.max_order_count
+        period_in_sec = portfolio_limits_obj.rolling_max_reject_count.order_count_period_seconds
+        ack_order_snapshot_obj_list: List[OrderSnapshot] = \
+            await underlying_read_order_snapshot_http(get_last_n_sec_orders_by_event(None, period_in_sec, "OE_REJ"))
+        if len(ack_order_snapshot_obj_list) > max_allowed_rejection_within_period:
+            logging.debug(f"max_allowed_rejection_within_period breached found : {len(ack_order_snapshot_obj_list)} "
+                          f"rejections in past period - initiating auto-kill switch")
+            # single top level objects are hardcoded id=1 , saves the query portfolio status, if always id=1
+            portfolio_status: PortfolioStatusOptional = PortfolioStatusOptional(id=1,
+                                                                                kill_switch=True)
+            await underlying_partial_update_portfolio_status_http(portfolio_status)
+        # else not required -
 
         # 3. No one expects anything useful to be returned - just return empty list
         return []

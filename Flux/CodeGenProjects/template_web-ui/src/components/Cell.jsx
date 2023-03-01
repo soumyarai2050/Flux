@@ -3,17 +3,17 @@ import { useSelector } from 'react-redux';
 import _, { cloneDeep, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
+import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener } from '@mui/material';
+import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
-    clearxpath, getDataxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
+    clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
     getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue
 } from '../utils';
-import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener } from '@mui/material';
-import { ColorTypes, DataTypes, Modes } from '../constants';
+import { DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
-import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './Cell.module.css';
 
 const Cell = (props) => {
@@ -21,7 +21,18 @@ const Cell = (props) => {
     const [active, setActive] = useState(false);
     const [open, setOpen] = useState(false);
 
-    const { data, originalData, row, propname, proptitle, mode, collections } = props;
+    const {
+        mode,
+        rowindex,
+        collection,
+        xpath,
+        dataxpath,
+        disabled,
+        dataRemove,
+        currentValue,
+        previousValue,
+        compare
+    } = props;
 
     const onFocusIn = useCallback(() => {
         setActive(true);
@@ -39,37 +50,18 @@ const Cell = (props) => {
         setOpen(false);
     }, [])
 
-    let collection = collections.filter(col => col.tableTitle === proptitle)[0];
     let type = DataTypes.STRING;
     let enumValues = [];
-    let xpath = row['xpath_' + propname];
-    if (proptitle && proptitle.indexOf('.') > -1) {
-        xpath = row[proptitle.substring(0, proptitle.lastIndexOf('.')) + '.xpath_' + propname]
-    }
-    let dataxpath = getDataxpath(data, xpath);
-    let disabled = false;
 
     if (collection) {
         type = collection.type;
         enumValues = collection.autocomplete_list;
     }
 
-    if (row[proptitle] === undefined) {
-        disabled = true;
-    } else if (mode === Modes.EDIT_MODE) {
-        if (collection && collection.ormNoUpdate && !row['data-add']) {
-            disabled = true;
-        } else if (collection.uiUpdateOnly && row['data-add']) {
-            disabled = true;
-        } else if (row['data-remove']) {
-            disabled = true;
-        }
-    }
-
     if (mode === Modes.EDIT_MODE && active && !disabled) {
         if (collection.autocomplete) {
             return (
-                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Autocomplete
                         sx={{ minWidth: 160 }}
                         className={classes.text_field}
@@ -96,13 +88,13 @@ const Cell = (props) => {
             )
         } else if (type === DataTypes.ENUM) {
             return (
-                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Select
                         className={classes.select}
                         size='small'
                         open={active}
                         disabled={disabled}
-                        value={row[proptitle]}
+                        value={currentValue}
                         onOpen={onFocusIn}
                         onClose={onFocusOut}
                         onChange={(e) => props.onSelectItemChange(e, dataxpath, xpath)}>
@@ -118,11 +110,11 @@ const Cell = (props) => {
             )
         } else if (type === DataTypes.BOOLEAN) {
             return (
-                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Checkbox
                         className={classes.checkbox}
                         defaultValue={false}
-                        checked={row[proptitle]}
+                        checked={currentValue}
                         disabled={disabled}
                         onChange={(e) => props.onCheckboxChange(e, dataxpath, xpath)}
                     />
@@ -130,10 +122,10 @@ const Cell = (props) => {
             )
         } else if (type === DataTypes.NUMBER) {
             let decimalScale = 2;
-            if (props.data.underlyingtype === DataTypes.INT32 || props.data.underlyingtype === DataTypes.INT64) {
+            if (collection.underlyingtype === DataTypes.INT32 || collection.underlyingtype === DataTypes.INT64) {
                 decimalScale = 0;
             }
-            let value = row[proptitle] ? row[proptitle] : 0;
+            let value = currentValue ? currentValue : 0;
 
             let min = collection.min;
             if (typeof (min) === DataTypes.STRING) {
@@ -146,7 +138,7 @@ const Cell = (props) => {
             }
 
             return (
-                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <NumericFormat
                         className={classes.text_field}
                         size='small'
@@ -168,16 +160,16 @@ const Cell = (props) => {
                 </TableCell>
             )
         } else if (type === DataTypes.DATE_TIME) {
-            let value = row[proptitle] ? new Date(row[proptitle]) : null;
+            let value = currentValue ? new Date(currentValue) : null;
             return (
-                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DateTimePicker
                             className={classes.text_field}
                             disabled={disabled}
                             value={value}
                             inputFormat="DD-MM-YYYY HH:mm:ss"
-                            onChange={(newValue) => props.onDateTimeChange(props.data.dataxpath, props.data.xpath, new Date(newValue).toISOString())}
+                            onChange={(newValue) => props.onDateTimeChange(dataxpath, xpath, new Date(newValue).toISOString())}
                             inputProps={{
                                 style: { padding: '6px 10px' },
                                 dataxpath: dataxpath,
@@ -189,9 +181,9 @@ const Cell = (props) => {
                 </TableCell>
             )
         } else if (type === DataTypes.STRING && !collection.abbreviated) {
-            let value = row[proptitle] ? row[proptitle] : '';
+            let value = currentValue ? currentValue : '';
             return (
-                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, props.rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <TextField
                         className={classes.text_field}
                         size='small'
@@ -218,16 +210,16 @@ const Cell = (props) => {
                     className={classes.checkbox}
                     disabled
                     defaultValue={false}
-                    checked={row[proptitle]}
+                    checked={currentValue}
                 />
             </TableCell >
         )
     }
 
     if (type === 'button') {
-        let value = row[proptitle];
+        let value = currentValue;
         if (value === undefined || value === null) {
-            let tableCellRemove = row['data-remove'] ? classes.remove : '';
+            let tableCellRemove = dataRemove ? classes.remove : '';
             return (
                 <TableCell className={`${classes.cell} ${classes.disabled} ${tableCellRemove}`} />
             )
@@ -254,7 +246,7 @@ const Cell = (props) => {
                     value={value}
                     caption={caption}
                     xpath={dataxpath}
-                    disabled={row['data-remove'] ? true : false}
+                    disabled={dataRemove ? true : false}
                     action={collection.button.action}
                     onClick={props.onButtonClick}
                 />
@@ -263,9 +255,9 @@ const Cell = (props) => {
     }
 
     if (type === 'progressBar') {
-        let value = row[proptitle];
+        let value = currentValue;
         if (value === undefined || value === null) {
-            let tableCellRemove = row['data-remove'] ? classes.remove : '';
+            let tableCellRemove = dataRemove ? classes.remove : '';
             return (
                 <TableCell className={`${classes.cell} ${classes.disabled} ${tableCellRemove}`} />
             )
@@ -296,8 +288,8 @@ const Cell = (props) => {
     }
 
     if (collection.abbreviated && collection.abbreviated === "JSON") {
-        let tableCellRemove = row['data-remove'] ? classes.remove : '';
-        let updatedData = row[proptitle];
+        let tableCellRemove = dataRemove ? classes.remove : '';
+        let updatedData = currentValue;
         if (type === DataTypes.OBJECT || type === DataTypes.ARRAY || (type === DataTypes.STRING && isValidJsonString(updatedData))) {
             if (type === DataTypes.OBJECT || type === DataTypes.ARRAY) {
                 updatedData = updatedData ? clearxpath(cloneDeep(updatedData)) : {};
@@ -333,39 +325,57 @@ const Cell = (props) => {
         }
     }
 
-    let color = getColorTypeFromValue(collection, row[proptitle]);
+    let color = getColorTypeFromValue(collection, currentValue);
     let tableCellColorClass = classes[color];
 
-    let dataModified = _.get(originalData, xpath) !== row[proptitle];
-    let tableCellRemove = row['data-remove'] ? classes.remove : '';
+    let dataModified = previousValue !== currentValue;
+    let tableCellRemove = dataRemove ? classes.remove : '';
     let disabledClass = disabled ? classes.disabled : '';
 
-    let currentValue = row[proptitle] !== undefined && row[proptitle] !== null ? row[proptitle].toLocaleString() : '';
-    if (dataModified) {
-        let originalValue = _.get(originalData, xpath) !== undefined && _.get(originalData, xpath) !== null ? _.get(originalData, xpath).toLocaleString() : '';
+    let value = currentValue !== undefined && currentValue !== null ? currentValue.toLocaleString() : '';
+    if (compare && dataModified) {
+        let originalValue = previousValue !== undefined && previousValue !== null ? previousValue.toLocaleString() : '';
         return (
             <TableCell className={`${classes.cell} ${tableCellColorClass} ${disabledClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 <span className={classes.previous}>{originalValue}</span>
-                <span className={classes.modified}>{currentValue}</span>
+                <span className={classes.modified}>{value}</span>
             </TableCell>
         )
     } else {
         return (
             <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                <span>{currentValue}</span>
+                <span>{value}</span>
             </TableCell>
         )
     }
 }
 
 Cell.propTypes = {
-    data: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
-    originalData: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
-    row: PropTypes.object.isRequired,
-    propname: PropTypes.string.isRequired,
-    proptitle: PropTypes.string,
-    mode: PropTypes.string.isRequired,
-    collections: PropTypes.array.isRequired
+    mode: PropTypes.oneOf([Modes.READ_MODE, Modes.EDIT_MODE]).isRequired,
+    rowindex: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+    name: PropTypes.string.isRequired,
+    elaborateTitle: PropTypes.string.isRequired,
+    currentValue: PropTypes.any,
+    previousValue: PropTypes.any,
+    collection: PropTypes.object.isRequired,
+    compare: PropTypes.bool.isRequired,
+    xpath: PropTypes.string,
+    dataxpath: PropTypes.string,
+    dataAdd: PropTypes.bool.isRequired,
+    dataRemove: PropTypes.bool.isRequired,
+    disabled: PropTypes.bool.isRequired,
+    onUpdate: PropTypes.func.isRequired,
+    onDoubleClick: PropTypes.func.isRequired,
+    onButtonClick: PropTypes.func.isRequired,
+    onCheckboxChange: PropTypes.func.isRequired,
+    onTextChange: PropTypes.func.isRequired,
+    onSelectItemChange: PropTypes.func.isRequired,
+    onAutocompleteOptionChange: PropTypes.func.isRequired,
+    onDateTimeChange: PropTypes.func.isRequired
+}
+
+Cell.defaultProps = {
+    compare: true
 }
 
 export default memo(Cell, isEqual);

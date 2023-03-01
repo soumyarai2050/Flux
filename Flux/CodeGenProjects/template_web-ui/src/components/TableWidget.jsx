@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useCallback, Fragment, memo } from 'react';
 import _, { cloneDeep } from 'lodash';
 import {
-    TableContainer, Table, TableBody, TableRow, TableCell, DialogTitle, DialogContent, DialogContentText,
+    TableContainer, Table, TableBody, DialogTitle, DialogContent, DialogContentText,
     DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination
 } from '@mui/material';
-import { generateRowTrees, generateRowsFromTree, addxpath, clearxpath, getTableRows, getTableColumns, getCommonKeyCollections } from '../utils';
 import { Settings, Close, Visibility, VisibilityOff } from '@mui/icons-material';
+import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
+import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections } from '../utils';
 import { DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
 import TableHead from './TableHead';
 import FullScreenModal from './Modal';
-import Cell from './Cell';
+import Row from './Row';
 import { Icon } from './Icon';
 import Alert from './Alert';
-import AbbreviatedJsonWidget from './AbbreviatedJson';
-import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import classes from './TableWidget.module.css';
+
 
 const TableWidget = (props) => {
 
@@ -29,8 +29,6 @@ const TableWidget = (props) => {
     const [data, setData] = useState(props.data);
     const [open, setOpen] = useState(false); // for full height modal
     const [showSettings, setShowSettings] = useState(false);
-    const [abbreviatedJson, setAbbreviatedJson] = useState({});
-    const [showAbbreviatedJson, setShowAbbreviatedJson] = useState(false);
     const [hide, setHide] = useState(true);
 
     const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -49,15 +47,8 @@ const TableWidget = (props) => {
 
     useEffect(() => {
         let trees = generateRowTrees(cloneDeep(data), props.collections, props.xpath);
-        // let tableRows = getTableRows(props.collections, props.originalData, data, props.xpath);
         setRowTrees(trees);
-        // setRows(tableRows);
     }, [props.collections, data, props.xpath])
-
-    // useEffect(() => {
-    //     let tableColumns = getTableColumns(props.collections);
-    //     setHeadCells(tableColumns);
-    // }, [props.collections, props.mode, hide])
 
     useEffect(() => {
         let commonKeyCollections = getCommonKeyCollections(rows, headCells, hide)
@@ -222,15 +213,6 @@ const TableWidget = (props) => {
         }
         let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: !e.target.checked } : cell)
         setHeadCells(updatedHeadCells);
-    }
-
-    const onAbbreviatedFieldOpen = (jsonData) => {
-        setAbbreviatedJson(clearxpath(cloneDeep(jsonData)));
-        setShowAbbreviatedJson(true);
-    }
-
-    const onAbbreviatedFieldClose = () => {
-        setShowAbbreviatedJson(false);
     }
 
     const onSettingsOpen = () => {
@@ -404,43 +386,33 @@ const TableWidget = (props) => {
                                             tableRowClass = classes.remove;
                                         }
 
-                                        return (
-                                            <TableRow
-                                                key={index}
-                                                className={`${classes.row} ${tableRowClass}`}
-                                                hover
-                                                selected={selectedRows.filter(id => id === row['data-id']).length > 0}
-                                                onDoubleClick={(e) => onRowDisselect(e, row['data-id'])}
-                                                onClick={(e) => onRowSelect(e, row['data-id'])}>
+                                        let cells = getFilteredCells();
+                                        let selected = selectedRows.filter(id => id === row['data-id']).length > 0;
 
-                                                {getFilteredCells().map((cell, i) => {
-                                                    // don't show cells that are hidden
-                                                    if (cell.hide) return;
-                                                    return (
-                                                        <Cell
-                                                            key={i}
-                                                            row={row}
-                                                            rowindex={row['data-id']}
-                                                            propname={cell.key}
-                                                            proptitle={cell.tableTitle}
-                                                            mode={props.mode}
-                                                            data={props.data}
-                                                            originalData={props.originalData}
-                                                            collections={props.collections}
-                                                            onUpdate={props.onUpdate}
-                                                            onAbbreviatedFieldOpen={onAbbreviatedFieldOpen}
-                                                            onDoubleClick={onRowClick}
-                                                            onButtonClick={onButtonClick}
-                                                            onCheckboxChange={onCheckboxChange}
-                                                            onTextChange={onTextChange}
-                                                            onSelectItemChange={onSelectItemChange}
-                                                            onAutocompleteOptionChange={onAutocompleteOptionChange}
-                                                            onDateTimeChange={onDateTimeChange}
-                                                        />
-                                                    )
-                                                })}
-                                            </TableRow>
-                                        );
+                                        return (
+                                            <Row
+                                                key={index}
+                                                className={tableRowClass}
+                                                cells={cells}
+                                                collections={props.collections}
+                                                compare={props.compare}
+                                                data={props.data}
+                                                onAutocompleteOptionChange={onAutocompleteOptionChange}
+                                                onButtonClick={onButtonClick}
+                                                onCheckboxChange={onCheckboxChange}
+                                                onDateTimeChange={onDateTimeChange}
+                                                onRowClick={onRowClick}
+                                                onRowDisselect={onRowDisselect}
+                                                onRowSelect={onRowSelect}
+                                                onSelectItemChange={onSelectItemChange}
+                                                onTextChange={onTextChange}
+                                                onUpdate={onUpdate}
+                                                originalData={props.originalData}
+                                                row={row}
+                                                selected={selected}
+                                                mode={props.mode}
+                                            />
+                                        )
                                     })}
                             </TableBody>
                         </Table>
@@ -458,8 +430,6 @@ const TableWidget = (props) => {
                     }
                 </Fragment>
             }
-
-            <AbbreviatedJsonWidget open={showAbbreviatedJson} onClose={onAbbreviatedFieldClose} json={abbreviatedJson} />
 
             <FullScreenModal
                 id={modalId}

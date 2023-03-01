@@ -294,4 +294,65 @@
 //    std::cout << conn.uri().to_string();
 //
 //    return 0;
+
+
+
+//
+//void run()
+//{
+//    while (true) {
+//        tcp::socket socket{ioc_};
+//        acceptor_.accept(socket);
+//        std::cout << "Socket Accepted" << std::endl;
+//
+//        std::thread{[q {std::move(socket)}]() {
+//            boost::beast::websocket::stream<tcp::socket> ws {std::move(const_cast<tcp::socket&>(q))};
+//            ws.accept();
+//
+//            std::string latest_data;
+//
+//            while (true) {
+//
+//                http::request<http::string_body> req{http::verb::get, "/market_data/get-all-market_depth/", 11};
+//                req.set(http::field::host, "127.0.0.1");
+//                req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+//
+//                net::io_context ioc;
+//                tcp::resolver resolver{ioc};
+//                auto const results = resolver.resolve("127.0.0.1", "8040");
+//                beast::tcp_stream stream{ioc};
+//                stream.connect(results);
+//                http::write(stream, req);
+//
+//                // Read the HTTP response
+//                beast::flat_buffer buffer;
+//                http::response<http::string_body> res;
+//                http::read(stream, buffer, res);
+//
+//                // Parse the JSON data
+//                rapidjson::Document doc;
+//                doc.Parse(res.body().c_str());
+//
+//                if (doc.IsArray() && doc.Size() > 0) {
+//                    // Check if the first JSON object has changed
+//                    const auto& obj = doc[0];
+//                    rapidjson::StringBuffer s;
+//                    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
+//                    obj.Accept(writer);
+//                    std::string json_str = s.GetString();
+//
+//                    if (!latest_data.empty() && json_str != latest_data) {
+//                        // If the data has been updated, store it and send it to the client
+//                        latest_data = json_str;
+//                        ws.write(boost::asio::buffer(latest_data));
+//                    } else {
+//                        latest_data = json_str;
+//                    }
+//                }
+//
+//                // Wait for 1 second before sending the next update
+//                std::this_thread::sleep_for(std::chrono::seconds(1));
+//            }
+//        }}.detach();
+//    }
 //}

@@ -104,6 +104,10 @@ class IncrementalIdBaseModel(BaseModel):
         cls._max_id_val = max_val
 
     @classmethod
+    def peek_max_id(cls) -> int:
+        return cls._max_id_val
+
+    @classmethod
     def next_id(cls) -> int:
         with cls._mutex:
             if cls._max_id_val is not None:

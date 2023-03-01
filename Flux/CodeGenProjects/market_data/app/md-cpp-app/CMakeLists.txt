@@ -23,7 +23,7 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:/usr/local/lib")
 link_directories(md_handler ${CMAKE_INSTALL_RPATH})
 
 # Include POCO headers from /usr/local/include
-include_directories(${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${POCO_INCLUDE_DIR} ${RapidJSON_INCLUDE_DIR})
-target_link_libraries(md_handler ${MONGO_LIB} ${BSON_LIB} ${POCO_LIB})
+include_directories(${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${POCO_INCLUDE_DIR} ${RapidJSON_INCLUDE_DIR} ${BOOST_INCLUDE_DIR})
+target_link_libraries(md_handler ${MONGO_LIB} ${BSON_LIB} ${POCO_LIB} ${BOOST_LIB})
 
 

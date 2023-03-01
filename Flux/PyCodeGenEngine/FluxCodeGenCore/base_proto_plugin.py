@@ -102,6 +102,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_progress_bar:  str = "FluxFldProgressBar"
     flux_fld_filter_enable:  str = "FluxFldFilterEnable"
     flux_msg_server_populate:  str = "FluxMsgServerPopulate"
+    flux_msg_additional_agg_after_filter: str = "FluxMsgAdditionalAggAfterFilter"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: str = "ProtoPackageName"  # to be used in models as proto_package_name variable name

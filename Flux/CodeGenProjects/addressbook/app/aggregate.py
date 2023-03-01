@@ -187,6 +187,29 @@ def get_last_n_sec_orders_by_event(symbol: str | None, last_n_sec: int, order_ev
     return agg_query
 
 
+def get_limited_portfolio_alerts_obj(limit: int):
+    return [
+        {
+            "$project": {
+                "kill_switch": 1,
+                "portfolio_alerts": {
+                    "$reverseArray": {"$slice": ["$portfolio_alerts", limit]},
+                },
+                "overall_buy_notional": 1,
+                "overall_sell_notional": 1,
+                "overall_buy_fill_notional": 1,
+                "overall_sell_fill_notional": 1,
+                "current_period_available_buy_order_count": 1,
+                "current_period_available_sell_order_count": 1,
+            }
+        }
+    ]
+
+
+def get_limited_strat_alerts_obj(limit: int):
+    return []
+
+
 if __name__ == '__main__':
     with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
     print(with_symbol_agg_query)

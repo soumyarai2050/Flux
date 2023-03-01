@@ -217,7 +217,7 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None):
     rolling_max_order_count = RollingMaxOrderCount(max_order_count=5, order_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxOrderCount(max_order_count=5, order_count_period_seconds=2)
 
-    portfolio_limits_obj = PortfolioLimitsBaseModel(max_open_baskets=5, max_open_notional_per_side=7_000,
+    portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=5, max_open_notional_per_side=7_000,
                                                     max_gross_n_open_notional=12_000,
                                                     rolling_max_order_count=rolling_max_order_count,
                                                     rolling_max_reject_count=rolling_max_reject_count,
@@ -254,7 +254,7 @@ def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
 
 
 def get_new_order_limits():
-    ord_limit_obj = OrderLimitsBaseModel(max_basis_points=20, max_px_deviation=1, max_px_levels=2,
+    ord_limit_obj = OrderLimitsBaseModel(_id=1, max_basis_points=20, max_px_deviation=1, max_px_levels=2,
                                          max_order_qty=10, max_order_notional=9_000)
     return ord_limit_obj
 

@@ -19,7 +19,7 @@ namespace md_handler {
 
             for (auto&& market_depth_document: market_depth_collection.find({})) {
 
-                std::__1::shared_ptr<Pipeline_n_DB_id> ptr_Pipeline_n_DB_id(new Pipeline_n_DB_id);
+                std::shared_ptr<Pipeline_n_DB_id> ptr_Pipeline_n_DB_id(new Pipeline_n_DB_id);
                 const int8_t position = static_cast<int8_t>(market_depth_document[position_key].get_int32().value);
                 const std::string&& symbol = market_depth_document[symbol_key].get_string().value.data();
                 const std::string&& side = market_depth_document[side_key].get_string().value.data();
@@ -51,13 +51,13 @@ namespace md_handler {
 
             //check if document exists (update) insert otherwise
             auto found = md_key_to_pipeline_n_db_id.find(market_depth_data.get_position_symbol_side_key());
-            std::__1::shared_ptr<Pipeline_n_DB_id> ptr_holder;
+            std::shared_ptr<Pipeline_n_DB_id> ptr_holder;
             if (found == md_key_to_pipeline_n_db_id.end()) {
                 // not found - insert new document
                 auto market_depth_insert_result = market_depth_collection.insert_one(market_depth_document);
                 auto market_depth_id = market_depth_insert_result->inserted_id();
                 // pipeline to perform aggregation
-                std::__1::shared_ptr<Pipeline_n_DB_id> ptr_Pipeline_n_DB_id(new Pipeline_n_DB_id);
+                std::shared_ptr<Pipeline_n_DB_id> ptr_Pipeline_n_DB_id(new Pipeline_n_DB_id);
                 update_pipeline(ptr_Pipeline_n_DB_id->pipeline, market_depth_data.getSymbol(), market_depth_data.getSide());
                 ptr_Pipeline_n_DB_id->market_depth_id = market_depth_id;
                 // store updated pipeline for future reuse

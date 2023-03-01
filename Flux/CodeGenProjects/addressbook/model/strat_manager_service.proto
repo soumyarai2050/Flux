@@ -335,6 +335,7 @@ message PortfolioStatus{
     alert_bubble_color: "PortfolioStatus.portfolio_alerts.severity"
   };
   option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
+  option (FluxMsgAdditionalAggAfterFilter) = {agg_var_name: "get_limited_portfolio_alerts_obj", agg_params: ["-100"]};
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -377,6 +378,7 @@ message PairStrat{
   };
     option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
     option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
+    option (FluxMsgAdditionalAggAfterFilter) = {agg_var_name: "get_limited_strat_alerts_obj", agg_params: ["-100"]};
 
     //Server generated unique Id
     required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];

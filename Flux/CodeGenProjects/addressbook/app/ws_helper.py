@@ -24,6 +24,10 @@ class PortfolioStatusBaseModelList(BaseModel):
     __root__: List[PortfolioStatusBaseModel]
 
 
+class PortfolioLimitsBaseModelList(BaseModel):
+    __root__: List[PortfolioStatusBaseModel]
+
+
 class OrderLimitsBaseModelList(BaseModel):
     __root__: List[OrderLimitsBaseModel]
 
