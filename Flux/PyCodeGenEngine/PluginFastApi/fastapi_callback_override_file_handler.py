@@ -76,12 +76,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"from {web_client_path} import {web_client_name_caps_camel_cased}\n"
         model_path = \
             self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_file_name}")
-        pydantic_models_comma_sep = ", ".join([msg.proto.name for msg in required_root_msg_list])
-        pydantic_query_models_comma_sep = ", ".join([msg.proto.name for msg in self.query_message_dict])
-        if pydantic_query_models_comma_sep:
-            pydantic_models_comma_sep = pydantic_models_comma_sep + ", " + pydantic_query_models_comma_sep
-        output_str += f"from {model_path} import " \
-                      f"{required_root_msg_list[0].proto.name}BaseModel, {pydantic_models_comma_sep}\n"
+        output_str += f"from {model_path} import *\n"
         routes_callback = \
             self.import_path_from_os_path("OUTPUT_DIR", f"{self.routes_callback_class_name}")
         callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)

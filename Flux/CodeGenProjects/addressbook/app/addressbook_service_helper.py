@@ -283,10 +283,10 @@ def create_order_limits():
 
 
 def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:
-    cancel_rate: CancelRate = CancelRate(max_cancel_rate=20, applicable_period_seconds=6)
+    cancel_rate: CancelRate = CancelRate(max_cancel_rate=20, applicable_period_seconds=0)
     market_trade_volume_participation: MarketTradeVolumeParticipation = \
         MarketTradeVolumeParticipation(max_participation_rate=30,
-                                       applicable_period_seconds=0)
+                                       applicable_period_seconds=180)
     market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=10, depth_levels=3)
     residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=2500, residual_mark_seconds=4)
     strat_limits: StratLimits = StratLimits(max_open_orders_per_side=200,

@@ -59,30 +59,12 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_model_imports(self) -> str:
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str = f"from {model_file_path} import {BaseFastapiPlugin.default_id_type_var_name}, " \
-                     f"{BaseFastapiPlugin.proto_package_var_name}, "
-        for enum in self.enum_list:
-            output_str += enum.proto.name
-            output_str += ", "
-        for message in self.root_message_list:
-            output_str += message.proto.name
-            output_str += ", "
-            output_str += f"{message.proto.name}Optional"
-            output_str += ", "
-            output_str += f"{message.proto.name}BaseModel"
-
-            if message != self.root_message_list[-1]:
-                output_str += ", "
-            else:
-                output_str += "\n"
+        output_str = f"from {model_file_path} import *\n"
         return output_str
 
     def _underlying_handle_generic_imports(self) -> str:
         generic_routes_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_routes")
-        output_str = f'from {generic_routes_file_path} import generic_post_http, ' + "\\\n" \
-                     f'\tgeneric_put_http, generic_patch_http, generic_delete_http, ' \
-                     f'\\\n\tgeneric_read_http, generic_read_ws, ' \
-                     f'generic_read_by_id_http, generic_read_by_id_ws\n'
+        output_str = f'from {generic_routes_file_path} import *\n'
         return output_str
 
     def _handle_underlying_mutex_str(self, message: protogen.Message, shared_lock_list: List[str]) -> Tuple[str, int]:

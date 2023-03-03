@@ -66,7 +66,7 @@ class StratCache:
         # else not required - returning None (default value of key)
         key2: str | None = None
         if strat_brief.pair_sell_side_trading_brief.security.sec_id is not None:
-            key2 = strat_brief.pair_sell_side_trading_brief.security.sec_id + "_BID"
+            key2 = strat_brief.pair_sell_side_trading_brief.security.sec_id + "_ASK"
         else:
             raise Exception(f"get_key_from_strat_brief: did not find sell sec id;;; strat_brief: {strat_brief}")
         # else not required - returning None (default value of key)

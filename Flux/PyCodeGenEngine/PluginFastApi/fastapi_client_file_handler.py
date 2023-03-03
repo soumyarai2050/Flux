@@ -104,20 +104,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
     def _import_model_in_client_file(self) -> str:
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str = f"from {model_file_path} import {BaseFastapiPlugin.default_id_type_var_name}, "
-        for enum in self.enum_list:
-            output_str += enum.proto.name
-            output_str += ", "
-        for message in self.root_message_list:
-            output_str += message.proto.name
-            output_str += ", "
-            output_str += f"{message.proto.name}BaseModel"
-            if message != self.root_message_list[-1]:
-                output_str += ", "
-        for message in self.query_message_dict:
-            output_str += ", "
-            output_str += f"{message.proto.name}BaseModel"
-        output_str += "\n"
+        output_str = f"from {model_file_path} import *\n"
         return output_str
 
     def _handle_client_routes_url(self, message: protogen.Message, message_name_snake_cased: str) -> str:
@@ -289,11 +276,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
         output_str = f'from typing import Dict, List, Callable, Any\n'
         generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
-        output_str += f'from {generic_web_client_path} import generic_http_get_all_client, ' + "\\\n" \
-                      f'\tgeneric_http_post_client, generic_http_get_client, generic_http_put_client, ' \
-                      f'generic_http_patch_client, generic_http_index_client,' \
-                      f'\\\n\tgeneric_http_delete_client, generic_ws_get_client, ' \
-                      f'generic_ws_get_all_client, generic_http_query_client\n'
+        output_str += f'from {generic_web_client_path} import *\n'
         output_str += self._import_model_in_client_file()
         output_str += "\n\n"
         output_str += f"class {convert_to_capitalized_camel_case(self.client_file_name)}:\n\n"

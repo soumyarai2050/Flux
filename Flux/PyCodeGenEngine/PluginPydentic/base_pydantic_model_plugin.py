@@ -5,6 +5,8 @@ from typing import List, Callable, Dict, Tuple, final
 import time
 from abc import abstractmethod
 from pathlib import PurePath
+from enum import auto
+from fastapi_utils.enums import StrEnum
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
         isinstance(debug_sleep_time := int(debug_sleep_time), int):
@@ -13,6 +15,13 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
+
+
+class IdType(StrEnum):
+    NO_ID = auto()
+    DEFAULT = auto()
+    INT_ID = auto()
+    STR_ID = auto()
 
 
 class BasePydanticModelPlugin(BaseProtoPlugin):
@@ -165,21 +174,27 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def _underlying_handle_none_default_fields(self, message: protogen.Message, has_id_field: bool) -> str:
         output_str = ""
-        if not has_id_field:
-            output_str += f"    {BasePydanticModelPlugin.default_id_field_name}: " \
-                          f"{BasePydanticModelPlugin.default_id_type_var_name} | None = " \
-                          f"Field(alias='_id')\n"
-        # else not required: if id field is present already then will be handled in next for loop
+        if message in self.root_message_list:
+            if not has_id_field:
+                output_str += f"    {BasePydanticModelPlugin.default_id_field_name}: " \
+                              f"{BasePydanticModelPlugin.default_id_type_var_name} | None = " \
+                              f"Field(alias='_id')\n"
+            # else not required: if id field is present already then will be handled in next for loop
 
         for field in message.fields:
             if field.proto.name == BasePydanticModelPlugin.default_id_field_name:
                 output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = " \
                               f"Field(alias='_id')\n"
             else:
-                if field.cardinality.name.lower() == "repeated":
-                    output_str += f"    {field.proto.name}: List[{self.proto_to_py_datatype(field)}] | None = None\n"
+                if field.message is not None:
+                    field_type = f"{field.message.proto.name}Optional"
                 else:
-                    output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = None\n"
+                    field_type = self.proto_to_py_datatype(field)
+                if field.cardinality.name.lower() == "repeated":
+                    output_str += f"    {field.proto.name}: List[{field_type}] | None = None\n"
+                else:
+                    output_str += f"    {field.proto.name}: {field_type} | None = None\n"
+
         return output_str
 
     def _add_config_class(self) -> str:
@@ -191,9 +206,11 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         message_name = message.proto.name
         output_str = f"class {message_name}Optional({message_name}):\n"
         has_id_field = BasePydanticModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
+
         output_str += self._underlying_handle_none_default_fields(message, has_id_field)
-        output_str += "\n"
-        output_str += self._add_config_class()
+        if has_id_field:
+            output_str += "\n"
+            output_str += self._add_config_class()
         output_str += "\n\n"
         return output_str
 
@@ -209,11 +226,19 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str += "\n"
         return output_str
 
-    def _handle_incremental_id_protected_field_override(self, message: protogen.Message) -> str:
-        output_str = "    _max_id_val: ClassVar[int | None] = None\n"
-        output_str += "    _mutex: ClassVar[Lock] = Lock()\n"
-        output_str += f'    id: int = Field(default_factory=(lambda: {message.proto.name}.next_id()), ' \
-                      f'description="Server generated unique Id", alias="_id")\n'
+    def _handle_unique_id_required_fields(self, message: protogen.Message, auto_gen_id_type: IdType) -> str:
+        if auto_gen_id_type == IdType.INT_ID:
+            output_str = "    _max_id_val: ClassVar[int | None] = None\n"
+            output_str += "    _mutex: ClassVar[Lock] = Lock()\n"
+            output_str += f'    id: int = Field(default_factory=(lambda: {message.proto.name}.next_id()), ' \
+                          f'description="Server generated unique Id", alias="_id")\n'
+        elif auto_gen_id_type == IdType.STR_ID:
+            output_str = "    _mutex: ClassVar[Lock] = Lock()\n"
+            output_str += f'    id: str = Field(default_factory=(lambda: {message.proto.name}.next_id()), ' \
+                          f'description="Server generated unique Id", alias="_id")\n'
+        else:
+            output_str = ""
+
         return output_str
 
     def _handle_ws_connection_manager_data_members_override(self, message: protogen.Message) -> str:
@@ -262,7 +287,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str = ""
         if is_msg_root:
             for field in message.fields:
-                if BasePydanticModelPlugin.default_id_field_name in field.proto.name:
+                if BasePydanticModelPlugin.default_id_field_name == field.proto.name:
                     output_str += f"    _cache_obj_id_to_obj_dict: ClassVar[Dict[{self.proto_to_py_datatype(field)}, " \
                                   f"'{message.proto.name}']] = " + "{}\n"
                     break
@@ -289,10 +314,11 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             # avoiding datetime validation
         return output_str
 
-    def _handle_config_class_and_other_root_class_versions(self, message: protogen.Message, auto_gen_id: bool) -> str:
+    def _handle_config_class_and_other_root_class_versions(self, message: protogen.Message,
+                                                           auto_gen_id_type: IdType) -> str:
         output_str = ""
         # Making class able to be populated with field name
-        if auto_gen_id:
+        if auto_gen_id_type not in ["NO_ID", "DEFAULT"]:
             output_str += "\n"
             output_str += self._add_config_class()
         output_str += "\n"
@@ -301,8 +327,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         output_str += "\n\n"
 
         # Adding other versions for root pydantic class
+        output_str += self.handle_message_all_optional_field(message)
         if message in self.root_message_list:
-            output_str += self.handle_message_all_optional_field(message)
             output_str += self.handle_dummy_message_gen(message)
         # If message is not root then no need to add message with optional fields
 

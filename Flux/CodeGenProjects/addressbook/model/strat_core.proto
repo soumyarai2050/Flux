@@ -179,7 +179,8 @@ message OrderBrief{
 }
 
 message Alert{
-  optional bool dismiss = 1 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldButton) = {
+  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional bool dismiss = 2 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldButton) = {
     unpressed_caption: "dismiss",
     pressed_caption: "undo",
     value_color_map: "true=DEBUG,false=INFO"
@@ -188,12 +189,12 @@ message Alert{
     action: "flux_toggle",
     pressed_value_as_text: "true"
   }];
-  required Severity severity = 2 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
-  required string alert_brief = 3 [(FluxFldSizeMax) = 32];
+  required Severity severity = 3 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
+  required string alert_brief = 4 [(FluxFldSizeMax) = 32];
   // must prefix strat:<strat-name> for strat alerts
-  optional string alert_details = 4 [(FluxFldAbbreviated) = "JSON"];
+  optional string alert_details = 5 [(FluxFldAbbreviated) = "JSON"];
   // populated only if this alert is for one or more orders
-  repeated OrderBrief impacted_order = 5;
+  repeated OrderBrief impacted_order = 6;
 }
 
 message Residual{

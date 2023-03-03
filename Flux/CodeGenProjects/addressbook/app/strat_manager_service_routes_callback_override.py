@@ -317,20 +317,26 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     await self._check_state_and_get_order_snapshot_obj(order_journal_obj,
                                                                        [OrderStatusType.OE_UNACK],
                                                                        OrderEventType.OE_ACK)
-                await underlying_partial_update_order_snapshot_http(
-                    OrderSnapshotOptional(_id=order_snapshot_obj.id,
-                                          last_update_date_time=order_journal_obj.order_event_date_time,
-                                          order_status=OrderStatusType.OE_ACKED))
+                if order_snapshot_obj is not None:
+                    await underlying_partial_update_order_snapshot_http(
+                        OrderSnapshotOptional(_id=order_snapshot_obj.id,
+                                              last_update_date_time=order_journal_obj.order_event_date_time,
+                                              order_status=OrderStatusType.OE_ACKED))
+                # else not required: none returned object signifies there was something wrong in
+                # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
             case OrderEventType.OE_CXL:
                 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
                     underlying_partial_update_order_snapshot_http
                 order_snapshot_obj = \
                     await self._check_state_and_get_order_snapshot_obj(
                         order_journal_obj, [OrderStatusType.OE_ACKED], OrderEventType.OE_CXL)
-                await underlying_partial_update_order_snapshot_http(
-                    OrderSnapshotOptional(_id=order_snapshot_obj.id,
-                                          last_update_date_time=order_journal_obj.order_event_date_time,
-                                          order_status=OrderStatusType.OE_CXL_UNACK))
+                if order_snapshot_obj is not None:
+                    await underlying_partial_update_order_snapshot_http(
+                        OrderSnapshotOptional(_id=order_snapshot_obj.id,
+                                              last_update_date_time=order_journal_obj.order_event_date_time,
+                                              order_status=OrderStatusType.OE_CXL_UNACK))
+                # else not required: none returned object signifies there was something wrong in
+                # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
             case OrderEventType.OE_CXL_ACK:
                 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
                     underlying_partial_update_order_snapshot_http
@@ -338,84 +344,97 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     await self._check_state_and_get_order_snapshot_obj(
                         order_journal_obj, [OrderStatusType.OE_CXL_UNACK, OrderStatusType.OE_ACKED],
                         OrderEventType.OE_CXL_ACK)
-                order_brief_obj = OrderBrief(**order_snapshot_obj.order_brief.dict())
-                if order_journal_obj.order.text:
-                    order_brief_obj.text.extend(order_journal_obj.order.text)
-                # else not required: If no text is present in order_journal then updating
-                # order snapshot with same obj
+                if order_snapshot_obj is not None:
+                    order_brief_obj = OrderBrief(**order_snapshot_obj.order_brief.dict())
+                    if order_journal_obj.order.text:
+                        order_brief_obj.text.extend(order_journal_obj.order.text)
+                    # else not required: If no text is present in order_journal then updating
+                    # order snapshot with same obj
 
-                cxled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
-                cxled_notional = cxled_qty * order_snapshot_obj.order_brief.px
-                avg_cxled_px = (cxled_notional / cxled_qty) if cxled_qty != 0 else 0
-                order_snapshot_obj = await underlying_partial_update_order_snapshot_http(
-                    OrderSnapshotOptional(_id=order_snapshot_obj.id,
-                                          order_brief=order_brief_obj,
-                                          cxled_qty=cxled_qty,
-                                          cxled_notional=cxled_notional,
-                                          avg_cxled_px=avg_cxled_px,
-                                          last_update_date_time=order_journal_obj.order_event_date_time,
-                                          order_status=OrderStatusType.OE_DOD))
-                symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_order_journal(
-                    order_journal_obj, order_snapshot_obj)
-                if symbol_side_snapshot is not None:
-                    updated_strat_brief = await self._update_strat_brief_from_order(order_snapshot_obj,
-                                                                                    symbol_side_snapshot)
-                    await self._update_pair_strat_from_order_journal(order_journal_obj, order_snapshot_obj,
-                                                                     updated_strat_brief)
-                    await self._update_portfolio_status_from_order_journal(
+                    cxled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
+                    cxled_notional = cxled_qty * order_snapshot_obj.order_brief.px
+                    avg_cxled_px = (cxled_notional / cxled_qty) if cxled_qty != 0 else 0
+                    order_snapshot_obj = await underlying_partial_update_order_snapshot_http(
+                        OrderSnapshotOptional(_id=order_snapshot_obj.id,
+                                              order_brief=order_brief_obj,
+                                              cxled_qty=cxled_qty,
+                                              cxled_notional=cxled_notional,
+                                              avg_cxled_px=avg_cxled_px,
+                                              last_update_date_time=order_journal_obj.order_event_date_time,
+                                              order_status=OrderStatusType.OE_DOD))
+                    symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_order_journal(
                         order_journal_obj, order_snapshot_obj)
-                # else not require_create_update_symbol_side_snapshot_from_order_journald: if symbol_side_snapshot
-                # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_order_journal
-                # which would have got added to alert already
+                    if symbol_side_snapshot is not None:
+                        updated_strat_brief = await self._update_strat_brief_from_order(order_snapshot_obj,
+                                                                                        symbol_side_snapshot)
+                        await self._update_pair_strat_from_order_journal(order_journal_obj, order_snapshot_obj,
+                                                                         updated_strat_brief)
+                        await self._update_portfolio_status_from_order_journal(
+                            order_journal_obj, order_snapshot_obj)
+                    # else not require_create_update_symbol_side_snapshot_from_order_journald: if symbol_side_snapshot
+                    # is None then it means some error occurred in
+                    # _create_update_symbol_side_snapshot_from_order_journal which would have got added to alert already
+
+                # else not required: none returned object signifies there was something wrong in
+                # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
 
             case OrderEventType.OE_CXL_REJ:
                 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
                     underlying_partial_update_order_snapshot_http
                 order_snapshot_obj = await self._check_state_and_get_order_snapshot_obj(
                     order_journal_obj, [OrderStatusType.OE_CXL_UNACK], OrderEventType.OE_CXL_REJ)
-                if order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty > 0:
-                    order_status = OrderStatusType.OE_ACKED
-                elif order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty > 0:
-                    order_status = OrderStatusType.OE_OVER_FILLED
-                else:
-                    order_status = OrderStatusType.OE_FILLED
-                await underlying_partial_update_order_snapshot_http(
-                    OrderSnapshotOptional(_id=order_snapshot_obj.id,
-                                          last_update_date_time=order_journal_obj.order_event_date_time,
-                                          order_status=order_status))
+                if order_snapshot_obj is not None:
+                    if order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty > 0:
+                        order_status = OrderStatusType.OE_ACKED
+                    elif order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty > 0:
+                        order_status = OrderStatusType.OE_OVER_FILLED
+                    else:
+                        order_status = OrderStatusType.OE_FILLED
+                    await underlying_partial_update_order_snapshot_http(
+                        OrderSnapshotOptional(_id=order_snapshot_obj.id,
+                                              last_update_date_time=order_journal_obj.order_event_date_time,
+                                              order_status=order_status))
+                # else not required: none returned object signifies there was something wrong in
+                # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
+
             case OrderEventType.OE_REJ:
                 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
                     underlying_partial_update_order_snapshot_http
                 order_snapshot_obj = \
                     await self._check_state_and_get_order_snapshot_obj(
                         order_journal_obj, [OrderStatusType.OE_ACKED], OrderEventType.OE_REJ)
-                order_brief_obj = OrderBrief(**order_snapshot_obj.order_brief.dict())
-                order_brief_obj.text.extend(order_journal_obj.order.text)
-                cxled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
-                cxled_notional = order_snapshot_obj.cxled_qty * order_snapshot_obj.order_brief.px
-                avg_cxled_px = (cxled_notional / cxled_qty) if cxled_qty != 0 else 0
-                order_snapshot_obj = await underlying_partial_update_order_snapshot_http(
-                    OrderSnapshotOptional(
-                        _id=order_snapshot_obj.id,
-                        order_brief=order_brief_obj,
-                        cxled_qty=cxled_qty,
-                        cxled_notional=cxled_notional,
-                        avg_cxled_px=avg_cxled_px,
-                        last_update_date_time=order_journal_obj.order_event_date_time,
-                        order_status=OrderStatusType.OE_DOD))
-                symbol_side_snapshot = \
-                    await self._create_update_symbol_side_snapshot_from_order_journal(order_journal_obj,
-                                                                                      order_snapshot_obj)
-                if symbol_side_snapshot is not None:
-                    updated_strat_brief = await self._update_strat_brief_from_order(order_snapshot_obj,
-                                                                                    symbol_side_snapshot)
-                    await self._update_pair_strat_from_order_journal(order_journal_obj, order_snapshot_obj,
-                                                                     updated_strat_brief)
-                    await self._update_portfolio_status_from_order_journal(
-                        order_journal_obj, order_snapshot_obj)
-                # else not require_create_update_symbol_side_snapshot_from_order_journald: if symbol_side_snapshot
-                # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_order_journal
-                # which would have got added to alert already
+
+                if order_snapshot_obj is not None:
+                    order_brief_obj = OrderBrief(**order_snapshot_obj.order_brief.dict())
+                    order_brief_obj.text.extend(order_journal_obj.order.text)
+                    cxled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
+                    cxled_notional = order_snapshot_obj.cxled_qty * order_snapshot_obj.order_brief.px
+                    avg_cxled_px = (cxled_notional / cxled_qty) if cxled_qty != 0 else 0
+                    order_snapshot_obj = await underlying_partial_update_order_snapshot_http(
+                        OrderSnapshotOptional(
+                            _id=order_snapshot_obj.id,
+                            order_brief=order_brief_obj,
+                            cxled_qty=cxled_qty,
+                            cxled_notional=cxled_notional,
+                            avg_cxled_px=avg_cxled_px,
+                            last_update_date_time=order_journal_obj.order_event_date_time,
+                            order_status=OrderStatusType.OE_DOD))
+                    symbol_side_snapshot = \
+                        await self._create_update_symbol_side_snapshot_from_order_journal(order_journal_obj,
+                                                                                          order_snapshot_obj)
+                    if symbol_side_snapshot is not None:
+                        updated_strat_brief = await self._update_strat_brief_from_order(order_snapshot_obj,
+                                                                                        symbol_side_snapshot)
+                        await self._update_pair_strat_from_order_journal(order_journal_obj, order_snapshot_obj,
+                                                                         updated_strat_brief)
+                        await self._update_portfolio_status_from_order_journal(
+                            order_journal_obj, order_snapshot_obj)
+                    # else not require_create_update_symbol_side_snapshot_from_order_journald:
+                    # if symbol_side_snapshot is None then it means some error occurred in
+                    # _create_update_symbol_side_snapshot_from_order_journal which would have
+                    # got added to alert already
+                # else not required: none returned object signifies there was something wrong in
+                # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
 
             case other:
                 err_str = f"Unsupported Order event - {other} in order_journal object - {order_journal_obj}"
@@ -485,11 +504,12 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                             updated_strat_status_obj.total_cxl_sell_notional += \
                                 order_snapshot.cxled_qty * order_snapshot.order_brief.px
                             updated_strat_status_obj.avg_cxl_sell_px = \
-                                (
-                                        updated_strat_status_obj.total_cxl_sell_notional / updated_strat_status_obj.total_cxl_sell_qty) \
+                                (updated_strat_status_obj.total_cxl_sell_notional /
+                                 updated_strat_status_obj.total_cxl_sell_qty) \
                                     if updated_strat_status_obj.total_cxl_sell_qty != 0 else 0
                             updated_strat_status_obj.total_cxl_exposure = \
-                                updated_strat_status_obj.total_cxl_buy_notional - updated_strat_status_obj.total_cxl_sell_notional
+                                updated_strat_status_obj.total_cxl_buy_notional - \
+                                updated_strat_status_obj.total_cxl_sell_notional
                         case other:
                             err_str = f"Unsupported Order Event type {other}"
                             await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
@@ -499,7 +519,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         updated_strat_status_obj.avg_open_sell_px = 0
                     else:
                         updated_strat_status_obj.avg_open_sell_px = \
-                            updated_strat_status_obj.total_open_sell_notional / updated_strat_status_obj.total_open_sell_qty
+                            updated_strat_status_obj.total_open_sell_notional / \
+                            updated_strat_status_obj.total_open_sell_qty
                 case other:
                     err_str = f"Unsupported Side Type {other} received in order journal {order_journal_obj} " \
                               f"while updating strat_status"

@@ -99,16 +99,7 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
         routes_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
         output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str += f"from {model_file_path} import "
-        if self.int_id_message_list:
-            for message in self.int_id_message_list:
-                output_str += message.proto.name
-                if message != self.int_id_message_list[-1]:
-                    output_str += ", "
-                else:
-                    output_str += "\n\n\n"
-        else:
-            output_str += "\n\n\n"
+        output_str += f"from {model_file_path} import *\n"
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
         output_str += f"async def init_max_id_handler(root_base_model):\n"
         output_str += f'    root_base_model.init_max_id(0)\n\n\n'

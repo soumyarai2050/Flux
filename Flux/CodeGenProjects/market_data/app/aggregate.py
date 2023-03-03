@@ -1,30 +1,30 @@
 # Market Depth cumulative average
 cum_px_qty_aggregate_query = {"aggregate": [
     {
-        "$setWindowFields" : {
+        "$setWindowFields": {
             "partitionBy": {"symbol": "$symbol", "side": "$side"},
-            "sortBy" : {
-                "position" : 1.0
+            "sortBy": {
+                "position": 1.0
             },
-            "output" : {
-                "cumulative_notional" : {
-                    "$sum" : {
-                        "$multiply" : [
+            "output": {
+                "cumulative_notional": {
+                    "$sum": {
+                        "$multiply": [
                             "$px",
                             "$qty"
                         ]
                     },
-                    "window" : {
-                        "documents" : [
+                    "window": {
+                        "documents": [
                             "unbounded",
                             "current"
                         ]
                     }
                 },
-                "cumulative_qty" : {
-                    "$sum" : "$qty",
-                    "window" : {
-                        "documents" : [
+                "cumulative_qty": {
+                    "$sum": "$qty",
+                    "window": {
+                        "documents": [
                             "unbounded",
                             "current"
                         ]
@@ -34,9 +34,9 @@ cum_px_qty_aggregate_query = {"aggregate": [
         }
     },
     {
-        "$addFields" : {
-            "cumulative_avg_px" : {
-                "$divide" : [
+        "$addFields": {
+            "cumulative_avg_px": {
+                "$divide": [
                     "$cumulative_notional",
                     "$cumulative_qty"
                 ]
@@ -46,7 +46,7 @@ cum_px_qty_aggregate_query = {"aggregate": [
 ]}
 
 
-def get_pair_side_brief_from_side(symbol: str):     # NOQA
+def get_pair_side_brief_from_side(symbol: str):  # NOQA
     return {"aggregate": [
         {
             "$unwind": {
@@ -65,7 +65,8 @@ def get_pair_side_brief_from_side(symbol: str):     # NOQA
         }
     ]}
 
-def get_max_market_depth_obj(symbol: str, side: str):     # NOQA
+
+def get_max_market_depth_obj(symbol: str, side: str):  # NOQA
     return {"aggregate": [
         {
             "$match": {
@@ -86,7 +87,8 @@ def get_max_market_depth_obj(symbol: str, side: str):     # NOQA
         }
     ]}
 
-def get_last_n_sec_total_qty(symbol: str,last_n_sec: float):   # NOQA
+
+def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):  # NOQA
     return [
         {
             "$setWindowFields": {
@@ -112,7 +114,8 @@ def get_last_n_sec_total_qty(symbol: str,last_n_sec: float):   # NOQA
         }
     ]
 
-def get_top_of_book_from_symbol(symbol: str):   # NOQA
+
+def get_top_of_book_from_symbol(symbol: str):  # NOQA
     return {"aggregate": [
         {
             "$match": {

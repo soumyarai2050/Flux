@@ -20,7 +20,6 @@ const Row = (props) => {
         originalData,
         collections,
         onUpdate,
-        compare,
         onRowClick,
         onButtonClick,
         onCheckboxChange,
@@ -79,7 +78,6 @@ const Row = (props) => {
                         currentValue={value}
                         previousValue={previousValue}
                         collection={collection}
-                        compare={compare}
                         xpath={xpath}
                         dataxpath={dataxpath}
                         dataAdd={dataAdd}
@@ -108,7 +106,6 @@ const Row = (props) => {
         originalData,
         collections,
         onUpdate,
-        compare,
         onRowClick,
         onButtonClick,
         onCheckboxChange,
@@ -128,7 +125,6 @@ Row.propTypes = {
     data: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     originalData: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     collections: PropTypes.array.isRequired,
-    compare: PropTypes.bool,
     onUpdate: PropTypes.func.isRequired,
     onRowSelect: PropTypes.func.isRequired,
     onRowDisselect: PropTypes.func.isRequired,
@@ -139,10 +135,6 @@ Row.propTypes = {
     onSelectItemChange: PropTypes.func.isRequired,
     onAutocompleteOptionChange: PropTypes.func.isRequired,
     onDateTimeChange: PropTypes.func.isRequired
-}
-
-Row.defaultProps = {
-    compare: true
 }
 
 export default Row;

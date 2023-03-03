@@ -10,7 +10,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from Flux.PyCodeGenEngine.PluginPydentic.base_pydantic_model_plugin import BasePydanticModelPlugin, main
+from Flux.PyCodeGenEngine.PluginPydentic.base_pydantic_model_plugin import BasePydanticModelPlugin, main, IdType
 
 
 class CachedPydanticModelPlugin(BasePydanticModelPlugin):
@@ -44,47 +44,55 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
 
         return output_str
 
-    def _check_id_int_field(self, message: protogen.Message) -> bool:
+    def _check_id_int_field(self, message: protogen.Message) -> IdType:
         """ Checking if id is of auto-increment int type"""
-        # If message contain id field of int type then overriding that id field with incremental id field
         for field in message.fields:
-            if message in self.root_message_list and \
-                    field.proto.name == CachedPydanticModelPlugin.default_id_field_name and \
-                    "int" == self.proto_to_py_datatype(field):
-                return True
+            if field.proto.name == CachedPydanticModelPlugin.default_id_field_name:
+                if "int" == self.proto_to_py_datatype(field):
+                    return IdType.INT_ID
+                elif "str" == self.proto_to_py_datatype(field):
+                    return IdType.STR_ID
+                break
             # else not required: if message doesn't contain id field then else of this for loop will
-            # handle id field creation for this pydantic class. If message contains id field but is not
-            # of int type then override will be avoided
+            # handle int id field creation for this pydantic class as default id type.
+            # If message contains id field but is not of int type then override will be avoided
         else:
-            if message in self.root_message_list and CachedPydanticModelPlugin.default_id_field_name not in \
-                    [field.proto.name for field in message.fields]:
-                return True
+            if message in self.root_message_list:
+                # Default case for cached impl
+                return IdType.INT_ID
             else:
-                return False
+                return IdType.NO_ID
 
-    def _handle_pydantic_class_declaration(self, message: protogen.Message) -> Tuple[str, bool]:
-        # auto_gen_id=True: If int id field is present in message or If id field doesn't exist in message
+    def _handle_pydantic_class_declaration(self, message: protogen.Message) -> Tuple[str, bool, IdType]:
+        # auto_gen_id_type = DEFAULT | INT_ID: If int id field is present in message or
+        #                   If id field doesn't exist in message
         #                   then using default int auto-increment id implementation
-        # auto_gen_id=False: If id field exists but of non-int type in message
-        auto_gen_id: bool = self._check_id_int_field(message)
-        is_msg_root = False
+        # auto_gen_id_type = STR_ID: If id field exists but of str type in message
+        # auto_gen_id_type = NO_ID: If no id field exists then no handling for id
+        auto_gen_id_type: IdType = self._check_id_int_field(message)
+        if message in self.root_message_list:
+            is_msg_root = True
+        else:
+            is_msg_root = False
         if self.response_field_case_style.lower() == "snake":
-            if auto_gen_id:
-                is_msg_root = True
+            if auto_gen_id_type == IdType.INT_ID or auto_gen_id_type == IdType.DEFAULT:
                 output_str = f"class {message.proto.name}(IncrementalIdCacheBaseModel):\n"
+            elif auto_gen_id_type == IdType.STR_ID:
+                output_str = f"class {message.proto.name}(UniqueStrIdBaseModel):\n"
             else:
                 output_str = f"class {message.proto.name}(BaseModel):\n"
         elif self.response_field_case_style.lower() == "camel":
-            if auto_gen_id:
-                is_msg_root = True
+            if auto_gen_id_type == IdType.INT_ID or auto_gen_id_type == IdType.DEFAULT:
                 output_str = f"class {message.proto.name}(IncrementalIdCamelCacheBaseModel):\n"
+            elif auto_gen_id_type == IdType.STR_ID:
+                output_str = f"class {message.proto.name}(UniqueStrIdCamelBaseModel):\n"
             else:
                 output_str = f"class {message.proto.name}(CamelCacheBaseModel):\n"
         else:
             err_str = f"{self.response_field_case_style} is not supported response type"
             logging.exception(err_str)
             raise Exception(err_str)
-        return output_str, is_msg_root
+        return output_str, is_msg_root, auto_gen_id_type
 
     def _handle_class_docstring(self, message: protogen.Message) -> str:
         output_str = ""
@@ -105,8 +113,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         return output_str
 
     def handle_message_output(self, message: protogen.Message) -> str:
-        auto_gen_id = self._check_id_int_field(message)
-        output_str, is_msg_root = self._handle_pydantic_class_declaration(message)
+        output_str, is_msg_root, auto_gen_id_type = self._handle_pydantic_class_declaration(message)
 
         # Adding docstring if message lvl comment available
         output_str += self._handle_class_docstring(message)
@@ -115,18 +122,15 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         output_str += self._handle_cache_n_ws_connection_manager_data_members_override(message, is_msg_root)
 
         # Handling Id field
-        if auto_gen_id:
-            output_str += self._handle_incremental_id_protected_field_override(message)
+        output_str += self._handle_unique_id_required_fields(message, auto_gen_id_type)
 
         # handling remaining fields
         for field in message.fields:
-            if auto_gen_id and field.proto.name == CachedPydanticModelPlugin.default_id_field_name:
+            if field.proto.name == CachedPydanticModelPlugin.default_id_field_name:
                 continue
-            # else not required: if message is not JsonRoot or field is not default id and is not int type
-            # then allowing override on id field
             output_str += ' '*4 + self.handle_field_output(field)
 
-        output_str += self._handle_config_class_and_other_root_class_versions(message, auto_gen_id)
+        output_str += self._handle_config_class_and_other_root_class_versions(message, auto_gen_id_type)
 
         return output_str
 
@@ -147,17 +151,9 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
                 output_str += "from fastapi_utils.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
 
-        incremental_id_camel_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
+        incremental_id_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
                                                                              "incremental_id_basemodel")
-        if self.response_field_case_style.lower() == "snake":
-            output_str += f'from {incremental_id_camel_base_model_path} import IncrementalIdCacheBaseModel\n'
-        elif self.response_field_case_style.lower() == "camel":
-            output_str += f'from {incremental_id_camel_base_model_path} import IncrementalIdCamelCacheBaseModel, ' \
-                          f'CamelCacheBaseModel\n'
-        else:
-            err_str = f"{self.response_field_case_style} is not supported response type"
-            logging.exception(err_str)
-            raise Exception(err_str)
+        output_str += f'from {incremental_id_base_model_path} import *\n'
         generic_utils_import_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_utils")
         output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime\n"
         output_str += "from typing import List\n\n\n"

@@ -120,14 +120,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
 
         output_str += f"from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str += f'from {model_file_path} import '
-        for message in self.root_message_list:
-            output_str += message.proto.name
-            if message != self.root_message_list[-1]:
-                output_str += ", "
-            else:
-                output_str += "\n\n\n"
-
+        output_str += f'from {model_file_path} import *\n'
         output_str += self.handle_init_db()
 
         return output_str
@@ -138,14 +131,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         routes_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
         output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        if self.custom_id_primary_key_messages:
-            output_str += f"from {model_file_path} import "
-            for message in self.custom_id_primary_key_messages:
-                output_str += message.proto.name
-                if message != self.custom_id_primary_key_messages[-1]:
-                    output_str += ", "
-                else:
-                    output_str += "\n"
+        output_str += f"from {model_file_path} import *\n"
         # else not required: if no message with custom id is found then avoiding import statement
         database_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.database_file_name)
         output_str += f"from {database_file_path} import init_db\n\n\n"

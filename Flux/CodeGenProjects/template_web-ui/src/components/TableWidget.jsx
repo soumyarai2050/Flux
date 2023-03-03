@@ -395,7 +395,6 @@ const TableWidget = (props) => {
                                                 className={tableRowClass}
                                                 cells={cells}
                                                 collections={props.collections}
-                                                compare={props.compare}
                                                 data={props.data}
                                                 onAutocompleteOptionChange={onAutocompleteOptionChange}
                                                 onButtonClick={onButtonClick}

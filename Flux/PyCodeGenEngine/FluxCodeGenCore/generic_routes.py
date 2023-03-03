@@ -79,12 +79,67 @@ async def generic_put_http(pydantic_class_type, stored_pydantic_obj, pydantic_ob
                                          update_agg_pipeline)
 
 
+def _compare_n_patch_list(stored_pydantic_obj_list: List, pydantic_obj_updated_list: List):
+    if stored_pydantic_obj_list:
+        # checking data-type of elements in array
+        # Checking one the first element as other elements will have same data-type
+        if isinstance(stored_pydantic_obj_list[0], list):
+            stored_pydantic_obj_list.extend(pydantic_obj_updated_list)
+        elif isinstance(stored_pydantic_obj_list[0], dict):
+            if stored_pydantic_obj_list[0].get("id") is not None:
+                present_ids = [stored_pydantic_obj.get("id") for stored_pydantic_obj in stored_pydantic_obj_list]
+                for index, update_obj in enumerate(pydantic_obj_updated_list):
+                    if isinstance(update_obj, dict):
+                        if (updated_id := update_obj.get("id")) is not None:
+                            if updated_id not in present_ids:
+                                stored_pydantic_obj_list.append(update_obj)
+                            else:
+                                stored_index = present_ids.index(update_obj.get("id"))
+                                if all(value is None for key, value in update_obj.items() if key != "id"):
+                                    stored_pydantic_obj_list.remove(stored_pydantic_obj_list[stored_index])
+                                else:
+                                    stored_pydantic_obj_list[stored_index] = \
+                                        compare_n_patch_json(stored_pydantic_obj_list[stored_index], update_obj)
+                        else:
+                            err_str = "pydantic_obj_updated_list elements don't have id field but" \
+                                      "stored_pydantic_obj_list elements have"
+                            logging.exception(err_str)
+                            raise Exception(err_str)
+                    else:
+                        err_str = "pydantic_obj_updated_list elements are not same datatypes as " \
+                                  "stored_pydantic_obj_list elements"
+                        logging.exception(err_str)
+                        raise Exception(err_str)
+                return stored_pydantic_obj_list
+            else:
+                stored_pydantic_obj_list.extend(pydantic_obj_updated_list)
+                return stored_pydantic_obj_list
+        else:
+            stored_pydantic_obj_list.extend(pydantic_obj_updated_list)
+            return stored_pydantic_obj_list
+    else:
+        return pydantic_obj_updated_list
+
+
+def compare_n_patch_json(stored_pydantic_obj_dict: Dict, pydantic_obj_updated_dict: Dict):
+    for key, value in stored_pydantic_obj_dict.items():
+        if (updated_value := pydantic_obj_updated_dict.get(key)) is not None:
+            if isinstance(value, dict):
+                stored_pydantic_obj_dict[key] = \
+                    compare_n_patch_json(stored_pydantic_obj_dict[key], pydantic_obj_updated_dict[key])
+            elif isinstance(value, list):
+                stored_pydantic_obj_dict[key] = \
+                    _compare_n_patch_list(stored_pydantic_obj_dict[key], pydantic_obj_updated_dict[key])
+            else:
+                stored_pydantic_obj_dict[key] = updated_value
+    return stored_pydantic_obj_dict
+
+
 @http_except_n_log_error(status_code=500)
 async def generic_patch_http(pydantic_class_type, stored_pydantic_obj, pydantic_obj_updated,
                              filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None):
-    req_dict_without_none_val = {k: v for k, v in
-                                 pydantic_obj_updated.dict(exclude_unset=True, exclude_none=True).items()}
-    request_obj = {'$set': req_dict_without_none_val.items()}
+    updated_pydantic_obj_dict = compare_n_patch_json(stored_pydantic_obj.dict(), pydantic_obj_updated.dict())
+    request_obj = {'$set': updated_pydantic_obj_dict.items()}
     return await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
                                          pydantic_obj_updated, request_obj, filter_agg_pipeline,
                                          update_agg_pipeline)

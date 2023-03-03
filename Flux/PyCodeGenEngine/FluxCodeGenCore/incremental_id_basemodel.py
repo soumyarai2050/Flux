@@ -3,6 +3,8 @@ from typing import ClassVar, Dict, Any
 from threading import Lock
 from re import sub
 from pydantic import BaseModel
+from pendulum import DateTime
+import os
 
 
 def to_camel(value):
@@ -89,6 +91,7 @@ class CamelCacheBaseModel(CacheBaseModel, CamelBaseModel):
 class BareCamelBaseModel(BareBaseModel, CamelBaseModel):
     ...
 
+
 class IncrementalIdBaseModel(BaseModel):
     _max_id_val: ClassVar[int | None] = None
     _mutex: ClassVar[Lock] = Lock()
@@ -136,6 +139,33 @@ class IncrementalIdCacheBaseModel(CacheBaseModel, IncrementalIdBaseModel):
 
 class IncrementalIdCamelCacheBaseModel(CamelCacheBaseModel, IncrementalIdBaseModel):
     _max_id_val: ClassVar[int | None] = None
+    _mutex: ClassVar[Lock] = Lock()
+    read_ws_path_ws_connection_manager: ClassVar[Any] = None
+    read_ws_path_with_id_ws_connection_manager: ClassVar[Any] = None
+
+
+class UniqueStrIdBaseModel(BaseModel):
+    _mutex: ClassVar[Lock] = Lock()
+
+    @classmethod
+    def next_id(cls) -> str:
+        with cls._mutex:
+            return f"{DateTime.utcnow()}-{os.getpid()}"
+
+
+class UniqueStrIdCamelBaseModel(UniqueStrIdBaseModel, CamelBaseModel):
+    _mutex: ClassVar[Lock] = Lock()
+    read_ws_path_ws_connection_manager: ClassVar[Any] = None
+    read_ws_path_with_id_ws_connection_manager: ClassVar[Any] = None
+
+
+class UniqueStrIdCacheBaseModel(CacheBaseModel, UniqueStrIdBaseModel):
+    _mutex: ClassVar[Lock] = Lock()
+    read_ws_path_ws_connection_manager: ClassVar[Any] = None
+    read_ws_path_with_id_ws_connection_manager: ClassVar[Any] = None
+
+
+class UniqueStrIdCamelCacheBaseModel(CamelCacheBaseModel, UniqueStrIdBaseModel):
     _mutex: ClassVar[Lock] = Lock()
     read_ws_path_ws_connection_manager: ClassVar[Any] = None
     read_ws_path_with_id_ws_connection_manager: ClassVar[Any] = None

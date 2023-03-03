@@ -55,11 +55,11 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
-                     f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
+                     f"updated_{message_name_snake_cased}_obj: {message.proto.name}Optional):\n"
         output_str += "        pass\n\n"
         output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
                       f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
-                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
+                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}Optional):\n"
         output_str += "        pass\n\n"
         return output_str
 
@@ -248,13 +248,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "import logging\n"
         output_str += "from typing import Optional, TypeVar, List, Type\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str += f"from {model_file_path} import {FastapiCallbackFileHandler.default_id_type_var_name}, "
-        for message in self.root_message_list:
-            output_str += message.proto.name
-            if message != self.root_message_list[-1]:
-                output_str += ", "
-            else:
-                output_str += "\n\n\n"
+        output_str += f"from {model_file_path} import *\n"
         output_str += self.handle_get_set_instance()
 
         # Adding app pre- and post-launch methods

@@ -31,7 +31,6 @@ const Cell = (props) => {
         dataRemove,
         currentValue,
         previousValue,
-        compare
     } = props;
 
     const onFocusIn = useCallback(() => {
@@ -333,7 +332,7 @@ const Cell = (props) => {
     let disabledClass = disabled ? classes.disabled : '';
 
     let value = currentValue !== undefined && currentValue !== null ? currentValue.toLocaleString() : '';
-    if (compare && dataModified) {
+    if (mode === Modes.EDIT_MODE && dataModified) {
         let originalValue = previousValue !== undefined && previousValue !== null ? previousValue.toLocaleString() : '';
         return (
             <TableCell className={`${classes.cell} ${tableCellColorClass} ${disabledClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
@@ -358,7 +357,6 @@ Cell.propTypes = {
     currentValue: PropTypes.any,
     previousValue: PropTypes.any,
     collection: PropTypes.object.isRequired,
-    compare: PropTypes.bool.isRequired,
     xpath: PropTypes.string,
     dataxpath: PropTypes.string,
     dataAdd: PropTypes.bool.isRequired,
@@ -372,10 +370,6 @@ Cell.propTypes = {
     onSelectItemChange: PropTypes.func.isRequired,
     onAutocompleteOptionChange: PropTypes.func.isRequired,
     onDateTimeChange: PropTypes.func.isRequired
-}
-
-Cell.defaultProps = {
-    compare: true
 }
 
 export default memo(Cell, isEqual);

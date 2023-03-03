@@ -36,24 +36,13 @@ class AddressbookLogAnalyzer(LogAnalyzer):
         created: bool = False
         while not created:
             try:
-                portfolio_status_obj_list: List[PortfolioStatusBaseModel] = \
-                    self.strat_manager_service_web_client.get_all_portfolio_status_client()
-                if len(portfolio_status_obj_list) == 1:
-                    portfolio_status_base_model = PortfolioStatusBaseModel(**portfolio_status_obj_list[0].dict())
-                    alert_obj = Alert(dismiss=False, severity=severity, alert_brief=alert_brief,
-                                      alert_details=alert_details, impacted_order=None)
-                    if portfolio_status_base_model.portfolio_alerts is None:
-                        portfolio_status_base_model.portfolio_alerts = [alert_obj]
-                    else:
-                        portfolio_status_base_model.portfolio_alerts.append(alert_obj)
-                    self.strat_manager_service_web_client.put_portfolio_status_client(portfolio_status_base_model)
-                    created = True
-                    alert_created: bool = False
-                else:
-                    err_str = f"send_alerts failed;;; portfolio_status_obj count expected 1 found: " \
-                               f"{len(portfolio_status_obj_list)} while raising alert with severity: {severity}, brief: " \
-                               f"{alert_brief}, alert_details: {alert_details}"
-                    logging.critical(err_str)
+                portfolio_status_base_model = PortfolioStatusBaseModel(_id=1)
+                alert_obj = Alert(_id=Alert.next_id(), dismiss=False, severity=severity, alert_brief=alert_brief,
+                                  alert_details=alert_details, impacted_order=None)
+                portfolio_status_base_model.portfolio_alerts = [alert_obj]
+                self.strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_base_model)
+                created = True
+                alert_created: bool = False
             except Exception as e:
                 logging.error(f"_send_alerts failed;;; exception: {e}", exc_info=True)
                 time.sleep(60)
