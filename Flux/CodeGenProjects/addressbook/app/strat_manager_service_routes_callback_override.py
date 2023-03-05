@@ -1,6 +1,6 @@
 # system imports
 import time
-from typing import List, Type, Dict
+from typing import Type, Set
 import threading
 from pathlib import PurePath
 from datetime import date
@@ -867,8 +867,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
     async def get_pair_strat_sec_filter_json_query_pre(self, pair_strat_class_type: Type[PairStrat], security_id: str):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_pair_strat_http
-        from Flux.CodeGenProjects.addressbook.app.aggregate import get_pair_strat_sec_filter_json
-        return await underlying_read_pair_strat_http(get_pair_strat_sec_filter_json(security_id))
+        from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
+        return await underlying_read_pair_strat_http(get_ongoing_pair_strat_filter(security_id))
 
     def _set_new_strat_limit(self, pair_strat_obj: PairStrat) -> None:  # NOQA
         pair_strat_obj.strat_limits = get_new_strat_limits()
@@ -1338,3 +1338,20 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             underlying_read_order_journal_http
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_last_n_sec_orders_by_event
         return await underlying_read_order_journal_http(get_last_n_sec_orders_by_event(symbol, last_n_sec, order_event))
+
+    async def get_ongoing_strats_query_pre(self, ongoing_strat_symbols_class_type: Type[OngoingStratSymbols]):
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            underlying_read_pair_strat_http
+        from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
+
+        pair_strat_list: List[PairStrat] = await underlying_read_pair_strat_http(get_ongoing_pair_strat_filter())
+        ongoing_symbols: Set[str] = set()
+
+        for pair_strat in pair_strat_list:
+            buy_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+            sell_symbol = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+            ongoing_symbols.add(buy_symbol)
+            ongoing_symbols.add(sell_symbol)
+
+        ongoing_strat_symbols = OngoingStratSymbols(symbols=list(ongoing_symbols))
+        return [ongoing_strat_symbols]

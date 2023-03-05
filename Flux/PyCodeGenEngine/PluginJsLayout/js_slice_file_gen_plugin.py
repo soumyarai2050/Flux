@@ -117,7 +117,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if message_name not in self.dependent_to_abbreviated_message_relation_dict.values():
             output_str = f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
                          f" () => " + "{\n"
-            output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}/`)\n"
+            output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
             output_str += "        .then(res => res.data);\n"
             output_str += "})\n\n"
         else:
@@ -185,7 +185,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const update{message_name} = createAsyncThunk('{message_name_camel_cased}/update', " \
                      f"(payload) => "+"{\n"
-        output_str += "    return axios.put(`${API_ROOT_URL}/put-"+f"{message_name_snake_cased}"+"`, payload)\n"
+        output_str += "    return axios.patch(`${API_ROOT_URL}/patch-"+f"{message_name_snake_cased}"+"`, payload)\n"
         output_str += "        .then(res => res.data);\n"
         output_str += "})\n\n"
         return output_str

@@ -67,10 +67,15 @@ WidgetContainer.propTypes = {
     menu: PropTypes.oneOfType([PropTypes.element, PropTypes.string]),
     mode: PropTypes.string,
     layout: PropTypes.string,
+    commonkeys: PropTypes.array.isRequired,
     onChangeMode: PropTypes.func,
     onChangeLayout: PropTypes.func,
     onSave: PropTypes.func,
     children: PropTypes.any
+}
+
+WidgetContainer.defaultProps = {
+    commonkeys: []
 }
 
 export default WidgetContainer;

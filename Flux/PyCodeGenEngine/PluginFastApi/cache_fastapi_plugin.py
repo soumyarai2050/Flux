@@ -72,15 +72,9 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
                 # else not required: avoiding repetition
 
             if CacheFastApiPlugin.flux_msg_json_query in str(message.proto.options):
-                if message in self.root_message_list:
-                    if message not in self.query_message_dict:
-                        self.query_message_dict[message] = self.get_query_option_message_values(message)
-                    # else not required: avoiding repetition
-                else:
-                    err_str = "Query type message should be root message also to perform db queries, " \
-                              f"message {message.proto.name} is not JsonRoot"
-                    logging.exception(err_str)
-                    raise Exception(err_str)
+                if message not in self.query_message_dict:
+                    self.query_message_dict[message] = self.get_query_option_message_values(message)
+                # else not required: avoiding repetition
             # else not required: avoiding list append if msg is not having option for query
 
             self.load_dependency_messages_and_enums_in_dicts(message)

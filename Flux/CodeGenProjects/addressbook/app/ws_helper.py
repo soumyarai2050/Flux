@@ -3,7 +3,8 @@ from typing import List
 from pydantic import BaseModel
 
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import TopOfBookBaseModel
+from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import TopOfBookBaseModel, \
+    MarketDepthBaseModel
 
 
 # needed for list parsing - for now
@@ -46,3 +47,9 @@ class FillsJournalBaseModelList(BaseModel):
 
 class StratBriefBaseModelList(BaseModel):
     __root__: List[StratBriefBaseModel]
+
+
+class MarketDepthBaseModelList(BaseModel):
+    __root__: List[MarketDepthBaseModel]
+
+

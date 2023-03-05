@@ -248,16 +248,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    headerProps={{\n"
         output_str += "                        name: props.name,\n"
         output_str += "                        title: title,\n"
-        if layout_type != JsxFileGenPlugin.repeated_root_type and layout_type != JsxFileGenPlugin.repeated_non_root_type:
+        if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                        mode: mode,\n"
-        output_str += "                        layout: props.layout,\n"
+            output_str += "                        layout: props.layout,\n"
         output_str += "                        menu: menu,\n"
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type or \
                 layout_type == JsxFileGenPlugin.repeated_non_root_type:
-            if layout_type != JsxFileGenPlugin.repeated_root_type and \
-                    layout_type != JsxFileGenPlugin.repeated_non_root_type:
+            if layout_type != JsxFileGenPlugin.repeated_root_type:
                 output_str += "                        onChangeMode: onChangeMode,\n"
-            output_str += "                        onChangeLayout: props.onChangeLayout,\n"
+                output_str += "                        onChangeLayout: props.onChangeLayout,\n"
             output_str += "                        onSave: onSave,\n"
             output_str += "                        onReload: onReload\n"
             output_str += "                    }}\n"
@@ -286,8 +285,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    xpath={currentSchemaXpath}\n"
         output_str += "                    onUserChange={onUserChange}\n"
         output_str += "                    onButtonToggle={onButtonToggle}\n"
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "                    compare={false}\n"
         output_str += "                />\n"
         output_str += "            ) : props.layout === Layouts.TREE_LAYOUT ? (\n"
         output_str += "                <TreeWidget\n"
@@ -655,7 +652,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                         f"selected{self.abbreviated_dependent_message_name}Id])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += "        let socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
-                          "'ws')}/get-all-"+f"{message_name_snake_cased}"+"-ws/`);\n"
+                          "'ws')}/get-all-"+f"{message_name_snake_cased}"+"-ws`);\n"
             output_str += "        setGetAllWebsocket(socket);\n"
             output_str += "        // close the websocket on re-render\n"
             output_str += "        return () => socket.close();\n"

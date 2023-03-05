@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, Tooltip, ClickAwayListener } from '@mui/material';
 import PropTypes from 'prop-types';
 import { clearxpath, getColorTypeFromValue, isValidJsonString } from '../utils';
-import { ColorTypes, DataTypes } from '../constants';
+import { DataTypes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
 import _, { cloneDeep } from 'lodash';
 import classes from './CommonKeyWidget.module.css';
@@ -93,7 +93,7 @@ const CommonKey = (props) => {
         color = getColorTypeFromValue(collection, collection.value);
     }
     let commonkeyColorClass = classes[color];
-    
+
     let commonkeyTitleColorClass = '';
     if (collection.nameColor) {
         let nameColor = collection.nameColor.toLowerCase();

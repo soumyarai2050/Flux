@@ -7,34 +7,36 @@ from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import \
     is_ongoing_pair_strat
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 
-
 class TradingDataManager:
     def __init__(self, executor_trigger_method: Callable):
         trading_base_url: str = "ws://127.0.0.1:8020/addressbook"
         market_data_base_url: str = "ws://127.0.0.1:8040/market_data"
+        cpp_ws_url: str = "ws://127.0.0.1:8083/"
         self.trading_cache: TradingCache = TradingCache()
 
-        self.top_of_book_ws_cont = WSReader(f"{market_data_base_url}/get-all-top_of_book-ws/", TopOfBookBaseModel,
+        self.top_of_book_ws_cont = WSReader(f"{market_data_base_url}/get-all-top_of_book-ws", TopOfBookBaseModel,
                                             TopOfBookBaseModelList, self.handle_top_of_book_ws)
 
-        self.pair_strat_ws_cont = WSReader(f"{trading_base_url}/get-all-pair_strat-ws/", PairStratBaseModel,
+        self.pair_strat_ws_cont = WSReader(f"{trading_base_url}/get-all-pair_strat-ws", PairStratBaseModel,
                                            PairStratBaseModelList, self.handle_pair_strat_ws, False)
-        self.portfolio_status_ws_cont = WSReader(f"{trading_base_url}/get-all-portfolio_status-ws/",
+        self.portfolio_status_ws_cont = WSReader(f"{trading_base_url}/get-all-portfolio_status-ws",
                                                  PortfolioStatusBaseModel,
                                                  PortfolioStatusBaseModelList, self.handle_portfolio_status_ws, False)
-        self.portfolio_limits_ws_cont = WSReader(f"{trading_base_url}/get-all-portfolio_limits-ws/",
+        self.portfolio_limits_ws_cont = WSReader(f"{trading_base_url}/get-all-portfolio_limits-ws",
                                                  PortfolioLimitsBaseModel,
                                                  PortfolioLimitsBaseModelList, self.handle_portfolio_limits_ws, False)
-        self.order_limits_ws_cont = WSReader(f"{trading_base_url}/get-all-order_limits-ws/", OrderLimitsBaseModel,
+        self.order_limits_ws_cont = WSReader(f"{trading_base_url}/get-all-order_limits-ws", OrderLimitsBaseModel,
                                              OrderLimitsBaseModelList, self.handle_order_limits_ws, False)
-        self.order_journal_ws_cont = WSReader(f"{trading_base_url}/get-all-order_journal-ws/", OrderJournalBaseModel,
+        self.order_journal_ws_cont = WSReader(f"{trading_base_url}/get-all-order_journal-ws", OrderJournalBaseModel,
                                               OrderJournalBaseModelList, self.handle_order_journal_ws, False)
-        self.strat_brief_ws_cont = WSReader(f"{trading_base_url}/get-all-strat_brief-ws/", StratBriefBaseModel,
+        self.strat_brief_ws_cont = WSReader(f"{trading_base_url}/get-all-strat_brief-ws", StratBriefBaseModel,
                                             StratBriefBaseModelList, self.handle_strat_brief_ws, False)
-        self.cancel_order_ws_cont = WSReader(f"{trading_base_url}/get-all-cancel_order-ws/", CancelOrderBaseModel,
+        self.cancel_order_ws_cont = WSReader(f"{trading_base_url}/get-all-cancel_order-ws", CancelOrderBaseModel,
                                              CancelOrderBaseModelList, self.handle_cancel_order_ws, True)
-        self.new_order_ws_cont = WSReader(f"{trading_base_url}/get-all-new_order-ws/", NewOrderBaseModel,
+        self.new_order_ws_cont = WSReader(f"{trading_base_url}/get-all-new_order-ws", NewOrderBaseModel,
                                           NewOrderBaseModelList, self.handle_new_order_ws, True)
+        self.market_depth_ws_const = WSReader(cpp_ws_url, MarketDepthBaseModel, MarketDepthBaseModelList,
+                                              self.handle_market_depth_ws, False)
 
         self.executor_trigger_method = executor_trigger_method
         self.strat_thread_dict: dict[str, Tuple['StratExecutor', Thread]] = dict()
@@ -215,3 +217,6 @@ class TradingDataManager:
             # else not required - strat does not need this update notification
 
         logging.debug(f"Updated top_of_book cache for keys: {key1}, {key2} ;;; top_of_book: {top_of_book_}")
+
+    def handle_market_depth_ws(self, market_depth_: MarketDepthBaseModel):      # NOQA
+        print(market_depth_)

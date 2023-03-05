@@ -30,10 +30,36 @@ cum_price_size_aggregate_json = {"aggregate": [
 ]}
 
 
-def get_pair_strat_sec_filter_json(security_id: str):
-    return {"aggregate": [
+def get_ongoing_pair_strat_filter(security_id: str | None = None):
+    agg_pipeline = {"aggregate": [
+        {
+            "$match": {}
+        },
         {
             "$match": {
+                "$or": [
+                    {
+                        "strat_status.strat_state": {
+                            "$eq": "StratState_ACTIVE"
+                        }
+                    },
+                    {
+                        "strat_status.strat_state": {
+                            "$eq": "StratState_PAUSED"
+                        }
+                    },
+                    {
+                        "strat_status.strat_state": {
+                            "$eq": "StratState_ERROR"
+                        }
+                    }
+                ]
+            },
+        }
+    ]}
+
+    if security_id is not None:
+        agg_pipeline["aggregate"][0]["$match"] = {
                 "$or": [
                     {
                         "pair_strat_params.strat_leg1.sec.sec_id": {
@@ -46,9 +72,9 @@ def get_pair_strat_sec_filter_json(security_id: str):
                         }
                     }
                 ]
-            },
-        }
-    ]}
+            }
+
+    return agg_pipeline
 
 
 def get_strat_brief_from_symbol(security_id: str):

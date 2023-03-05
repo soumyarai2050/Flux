@@ -183,17 +183,20 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
         for field in message.fields:
             if field.proto.name == BasePydanticModelPlugin.default_id_field_name:
-                output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = " \
-                              f"Field(alias='_id')\n"
+                if message in self.root_message_list:
+                    output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = " \
+                                  f"Field(alias='_id')\n"
+                continue
+            # else not required: If message is not root type then avoiding id field in optional version so that
+            # it's id can be generated if not provided inside root message
+            if field.message is not None:
+                field_type = f"{field.message.proto.name}Optional"
             else:
-                if field.message is not None:
-                    field_type = f"{field.message.proto.name}Optional"
-                else:
-                    field_type = self.proto_to_py_datatype(field)
-                if field.cardinality.name.lower() == "repeated":
-                    output_str += f"    {field.proto.name}: List[{field_type}] | None = None\n"
-                else:
-                    output_str += f"    {field.proto.name}: {field_type} | None = None\n"
+                field_type = self.proto_to_py_datatype(field)
+            if field.cardinality.name.lower() == "repeated":
+                output_str += f"    {field.proto.name}: List[{field_type}] | None = None\n"
+            else:
+                output_str += f"    {field.proto.name}: {field_type} | None = None\n"
 
         return output_str
 
@@ -355,24 +358,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def _import_current_models(self) -> str:
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str = f"from {model_file_path} import {BasePydanticModelPlugin.default_id_type_var_name}, " \
-                     f"{BasePydanticModelPlugin.proto_package_var_name}, "
-        # importing enums
-        for enum in self.enum_list:
-            output_str += enum.proto.name + ", "
-
-        for message in self.ordered_message_list:
-            output_str += message.proto.name
-            if message in self.root_message_list:
-                output_str += ", "
-                output_str += f"{message.proto.name}Optional"
-                output_str += ", "
-                output_str += f"{message.proto.name}BaseModel"
-            # else not required: if message is not of root type then optional abd basemodel version doesn't exist
-            if message != self.ordered_message_list[-1]:
-                output_str += ", "
-            else:
-                output_str += "\n"
+        output_str = f"from {model_file_path} import *\n"
         return output_str
 
     def handle_model_import_file_gen(self) -> str:

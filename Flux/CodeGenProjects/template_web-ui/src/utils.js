@@ -662,7 +662,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
 
             }
         }
-    } else if(currentSchema.type === DataTypes.ARRAY) {
+    } else if (currentSchema.type === DataTypes.ARRAY) {
         // TODO: add support for array for primitive data types
     }
 }
@@ -1181,7 +1181,7 @@ export function getTableColumns(collections, mode) {
     return columns;
 }
 
-export function getCommonKeyCollections(rows, tableColumns, hide = false) {
+export function getCommonKeyCollections(rows, tableColumns, hide = true) {
     if (rows.length > 1) {
         tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => column.type !== 'button');
     }

@@ -35,5 +35,18 @@ const AbbreviatedJson = (props) => {
     )
 }
 
+AbbreviatedJson.propTypes = {
+    text: PropTypes.string.isRequired,
+    open: PropTypes.bool.isRequired,
+    src: PropTypes.oneOfType([PropTypes.array, PropTypes.object]).isRequired,
+    onClose: PropTypes.func.isRequired
+}
+
+AbbreviatedJson.defaultProps = {
+    text: JSON.stringify({}),
+    open: false,
+    src: {}
+}
+
 export default AbbreviatedJson;
 

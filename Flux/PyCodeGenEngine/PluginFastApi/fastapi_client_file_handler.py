@@ -120,35 +120,35 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
             BaseFastapiPlugin.flux_json_root_create_field: f"self.create_{message_name_snake_cased}_client_url: "
                                                            "str = f'http://{self.host}:{self.port}/" +
                                                            f"{self.proto_file_package}/"
-                                                           f"create-{message_name_snake_cased}/'",
+                                                           f"create-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_read_field: f"self.get_{message_name_snake_cased}_client_url: str = "
                                                          "f'http://{self.host}:{self.port}/" +
                                                          f"{self.proto_file_package}/"
-                                                         f"get-{message_name_snake_cased}/'",
+                                                         f"get-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_update_field: f"self.put_{message_name_snake_cased}_client_url: str = "
                                                            "f'http://{self.host}:{self.port}/" +
                                                            f"{self.proto_file_package}/"
-                                                           f"put-{message_name_snake_cased}/'",
+                                                           f"put-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_patch_field: f"self.patch_{message_name_snake_cased}_client_url: "
                                                           "str = f'http://{self.host}:{self.port}/" +
                                                           f"{self.proto_file_package}/"
-                                                          f"patch-{message_name_snake_cased}/'",
+                                                          f"patch-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_delete_field: f"self.delete_{message_name_snake_cased}_client_url: "
                                                            "str = f'http://{self.host}:{self.port}/" +
                                                            f"{self.proto_file_package}/"
-                                                           f"delete-{message_name_snake_cased}/'",
+                                                           f"delete-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_read_websocket_field: f"self.get_{message_name_snake_cased}_"
                                                                    f"client_ws_url: "
                                                                    "str = f'ws://{self.host}:{self.port}/" +
                                                                    f"{self.proto_file_package}/get-"
-                                                                   f"{message_name_snake_cased}-ws/'"
+                                                                   f"{message_name_snake_cased}-ws'"
         }
         output_str += " " * 8 + "self.get_all_" + f"{message_name_snake_cased}" + \
                       "_client_url: str = f'http://{self.host}:{self.port}/" + \
-                      f"{self.proto_file_package}/get-all-{message_name_snake_cased}/'\n"
+                      f"{self.proto_file_package}/get-all-{message_name_snake_cased}'\n"
         output_str += " " * 8 + "self.get_all_" + f"{message_name_snake_cased}" + \
                       "_client_ws_url: str = f'ws://{self.host}:{self.port}/" \
-                      + f"{self.proto_file_package}/get-all-{message_name_snake_cased}-ws/'\n"
+                      + f"{self.proto_file_package}/get-all-{message_name_snake_cased}-ws'\n"
 
         for crud_option_field_name, url in crud_field_name_to_url_dict.items():
             if crud_option_field_name in option_dict:
@@ -160,7 +160,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
             if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_index):
                 output_str += " " * 8 + f"self.get_{message_name_snake_cased}_from_index_fields_client_url: " \
                                         f"str = f'http://" + "{self.host}:{self.port}/" + \
-                              f"{self.proto_file_package}/get-{message_name_snake_cased}-from-index-fields/'\n"
+                              f"{self.proto_file_package}/get-{message_name_snake_cased}-from-index-fields'\n"
                 break
             # else not required: Avoiding field if index option is not enabled
 

@@ -5,7 +5,7 @@ import os
 from pendulum import DateTime
 from threading import Lock
 
-from Flux.CodeGenProjects.addressbook.app.aggregate import get_pair_strat_sec_filter_json
+from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import  *
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
     StratManagerServiceWebClient
@@ -37,20 +37,17 @@ def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
 async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
     from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
         underlying_read_pair_strat_http
-    read_pair_strat_filter = get_pair_strat_sec_filter_json(sec_id)
+    read_pair_strat_filter = get_ongoing_pair_strat_filter(sec_id)
     pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
     match_level_1_pair_strats: List[PairStrat] = list()
     match_level_2_pair_strats: List[PairStrat] = list()
     for pair_strat in pair_strats:
-        # TODO LAZY: move this to aggregate
-        if is_ongoing_pair_strat(pair_strat):
-            match_level: int = get_match_level(pair_strat, sec_id, side)
-            if match_level == 1:
-                match_level_1_pair_strats.append(pair_strat)
-            elif match_level == 2:
-                match_level_2_pair_strats.append(pair_strat)
-            # else not a match ignore
-        # else not required, ignore unspecified, ready, or done strats (ignore yet to start or completed, match ongoing)
+        match_level: int = get_match_level(pair_strat, sec_id, side)
+        if match_level == 1:
+            match_level_1_pair_strats.append(pair_strat)
+        elif match_level == 2:
+            match_level_2_pair_strats.append(pair_strat)
+        # else not a match ignore
     return match_level_1_pair_strats, match_level_2_pair_strats
 
 
@@ -209,7 +206,7 @@ def is_service_up():
         return False
 
 
-def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None):
+def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> PortfolioLimitsBaseModel:
     if eligible_brokers is None:
         eligible_brokers = []
     # else using provided value

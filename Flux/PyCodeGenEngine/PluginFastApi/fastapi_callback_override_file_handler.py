@@ -262,20 +262,6 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
             msg_name = message.proto.name
             msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
 
-            # Testing query requisites in message
-            option_list_of_dict_values = \
-                self.get_complex_option_values_as_list_of_dict(message,
-                                                               FastapiCallbackOverrideFileHandler.flux_msg_json_root)
-            # Since JsonRoot option is non-repeated
-            option_dict_value = option_list_of_dict_values[0]
-
-            if option_dict_value.get(FastapiCallbackOverrideFileHandler.flux_json_root_read_field) is None:
-                err_str = f"Message should have read impl enabled in root option to use query, " \
-                          f"{msg_name} message has no read impl to generate read routes"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            # else not required: If message contains read routes then proceeding further
-
             aggregate_value_list = self.query_message_dict[message]
 
             for aggregate_value in aggregate_value_list:

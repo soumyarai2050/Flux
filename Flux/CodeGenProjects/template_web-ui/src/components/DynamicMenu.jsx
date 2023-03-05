@@ -216,7 +216,7 @@ const DynamicMenu = (props) => {
 }
 
 DynamicMenu.propTypes = {
-    data: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
+    data: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
     collections: PropTypes.array,
     disabled: PropTypes.bool,
     onSwitchToggle: PropTypes.func

@@ -4,6 +4,8 @@ import time
 from pathlib import PurePath
 from threading import Thread
 
+import pytz
+
 os.environ["DBType"] = "beanie"
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
 
@@ -147,15 +149,23 @@ class StratExecutor:
                 top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
                 if top_of_books is not None:
                     if top_of_books[0].symbol == "CB_Sec_1":
-                        latest_top_of_book = top_of_books[0]
+                        buy_top_of_book = top_of_books[0]
+                        sell_top_of_book = top_of_books[1]
                     else:
-                        latest_top_of_book = top_of_books[1]
+                        buy_top_of_book = top_of_books[1]
+                        sell_top_of_book = top_of_books[0]
                     # TODO == won't work - there are 2 ToB objects - we may have processed the newer - older will be
                     #  different but less
-                    if latest_top_of_book.bid_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
+                    if buy_top_of_book.bid_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
                             self._top_of_books_update_date_time:
-                        if latest_top_of_book.bid_quote.px == 25:
-                            order_id = TradeSimulator.place_new_order(100, 90, Side.BUY, "CB_Sec_1", "ACC")
+                        if buy_top_of_book.bid_quote.px == 25:
+                            order_id = TradeSimulator.place_new_order(100, 90, Side.BUY, "CB_Sec_1", "Acc1")
+
+                    if sell_top_of_book.ask_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
+                            self._top_of_books_update_date_time:
+                        if sell_top_of_book.ask_quote.px == 25:
+                            order_id = TradeSimulator.place_new_order(110, 70, Side.SELL, "EQT_Sec_1", "Acc1")
+
             else:
                 continue  # no update to process
         # we are outside while 1 (strat processing loop) - shut down this strat processing

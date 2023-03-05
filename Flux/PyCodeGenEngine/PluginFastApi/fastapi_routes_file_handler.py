@@ -211,7 +211,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_PUT_gen(message, aggregation_type, id_field_type, shared_lock_list)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}/' + \
+        output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
                       f'", response_model={message.proto.name}, status_code=200)\n'
         output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}_updated: " \
                       f"{message.proto.name}) -> {message.proto.name}:\n"
@@ -222,9 +222,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
     def handle_underlying_PATCH_gen(self, message: protogen.Message, aggregation_type: str | None = None,
                                     id_field_type: str | None = None, shared_lock_list: List[str] | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}/' + \
-                     f'", response_model={message.proto.name}, status_code=200)\n'
-        output_str += f"async def underlying_partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_updated: " \
+        output_str = f"async def underlying_partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_updated: " \
                       f"{message.proto.name}Optional, filter_agg_pipeline: Any = None) -> {message.proto.name}:\n"
         output_str += f'    """\n'
         output_str += f'    Partial Update route for {message.proto.name}\n'
@@ -283,7 +281,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_PATCH_gen(message, aggregation_type, id_field_type, shared_lock_list)
         output_str += f"\n"
-        output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}/' + \
+        output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
                      f'", response_model={message.proto.name}, status_code=200)\n'
         output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_updated: " \
                       f"{message.proto.name}Optional) -> {message.proto.name}:\n"
@@ -340,7 +338,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_DELETE_gen(message, aggregation_type, id_field_type, shared_lock_list)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + \
+        output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}' + \
                       '{' + f'{message_name_snake_cased}_id' + '}' + \
                       f'", response_model=DefaultWebResponse, status_code=200)\n'
         if id_field_type is not None:
@@ -628,7 +626,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_GET_ALL_gen(message, aggregation_type, shared_lock_list)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}/' + \
+        output_str += f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}' + \
                       f'", response_model=List[{message.proto.name}], status_code=200)\n'
         output_str += f"async def read_{message_name_snake_cased}_http() -> List[{message.proto.name}]:\n"
         output_str += f"    return await underlying_read_{message_name_snake_cased}_http()\n\n\n"
@@ -673,7 +671,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = self.handle_underlying_GET_ALL_ws_gen(message, aggregation_type, shared_lock_list)
         output_str += f"\n"
-        output_str += f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws/")\n'
+        output_str += f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws")\n'
         output_str += f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket) -> None:\n"
         output_str += f"    await underlying_read_{message_name_snake_cased}_ws(websocket)\n\n\n"
         return output_str
@@ -882,8 +880,6 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_query_methods(self, message: protogen.Message) -> str:
         output_str = ""
-        shared_mutex_list = self._get_list_of_shared_lock_for_message(message)
-
         aggregate_value_list = self.query_message_dict[message]
 
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
@@ -892,7 +888,6 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             aggregate_params = aggregate_value[FastapiRoutesFileHandler.aggregate_params_key]
             aggregate_params_data_types = aggregate_value[FastapiRoutesFileHandler.aggregate_params_data_types_key]
 
-            mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_mutex_list)
             if aggregate_params:
                 agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
                                                       for param, param_type in zip(aggregate_params,
@@ -902,12 +897,11 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 agg_params_url_query_str = "/".join(["{"+f"{param}"+"}" for param in aggregate_params])
                 output_str = f"async def underlying_{aggregate_var_name}_query_http({agg_params_with_type_str}) -> " \
                              f"List[{message.proto.name}]:\n"
-                output_str += mutex_handling_str
-                output_str += " "*indent_count + f"    {message_name_snake_cased}_obj = await " \
+                output_str += f"    {message_name_snake_cased}_obj = await " \
                               f"callback_class.{aggregate_var_name}_query_pre({message.proto.name}, {agg_params_str})\n"
-                output_str += " "*indent_count + f"    {message_name_snake_cased}_obj = await " \
+                output_str += f"    {message_name_snake_cased}_obj = await " \
                               f"callback_class.{aggregate_var_name}_query_post({message_name_snake_cased}_obj)\n"
-                output_str += " "*indent_count + f"    return {message_name_snake_cased}_obj\n\n\n"
+                output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
                 output_str += f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}/' \
                               f'{agg_params_url_query_str}' + \
                               f'", response_model=List[{message.proto.name}], status_code=200)\n'
@@ -921,12 +915,11 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             else:
                 output_str += f"async def underlying_{aggregate_var_name}_query_http() -> " \
                               f"List[{message.proto.name}]:\n"
-                output_str += mutex_handling_str
-                output_str += " "*indent_count + f"    {message_name_snake_cased}_obj = await callback_class.{aggregate_var_name}_" \
+                output_str += f"    {message_name_snake_cased}_obj = await callback_class.{aggregate_var_name}_" \
                               f"query_pre({message.proto.name})\n"
-                output_str += " "*indent_count + f"    await callback_class.{aggregate_var_name}_query_post(" \
+                output_str += f"    await callback_class.{aggregate_var_name}_query_post(" \
                               f"{message_name_snake_cased}_obj)\n"
-                output_str += " "*indent_count + f"    return {message_name_snake_cased}_obj\n\n\n"
+                output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
                 output_str += f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}/' + \
                               f'", response_model=List[{message.proto.name}], status_code=200)\n'
                 output_str += f"async def {aggregate_var_name}_query_http() -> " \
@@ -946,6 +939,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             if BaseFastapiPlugin.flux_msg_json_root in str(message.proto.options):
                 output_str += self._handle_routes_methods(message)
 
+        for message in self.root_message_list + self.non_root_message_list:
             if BaseFastapiPlugin.flux_msg_json_query in str(message.proto.options):
                 output_str += self._handle_query_methods(message)
 

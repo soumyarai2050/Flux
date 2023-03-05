@@ -101,6 +101,7 @@ message OrderJournal{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
@@ -212,6 +213,7 @@ message FillsJournal{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
@@ -291,6 +293,7 @@ message PortfolioLimits{
     CreateDesc: AggregateType_FilterAggregate,
     ReadDesc: AggregateType_FilterAggregate,
     UpdateDesc: AggregateType_FilterAggregate,
+    PatchDesc: AggregateType_FilterAggregate,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_FilterAggregate
   };
@@ -397,6 +400,7 @@ message StratCollection{
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
     UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
@@ -559,4 +563,11 @@ message CommandResponse{
   repeated string response = 3 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
   optional Security security = 4;
   required Side side = 5;
+}
+
+message OngoingStratSymbols{
+  option (FluxMsgJsonQuery) = {
+      AggregateVarName: "get_ongoing_strats"
+  };
+  repeated string symbols = 1;
 }
