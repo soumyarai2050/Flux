@@ -89,8 +89,23 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             json_type = JsonSchemaConvertPlugin.proto_type_to_json_type_dict[underlying_type]
         return underlying_type, json_type
 
+    def check_is_dependent_widget_field_name_snake_cased(self, field: protogen.Field) -> None:
+        if field.message is not None:
+            if JsonSchemaConvertPlugin.flux_msg_widget_ui_data in str(field.message.proto.options):
+                if field.proto.name != convert_camel_case_to_specific_case(field.message.proto.name):
+                    err_str = f"field {field.proto.name} is of dependent widget message type " \
+                              f"{field.message.proto.name} but is not snake_case of dependent widget message," \
+                              f"message containing field - {field.parent.proto.name}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+                # else not required: avoid if field_name is snake case of its dependent message type
+            # else not required: avoid if field's message type is non-widget type
+        # else not required: avoid if field is simple or enum type
+
     def __load_dependency_messages_and_enums_in_dicts(self, message: protogen.Message):
         for field in message.fields:
+            self.check_is_dependent_widget_field_name_snake_cased(field)
+
             if field.kind.name.lower() == "enum":
                 if field.enum not in self.__enum_list:
                     self.__enum_list.append(field.enum)

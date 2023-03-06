@@ -189,12 +189,13 @@ message MarketDepth {
   required TickTypeEnum side = 4;
   required float px = 5;
   required int64 qty = 6;
-  required int32 position = 7;
-  optional string market_maker = 8;
-  optional bool is_smart_depth = 9;
-  optional float cumulative_notional = 10;
-  optional int64 cumulative_qty = 11;
-  optional float cumulative_avg_px = 12;
+  required float premium = 7;
+  required int32 position = 8;
+  optional string market_maker = 9;
+  optional bool is_smart_depth = 10;
+  optional float cumulative_notional = 11;
+  optional int64 cumulative_qty = 12;
+  optional float cumulative_avg_px = 13;
 }
 
 message MarketTradeVolume{

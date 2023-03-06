@@ -4,19 +4,22 @@ import time
 from pathlib import PurePath
 from threading import Thread
 
-import pytz
+import math
 
 os.environ["DBType"] = "beanie"
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
 
+from FluxPythonUtils.scripts.utility_functions import configure_logger
 from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations
 from Flux.CodeGenProjects.addressbook.app.trading_data_manager import TradingDataManager
 from Flux.CodeGenProjects.addressbook.app.strat_cache import *
-from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
+from Flux.CodeGenProjects.addressbook.app.trading_link import get_trading_link, TradingLinkBase
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import *
 
 
 class StratExecutor:
+    trading_link: ClassVar[TradingLinkBase] = get_trading_link()
+
     @staticmethod
     def executor_trigger(trading_data_manager: TradingDataManager, strat_cache: StratCache):
         strat_executor: StratExecutor = StratExecutor(trading_data_manager, strat_cache)
@@ -32,7 +35,6 @@ class StratExecutor:
         self.strat_cache: StratCache = strat_cache
 
         self._portfolio_status_update_date_time: DateTime | None = None
-        self._pair_strat_update_date_time: DateTime | None = None
         self._strat_brief_update_date_time: DateTime | None = None
         self._order_snapshots_update_date_time: DateTime | None = None
         self._order_journals_update_date_time: DateTime | None = None
@@ -44,11 +46,8 @@ class StratExecutor:
         self._cancel_orders_processed_slice: int = 0
         self._top_of_books_update_date_time: DateTime | None = None
 
-        # TODO FIX THIS
-        self.buy_sec_id: str = config_dict.get("buy_sec_id")
-        self.sell_sec_id: str = config_dict.get("sell_sec_id")
-        self.underlying_acc: str = config_dict.get("underlying_account")
-        self.market_depth_lvl: int = config_dict.get("market_depth_lvl")
+        self.primary_leg_notional: float = 0
+        self.secondary_leg_notional: float = 0
 
     def check_order_eligibility(self, side: Side, check_notional: float) -> bool:
         strat_brief, self._strat_brief_update_date_time = \
@@ -73,7 +72,7 @@ class StratExecutor:
                 return False
 
     def get_px_qty_from_depth(self, depth: int, symbol: str, side: Side) -> MarketDepthBaseModel:  # NOQA
-        market_depth_objs = TradeSimulator.market_data_service_web_client.get_market_depth_from_index_client(symbol)
+        market_depth_objs = self.trading_link.market_data_service_web_client.get_market_depth_from_index_client(symbol)
         side = "BID" if side == Side.BUY else "ASK"
 
         if len(market_depth_objs) > 0:
@@ -86,157 +85,240 @@ class StratExecutor:
         else:
             raise Exception(f"Can't find market_depth objects for symbol {symbol}")
 
-    def check_new_order_limits(self, new_order) -> bool:
-        return True
+    def extract_legs_from_tobs(self, pair_strat, top_of_books) -> Tuple[TopOfBook | None, TopOfBook | None]:
+        primary_leg: TopOfBook | None = None
+        secondary_leg: TopOfBook | None = None
+        error = False
+        if pair_strat.pair_strat_params.strat_legl.sec.sec_id == top_of_books[0].symbol:
+            primary_leg = top_of_books[0]
+            if len(top_of_books) == 2:
+                if pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[1].symbol:
+                    secondary_leg = top_of_books[1]
+                else:
+                    logging.error(f"unexpected security: found in top_of_books[1]: {top_of_books[1]}, "
+                                  f"expected: {pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+                    error = True
+        elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[0].symbol:
+            secondary_leg = top_of_books[0]
+            if len(top_of_books) == 2:
+                if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == top_of_books[1].symbol:
+                    primary_leg = top_of_books[1]
+                else:
+                    logging.error(f"unexpected security: found in top_of_books[1]: {top_of_books[1]}, "
+                                  f"expected: {pair_strat.pair_strat_params.strat_leg1.sec.sec_id}")
+                    error = True
+        else:
+            logging.error(f"unexpected security: found in top_of_books[1]: {top_of_books[1]}, expected either of: "
+                          f"{pair_strat.pair_strat_params.strat_legl.sec.sec_id} or "
+                          f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+            error = True
+        if error:
+            return None, None
+        else:
+            return primary_leg, secondary_leg
+
+    def place_new_order(self, px: float, qty, side: Side, trading_symbol: str, system_symbol: str, account, exchange) \
+            -> bool:
+        if self.check_new_order_limits(px, qty, side, trading_symbol, account, exchange):
+            return get_trading_link().place_new_order(px, qty, side, trading_symbol, system_symbol, account, exchange)
+        else:
+            return False
+
+    def check_new_order_limits(self, px, qty, side, trading_symbol, account, exchange) -> bool:
+        checks_passed: bool = True
+        order_limits: OrderLimitsBaseModel
+        order_limits, _ = self.trading_data_manager.trading_cache.get_order_limits()
+        if order_limits.max_order_notional < (px * qty):
+            logging.error(f"blocked generated order, breaches max_order_notional limit, expected less than: "
+                          f"{order_limits.max_order_notional}, found: {(px * qty)} ")
+            checks_passed = False
+        if order_limits.max_order_qty < qty:
+            logging.error(f"blocked generated order, breaches max_order_qty limit, expected less than: "
+                          f"{order_limits.max_order_qty}, found: {qty} ")
+            checks_passed = False
+        return checks_passed
 
     def run(self):
+        ret_val: int = -5000
         while 1:
-            if self.strat_cache.stopped:
-                break
-            self.strat_cache.notify_semaphore.acquire()
+            try:
+                ret_val = self.internal_run()
+            except Exception as e:
+                logging.error(f"Run returned with exception - sending again, exception: {e}")
+            finally:
+                if ret_val != 0:
+                    logging.error(f"Error: Run returned, code: {ret_val} - sending again")
+                else:
+                    pair_strat, = self.strat_cache.get_pair_strat()
+                    logging.warning(f"graceful shut down this strat processing for strat: "
+                                    f"{pair_strat.pair_strat_params.strat_legi.sec.sec_id}_"
+                                    f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}_"
+                                    f"{pair_strat.id};;;strat details: {self.strat_cache.get_pair_strat()}")
+                    break
 
-            # 1. check if portfolio status has updated since we last checked
-            portfolio_status_tuple = self.trading_data_manager.trading_cache.get_portfolio_status()
-            if portfolio_status_tuple is not None:
-                portfolio_status, self._portfolio_status_update_date_time = portfolio_status_tuple
-                # If kill switch is enabled - don't act, just return
-                if portfolio_status.kill_switch:
+    def internal_run(self):
+        while 1:
+            try:
+                if self.strat_cache.stopped:
+                    break
+                self.strat_cache.notify_semaphore.acquire()
+
+                # 1. check if portfolio status has updated since we last checked
+                portfolio_status_tuple = self.trading_data_manager.trading_cache.get_portfolio_status()
+                if portfolio_status_tuple is None:
+                    logging.warning(
+                        "no portfolio status found yet - strat will not trigger until portfolio status arrives")
                     continue
-            # else no update - do we need this processed again ?
+                if portfolio_status_tuple is not None:
+                    portfolio_status, self._portfolio_status_update_date_time = portfolio_status_tuple
+                    # If kill switch is enabled - don't act, just return
+                    if portfolio_status.kill_switch:
+                        continue
+                # else no update - do we need this processed again ?
 
-            # 2. check if pair-strat has updated since we last checked
-            pair_strat_tuple = self.strat_cache.get_pair_strat(self._pair_strat_update_date_time)
-            if pair_strat_tuple is not None:
-                pair_strat, self._pair_strat_update_date_time = pair_strat_tuple
-                # If strat status not active, don't act, just return
-                if pair_strat.strat_status.strat_state != StratState.StratState_ACTIVE:
-                    continue
-            # else no update - do we need this processed again ?
+                # 2. get pair-strat: no checking if it's updated since last checked (required for TOB extraction)
+                pair_strat_tuple = self.strat_cache.get_pair_strat()
+                if pair_strat_tuple is not None:
+                    pair_strat, pair_strat_update_date_time = pair_strat_tuple
+                    # If strat_status not active, don't act, just return
+                    if pair_strat.strat_status.strat_state != StratState.StratState_ACTIVE:
+                        continue
+                else:
+                    logging.error(f"pair_strat_tuple is None for: {self.strat_cache}")
+                    return -1
 
-            # 3. check if any cxl order is requested and send out
-            cancel_orders_and_date_tuple = self.strat_cache.get_cancel_orders(self._cancel_orders_update_date_time)
-            if cancel_orders_and_date_tuple is not None:
-                cancel_orders, self._cancel_orders_update_date_time = cancel_orders_and_date_tuple
-                if cancel_orders is not None:
-                    final_slice = len(cancel_orders)
-                    unprocessed_cancel_orders: List[CancelOrderBaseModel] = \
-                        cancel_orders[self._cancel_orders_processed_slice:final_slice]
-                    self._cancel_orders_processed_slice = final_slice
-                    for cancel_order in unprocessed_cancel_orders:
-                        TradeSimulator.place_cxl_order(cancel_order.order_id, cancel_order.side,
-                                                       cancel_order.security.sec_id, "dummy_account")
-            # else no cancel order to process
+                # 3. check if any xl order is requested and send out
+                cancel_orders_and_date_tuple = self.strat_cache.get_cancel_orders(self._cancel_orders_update_date_time)
+                if cancel_orders_and_date_tuple is not None:
+                    cancel_orders, self._cancel_orders_update_date_time = cancel_orders_and_date_tuple
+                    if cancel_orders is not None:
+                        final_slice = len(cancel_orders)
+                        unprocessed_cancel_orders: List[CancelOrderBaseModel] = \
+                            cancel_orders[self._cancel_orders_processed_slice:final_slice]
+                        self._cancel_orders_processed_slice = final_slice
+                        for cancel_order in unprocessed_cancel_orders:
+                            self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side,
+                                                              cancel_order.security.sec_id)
+                # else no cancel_order to process
 
-            # 4. check if any new order is requested: apply all risk checks, no strat param checks and send out
-            new_orders_and_date_tuple = self.strat_cache.get_new_orders(self._new_orders_update_date_time)
-            if new_orders_and_date_tuple is not None:
-                new_orders, self._new_orders_update_date_time = new_orders_and_date_tuple
-                if new_orders is not None:
-                    final_slice = len(new_orders)
-                    unprocessed_new_orders: List[NewOrderBaseModel] = new_orders[self._new_orders_processed_slice:final_slice]
-                    self._new_orders_processed_slice = final_slice
-                    for new_order in unprocessed_new_orders:
-                        if self.check_new_order_limits(new_order):
-                            TradeSimulator.place_new_order(new_order.px, new_order.qty, new_order.side,
-                                                           new_order.security.sec_id, "dummy_account")
-                        else:
-                            logging.error(f"order check failed - unable to send new order: {new_order}")
-            # else no new order to process
+                # 4. check if any new_order is requested: apply all risk checks, no strat param checks and send out
+                new_orders_and_date_tuple = self.strat_cache.get_new_orders(self._new_orders_update_date_time)
+                if new_orders_and_date_tuple is not None:
+                    new_orders, self._new_orders_update_date_time = new_orders_and_date_tuple
+                    if new_orders is not None:
+                        final_slice = len(new_orders)
+                        unprocessed_new_orders: List[NewOrderBaseModel] = new_orders[
+                                                                          self._new_orders_processed_slice:final_slice]
+                        self._new_orders_processed_slice = final_slice
+                        for new_order in unprocessed_new_orders:
+                            if self.check_new_order_limits(new_order.px, new_order.qty, new_order.side,
+                                                           new_order.security.sec_id, "trading-symbol",
+                                                           "trading-account"):
+                                self.trading_link.place_new_order(new_order.px, new_order.qty, new_order.side,
+                                                                  new_order.security.sec_id, "trading-symbol",
+                                                                  "trading-account")
+                            else:
+                                logging.error(f"order check failed - unable to send new_order: {new_order}")
+                # else no new_order to process
 
-            # 5. check if top of book is updated
-            top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(self._top_of_books_update_date_time)
-            if top_of_book_and_date_tuple is not None:
-                top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
-                if top_of_books is not None:
-                    if top_of_books[0].symbol == "CB_Sec_1":
-                        buy_top_of_book = top_of_books[0]
-                        sell_top_of_book = top_of_books[1]
+                # 5. check if top_of_book is updated
+                posted_primary_notional: float = 0
+                posted_secondary_notional: float = 0
+                top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(self._top_of_books_update_date_time)
+                if top_of_book_and_date_tuple is not None:
+                    top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
+                    if top_of_books is not None and len(top_of_books) <= 2:
+                        primary_leg, secondary_leg = self.extract_legs_from_tobs(pair_strat, top_of_books)
+                        if primary_leg is not None and self.strat_cache.primary_leg_trading_symbol is None:
+                            primary_leg = None
+                            logging.error(f"Unable to proceed with this ticker: {primary_leg} no static data")
+                        if secondary_leg is not None and self.strat_cache.secondary_leg_trading_symbol is None:
+                            secondary_leg = None
+                            logging.error(f"Unable to proceed with this ticker: {primary_leg} no static data")
+                        if primary_leg is not None and self.strat_cache.primary_leg_trading_symbol is not None:
+                            if abs(self.primary_leg_notional) <= abs(self.secondary_leg_notional):
+                                # process primary leg
+                                if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:  # execute aggressive buy
+                                    if not (primary_leg.ask_quote.qty == 0 or math.isclose(primary_leg.ask_quote.px,
+                                                                                           0)):
+                                        self.place_new_order(primary_leg.ask_quote.px, primary_leg.ask_quote.qty,
+                                                             Side.BUY,
+                                                             self.strat_cache.primary_leg_trading_symbol,
+                                                             primary_leg.symbol,
+                                                             "trading-account", "exchange-name")
+                                        posted_primary_notional = primary_leg.ask_quote.px * primary_leg.ask_quote.qty
+                                    else:
+                                        logging.error(
+                                            f"0 value found in ask TOB - ignoring: px{primary_leg.ask_quote.px}, "
+                                            f"qty: {primary_leg.ask_quote.qty}")
+                                        continue
+                                else:  # execute aggressive sell
+                                    if not (primary_leg.bid_quote.qty == 0 or math.isclose(primary_leg.bid_quote.px,
+                                                                                           0)):
+                                        self.place_new_order(primary_leg.bid_quote.px, primary_leg.bid_quote.qty,
+                                                             Side.SELL, self.strat_cache.primary_leg_trading_symbol,
+                                                             primary_leg.symbol,
+                                                             "trading-account", "exchange-name")
+                                        posted_primary_notional = primary_leg.bid_quote.px * primary_leg.bid_quote.qty
+                                    else:
+                                        logging.error(f"O value found in TOB - ignoring: px {primary_leg.bid_quote.px}"
+                                                      f", qty: {primary_leg.bid_quote.qty}")
+                                        continue
+                        if secondary_leg is not None and self.strat_cache.secondary_leg_trading_symbol is not None:
+                            if abs(self.secondary_leg_notional) <= abs(self.primary_leg_notional):
+                                # process secondary leg
+                                if pair_strat.pair_strat_params.strat_leg2.side == Side.BUY:  # execute aggressive buy
+                                    if not (secondary_leg.ask_quote.qty == 0 or
+                                            math.isclose(secondary_leg.ask_quote.px, 0)):
+                                        self.place_new_order(secondary_leg.ask_quote.px, secondary_leg.ask_quote.qty,
+                                                             Side.BUY, self.strat_cache.secondary_leg_trading_symbol,
+                                                             secondary_leg.symbol,
+                                                             "trading-account", "exchange-name")
+                                        posted_secondary_notional = \
+                                            secondary_leg.ask_quote.px * secondary_leg.ask_quote.qty
+                                    else:
+                                        logging.error(
+                                            f"0 value found in ask TOB - ignoring: px{secondary_leg.ask_quote.px}, "
+                                            f"qty: {secondary_leg.ask_quote.qty}")
+                                        continue
+                                else:  # execute aggressive sell
+                                    if not (secondary_leg.bid_quote.qty == 0 or
+                                            math.isclose(secondary_leg.bid_quote.px, 0)):
+                                        self.place_new_order(secondary_leg.bid_quote.px, secondary_leg.bid_quote.qty,
+                                                             Side.SELL, self.strat_cache.secondary_leg_trading_symbol,
+                                                             secondary_leg.symbol,
+                                                             "trading-account", "exchange-name")
+                                        posted_secondary_notional = \
+                                            secondary_leg.bid_quote.px * secondary_leg.bid_quote.qty
+                                    else:
+                                        logging.error(
+                                            f"O value found in TOB - ignoring: px {secondary_leg.bid_quote.px}"
+                                            f", qty: {secondary_leg.bid_quote.qty}")
+                                        continue
+                        self.primary_leg_notional += posted_primary_notional
+                        self.secondary_leg_notional += posted_secondary_notional
+                        logging.debug(f"strat-matched ToB: {[str(tob) for tob in top_of_books]}")
                     else:
-                        buy_top_of_book = top_of_books[1]
-                        sell_top_of_book = top_of_books[0]
-                    # TODO == won't work - there are 2 ToB objects - we may have processed the newer - older will be
-                    #  different but less
-                    if buy_top_of_book.bid_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
-                            self._top_of_books_update_date_time:
-                        if buy_top_of_book.bid_quote.px == 25:
-                            order_id = TradeSimulator.place_new_order(100, 90, Side.BUY, "CB_Sec_1", "Acc1")
-
-                    if sell_top_of_book.ask_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
-                            self._top_of_books_update_date_time:
-                        if sell_top_of_book.ask_quote.px == 25:
-                            order_id = TradeSimulator.place_new_order(110, 70, Side.SELL, "EQT_Sec_1", "Acc1")
-
-            else:
-                continue  # no update to process
-        # we are outside while 1 (strat processing loop) - shut down this strat processing
-        pair_strat, _ = self.strat_cache.get_pair_strat()
-        logging.critical(f"shutting down this strat processing for strat: "
-                         f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}_"
-                         f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}_"
-                         f"{pair_strat.id};;;strat: {self.strat_cache.get_pair_strat()}")
-        return
-        # # TODO This moves to the trade notify receiver thread
-        # if order_journal_.order_event == OrderEventType.OE_NEW:
-        #     TradeSimulator.ack_order_n_fill(order_journal_.order.px, order_journal_.order.qty,
-        #     order_journal_.order.order_id,
-        #                                     order_journal_.order.side, order_journal_.order.security.sec_id,
-        #                                     order_journal_.order.underlying_account)
-        # elif order_journal_.order_event == OrderEventType.OE_CXL:
-        #     TradeSimulator.place_cxl_order(order_journal_.order.px, order_journal_.order.qty,
-        #     order_journal_.order.order_id,
-        #                                    order_journal_.order.side, order_journal_.order.security.sec_id,
-        #                                    order_journal_.order.underlying_account)
-
-        # wait for websockets to set models in data-members
-        # time.sleep(5)
-
-        # order_count = 1
-        # buying_stopped = False
-        # selling_stopped = False
-        # while True:
-        #     # Buying if allowed
-        #     market_depth_for_buy = self.get_px_qty_from_depth(2, self.buy_sec_id, Side.BUY)
-        #     if order_count == 1:
-        #         TradeSimulator.place_new_order(market_depth_for_buy.px, market_depth_for_buy.qty, f"O{order_count}",
-        #                                        Side.BUY, self.buy_sec_id, self.underlying_acc)
-        #         order_count += 1
-        #     else:
-        #         if not buying_stopped:
-        #             if self.check_order_eligibility(Side.BUY, market_depth_for_buy.px * market_depth_for_buy.qty):
-        #                 TradeSimulator.place_new_order(market_depth_for_buy.px, market_depth_for_buy.qty,
-        #                                           f"O{order_count}", Side.BUY,
-        #                                                self.buy_sec_id, self.underlying_acc)
-        #                 order_count += 1
-        #             else:
-        #                 print("Stopping Buying, reached threshold")
-        #                 buying_stopped = True
-        #
-        #     time.sleep(10)
-        #
-        #     # Selling if allowed
-        #     market_depth_for_sell = self.get_px_qty_from_depth(2, self.sell_sec_id, Side.SELL)
-        #     if order_count == 2:
-        #         TradeSimulator.place_new_order(market_depth_for_sell.px, market_depth_for_sell.qty, f"O{order_count}",
-        #                                        Side.SELL, self.sell_sec_id, self.underlying_acc)
-        #         order_count += 1
-        #     else:
-        #         if not selling_stopped:
-        #             if self.check_order_eligibility(Side.SELL, market_depth_for_sell.px * market_depth_for_sell.qty):
-        #                 TradeSimulator.place_new_order(market_depth_for_sell.px, market_depth_for_sell.qty,
-        #                                           f"O{order_count}", Side.SELL,
-        #                                                self.sell_sec_id, self.underlying_acc)
-        #                 order_count += 1
-        #             else:
-        #                 print("Stopping Selling, reached threshold")
-        #                 selling_stopped = True
-        #
-        #     time.sleep(10)
-        #
-        #     if buying_stopped and selling_stopped:
-        #         break
+                        logging.error(f"expected 1 / 2 TOB , received: "
+                                      f"{len(top_of_books) if top_of_books is not None else 0} in tob update!;;;"
+                                      f"received-TOBs: "
+                                      f"{[str(tob) for tob in top_of_books] if top_of_books is not None else None}!")
+                else:
+                    continue  # no update to process
+            except Exception as e:
+                logging.error(f"Run returned with exception - sending again, exception: {e}")
+                return -1
+            # we are outside while 1 (strat processing loop) - graceful shut down this strat processing
+            return 0
 
 
 if __name__ == "__main__":
+    from datetime import datetime
+
+    log_dir: PurePath = PurePath(__file__).parent.parent / "log"
+    datetime_str: str = datetime.now().strftime("%Y%m%d")
+    configure_logger('debug', str(log_dir), f'strat_executor_{datetime_str}.log')
+
     trading_data_manager = TradingDataManager(StratExecutor.executor_trigger)
     while 1:
         time.sleep(10)

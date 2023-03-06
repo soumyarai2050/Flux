@@ -60,19 +60,19 @@ def get_ongoing_pair_strat_filter(security_id: str | None = None):
 
     if security_id is not None:
         agg_pipeline["aggregate"][0]["$match"] = {
-                "$or": [
-                    {
-                        "pair_strat_params.strat_leg1.sec.sec_id": {
-                            "$eq": security_id
-                        }
-                    },
-                    {
-                        "pair_strat_params.strat_leg2.sec.sec_id": {
-                            "$eq": security_id
-                        }
+            "$or": [
+                {
+                    "pair_strat_params.strat_leg1.sec.sec_id": {
+                        "$eq": security_id
                     }
-                ]
-            }
+                },
+                {
+                    "pair_strat_params.strat_leg2.sec.sec_id": {
+                        "$eq": security_id
+                    }
+                }
+            ]
+        }
 
     return agg_pipeline
 
@@ -97,7 +97,8 @@ def get_strat_brief_from_symbol(security_id: str):
         }
     ]}
 
-def get_order_snapshot_order_id_filter_json(order_id: str):     # NOQA
+
+def get_order_snapshot_order_id_filter_json(order_id: str):  # NOQA
     return {"aggregate": [
         {
             "$match": {
@@ -106,7 +107,8 @@ def get_order_snapshot_order_id_filter_json(order_id: str):     # NOQA
         }
     ]}
 
-def get_order_snapshot_from_sec_symbol(symbol: str):     # NOQA
+
+def get_order_snapshot_from_sec_symbol(symbol: str):  # NOQA
     return {"aggregate": [
         {
             "$match": {
@@ -115,7 +117,8 @@ def get_order_snapshot_from_sec_symbol(symbol: str):     # NOQA
         }
     ]}
 
-def get_symbol_side_snapshot_from_symbol_side(security_id: str, side: str):     # NOQA
+
+def get_symbol_side_snapshot_from_symbol_side(security_id: str, side: str):  # NOQA
     return {"aggregate": [
         {
             "$match": {
@@ -161,14 +164,35 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
     ]}
 
 
+# careful with special chars on regex match !!
+def get_order_of_matching_suffix_order_id_filter(order_id_suffix: str):
+    regex_order_id_suffix: str = f".*{order_id_suffix}$"
+    return {"aggregate": [{
+        "$match": {
+            "order.order_id": {"$regex": regex_order_id_suffix}
+        }
+    }
+    ]}
+
+
+def get_cancel_order_by_order_id_filter(order_id: str):
+    return {"aggregate": [
+        {
+            "$match": {
+                "order_id": order_id
+            }
+        }
+    ]}
+
+
 def get_open_order_snapshots_by_order_status(order_status: str):
     return {"aggregate": [
-            {
-                "$match": {
-                    "order_status": order_status
-                }
+        {
+            "$match": {
+                "order_status": order_status
             }
-        ]}
+        }
+    ]}
 
 
 def get_last_n_sec_orders_by_event(symbol: str | None, last_n_sec: int, order_event: str):
@@ -198,15 +222,15 @@ def get_last_n_sec_orders_by_event(symbol: str | None, last_n_sec: int, order_ev
     ]}
     if symbol is not None:
         match_agg = {
-                "$and": [
-                    {
-                        "order.security.sec_id": symbol
-                    },
-                    {
-                        "order_event": order_event
-                    }
-                ]
-            }
+            "$and": [
+                {
+                    "order.security.sec_id": symbol
+                },
+                {
+                    "order_event": order_event
+                }
+            ]
+        }
     else:
         match_agg = {"order_event": order_event}
     agg_query["aggregate"][0]["$match"] = match_agg
@@ -270,7 +294,7 @@ def get_limited_strat_alerts_obj(limit: int):
                     "residual": 1,
                     "balance_notional": 1,
                     "strat_alerts": {
-                      "$reverseArray": {"$slice": ["$strat_status.strat_alerts", -limit]},
+                        "$reverseArray": {"$slice": ["$strat_status.strat_alerts", -limit]},
                     }
                 },
                 "strat_limits": 1,

@@ -10,7 +10,10 @@ class TradingCache:
     def get_portfolio_status(self, date_time: DateTime | None = None
                              ) -> Tuple[PortfolioStatusBaseModel, DateTime] | None:
         if date_time is None or date_time < self._portfolio_status_update_date_time:
-            return self._portfolio_status, self._portfolio_status_update_date_time
+            if self._portfolio_status is not None:
+                return self._portfolio_status, self._portfolio_status_update_date_time
+            else:
+                return None
         else:
             return None
 
@@ -22,7 +25,10 @@ class TradingCache:
     def get_portfolio_limits(self, date_time: DateTime | None = None
                              ) -> Tuple[PortfolioLimitsBaseModel, DateTime] | None:
         if date_time is None or date_time < self._portfolio_limits_update_date_time:
-            return self._portfolio_limits, self._portfolio_limits_update_date_time
+            if self._portfolio_limits is not None:
+                return self._portfolio_limits, self._portfolio_limits_update_date_time
+            else:
+                return None
         else:
             return None
 
@@ -33,7 +39,10 @@ class TradingCache:
 
     def get_order_limits(self, date_time: DateTime | None = None) -> Tuple[OrderLimitsBaseModel, DateTime] | None:
         if date_time is None or date_time < self._order_limits_update_date_time:
-            return self._order_limits, self._order_limits_update_date_time
+            if self._order_limits is not None:
+                return self._order_limits, self._order_limits_update_date_time
+            else:
+                return None
         else:
             return None
 

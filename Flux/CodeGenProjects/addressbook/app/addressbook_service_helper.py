@@ -6,7 +6,7 @@ from pendulum import DateTime
 from threading import Lock
 
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import  *
+from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 
@@ -67,7 +67,7 @@ async def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, aler
     with update_strat_status_lock:
         match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
         if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
-            logging.error(f"error: {alert_brief} processing {sec_id}, side: {side} no viable pair_strat to report to"
+            logging.error(f"error: {alert_brief}; processing {sec_id}, side: {side} no viable pair_strat to report to"
                           f";;; alert_details: {alert_details}")
             return
         else:
@@ -95,14 +95,30 @@ async def get_single_exact_match_ongoing_strat_from_symbol_n_side(sec_id: str, s
         else:
             logging.error(f"error: pair_strat should be found only one in match_lvl_1, "
                           f"found {match_level_1_pair_strats}")
-        if len(match_level_2_pair_strats) == 1:
-            pair_strat = match_level_2_pair_strats[0]
-            logging.error(f"error: pair_strat should be found in level 1 only, when provided "
-                          f"symbol: {sec_id} and side: {side}")
-        else:
-            logging.error(f"error: multiple ongoing pair strats matching symbol: {sec_id} & side: {side} found, one "
-                          f"match expected, found: {len(match_level_1_pair_strats)}")
+        if pair_strat is None:
+            if len(match_level_2_pair_strats) == 1:
+                pair_strat = match_level_2_pair_strats[0]
+                logging.error(f"error: pair_strat should be found in level 1 only, when provided "
+                              f"symbol: {sec_id} and side: {side}")
+            else:
+                logging.error(
+                    f"error: multiple ongoing pair strats matching symbol: {sec_id} & side: {side} found, one "
+                    f"match expected, found: {len(match_level_1_pair_strats)}")
         return pair_strat
+
+
+async def update_strat_alert_async(strat_id: int, alert_brief: str, alert_details: str | None = None,
+                                   impacted_orders: List[OrderBrief] | None = None,
+                                   severity: Severity = Severity.Severity_ERROR):
+    alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
+    from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+        underlying_read_pair_strat_by_id_http, underlying_partial_update_pair_strat_http
+    with update_strat_status_lock:
+        pair_strat: PairStrat = await underlying_read_pair_strat_by_id_http(strat_id)
+        strat_status: StratStatus = StratStatus(strat_state=pair_strat.strat_status.strat_state,
+                                                strat_alerts=(pair_strat.strat_status.strat_alerts.append(alert)))
+        pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=strat_status)
+    await underlying_partial_update_pair_strat_http(pair_strat_updated)
 
 
 def except_n_log_alert(severity: Severity = Severity.Severity_ERROR):
@@ -193,13 +209,19 @@ def update_portfolio_status(overall_buy_notional: float | None, overall_sell_not
         # else not action required - no action to take - ignore and continue
     except Exception as e:
         logging.critical(
-            f"something serious is wrong: update_portfolio_status is throwing as exception!;;; exception: {e}",
+            f"something serious is wrong: update_portfolio_status is throwing an exception!;;; exception: {e}",
             exc_info=True)
 
 
 def is_service_up():
     try:
+        portfolio_status_list: List[
+            PortfolioStatusBaseModel] = strat_manager_service_web_client_internal.get_all_portfolio_status_client()
         strat_manager_service_web_client_internal.get_all_order_limits_client()
+        if 0 == len(portfolio_status_list):  # no portfolio status set yet, create one
+            portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(kill_switch=False,
+                                                                                  portfolio_alerts=[])
+            strat_manager_service_web_client_internal.create_portfolio_status_client(portfolio_status)
         return True
     except Exception as e:
         logging.error(f"service_up test failed - tried get_all_order_limits_client;;; exception: {e}", exc_info=True)
@@ -227,7 +249,7 @@ def create_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Por
     portfolio_limits_obj = get_new_portfolio_limits(eligible_brokers)
     portfolio_limits: PortfolioLimitsBaseModel = strat_manager_service_web_client_internal.create_portfolio_limits_client(
         portfolio_limits_obj)
-    logging.info(f"created portfolio_limits;;; (portfolio_limits_obj)")
+    logging.info(f"created portfolio_limits;;; {portfolio_limits_obj}")
     return portfolio_limits
 
 

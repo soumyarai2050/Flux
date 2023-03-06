@@ -1,20 +1,19 @@
 # system imports
+import logging
 import time
-from typing import Type, Set
+from typing import List, Type, Tuple, Dict, FrozenSet, Set
 import threading
 from pathlib import PurePath
-from datetime import date
-import logging
+from datetime import date, datetime
 
-import pytz
 # third-party package imports
-from pendulum import DateTime
-from pydantic import BaseModel
+from pendulum import DateTime, local_timezone
 from fastapi import HTTPException
 
 # project imports
+from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
 from FluxPythonUtils.scripts.utility_functions import avg_of_new_val_sum_to_avg, store_json_or_dict_to_file, \
-    load_json_dict_from_file, load_yaml_configurations
+    load_json_dict_from_file, load_yaml_configurations, get_host_port_from_env
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import TopOfBookBaseModel
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes_callback import \
@@ -23,46 +22,16 @@ from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client i
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import is_service_up, \
-    get_portfolio_limits, create_portfolio_limits, get_order_limits, create_order_limits, except_n_log_alert, \
-    get_new_strat_limits, update_strat_alert_by_sec_and_side_async, \
-    get_single_exact_match_ongoing_strat_from_symbol_n_side
+    create_alert, update_strat_alert_by_sec_and_side_async, get_new_strat_limits, \
+    get_single_exact_match_ongoing_strat_from_symbol_n_side, get_portfolio_limits, is_ongoing_pair_strat, \
+    create_portfolio_limits, get_order_limits, create_order_limits, except_n_log_alert
 
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
 
-strat_manager_service_web_client = StratManagerServiceWebClient()
-market_data_service_web_client = MarketDataServiceWebClient()
+host, port = get_host_port_from_env()
 
-
-class ServiceState(BaseModel):
-    ready: bool = False
-    last_exception: Exception | None = None
-    error_prefix: str = ""
-    first_error_time: DateTime | None = None
-
-    class Config:
-        arbitrary_types_allowed = True
-
-    def record_error(self, e: Exception) -> int:
-        """
-        returns time in seconds since first error if error is repeated, 0 otherwise
-        if new error - record error in last error and update first error time with
-        """
-        if self.last_exception == e:
-            return self.first_error_time.diff(DateTime.utcnow()).in_seconds()
-        else:
-            self.last_exception = e
-            self.first_error_time = DateTime.utcnow()
-            return 0
-
-    def handle_exception(self, e: Exception):
-        error_str: str = f"{self.error_prefix}{e}"
-        logging.error(error_str, exc_info=True)
-        if (last_error_interval_in_sec := self.record_error(e)) == 0:
-            # raise alert
-            pass
-        elif last_error_interval_in_sec > (60 * 5):
-            # it's been 5 minutes the error is still not resolved - re-alert
-            pass
+strat_manager_service_web_client = StratManagerServiceWebClient(host, port)
+market_data_service_web_client = MarketDataServiceWebClient(host, 8040)
 
 
 class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallback):
@@ -102,11 +71,15 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         portfolio_limits = create_portfolio_limits()
                     self.service_ready = True
             else:
-                # any periodic refresh code goes here - for now we can just return
-
-                # Gets all open orders, updates residuals and raises pause to strat if req
-                strat_manager_service_web_client.get_open_order_snapshots_by_order_status_query_client(
-                    [OrderStatusType.OE_ACKED])
+                # any periodic refresh code goes here
+                try:
+                    # Gets all open orders, updates residuals and raises pause to strat if req
+                    strat_manager_service_web_client.get_open_order_snapshots_by_order_status_query_client(
+                        [OrderStatusType.OE_ACKED])
+                except Exception as e:
+                    logging.error("periodic open order check failed, "
+                                  "periodic order state checks will not be honored and retried in next periodic cycle"
+                                  f";;;exception: {e}", exc_info=True)
 
     # Example 0 of 5: pre- and post-launch server
     def app_launch_pre(self):
@@ -929,6 +902,11 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
     @except_n_log_alert(severity=Severity.Severity_ERROR)
     async def create_pair_strat_pre(self, pair_strat_obj: PairStrat):
+        if not self.service_ready:
+            # raise service unavailable 503 exception, let the caller retry
+            raise HTTPException(status_code=503, detail="create_pair_strat_pre not ready - service is not "
+                                                        "initialized yet")
+        # expectation: no strat limit or status is set while creating a strat, this call creates these
         if pair_strat_obj.strat_status is not None:
             raise Exception("error: create_pair_strat_pre called with pre-set strat_status, "
                             f"pair_strat_obj: {pair_strat_obj}")
@@ -1114,6 +1092,17 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
         logging.debug(f"further updated by _update_pair_strat_pre: {updated_pair_strat_obj}")
 
+    async def get_order_of_matching_suffix_order_id(self, order_id: str) -> str | None:
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            underlying_read_order_journal_http
+        from Flux.CodeGenProjects.addressbook.app.aggregate import get_order_of_matching_suffix_order_id_filter
+        stored_order_list: List[OrderJournal] = await underlying_read_order_journal_http(
+            get_order_of_matching_suffix_order_id_filter(order_id))
+        if len(stored_order_list) > 0:
+            return stored_order_list[0].order.order_id
+        else:
+            return None
+
     async def _get_order_limits(self) -> OrderLimits:  # NOQA
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_order_limits_http
@@ -1126,6 +1115,19 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                       f"{order_limits_objs}"
             logging.exception(err_str)
             raise Exception(err_str)
+
+    async def _get_pair_strat_from_symbol(self, symbol: str) -> PairStrat:  # NOQA
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            underlying_read_pair_strat_http
+        from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
+        pair_strat_objs_list = await underlying_read_pair_strat_http(get_ongoing_pair_strat_filter(symbol))
+        if len(pair_strat_objs_list) == 1:
+            return pair_strat_objs_list[0]
+        else:
+            err_str_: str = f"PairStrat should be one document per symbol, received {(len(pair_strat_objs_list))};;;" \
+                            f"{pair_strat_objs_list}"
+            logging.exception(err_str_)
+            raise Exception(err_str_)
 
     def _get_top_of_book_from_symbol(self, symbol: str):
         top_of_book_list: List[TopOfBookBaseModel] = market_data_service_web_client.get_top_of_book_from_index_client(
@@ -1322,13 +1324,24 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             symbol = order_snapshot.order_brief.security.sec_id
             side = order_snapshot.order_brief.side
             pair_strat_obj = await get_single_exact_match_ongoing_strat_from_symbol_n_side(symbol, side)
-            time_delta = DateTime.utcnow() - order_snapshot.create_date_time.replace(tzinfo=pytz.UTC)
+            time_delta = DateTime.utcnow() - order_snapshot.create_date_time
             if pair_strat_obj is not None and (time_delta.total_seconds() >
                                                pair_strat_obj.strat_limits.residual_restriction.residual_mark_seconds):
                 cancel_order: CancelOrder = CancelOrder(order_id=order_snapshot.order_brief.order_id,
                                                         security=order_snapshot.order_brief.security,
                                                         side=order_snapshot.order_brief.side)
-                await underlying_create_cancel_order_http(cancel_order)
+                # trigger cancel if it does not already exist for this order id, otherwise log for alert
+                from Flux.CodeGenProjects.addressbook.app.aggregate import get_cancel_order_by_order_id_filter
+                from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+                    underlying_read_cancel_order_http
+                cxl_order_list: List[CancelOrder] | None = await underlying_read_cancel_order_http(
+                    get_cancel_order_by_order_id_filter(cancel_order.order_id))
+                if cxl_order_list is None or len(cxl_order_list) == 0:
+                    await underlying_create_cancel_order_http(cancel_order)
+                else:
+                    logging.error(f"cxl_expired_open_orders failed: Prior cxl request found in DB for this order-id: "
+                                  f"{cancel_order.order_id}, use swagger to delete this order-id form DB to trigger "
+                                  f"cxl request again;;;order_snapshot: {order_snapshot}")
             # else not required: If pair_strat_obj is None or If time-delta is still less than
             # residual_mark_seconds then avoiding cancellation of order
 
@@ -1355,3 +1368,28 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
         ongoing_strat_symbols = OngoingStratSymbols(symbols=list(ongoing_symbols))
         return [ongoing_strat_symbols]
+
+    @staticmethod
+    def get_id_from_strat_key(unloaded_strat_key: str) -> int:
+        parts: List[str] = (unloaded_strat_key.split("_"))
+        return int(parts[-1])
+
+    async def update_strat_collection_pre(self, stored_strat_collection_obj: StratCollection,
+                                          updated_strat_collection_obj: StratCollection):
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            underlying_read_pair_strat_by_id_http
+        updated_strat_collection_loaded_strat_keys_frozenset = frozenset(updated_strat_collection_obj.loaded_strat_keys)
+        stored_strat_collection_loaded_strat_keys_frozenset = frozenset(stored_strat_collection_obj.loaded_strat_keys)
+        # existing items in stored loaded frozenset but not in the updated stored frozen set need to move to done state
+        unloaded_strat_keys_frozenset = stored_strat_collection_loaded_strat_keys_frozenset.difference(
+            updated_strat_collection_loaded_strat_keys_frozenset)
+        if len(unloaded_strat_keys_frozenset) != 0:
+            unloaded_strat_key: str
+            for unloaded_strat_key in unloaded_strat_keys_frozenset:
+                pair_strat_id: int = self.get_id_from_strat_key(unloaded_strat_key)
+                pair_strat = await underlying_read_pair_strat_by_id_http(pair_strat_id)
+                if is_ongoing_pair_strat(pair_strat):
+                    error_str = f"unloading and ongoing pair strat key: {unloaded_strat_key} is not supported, " \
+                                f"current strat status: {pair_strat.strat_status.strat_state}"
+                    logging.error(error_str)
+                    raise HTTPException(status_code=503, detail=error_str)

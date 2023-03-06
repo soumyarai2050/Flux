@@ -1,13 +1,18 @@
-from threading import RLock, Semaphore
-from typing import Dict, Tuple, Optional
+import logging
+from threading import RLock, Lock, Semaphore
+from typing import Dict, Tuple, Optional, ClassVar
+import copy
 
 import pytz
 from pendulum import DateTime
 
+from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
 from Flux.CodeGenProjects.addressbook.app.ws_helper import *
 
 
 class StratCache:
+    add_to_strat_cache_rlock: RLock = RLock()
+
     @staticmethod
     def get_key_from_order_snapshot(order_snapshot: OrderSnapshotBaseModel):
         key: str | None = None
@@ -98,19 +103,32 @@ class StratCache:
 
     def get_pair_strat(self, date_time: DateTime | None = None) -> Tuple[PairStratBaseModel, DateTime] | None:
         if date_time is None or date_time < self._pair_strat_update_date_time:
-            return self._pair_strat, self._pair_strat_update_date_time
+            if self._pair_strat is not None:
+                return self._pair_strat, self._pair_strat_update_date_time
+            else:
+                return None
         else:
             return None
+
+    def get_trading_symbols(self):
+        primary_ticker = self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+        secondary_ticker = self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+        return primary_ticker, secondary_ticker
 
     # None to remove pair strat
     def set_pair_strat(self, pair_strat: PairStratBaseModel | None) -> DateTime:
         self._pair_strat = pair_strat
         self._pair_strat_update_date_time = DateTime.utcnow()
+        if self._pair_strat is not None:
+            self.primary_leg_trading_symbol, self.secondary_leg_trading_symbol = self.get_trading_symbols()
         return self._pair_strat_update_date_time
 
     def get_strat_brief(self, date_time: DateTime | None = None) -> Tuple[StratBriefBaseModel, DateTime] | None:
         if date_time is None or date_time < self._strat_brief_update_date_time:
-            return self._strat_brief, self._strat_brief_update_date_time
+            if self._strat_brief is not None:
+                return self._strat_brief, self._strat_brief_update_date_time
+            else:
+                return None
         else:
             return None
 
@@ -119,9 +137,13 @@ class StratCache:
         self._strat_brief_update_date_time = DateTime.utcnow()
         return self._strat_brief_update_date_time
 
-    def get_order_snapshots(self, date_time: DateTime | None = None) -> Tuple[List[OrderSnapshotBaseModel], DateTime] | None:
+    def get_order_snapshots(self, date_time: DateTime | None = None) -> \
+            Tuple[List[OrderSnapshotBaseModel], DateTime] | None:
         if date_time is None or date_time < self._order_snapshots_update_date_time:
-            return self._order_snapshots, self._order_snapshots_update_date_time
+            if self._order_snapshots is not None:
+                return self._order_snapshots, self._order_snapshots_update_date_time
+            else:
+                return None
         else:
             return None
 
@@ -132,9 +154,11 @@ class StratCache:
         self._order_snapshots_update_date_time = DateTime.utcnow()
         return self._order_snapshots_update_date_time
 
-    def get_order_journals(self, date_time: DateTime | None = None) -> Tuple[List[OrderJournalBaseModel], DateTime] | None:
+    def get_order_journals(self, date_time: DateTime | None = None) -> \
+            Tuple[List[OrderJournalBaseModel], DateTime] | None:
         if date_time is None or date_time < self._order_journals_update_date_time:
-            return self._order_journals, self._order_journals_update_date_time
+            if self._order_journals is not None:
+                return self._order_journals, self._order_journals_update_date_time
         else:
             return None
 
@@ -145,9 +169,13 @@ class StratCache:
         self._order_journals_update_date_time = DateTime.utcnow()
         return self._order_journals_update_date_time
 
-    def get_fills_journals(self, date_time: DateTime | None = None) -> Tuple[List[FillsJournalBaseModel], DateTime] | None:
+    def get_fills_journals(self, date_time: DateTime | None = None) -> \
+            Tuple[List[FillsJournalBaseModel], DateTime] | None:
         if date_time is None or date_time < self._fills_journals_update_date_time:
-            return self._fills_journals, self._fills_journals_update_date_time
+            if self._fills_journals is not None:
+                return self._fills_journals, self._fills_journals_update_date_time
+            else:
+                return None
         else:
             return None
 
@@ -158,9 +186,13 @@ class StratCache:
         self._fills_journals_update_date_time = DateTime.utcnow()
         return self._fills_journals_update_date_time
 
-    def get_cancel_orders(self, date_time: DateTime | None = None) -> Tuple[List[CancelOrderBaseModel], DateTime] | None:
+    def get_cancel_orders(self, date_time: DateTime | None = None) -> \
+            Tuple[List[CancelOrderBaseModel], DateTime] | None:
         if date_time is None or date_time < self._cancel_orders_update_date_time:
-            return self._cancel_orders, self._cancel_orders_update_date_time
+            if self._cancel_orders is not None:
+                return self._cancel_orders, self._cancel_orders_update_date_time
+            else:
+                return None
         else:
             return None
 
@@ -173,7 +205,10 @@ class StratCache:
 
     def get_new_orders(self, date_time: DateTime | None = None) -> Tuple[List[NewOrderBaseModel], DateTime] | None:
         if date_time is None or date_time < self._new_orders_update_date_time:
-            return self._new_orders, self._new_orders_update_date_time
+            if self._new_orders is not None:
+                return self._new_orders, self._new_orders_update_date_time
+            else:
+                return None
         else:
             return None
 
@@ -186,7 +221,10 @@ class StratCache:
 
     def get_top_of_books(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
         if date_time is None or date_time < self._top_of_books_update_date_time:
-            return self._top_of_books, self._top_of_books_update_date_time
+            with self.re_ent_lock:
+                _top_of_books_update_date_time = copy.deepcopy(self._top_of_books_update_date_time)
+                _top_of_books = copy.deepcopy(self._top_of_books)
+                return _top_of_books, _top_of_books_update_date_time
         else:
             return None
 
@@ -222,51 +260,65 @@ class StratCache:
 
     @classmethod
     def notify_all(cls):
-        for strat_cache in cls.strat_cache_list:
+        for strat_cache in cls.strat_cache_dict.values():
             strat_cache.notify_semaphore.release()
 
     @classmethod
-    def add(cls, key: str, strat_cache: 'StratCache'):
-        strat_idx: int | None = cls.strat_cache_dict.get(key)
-        if strat_idx is None:
-            cls.strat_cache_list.append(strat_cache)
-            cls.strat_cache_dict[key] = len(cls.strat_cache_list) - 1
-        else:
-            raise Exception(f"Existing StratCache found for add StratCache request: {cls.strat_cache_list[strat_idx]}")
+    def add(cls, key: str, strat_cache_: 'StratCache'):
+        with cls.add_to_strat_cache_rlock:
+            strat_cache: StratCache | None = cls.strat_cache_dict.get(key)
+            if strat_cache is None:
+                cls.strat_cache_dict[key] = strat_cache_
+            else:
+                error_str: str = f"Existing StratCache found for add StratCache request, key: {key};;; " \
+                                 f"existing_cache: {strat_cache}, strat_cache send to add: {strat_cache_}"
+                logging.error(error_str)
+                raise Exception(error_str)
 
     @classmethod
-    def get_by_key(cls, key) -> Optional['StratCache']:
-        strat_idx: int = cls.strat_cache_dict.get(key)
-        if strat_idx is not None:
-            return cls.get_by_idx(strat_idx, key)
-        else:
-            return None
+    def pop(cls, key1: str, key2: str):
+        with cls.add_to_strat_cache_rlock:
+            cls.strat_cache_dict.pop(key1)
+            cls.strat_cache_dict.pop(key2)
 
     @classmethod
-    def get_by_idx(cls, strat_idx: int, key: str = "") -> 'StratCache':
-        if len(cls.strat_cache_list) > strat_idx:
-            return cls.strat_cache_list[strat_idx]
-        else:
-            raise Exception(f"StratCache not found for request: {strat_idx} {key}")
+    def get(cls, key1: str, key2: str | None = None) -> Optional['StratCache']:
+        strat_cache: StratCache = cls.get(key1)
+        if strat_cache is None and key2 is not None:
+            strat_cache: StratCache = cls.get(key1)
+        return strat_cache
 
     @classmethod
     def guaranteed_get_by_key(cls, key1, key2) -> 'StratCache':
-        strat_cache: StratCache = cls.get_by_key(key1)
+        strat_cache: StratCache = cls.get(key1)
         if strat_cache is None:
-            strat_cache = StratCache()
-            cls.add(key1, strat_cache)
-            cls.add(key2, strat_cache)
-            logging.info(f"Created strat cache for key: {key1} {key2}")
+            with cls.add_to_strat_cache_rlock:
+                strat_cache2: StratCache = cls.get(key2)
+                if strat_cache2 is None:  # key2 is guaranteed None, key1 maybe None
+                    strat_cache1: StratCache = cls.get(key1)
+                    if strat_cache1 is None:  # DCLP (maybe apply SM-DCLP)  # both key-1 and key-1 are none - add
+                        strat_cache = StratCache()
+                        cls.add(key1, strat_cache)
+                        cls.add(key2, strat_cache)
+                        logging.info(f"Created strat_cache for key: {key1} {key2}")
+                    else:
+                        cls.add(key2, strat_cache1)  # add key1 found cache to key2
+                        strat_cache = strat_cache1
+                else:  # key2 is has cache, key1 maybe None
+                    strat_cache1: StratCache = cls.get(key1)
+                    if strat_cache1 is None:
+                        cls.add(key1, strat_cache2) # add key2 found cache to key1
+                        strat_cache = strat_cache2
         return strat_cache
 
-    strat_cache_list: List['StratCache'] = list()
-    strat_cache_dict: Dict[str, int] = dict()
+    strat_cache_dict: Dict[str, 'StratCache'] = dict()
 
     def __init__(self):
         self.re_ent_lock: RLock = RLock()
         self.notify_semaphore = Semaphore()
         self.stopped = True  # used by consumer thread to stop processing
-
+        self.primary_leg_trading_symbol: str | None = None
+        self.secondary_leg_trading_symbol: str | None = None
         self._cancel_orders: List[CancelOrderBaseModel] | None = None
         self._cancel_orders_update_date_time: DateTime = DateTime.utcnow()
 
@@ -291,3 +343,10 @@ class StratCache:
         self._top_of_books: List[TopOfBookBaseModel] | None = None
         self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
 
+    def __str__(self):
+        return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.primary_leg_trading_symbol},  " \
+               f"secondary_leg_trading_symbol: {self.secondary_leg_trading_symbol}, pair_strat: {self._pair_strat}, " \
+               f"strat_brief: {self._strat_brief}, cancel_orders: [{self._cancel_orders}], " \
+               f"new_orders: [{self._new_orders}], order_snapshots: {self._order_snapshots}, " \
+               f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
+               f"top of books: {self._top_of_books}"

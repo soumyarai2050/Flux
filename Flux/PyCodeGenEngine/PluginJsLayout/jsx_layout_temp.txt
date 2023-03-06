@@ -54,7 +54,7 @@ const Layout = (props) => {
     }
 
     useEffect(() => {
-        let socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/get-all-ui_layout-ws/`);
+        let socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/get-all-ui_layout-ws`);
         setWebsocket(socket);
         // close the websocket on re-render
         return () => socket.close();

@@ -1,32 +1,50 @@
 # pragma once
 #include <string>
-#include "iostream"
+#include <iostream>
 
-#include "Poco/Net/HTTPClientSession.h"
-#include "Poco/Net/HTTPRequest.h"
-#include "Poco/Net/HTTPResponse.h"
-#include "Poco/StreamCopier.h"
+#include <boost/asio.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+
+
+namespace beast = boost::beast;
+namespace http = beast::http;
+using tcp = boost::asio::ip::tcp;
 
 class MD_ManageSubscriptionSymbols {
 public:
-    static std::string get(const std::string& host, int port, const std::string& path) {
-        try {
-            Poco::Net::HTTPClientSession session(host, port);
 
-            Poco::Net::HTTPRequest request(Poco::Net::HTTPRequest::HTTP_GET, path);
+    MD_ManageSubscriptionSymbols(std::string& host, std::string& port, std::string& target) :
+    host_(host), port_(port), target_(target) {}
 
-            session.sendRequest(request);
-            Poco::Net::HTTPResponse response;
-            std::istream& responseStream = session.receiveResponse(response);
+    std::string get() {
+        boost::asio::io_context io_context;
+        tcp::resolver resolver(io_context);
+        beast::tcp_stream stream(io_context);
 
-            std::string responseBody;
-            Poco::StreamCopier::copyToString(responseStream, responseBody);
-            return responseBody;
+        auto const results = resolver.resolve(host_, port_);
 
-        } catch (std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
-            return "";
-        }
+        stream.connect(results);
+
+        http::request<http::string_body> req{http::verb::get, target_, 11};
+        req.set(http::field::host, host_ + ':' + port_);
+
+        http::write(stream, req);
+
+        beast::flat_buffer buffer;
+        http::response<http::dynamic_body> res;
+
+        http::read(stream, buffer, res);
+
+        std::string response_body = boost::beast::buffers_to_string(res.body().data());
+
+
+        return response_body;
     }
+
+private:
+    std::string host_;
+    std::string port_;
+    std::string target_;
 };
 

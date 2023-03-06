@@ -110,7 +110,8 @@ message OrderJournal{
     y: 31,
     w: 10,
     h: 12,
-    layout: UI_TABLE
+    layout: UI_TABLE,
+    is_repeated: True
   };
   option (FluxMsgJsonQuery) = {
       AggregateVarName: "get_last_n_sec_orders_by_event",
@@ -143,7 +144,8 @@ message OrderSnapshot{
     y: 31,
     w: 10,
     h: 12,
-    layout: UI_TABLE
+    layout: UI_TABLE,
+    is_repeated: True
   };
   option (FluxMsgJsonQuery) = {
       AggregateVarName: "get_open_order_snapshots_by_order_status",
@@ -189,7 +191,8 @@ message SymbolSideSnapshot{
     y: 31,
     w: 10,
     h: 12,
-    layout: UI_TABLE
+    layout: UI_TABLE,
+    is_repeated: True
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required Security security = 2;
@@ -222,7 +225,8 @@ message FillsJournal{
     y: 31,
     w: 8,
     h: 12,
-    layout: UI_TABLE
+    layout: UI_TABLE,
+    is_repeated: True
   };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
   
@@ -452,7 +456,8 @@ message StratBrief{
     y: 31,
     w: 10,
     h: 12,
-    layout: UI_TABLE
+    layout: UI_TABLE,
+    is_repeated: True
   };
   option (FluxMsgJsonQuery) = {
       AggregateVarName: "get_strat_brief_from_symbol",
