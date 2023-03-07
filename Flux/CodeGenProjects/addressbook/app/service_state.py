@@ -16,7 +16,7 @@ class ServiceState(BaseModel):
     def record_error(self, e: Exception) -> int:
         """
         returns time in seconds since first error if error is repeated, 0 otherwise
-        if new error - record error in last error and update first error time with
+        if new error - record error in last error and update first error time with current time
         """
         if self.last_exception == e:
             return self.first_error_time.diff(DateTime.utcnow()).in_seconds()

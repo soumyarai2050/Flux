@@ -180,6 +180,7 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldIndex = 52157;
   optional bool FluxFldWebSocket = 52158;
   optional string FluxFldDateTimeFormat = 52159;
+  optional bool FluxFldCollectionLink = 52160;
 
   //ORM options - 551
   optional bool FluxFldOrmNoUpdate = 55151;  //The field that gets persisted in create to ORM and subsequently can't be updated has this option set

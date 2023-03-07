@@ -49,6 +49,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.output_file_name_suffix: str = ""
         self.root_message_list: List[protogen.Message] = []
         self.non_root_message_list: List[protogen.Message] = []
+        self.query_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
         self.ordered_message_list: List[protogen.Message] = []
         self.enum_type_validator()
@@ -97,6 +98,12 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                         self.non_root_message_list.append(field.message)
                     # else not required: avoiding repetition
                 self.load_dependency_messages_and_enums_in_dicts(field.message)
+
+                if BasePydanticModelPlugin.flux_msg_json_query in str(field.message.proto.options):
+                    if field.message not in self.query_message_list:
+                        self.query_message_list.append(field.message)
+                    # else not required: avoiding repetition
+
             # else not required: avoiding other kinds than message or enum
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
@@ -119,6 +126,11 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             else:
                 if message not in self.non_root_message_list:
                     self.non_root_message_list.append(message)
+                # else not required: avoiding repetition
+
+            if BasePydanticModelPlugin.flux_msg_json_query in str(message.proto.options):
+                if message not in self.query_message_list:
+                    self.query_message_list.append(message)
                 # else not required: avoiding repetition
 
             self.load_dependency_messages_and_enums_in_dicts(message)
@@ -331,7 +343,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
         # Adding other versions for root pydantic class
         output_str += self.handle_message_all_optional_field(message)
-        if message in self.root_message_list:
+        if message in self.root_message_list+list(self.query_message_list):
             output_str += self.handle_dummy_message_gen(message)
         # If message is not root then no need to add message with optional fields
 

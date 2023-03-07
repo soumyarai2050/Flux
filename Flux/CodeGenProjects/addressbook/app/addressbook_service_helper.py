@@ -4,15 +4,14 @@ import sys
 import os
 from pendulum import DateTime
 from threading import Lock
-
+from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 
-# TODO: read host and port from env
-
-strat_manager_service_web_client_internal = StratManagerServiceWebClient()
+host, port = get_host_port_from_env()
+strat_manager_service_web_client_internal = StratManagerServiceWebClient(host, port)
 
 update_portfolio_status_lock: Lock = Lock()
 update_strat_status_lock: Lock = Lock()
@@ -217,14 +216,14 @@ def is_service_up():
     try:
         portfolio_status_list: List[
             PortfolioStatusBaseModel] = strat_manager_service_web_client_internal.get_all_portfolio_status_client()
-        strat_manager_service_web_client_internal.get_all_order_limits_client()
         if 0 == len(portfolio_status_list):  # no portfolio status set yet, create one
             portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(kill_switch=False,
                                                                                   portfolio_alerts=[])
             strat_manager_service_web_client_internal.create_portfolio_status_client(portfolio_status)
         return True
     except Exception as e:
-        logging.error(f"service_up test failed - tried get_all_order_limits_client;;; exception: {e}", exc_info=True)
+        logging.error("service_up test failed - tried get_all_portfolio_status_client (and maybe create);;;"
+                      f"exception: {e}", exc_info=True)
         return False
 
 
@@ -274,7 +273,7 @@ def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
 
 def get_new_order_limits():
     ord_limit_obj = OrderLimitsBaseModel(_id=1, max_basis_points=20, max_px_deviation=1, max_px_levels=2,
-                                         max_order_qty=10, max_order_notional=9_000)
+                                         max_order_qty=10, min_order_notional=1_000, max_order_notional=9_000)
     return ord_limit_obj
 
 

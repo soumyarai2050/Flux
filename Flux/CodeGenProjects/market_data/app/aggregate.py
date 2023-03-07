@@ -89,11 +89,11 @@ def get_max_market_depth_obj(symbol: str, side: str):  # NOQA
 
 
 def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):  # NOQA
-    return [
+    return {"aggregate": [
         {
             "$setWindowFields": {
                 "partitionBy": {
-                    "symbol": f"${symbol}"
+                    "symbol": f"$symbol"
                 },
                 "sortBy": {
                     "time": 1.0
@@ -111,8 +111,13 @@ def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):  # NOQA
                     }
                 }
             }
+        },
+        {
+            "$match": {
+                "symbol": symbol
+            }
         }
-    ]
+    ]}
 
 
 def get_top_of_book_from_symbol(symbol: str):  # NOQA

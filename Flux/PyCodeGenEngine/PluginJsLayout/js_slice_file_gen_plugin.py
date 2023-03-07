@@ -181,11 +181,17 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "})\n\n"
                 return output_str
 
-    def handle_update_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:    # NOQA
+    def handle_update_export_out_str(self, message: protogen.Message, message_name: str,
+                                     message_name_camel_cased: str) -> str:    # NOQA
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const update{message_name} = createAsyncThunk('{message_name_camel_cased}/update', " \
                      f"(payload) => "+"{\n"
-        output_str += "    return axios.patch(`${API_ROOT_URL}/patch-"+f"{message_name_snake_cased}"+"`, payload)\n"
+        option_val_dict = self.get_complex_option_values_as_list_of_dict(message, JsSliceFileGenPlugin.flux_msg_json_root)[0]
+
+        if JsSliceFileGenPlugin.flux_json_root_patch_field in option_val_dict:
+            output_str += "    return axios.patch(`${API_ROOT_URL}/patch-"+f"{message_name_snake_cased}"+"`, payload)\n"
+        else:
+            output_str += "    return axios.put(`${API_ROOT_URL}/put-"+f"{message_name_snake_cased}"+"`, payload)\n"
         output_str += "        .then(res => res.data);\n"
         output_str += "})\n\n"
         return output_str
@@ -318,7 +324,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if message_name not in self.repeated_layout_msg_name_list:
             output_str += self.handle_get_export_out_str(message_name, message_name_camel_cased)
             output_str += self.handle_create_export_out_str(message_name, message_name_camel_cased)
-            output_str += self.handle_update_export_out_str(message_name, message_name_camel_cased)
+            output_str += self.handle_update_export_out_str(message, message_name, message_name_camel_cased)
         output_str += f"const {message_name_camel_cased}Slice = createSlice(" + "{\n"
         output_str += f"    name: '{message_name_camel_cased}',\n"
         output_str += "    initialState: initialState,\n"

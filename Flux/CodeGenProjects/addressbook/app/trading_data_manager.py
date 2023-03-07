@@ -37,8 +37,8 @@ class TradingDataManager:
                                              CancelOrderBaseModelList, self.handle_cancel_order_ws, True)
         self.new_order_ws_cont = WSReader(f"{trading_base_url}/get-all-new_order-ws", NewOrderBaseModel,
                                           NewOrderBaseModelList, self.handle_new_order_ws, True)
-        self.market_depth_ws_const = WSReader(cpp_ws_url, MarketDepthBaseModel, MarketDepthBaseModelList,
-                                              self.handle_market_depth_ws, False)
+        # self.market_depth_ws_const = WSReader(cpp_ws_url, MarketDepthBaseModel, MarketDepthBaseModelList,
+        #                                       self.handle_market_depth_ws, False)
 
         self.executor_trigger_method = executor_trigger_method
         self.strat_thread_dict: dict[str, Tuple['StratExecutor', Thread]] = dict()
@@ -52,7 +52,7 @@ class TradingDataManager:
 
     # define callbacks for types you expect from ws as updates
     def handle_portfolio_status_ws(self, portfolio_status_: PortfolioStatusBaseModel):
-        # handle kill switch in portfolio status handler directly
+        # handle kill switch here (in portfolio status handler directly)
         with self.portfolio_status_ws_cont.single_obj_lock:
             portfolio_status_tuple = self.trading_cache.get_portfolio_status()
             if portfolio_status_tuple is None or portfolio_status_tuple[0] is None:
@@ -63,7 +63,7 @@ class TradingDataManager:
                     StratCache.notify_all()
                 logging.info(f"Added portfolio status with id: {portfolio_status_.id}")
             else:
-                portfolio_status, _ = self.trading_cache.get_portfolio_status()
+                portfolio_status, _ = portfolio_status_tuple
                 if portfolio_status.id == portfolio_status_.id:
                     self.trading_cache.set_portfolio_status(portfolio_status_)
                     if self.portfolio_status_ws_cont.notify:
@@ -76,11 +76,12 @@ class TradingDataManager:
                                   f"found portfolio_status: {portfolio_status_} ")
 
     def handle_portfolio_limits_ws(self, portfolio_limits_: PortfolioLimitsBaseModel):
-        # handle kill switch in portfolio limits handler directly
         with self.portfolio_limits_ws_cont.single_obj_lock:
             portfolio_limits_tuple = self.trading_cache.get_portfolio_limits()
             if portfolio_limits_tuple is None or portfolio_limits_tuple[0] is None:
                 self.trading_cache.set_portfolio_limits(portfolio_limits_)
+                if self.portfolio_limits_ws_cont.notify:
+                    StratCache.notify_all()
                 logging.info(f"Added portfolio status with id: {portfolio_limits_.id}")
             else:
                 portfolio_limits, _ = self.trading_cache.get_portfolio_limits()
@@ -94,24 +95,6 @@ class TradingDataManager:
                                   f"{portfolio_limits.id} found: {portfolio_limits_.id};;;"
                                   f"current portfolio_limits: {portfolio_limits}, "
                                   f"found portfolio_limits: {portfolio_limits_} ")
-
-    def handle_strat_brief_ws(self, strat_brief_: StratBriefBaseModel):
-        key1, key2 = StratCache.get_key_from_strat_brief(strat_brief_)
-        strat_cache: StratCache = StratCache.get(key1, key2)
-        if strat_cache is not None:
-            with strat_cache.re_ent_lock:
-                strat_cache.set_strat_brief(strat_brief_)
-            cached_pair_strat, _ = strat_cache.get_pair_strat()
-            if self.strat_brief_ws_cont.notify and cached_pair_strat is not None:
-                strat_cache.notify_semaphore.release()
-            elif cached_pair_strat is None:
-                logging.warning(f"ignoring: no ongoing pair strat matches this strat_brief: {strat_brief_}")
-            # else not required - strat does not need this update notification
-            logging.debug(f"Updated strat_brief cache for key: {key1} {key2} ;;; strat_brief: {strat_brief_}")
-        else:
-            logging.debug("either a non-ongoing strat-brief or one before corresponding active pair_strat: "
-                          "we discard this and expect algo to get snapshot with explicit web query - maybe we wire "
-                          f"explicit web query in ongoing pair-strat notification;;;strat_brief: {strat_brief_}")
 
     def handle_order_limits_ws(self, order_limits_: OrderLimitsBaseModel):
         with self.order_limits_ws_cont.single_obj_lock:
@@ -171,6 +154,26 @@ class TradingDataManager:
                 logging.warning(f"handle_pair_strat_ws: removed cache entry of non ongoing pair strat from trading:"
                                 f" {pair_strat_}")
             # else not required - non-ongoing pair strat is not to exist in cache
+
+    def handle_strat_brief_ws(self, strat_brief_: StratBriefBaseModel):
+        key1, key2 = StratCache.get_key_from_strat_brief(strat_brief_)
+        strat_cache: StratCache = StratCache.get(key1, key2)
+        if strat_cache is not None:
+            with strat_cache.re_ent_lock:
+                strat_cache.set_strat_brief(strat_brief_)
+            cached_pair_strat_tuple = strat_cache.get_pair_strat()
+            if self.strat_brief_ws_cont.notify and cached_pair_strat_tuple is not None and \
+                    cached_pair_strat_tuple[0] is not None:
+                cached_pair_strat, _ = cached_pair_strat_tuple
+                strat_cache.notify_semaphore.release()
+            elif (cached_pair_strat_tuple is None) or (cached_pair_strat_tuple[0] is None):
+                logging.warning(f"ignoring: no ongoing pair strat matches this strat_brief: {strat_brief_}")
+            # else not required - strat does not need this update notification
+            logging.debug(f"Updated strat_brief cache for key: {key1} {key2} ;;; strat_brief: {strat_brief_}")
+        else:
+            logging.debug("either a non-ongoing strat-brief or one before corresponding active pair_strat: "
+                          "we discard this and expect algo to get snapshot with explicit web query - maybe we wire "
+                          f"explicit web query in ongoing pair-strat notification;;;strat_brief: {strat_brief_}")
 
     def handle_order_journal_ws(self, order_journal_: OrderJournalBaseModel):  # NOQA
         key = StratCache.get_key_from_order_journal(order_journal_)

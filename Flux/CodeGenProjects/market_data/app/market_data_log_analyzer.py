@@ -50,6 +50,6 @@ if __name__ == '__main__':
         log_dir: PurePath = PurePath(__file__).parent.parent / "log"
         datetime_str: str = datetime.now().strftime("%Y%m%d")
         configure_logger('debug', str(log_dir), f'market_data_log_analyzer_{datetime_str}.log')
-        PairStratEngineLogAnalyzer(str(log_dir / f'market_data_beanie_logs_{datetime_str}.log'))
+        MarketDataLogAnalyzer(str(log_dir / f'market_data_beanie_logs_{datetime_str}.log'))
 
     main()

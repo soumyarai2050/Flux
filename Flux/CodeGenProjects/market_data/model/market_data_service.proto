@@ -61,13 +61,6 @@ message MarketDataBrief{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgWidgetUIData) = {
-    x: 0,
-    y: 18,
-    w: 18,
-    h: 12,
-    layout: UI_TABLE
-  };
   required Security security = 1;
   required Side side = 2;
   required int64 last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
@@ -148,13 +141,6 @@ message LastTrade {
     layout: UI_TABLE,
     is_repeated: true
   };
-  option (FluxMsgJsonQuery) = {
-    AggregateVarName: "get_last_n_sec_total_qty",
-    AggregateParams: "symbol",
-    AggregateParams: "last_n_sec",
-    AggregateParamsDataType: "str",
-    AggregateParamsDataType: "float"
-  };
   required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   required int64 time = 2 [(FluxFldValIsDateTime) = true];
   required float px = 3;
@@ -164,6 +150,20 @@ message LastTrade {
   optional bool past_limit = 7;
   optional bool unreported = 8;
   optional MarketTradeVolume market_trade_volume = 9;
+}
+
+message LastSecMarketTradeVol{
+  option (FluxMsgJsonQuery) = {
+    AggregateVarName: "get_last_n_sec_total_qty",
+    AggregateParams: "buy_symbol",
+    AggregateParams: "sell_symbol",
+    AggregateParams: "last_n_sec",
+    AggregateParamsDataType: "str",
+    AggregateParamsDataType: "str",
+    AggregateParamsDataType: "int"
+  };
+  optional int64 buy_side_last_sec_trade_vol = 1;
+  optional int64 sell_side_last_sec_trade_vol = 2;
 }
 
 message MarketDepth {
@@ -189,7 +189,7 @@ message MarketDepth {
   required TickTypeEnum side = 4;
   required float px = 5;
   required int64 qty = 6;
-  required float premium = 7;
+  optional float premium = 7;
   required int32 position = 8;
   optional string market_maker = 9;
   optional bool is_smart_depth = 10;
@@ -199,8 +199,9 @@ message MarketDepth {
 }
 
 message MarketTradeVolume{
-  optional int64 participation_period_last_trade_qty_sum = 1;
-  optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
+  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional int64 participation_period_last_trade_qty_sum = 2;
+  optional int32 applicable_period_seconds = 3 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
 }
 
 message RawMarketDepthHistory {

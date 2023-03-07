@@ -3,6 +3,7 @@ import logging
 import os
 import time
 from pathlib import PurePath
+from typing import List, Optional
 
 # Project imports
 from FluxPythonUtils.scripts.utility_functions import configure_logger
@@ -22,10 +23,9 @@ debug_mode: bool = False if (debug_env := os.getenv("DEBUG")) is None or len(deb
 
 
 class AddressbookLogAnalyzer(LogAnalyzer):
-    def __init__(self, log_file_path_and_name):
-        super().__init__(log_file_path_and_name, debug_mode=debug_mode)
+    def __init__(self, log_files: Optional[List[str]]):
         self.strat_manager_service_web_client = StratManagerServiceWebClient(host=host, port=port)
-        self._analyze_log()
+        super().__init__(log_files, debug_mode=debug_mode)
 
     def _send_alerts(self, severity: str, alert_brief: str, alert_details: str):
         logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
@@ -41,15 +41,21 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                 created = True
             except Exception as e:
                 logging.error(f"_send_alerts failed;;; exception: {e}", exc_info=True)
-                time.sleep(60)
+                time.sleep(30)
 
 
 if __name__ == '__main__':
     def main():
         from datetime import datetime
         log_dir: PurePath = PurePath(__file__).parent.parent / "log"
+        market_data_log_dir: PurePath = PurePath(__file__).parent.parent.parent / "market_data" / "log"
         datetime_str: str = datetime.now().strftime("%Y%m%d")
-        configure_logger('debug', str(log_dir), f'addressbook_log_analyzer_{datetime_str}.log')
-        AddressbookLogAnalyzer(str(log_dir / f'addressbook_beanie_logs_{datetime_str}.log'))
+        log_files: List[str] = [
+            str(market_data_log_dir / f"market_data_beanie_logs_{datetime_str}.log"),
+            str(log_dir / f"addressbook_beanie_logs_{datetime_str}.log"),
+            str(log_dir / f"strat_executer_{datetime_str}.log")
+        ]
+        configure_logger("debug", str(log_dir), f"addressbook_log_analyzer_{datetime_str}.log")
+        AddressbookLogAnalyzer(log_files)
 
     main()

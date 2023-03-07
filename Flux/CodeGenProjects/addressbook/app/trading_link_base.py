@@ -1,15 +1,18 @@
 from abc import abstractmethod
 from typing import List, ClassVar
-from Flux. CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import Security, \
+
+from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
+from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import Security, \
     OrderBrief, OrderJournalBaseModel, Side, OrderEventType, FillsJournalBaseModel
-from Flux. CodeGenProjects.market_data.generated.market_data_service_web_client import MarketDataServiceWebClient
-from Flux. CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
+from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client import MarketDataServiceWebClient
+from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 
 
 class TradingLinkBase:
-    strat_manager_service_web_client: ClassVar[StratManagerServiceWebClient] = StratManagerServiceWebClient()
-    market_data_service_web_client: ClassVar[MarketDataServiceWebClient] = MarketDataServiceWebClient()
+    host, port = get_host_port_from_env()
+    strat_manager_service_web_client: ClassVar[StratManagerServiceWebClient] = StratManagerServiceWebClient(host, port)
+    market_data_service_web_client: ClassVar[MarketDataServiceWebClient] = MarketDataServiceWebClient(host, 8040)
 
     @classmethod
     @abstractmethod

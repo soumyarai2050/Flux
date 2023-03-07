@@ -30,21 +30,38 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
             case "optional":
                 if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
                     output_str = f"{field.proto.name}: Indexed({field_type}) | None"
+                elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
+                    output_str = f"{field.proto.name}: Link[{field_type}] | None"
                 else:
                     output_str = f"{field.proto.name}: {field_type} | None"
             case "repeated":
                 if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
-                    output_str = f"{field.proto.name}: Indexed(List[{field_type}])"
+                    if BeanieModelPlugin.flux_fld_is_required in str(field.proto.options):
+                        output_str = f"{field.proto.name}: Indexed(List[{field_type}])"
+                    else:
+                        output_str = f"{field.proto.name}: Indexed(List[{field_type}]) | None"
+                elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
+                    if BeanieModelPlugin.flux_fld_is_required in str(field.proto.options):
+                        output_str = f"{field.proto.name}: List[Link[{field_type}]]"
+                    else:
+                        output_str = f"{field.proto.name}: List[Link[{field_type}]] | None"
                 else:
-                    if self.flux_fld_is_required in str(field.proto.options):
+                    if BeanieModelPlugin.flux_fld_is_required in str(field.proto.options):
                         output_str = f"{field.proto.name}: List[{field_type}]"
                     else:
                         output_str = f"{field.proto.name}: List[{field_type}] | None"
-            case other:
+            case "required":
                 if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
                     output_str = f"{field.proto.name}: Indexed({field_type})"
+                elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
+                    output_str = f"{field.proto.name}: Link[{field_type}]"
                 else:
                     output_str = f"{field.proto.name}: {field_type}"
+            case other:
+                err_str = f"unsupported field cardinality {other}"
+                logging.exception(err_str)
+                raise Exception(err_str)
+
         return output_str
 
     def handle_field_output(self, field: protogen.Field) -> str:
@@ -169,7 +186,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         return output_str
 
     def handle_imports(self) -> str:
-        output_str = "from beanie import Indexed, Document, PydanticObjectId\n"
+        output_str = "from beanie import Indexed, Document, PydanticObjectId, Link\n"
         output_str += "from pydantic import BaseModel, Field, validator\n"
         output_str += "import pendulum\n"
         output_str += "from threading import Lock, RLock\n"

@@ -285,10 +285,16 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         output_str += " "*4 + f'    self.host = {host} if host is None else host\n'
         output_str += " "*4 + f'    self.port = {port} if port is None else port\n\n'
         output_str += " "*4 + f'    # urls\n'
-        for message in self.root_message_list:
+        for message in self.root_message_list+list(self.query_message_dict):
             output_str += self._handle_client_url_gen(message)
             output_str += "\n"
         output_str += f'    # interfaces\n'
         for message in self.root_message_list:
             output_str += self.handle_client_methods(message)
+
+        for message in list(self.query_message_dict):
+            if message not in self.root_message_list:
+                output_str += self.handle_client_methods(message)
+            # else not required: root lvl message with query already executed in last loop
+
         return output_str

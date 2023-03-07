@@ -115,12 +115,13 @@ class StratCache:
         secondary_ticker = self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id
         return primary_ticker, secondary_ticker
 
-    # None to remove pair strat
+    # pass None to remove pair strat
     def set_pair_strat(self, pair_strat: PairStratBaseModel | None) -> DateTime:
         self._pair_strat = pair_strat
         self._pair_strat_update_date_time = DateTime.utcnow()
         if self._pair_strat is not None:
             self.primary_leg_trading_symbol, self.secondary_leg_trading_symbol = self.get_trading_symbols()
+        # else not required: passing None to clear pair_strat form cache is valid
         return self._pair_strat_update_date_time
 
     def get_strat_brief(self, date_time: DateTime | None = None) -> Tuple[StratBriefBaseModel, DateTime] | None:
@@ -222,9 +223,12 @@ class StratCache:
     def get_top_of_books(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
         if date_time is None or date_time < self._top_of_books_update_date_time:
             with self.re_ent_lock:
-                _top_of_books_update_date_time = copy.deepcopy(self._top_of_books_update_date_time)
-                _top_of_books = copy.deepcopy(self._top_of_books)
-                return _top_of_books, _top_of_books_update_date_time
+                if self._top_of_books is not None:
+                    _top_of_books_update_date_time = copy.deepcopy(self._top_of_books_update_date_time)
+                    _top_of_books = copy.deepcopy(self._top_of_books)
+                    return _top_of_books, _top_of_books_update_date_time
+                else:
+                    return None
         else:
             return None
 
@@ -283,9 +287,9 @@ class StratCache:
 
     @classmethod
     def get(cls, key1: str, key2: str | None = None) -> Optional['StratCache']:
-        strat_cache: StratCache = cls.get(key1)
+        strat_cache: StratCache = cls.strat_cache_dict.get(key1)
         if strat_cache is None and key2 is not None:
-            strat_cache: StratCache = cls.get(key1)
+            strat_cache: StratCache = cls.strat_cache_dict.get(key2)
         return strat_cache
 
     @classmethod
@@ -319,6 +323,7 @@ class StratCache:
         self.stopped = True  # used by consumer thread to stop processing
         self.primary_leg_trading_symbol: str | None = None
         self.secondary_leg_trading_symbol: str | None = None
+
         self._cancel_orders: List[CancelOrderBaseModel] | None = None
         self._cancel_orders_update_date_time: DateTime = DateTime.utcnow()
 
