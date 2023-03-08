@@ -12,7 +12,7 @@
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/StreamCopier.h>
 #include "MD_TopOfBookPublisher.h"
-#include "MD_MarketDepth.h"
+#include "MD_DepthSingleSide.h"
 
 namespace md_handler {
     using bsoncxx::builder::basic::make_array;
@@ -35,6 +35,7 @@ namespace md_handler {
     const std::string qty_key = "qty";
     const std::string exchange_key = "exchange";
     const std::string px_key = "px";
+    const std::string premium_key = "premium";
     const std::string operation_key = "operation";
     const std::string time_key = "time";
     const std::string id_key = "_id";

@@ -2,7 +2,7 @@
 
 #include "gtest/gtest.h"
 #include "../src/MD_MongoDBHandler.h"
-#include "../src/MD_MarketDepth.h"
+#include "../src/MD_DepthSingleSide.h"
 #include "../src/MD_LastTradeHandler.h"
 #include "../src/MD_DepthHandler.h"
 #include "../src/MD_Utils.h"
@@ -25,7 +25,7 @@ TEST(MarketDataHandlerTestSuite, StartUpTest){ // 12/2/2020 -> 737761
 }
 
 void validate_db_record_against_expected(const bsoncxx::document::value &query,
-                                         const std::vector<md_handler::MD_MarketDepth> &expected_market_depth_record,
+                                         const std::vector<md_handler::MD_DepthSingleSide> &expected_market_depth_record,
                                          const bool ignore_date_time){
     sleep(1); // it seems commits may not reflect immediately - adding delay ensure test case does not fail due to the data visibility delay
     auto db_market_depth_records = market_depth_collection.find({query});
@@ -98,39 +98,39 @@ TEST(MarketDataHandlerTestSuite, AggregateMarketDepthTest){ // 12/2/2020 -> 7377
 
     market_depth_collection.delete_many({});
 
-    std::vector<md_handler::MD_MarketDepth> test_data_list = {{20, 10, 0, symbol, "BID"},
-                                                              {30, 5,  1, symbol, "BID"},
-                                                              {50, 3,  2, symbol, "BID"},
+    std::vector<md_handler::MD_DepthSingleSide> test_data_list = {{20, 10, 0, symbol, "BID"},
+                                                                  {30, 5,  1, symbol, "BID"},
+                                                                  {50, 3,  2, symbol, "BID"},
 
-                                                              {40, 25, 0, symbol, "ASK"},
-                                                              {40, 30, 1, symbol, "ASK"}};
+                                                                  {40, 25, 0, symbol, "ASK"},
+                                                                  {40, 30, 1, symbol, "ASK"}};
     // insert test data into DB (both bid and ask)
     for (auto& test_data: test_data_list){
-        md_handler::setMillisecondsSinceEpochNow<md_handler::MD_MarketDepth>(test_data);
+        md_handler::setMillisecondsSinceEpochNow<md_handler::MD_DepthSingleSide>(test_data);
         marketDataHandler.handle_md_update(test_data);
     }
 
     //Create Expected Bid Data:
-    std::vector<md_handler::MD_MarketDepth> expected_bid_data_list = {{20, 10, 0, symbol, "BID", 20,  200.0, 10.0},
-                                                                      {30, 5,  1, symbol, "BID", 50,  350.0, 7.0},
-                                                                      {50, 3,  2, symbol, "BID", 100, 500.0, 5.0}};
+    std::vector<md_handler::MD_DepthSingleSide> expected_bid_data_list = {{20, 10, 0, symbol, "BID", 20,  200.0, 10.0},
+                                                                          {30, 5,  1, symbol, "BID", 50,  350.0, 7.0},
+                                                                          {50, 3,  2, symbol, "BID", 100, 500.0, 5.0}};
     validate_db_record_against_expected(bid_query, expected_bid_data_list, true);
 
     // Next test : Replace 0th entry in Market Depth and validate all aggregation are as expected
-    md_handler::MD_MarketDepth test_data {20, 25, 0, symbol, "BID"};
-    md_handler::setMillisecondsSinceEpochNow<md_handler::MD_MarketDepth>(test_data);
+    md_handler::MD_DepthSingleSide test_data {20, 25, 0, symbol, "BID"};
+    md_handler::setMillisecondsSinceEpochNow<md_handler::MD_DepthSingleSide>(test_data);
     marketDataHandler.handle_md_update(test_data);
 
     //Create Expected Bid Data:
-    std::vector<md_handler::MD_MarketDepth> expected_bid_data_list2 = {{20, 25, 0, symbol, "BID", 20,  500.0, 25.0},
-                                                                       {30, 5,  1, symbol, "BID", 50,  650.0, 13.0},
-                                                                       {50, 3,  2, symbol, "BID", 100, 800,   8.0}};
+    std::vector<md_handler::MD_DepthSingleSide> expected_bid_data_list2 = {{20, 25, 0, symbol, "BID", 20,  500.0, 25.0},
+                                                                           {30, 5,  1, symbol, "BID", 50,  650.0, 13.0},
+                                                                           {50, 3,  2, symbol, "BID", 100, 800,   8.0}};
     validate_db_record_against_expected(bid_query, expected_bid_data_list2, true);
 
 
     // post_insert_ask_market_depths: retrieve only side: ASK data for symbol defined in ask_query
-    std::vector<md_handler::MD_MarketDepth> expected_ask_data_list = {{40, 25, 0, symbol, "ASK", 40, 1000.0, 25.0},
-                                                                      {40, 30, 1, symbol, "ASK", 80, 2200,   27.5}};
+    std::vector<md_handler::MD_DepthSingleSide> expected_ask_data_list = {{40, 25, 0, symbol, "ASK", 40, 1000.0, 25.0},
+                                                                          {40, 30, 1, symbol, "ASK", 80, 2200,   27.5}};
     validate_db_record_against_expected(ask_query, expected_ask_data_list, true);
 }
 

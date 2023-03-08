@@ -17,7 +17,7 @@
 #include "rapidjson/stringbuffer.h"
 
 #include "MD_Utils.h"
-#include "MD_MarketDepth.h"
+#include "MD_DepthSingleSide.h"
 #include "MD_MongoDBHandler.h"
 #include "MD_LastTrade.h"
 
@@ -34,7 +34,7 @@ namespace md_handler {
         Poco::Net::HTTPRequest request;
         Poco::Net::HTTPResponse response;
         const static inline md_handler::MD_LastTrade _emptyLastTrade{};
-        const static inline md_handler::MD_MarketDepth _emptyMarketDepth{};
+        const static inline md_handler::MD_DepthSingleSide _emptyMarketDepth{};
         static std::unordered_map<std::string, std::string> top_of_book_cache;
 
     public:
@@ -71,8 +71,8 @@ namespace md_handler {
         }
 
         std::string
-        create_data(const md_handler::MD_MarketDepth &bid_market_depth,
-                    const md_handler::MD_MarketDepth &ask_market_depth){
+        create_data(const md_handler::MD_DepthSingleSide &bid_market_depth,
+                    const md_handler::MD_DepthSingleSide &ask_market_depth){
             return create_data(bid_market_depth, ask_market_depth, _emptyLastTrade);
         }
 
@@ -82,8 +82,8 @@ namespace md_handler {
         }
 
         std::string
-        create_data(const md_handler::MD_MarketDepth &bid_market_depth,
-                    const md_handler::MD_MarketDepth &ask_market_depth,
+        create_data(const md_handler::MD_DepthSingleSide &bid_market_depth,
+                    const md_handler::MD_DepthSingleSide &ask_market_depth,
                     const md_handler::MD_LastTrade &lastTrade){
             request = Poco::Net::HTTPRequest(Poco::Net::HTTPRequest::HTTP_POST, post_uri);
             request.setContentType("application/json");
@@ -189,8 +189,8 @@ namespace md_handler {
         }
 
         //return id if successful , empty string if failed - logging done internally
-        std::string patch_data(const std::string& top_of_book_db_id, const md_handler::MD_MarketDepth &bid_market_depth,
-                   const md_handler::MD_MarketDepth &ask_market_depth) {
+        std::string patch_data(const std::string& top_of_book_db_id, const md_handler::MD_DepthSingleSide &bid_market_depth,
+                   const md_handler::MD_DepthSingleSide &ask_market_depth) {
             request = Poco::Net::HTTPRequest(Poco::Net::HTTPRequest::HTTP_PATCH, patch_uri);
             request.setContentType("application/json");
             request.add("Accept", "application/json");

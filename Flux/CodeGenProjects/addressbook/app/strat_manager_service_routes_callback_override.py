@@ -60,9 +60,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         error_prefix = "_app_launch_pre_thread_func: "
         static_data_service_state: ServiceState = ServiceState(
             error_prefix=error_prefix + "static_data_service failed, exception: ")
-
+        should_sleep: bool = False
         while True:
-            time.sleep(self.min_refresh_interval)
+            if should_sleep:
+                time.sleep(self.min_refresh_interval)
             if not self.service_ready:
                 try:
                     if is_service_up():
@@ -71,11 +72,14 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         if (portfolio_limits := get_portfolio_limits()) is None:
                             portfolio_limits = create_portfolio_limits()
                         self.service_ready = True
+                    else:
+                        should_sleep = True
                 except Exception as e:
                     logging.error("unexpected: service startup threw exception, "
                                   f"we'll retry periodically in: {self.min_refresh_interval} seconds"
                                   f";;;exception: {e}", exc_info=True)
             else:
+                should_sleep = True
                 # any periodic refresh code goes here
                 try:
                     # Gets all open orders, updates residuals and raises pause to strat if req

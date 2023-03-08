@@ -4,7 +4,7 @@
 #include <exception>
 #include <chrono>
 
-#include "MD_MarketDepth.h"
+#include "MD_DepthSingleSide.h"
 #include "MD_DepthHandler.h"
 #include "MD_LastTrade.h"
 #include "MD_LastTradeHandler.h"
@@ -43,7 +43,7 @@ namespace md_handler {
         void replay(const ReplyType replay_type=ReplyType::HISTORY_ACCELERATE) {
             auto md_depth_history_doc_itr = md_depth_history_cursor.begin();
             bool market_depth_no_replay = true;
-            std::shared_ptr<MD_MarketDepth> sp_market_depth;
+            std::shared_ptr<MD_DepthSingleSide> sp_market_depth;
 
             auto all_last_doc_itr = last_trade_cursor.begin();
             bool all_last_no_replay = true;
@@ -53,13 +53,13 @@ namespace md_handler {
                 if(md_depth_history_doc_itr != md_depth_history_cursor.end()){
                     if (market_depth_no_replay){
                         auto &&md_depth_history_doc = *md_depth_history_doc_itr;
-                        sp_market_depth = std::make_shared<MD_MarketDepth>(md_depth_history_doc[qty_key].get_int64().value,
-                                                         md_depth_history_doc[px_key].get_double().value,
-                                                         static_cast<int8_t>(md_depth_history_doc[position_key].get_int32().value),
-                                                         md_depth_history_doc[symbol_key].get_string().value.data(),
-                                                         md_depth_history_doc[side_key].get_string().value.data());
+                        sp_market_depth = std::make_shared<MD_DepthSingleSide>(md_depth_history_doc[qty_key].get_int64().value,
+                                                                               md_depth_history_doc[px_key].get_double().value,
+                                                                               static_cast<int8_t>(md_depth_history_doc[position_key].get_int32().value),
+                                                                               md_depth_history_doc[symbol_key].get_string().value.data(),
+                                                                               md_depth_history_doc[side_key].get_string().value.data());
                         bsoncxx::types::b_date date_time = md_depth_history_doc[time_key].get_date();
-                        setMillisecondsSinceEpoch<MD_MarketDepth>(*sp_market_depth, date_time, replay_type);
+                        setMillisecondsSinceEpoch<MD_DepthSingleSide>(*sp_market_depth, date_time, replay_type);
                         market_depth_no_replay = false;
                         md_depth_history_doc_itr++;
                     }

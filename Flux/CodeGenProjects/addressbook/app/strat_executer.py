@@ -46,8 +46,10 @@ class StratExecutor:
         self._cancel_orders_processed_slice: int = 0
         self._top_of_books_update_date_time: DateTime | None = None
 
-        self.primary_leg_notional: float = 0
-        self.secondary_leg_notional: float = 0
+        self.last_order_time_stamp: DateTime | None = None
+
+        self.leg1_notional: float = 0
+        self.leg2_notional: float = 0
 
     def check_order_eligibility(self, side: Side, check_notional: float) -> bool:
         strat_brief, self._strat_brief_update_date_time = \
@@ -141,6 +143,9 @@ class StratExecutor:
             logging.error(f"blocked generated order, breaches max_order_qty limit, expected less than: "
                           f"{order_limits.max_order_qty}, found: {qty} ")
             checks_passed = False
+        # TODO urgent - temp check - remove
+        if self.last_order_time_stamp.add(minutes=2) < DateTime.now():  # allow orders only after 2 min
+            checks_passed = False
         return checks_passed
 
     def run(self):
@@ -161,122 +166,102 @@ class StratExecutor:
                                     f"{pair_strat.id};;;strat details: {self.strat_cache.get_pair_strat()}")
                     break
 
-    def _check_tob_and_place_order(self, pair_strat: PairStratBaseModel) -> bool:
-        posted_primary_notional: float = 0
-        posted_secondary_notional: float = 0
-        top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(self._top_of_books_update_date_time)
-        if top_of_book_and_date_tuple is not None:
-            top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
-            if top_of_books is not None and len(top_of_books) <= 2:
-                primary_leg, secondary_leg = self.extract_legs_from_tobs(pair_strat, top_of_books)
-                if primary_leg is not None and self.strat_cache.primary_leg_trading_symbol is None:
-                    primary_leg = None
-                    logging.error(f"Unable to proceed with this ticker: {primary_leg} no static data")
-                if secondary_leg is not None and self.strat_cache.secondary_leg_trading_symbol is None:
-                    secondary_leg = None
-                    logging.error(f"Unable to proceed with this ticker: {primary_leg} no static data")
-                if primary_leg is not None and self.strat_cache.primary_leg_trading_symbol is not None:
-                    if abs(self.primary_leg_notional) <= abs(self.secondary_leg_notional):
-                        # process primary leg
-                        if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:  # execute aggressive buy
-                            if not (primary_leg.ask_quote.qty == 0 or math.isclose(primary_leg.ask_quote.px,
-                                                                                   0)):
-                                self.place_new_order(primary_leg.ask_quote.px, primary_leg.ask_quote.qty,
-                                                     Side.BUY,
-                                                     self.strat_cache.primary_leg_trading_symbol,
-                                                     primary_leg.symbol,
-                                                     "trading-account", "exchange-name")
-                                posted_primary_notional = primary_leg.ask_quote.px * primary_leg.ask_quote.qty
-                                return True
-                            else:
-                                logging.error(
-                                    f"0 value found in ask TOB - ignoring: px{primary_leg.ask_quote.px}, "
-                                    f"qty: {primary_leg.ask_quote.qty}")
-                                return False
-                        else:  # execute aggressive sell
-                            if not (primary_leg.bid_quote.qty == 0 or math.isclose(primary_leg.bid_quote.px,
-                                                                                   0)):
-                                self.place_new_order(primary_leg.bid_quote.px, primary_leg.bid_quote.qty,
-                                                     Side.SELL, self.strat_cache.primary_leg_trading_symbol,
-                                                     primary_leg.symbol,
-                                                     "trading-account", "exchange-name")
-                                posted_primary_notional = primary_leg.bid_quote.px * primary_leg.bid_quote.qty
-                                return True
-                            else:
-                                logging.error(f"0 value found in TOB - ignoring: px {primary_leg.bid_quote.px}"
-                                              f", qty: {primary_leg.bid_quote.qty}")
-                                return False
-                if secondary_leg is not None and self.strat_cache.secondary_leg_trading_symbol is not None:
-                    if abs(self.secondary_leg_notional) <= abs(self.primary_leg_notional):
-                        # process secondary leg
-                        if pair_strat.pair_strat_params.strat_leg2.side == Side.BUY:  # execute aggressive buy
-                            if not (secondary_leg.ask_quote.qty == 0 or
-                                    math.isclose(secondary_leg.ask_quote.px, 0)):
-                                self.place_new_order(secondary_leg.ask_quote.px, secondary_leg.ask_quote.qty,
-                                                     Side.BUY, self.strat_cache.secondary_leg_trading_symbol,
-                                                     secondary_leg.symbol,
-                                                     "trading-account", "exchange-name")
-                                posted_secondary_notional = \
-                                    secondary_leg.ask_quote.px * secondary_leg.ask_quote.qty
-                                return True
-                            else:
-                                logging.error(
-                                    f"0 value found in ask TOB - ignoring: px{secondary_leg.ask_quote.px}, "
-                                    f"qty: {secondary_leg.ask_quote.qty}")
-                                return False
-                        else:  # execute aggressive sell
-                            if not (secondary_leg.bid_quote.qty == 0 or
-                                    math.isclose(secondary_leg.bid_quote.px, 0)):
-                                self.place_new_order(secondary_leg.bid_quote.px, secondary_leg.bid_quote.qty,
-                                                     Side.SELL, self.strat_cache.secondary_leg_trading_symbol,
-                                                     secondary_leg.symbol,
-                                                     "trading-account", "exchange-name")
-                                posted_secondary_notional = \
-                                    secondary_leg.bid_quote.px * secondary_leg.bid_quote.qty
-                                return True
-                            else:
-                                logging.error(
-                                    f"0 value found in TOB - ignoring: px {secondary_leg.bid_quote.px}"
-                                    f", qty: {secondary_leg.bid_quote.qty}")
-                                return False
-                self.primary_leg_notional += posted_primary_notional
-                self.secondary_leg_notional += posted_secondary_notional
-                logging.debug(f"strat-matched ToB: {[str(tob) for tob in top_of_books]}")
-            else:
-                logging.error(f"expected 1 / 2 TOB , received: "
-                              f"{len(top_of_books) if top_of_books is not None else 0} in tob update!;;;"
-                              f"received-TOBs: "
-                              f"{[str(tob) for tob in top_of_books] if top_of_books is not None else None}!")
-                return False
-        else:
-            return False  # no update to process
+    def _check_tob_and_place_order(self, pair_strat: PairStratBaseModel, top_of_books) -> bool:
+        posted_leg1_notional: float = 0
+        posted_leg2_notional: float = 0
+        leg1, leg2 = self.extract_legs_from_tobs(pair_strat, top_of_books)
+        if leg1 is not None and self.strat_cache.primary_leg_trading_symbol is None:
+            leg1 = None
+            logging.error(f"Unable to proceed with this ticker: {leg1} no static data")
+        if leg2 is not None and self.strat_cache.secondary_leg_trading_symbol is None:
+            leg2 = None
+            logging.error(f"Unable to proceed with this ticker: {leg1} no static data")
 
-    def _check_tob_and_place_order_test(self, pair_strat: PairStratBaseModel) -> bool:
+        order_placed: bool = False
+        if leg1 is not None and self.strat_cache.primary_leg_trading_symbol is not None:
+            if abs(self.leg1_notional) <= abs(self.leg2_notional):
+                # process primary leg
+                if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:  # execute aggressive buy
+                    if not (leg1.ask_quote.qty == 0 or math.isclose(leg1.ask_quote.px, 0)):
+                        order_placed = self.place_new_order(leg1.ask_quote.px, leg1.ask_quote.qty,
+                                                            Side.BUY,
+                                                            self.strat_cache.primary_leg_trading_symbol,
+                                                            leg1.symbol,
+                                                            "trading-account", "exchange-name")
+                        if order_placed:
+                            posted_leg1_notional = leg1.ask_quote.px * leg1.ask_quote.qty
+                    else:
+                        logging.error(
+                            f"0 value found in ask TOB - ignoring: px{leg1.ask_quote.px}, "
+                            f"qty: {leg1.ask_quote.qty}")
+                        return False
+                else:  # execute aggressive sell
+                    if not (leg1.bid_quote.qty == 0 or math.isclose(leg1.bid_quote.px, 0)):
+                        order_placed = self.place_new_order(leg1.bid_quote.px, leg1.bid_quote.qty,
+                                             Side.SELL, self.strat_cache.primary_leg_trading_symbol,
+                                             leg1.symbol,
+                                             "trading-account", "exchange-name")
+                        if order_placed:
+                            posted_leg1_notional = leg1.bid_quote.px * leg1.bid_quote.qty
+                    else:
+                        logging.error(f"0 value found in TOB - ignoring: px {leg1.bid_quote.px}"
+                                      f", qty: {leg1.bid_quote.qty}")
+                        return False
+        if leg2 is not None and self.strat_cache.secondary_leg_trading_symbol is not None:
+            if abs(self.leg2_notional) <= abs(self.leg1_notional):
+                # process secondary leg
+                if pair_strat.pair_strat_params.strat_leg2.side == Side.BUY:  # execute aggressive buy
+                    if not (leg2.ask_quote.qty == 0 or math.isclose(leg2.ask_quote.px, 0)):
+                        order_placed = self.place_new_order(leg2.ask_quote.px, leg2.ask_quote.qty,
+                                             Side.BUY, self.strat_cache.secondary_leg_trading_symbol,
+                                             leg2.symbol,
+                                             "trading-account", "exchange-name")
+                        if order_placed:
+                            posted_leg2_notional = leg2.ask_quote.px * leg2.ask_quote.qty
+                    else:
+                        logging.error(
+                            f"0 value found in ask TOB - ignoring: px{leg2.ask_quote.px}, "
+                            f"qty: {leg2.ask_quote.qty}")
+                        return False
+                else:  # execute aggressive sell
+                    if not (leg2.bid_quote.qty == 0 or math.isclose(leg2.bid_quote.px, 0)):
+                        self.place_new_order(leg2.bid_quote.px, leg2.bid_quote.qty,
+                                             Side.SELL, self.strat_cache.secondary_leg_trading_symbol,
+                                             leg2.symbol,
+                                             "trading-account", "exchange-name")
+                        if order_placed:
+                            posted_leg2_notional = leg2.bid_quote.px * leg2.bid_quote.qty
+                    else:
+                        logging.error(
+                            f"0 value found in TOB - ignoring: px {leg2.bid_quote.px}"
+                            f", qty: {leg2.bid_quote.qty}")
+                        return False
+        if order_placed:
+            self.last_order_time_stamp = DateTime.now()
+            self.leg1_notional += posted_leg1_notional
+            self.leg2_notional += posted_leg2_notional
+            logging.debug(f"strat-matched ToB: {[str(tob) for tob in top_of_books]}")
+        return order_placed
+
+    def _check_tob_and_place_order_test(self, pair_strat: PairStratBaseModel, top_of_books) -> bool:
         from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
-
-        top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(self._top_of_books_update_date_time)
-        if top_of_book_and_date_tuple is not None:
-            top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
-            if top_of_books is not None:
-                if top_of_books[0].symbol == "CB_Sec_1":
-                    buy_top_of_book = top_of_books[0]
-                    sell_top_of_book = top_of_books[1]
-                else:
-                    buy_top_of_book = top_of_books[1]
-                    sell_top_of_book = top_of_books[0]
-
-                if buy_top_of_book.bid_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
-                        self._top_of_books_update_date_time:
-                    if buy_top_of_book.bid_quote.px == 25:
-                        order_id = TradeSimulator.place_new_order(100, 90, Side.BUY, "CB_Sec_1", "", "Acc1")
-
-                if sell_top_of_book.ask_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
-                        self._top_of_books_update_date_time:
-                    if sell_top_of_book.ask_quote.px == 25:
-                        order_id = TradeSimulator.place_new_order(110, 70, Side.SELL, "EQT_Sec_1", "", "Acc1")
-                return True
+        if top_of_books[0].symbol == "CB_Sec_1":
+            buy_top_of_book = top_of_books[0]
+            sell_top_of_book = top_of_books[1]
         else:
-            return False  # no update to process
+            buy_top_of_book = top_of_books[1]
+            sell_top_of_book = top_of_books[0]
+
+        if buy_top_of_book.bid_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
+                self._top_of_books_update_date_time:
+            if buy_top_of_book.bid_quote.px == 25:
+                order_id = TradeSimulator.place_new_order(100, 90, Side.BUY, "CB_Sec_1", "", "Acc1")
+
+        if sell_top_of_book.ask_quote.last_update_date_time.replace(tzinfo=pytz.UTC) == \
+                self._top_of_books_update_date_time:
+            if sell_top_of_book.ask_quote.px == 25:
+                order_id = TradeSimulator.place_new_order(110, 70, Side.SELL, "EQT_Sec_1", "", "Acc1")
+        return True
 
     def internal_run(self):
         while 1:
@@ -361,13 +346,21 @@ class StratExecutor:
                 # else no new_order to process
 
                 # 5. check if top_of_book is updated
-                if not self.is_test_run:
-                    if not self._check_tob_and_place_order(pair_strat):
-                        continue
-                else:
-                    if not self._check_tob_and_place_order_test(pair_strat):
-                        continue
+                top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(self._top_of_books_update_date_time)
 
+                if top_of_book_and_date_tuple is not None:
+                    top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
+                    if top_of_books is not None and len(top_of_books) <= 2:
+                        if not self.is_test_run:
+                            self._check_tob_and_place_order(pair_strat, top_of_books)
+                        else:
+                            self._check_tob_and_place_order_test(pair_strat, top_of_books)
+                    else:
+                        logging.error(f"expected 1 / 2 TOB , received: "
+                                      f"{len(top_of_books) if top_of_books is not None else 0} in tob update!;;;"
+                                      f"received-TOBs: "
+                                      f"{[str(tob) for tob in top_of_books] if top_of_books is not None else None}!")
+                continue  # go next run - we don't stop processing for one faulty tob update
             except Exception as e:
                 logging.error(f"Run returned with exception - sending again, exception: {e}")
                 return -1

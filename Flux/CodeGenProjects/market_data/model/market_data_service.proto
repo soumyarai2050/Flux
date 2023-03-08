@@ -7,9 +7,10 @@ package market_data;
 option (FluxFileCRUDPortOffset) = 40;
 
 message Quote{
-  optional double px = 1;
+  optional float px = 1;
   optional int64 qty = 2;
-  optional int64 last_update_date_time = 3[(FluxFldValIsDateTime) = true];
+  optional float premium = 3;
+  optional int64 last_update_date_time = 4[(FluxFldValIsDateTime) = true];
 }
 
 message TopOfBook {
@@ -145,11 +146,12 @@ message LastTrade {
   required int64 time = 2 [(FluxFldValIsDateTime) = true];
   required float px = 3;
   required int64 qty = 4;
-  optional string exchange = 5;
-  optional string special_conditions = 6;
-  optional bool past_limit = 7;
-  optional bool unreported = 8;
-  optional MarketTradeVolume market_trade_volume = 9;
+  optional float premium = 5;
+  optional string exchange = 6;
+  optional string special_conditions = 7;
+  optional bool past_limit = 8;
+  optional bool unreported = 9;
+  optional MarketTradeVolume market_trade_volume = 10;
 }
 
 message LastSecMarketTradeVol{

@@ -24,7 +24,7 @@ namespace md_handler {
                 const std::string&& symbol = market_depth_document[symbol_key].get_string().value.data();
                 const std::string&& side = market_depth_document[side_key].get_string().value.data();
                 ptr_Pipeline_n_DB_id->market_depth_id = market_depth_document[id_key].get_value();
-                auto position_symbol_side_key = MD_MarketDepth::get_pos_symbol_side_key(position, symbol, side);
+                auto position_symbol_side_key = MD_DepthSingleSide::get_pos_symbol_side_key(position, symbol, side);
                 md_key_to_pipeline_n_db_id[position_symbol_side_key] = ptr_Pipeline_n_DB_id;
             }
 
@@ -36,7 +36,7 @@ namespace md_handler {
             }
         }
 
-        void insert_market_depth(const MD_MarketDepth &market_depth_data){
+        void insert_market_depth(MD_DepthSingleSide &market_depth_data){
             // build document to insert
             bsoncxx::document::view_or_value market_depth_document = bsoncxx::builder::stream::document{}
                     //<< time_key << marketDataUpdateHolder_.time
@@ -44,6 +44,7 @@ namespace md_handler {
                     << side_key << market_depth_data.getSide()
                     << qty_key << market_depth_data.getQty()
                     << px_key << market_depth_data.getPx()
+                    << premium_key << market_depth_data.getPremium()
                     << position_key << market_depth_data.getPosition() // TODO - Add 64 bit placeholders for cumulative types
                     << time_key << bsoncxx::v_noabi::types::b_date(
                     get_chrono_ms_from_int64(market_depth_data.getMillisecondsSinceEpoch()))
@@ -80,16 +81,16 @@ namespace md_handler {
             for (auto &&depth_doc: market_depth_result) {}
         }
 
-        void handle_md_update(const MD_MarketDepth &market_depth_data,
-                              const MD_MarketDepth &other_side_market_depth_data = empty_market_depth_data){
+        void handle_md_update(MD_DepthSingleSide &market_depth_data,
+                              MD_DepthSingleSide &other_side_market_depth_data = empty_market_depth_data){
             if (market_depth_data.getSide() == "BID")
                 handle_md_update_(market_depth_data, other_side_market_depth_data);
             else
                 handle_md_update_(other_side_market_depth_data, market_depth_data);
         }
 
-        void handle_md_update_(const MD_MarketDepth &bid_market_depth,
-                              const MD_MarketDepth &ask_market_depth)
+        void handle_md_update_(MD_DepthSingleSide &bid_market_depth,
+                              MD_DepthSingleSide &ask_market_depth)
         {
             if (not bid_market_depth.isEmpty())
                 insert_market_depth(bid_market_depth);
@@ -101,10 +102,10 @@ namespace md_handler {
             std::string dbId;
             if ((not bid_market_depth.isEmpty()) && bid_market_depth.getPosition() == 0){  // only position 0 is top of the book
                 // if it's not in cache we create else we update
-                dbId = top_of_book_publisher.GetDBIdForSymbol(bid_market_depth.getSymbol());
+                dbId = md_handler::MD_TopOfBookPublisher::GetDBIdForSymbol(bid_market_depth.getSymbol());
             }
             else if ((not ask_market_depth.isEmpty()) && ask_market_depth.getPosition() == 0){
-                dbId = top_of_book_publisher.GetDBIdForSymbol(ask_market_depth.getSymbol());
+                dbId = md_handler::MD_TopOfBookPublisher::GetDBIdForSymbol(ask_market_depth.getSymbol());
             }
             else{
                 //no need for top of book update
@@ -115,7 +116,7 @@ namespace md_handler {
                 top_of_book_publisher.create_data(bid_market_depth, ask_market_depth);
             }
             else{ //update existing top of book record
-                auto top_of_book_db_id = dbId;
+                const auto& top_of_book_db_id = dbId;
                 top_of_book_publisher.patch_data(top_of_book_db_id, bid_market_depth, ask_market_depth);
             }
         }

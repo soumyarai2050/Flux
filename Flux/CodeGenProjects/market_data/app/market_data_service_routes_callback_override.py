@@ -32,7 +32,20 @@ class MarketDataServiceRoutesCallbackOverride(MarketDataServiceRoutesCallback):
                                                                                                  last_n_sec))
         sell_last_trade_obj_list = await underlying_read_last_trade_http(get_last_n_sec_total_qty(sell_symbol,
                                                                                                   last_n_sec))
-        last_sec_market_trade_vol = LastSecMarketTradeVol(buy_side_last_sec_trade_vol=buy_last_trade_obj_list[-1].market_trade_volume.participation_period_last_trade_qty_sum,
-                                                          sell_side_last_sec_trade_vol=sell_last_trade_obj_list[-1].market_trade_volume.participation_period_last_trade_qty_sum)
+
+        if buy_last_trade_obj_list:
+            buy_side_last_sec_trade_vol = \
+                buy_last_trade_obj_list[-1].market_trade_volume.participation_period_last_trade_qty_sum
+        else:
+            buy_side_last_sec_trade_vol = 0
+
+        if sell_last_trade_obj_list:
+            sell_side_last_sec_trade_vol = \
+                sell_last_trade_obj_list[-1].market_trade_volume.participation_period_last_trade_qty_sum
+        else:
+            sell_side_last_sec_trade_vol = 0
+
+        last_sec_market_trade_vol = LastSecMarketTradeVol(buy_side_last_sec_trade_vol=buy_side_last_sec_trade_vol,
+                                                          sell_side_last_sec_trade_vol=sell_side_last_sec_trade_vol)
 
         return [last_sec_market_trade_vol]

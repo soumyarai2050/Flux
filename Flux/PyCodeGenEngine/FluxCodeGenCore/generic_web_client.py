@@ -175,11 +175,10 @@ def generic_http_index_client(url: str, query_params: List[Any], pydantic_type):
 
 @log_n_except
 def generic_http_query_client(url: str, query_params: List[Any], pydantic_type):
-    query_params = "/".join(query_params)
+    query_params = "/".join([str(param) for param in query_params])
     if url.endswith("/"):
         url = f"{url}{query_params}"
     else:
         url = f"{url}/{query_params}"
-
     response: requests.Response = requests.get(url)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
