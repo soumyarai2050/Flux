@@ -23,17 +23,18 @@
 
 namespace md_handler {
     // TODO From Config
-    const std::string host = "127.0.0.1";
+    const std::string host = getenv("HOST") ? getenv("HOST") : "127.0.0.1";
     const int port = 8040;
     const std::string post_uri = "/market_data/create-top_of_book";
-    const std::string patch_uri = "/market_data/patch-top_of_book/";
+    const std::string patch_uri = "/market_data/patch-top_of_book";
 
     class MD_TopOfBookPublisher {
     protected:
         Poco::Net::HTTPClientSession session;
         Poco::Net::HTTPRequest request;
         Poco::Net::HTTPResponse response;
-        const static inline md_handler::MD_LastTrade _emptyLastTrade{};
+        static inline md_handler::MD_LastTrade _emptyLastTrade{};
+        const static inline md_handler::MD_MktOverview _emptyMktOverview{_emptyLastTrade, 0};
         const static inline md_handler::MD_DepthSingleSide _emptyMarketDepth{};
         static std::unordered_map<std::string, std::string> top_of_book_cache;
 
@@ -73,18 +74,19 @@ namespace md_handler {
         std::string
         create_data(const md_handler::MD_DepthSingleSide &bid_market_depth,
                     const md_handler::MD_DepthSingleSide &ask_market_depth){
-            return create_data(bid_market_depth, ask_market_depth, _emptyLastTrade);
+            return create_data(bid_market_depth, ask_market_depth, _emptyMktOverview);
         }
 
         std::string
-        create_data(const md_handler::MD_LastTrade &lastTrade){
-            return create_data(_emptyMarketDepth, _emptyMarketDepth, lastTrade);
+        create_data(const md_handler::MD_MktOverview &mkt_overview){
+            return create_data(_emptyMarketDepth, _emptyMarketDepth, mkt_overview);
         }
 
         std::string
         create_data(const md_handler::MD_DepthSingleSide &bid_market_depth,
                     const md_handler::MD_DepthSingleSide &ask_market_depth,
-                    const md_handler::MD_LastTrade &lastTrade){
+                    const md_handler::MD_MktOverview &mkt_overview){
+            const md_handler::MD_LastTrade &lastTrade = mkt_overview.getLastTrade();
             request = Poco::Net::HTTPRequest(Poco::Net::HTTPRequest::HTTP_POST, post_uri);
             request.setContentType("application/json");
             request.add("Accept", "application/json");
@@ -93,7 +95,7 @@ namespace md_handler {
             if (symbol.empty())
                 symbol = lastTrade.getSymbol();
             if (symbol.empty()){
-                std::cerr << "no symbol sent - dropping this create!" << std::endl;
+                std::cerr << "no symbol sent - dropping create request!" << std::endl;
                 return "";
             }
             std::string &&bid_str_date_time = get_date_time_str_from_milliseconds(bid_market_depth.getMillisecondsSinceEpoch());
@@ -115,7 +117,7 @@ namespace md_handler {
             symbol_textPart.SetString(symbol.c_str(), create_top_of_book_alloc);
             create_top_of_book.AddMember("symbol", symbol_textPart, create_top_of_book_alloc);
 
-            create_top_of_book.AddMember("total_trading_security_size", 0, create_top_of_book_alloc);
+            create_top_of_book.AddMember("total_trading_security_size", mkt_overview.getTotalTradingSecSize(), create_top_of_book_alloc);
 
             rapidjson::Value bid_quote_object(rapidjson::kObjectType);
             bid_quote_object.AddMember("px", bid_market_depth.getPx(), create_top_of_book_alloc);
@@ -137,6 +139,7 @@ namespace md_handler {
             }
             create_top_of_book.AddMember("ask_quote", ask_quote_object, create_top_of_book_alloc);
 
+            // last trade we set irrespective
             rapidjson::Value last_trade_object(rapidjson::kObjectType);
             last_trade_object.AddMember("px", lastTrade.getPx(), create_top_of_book_alloc);
             last_trade_object.AddMember("qty", lastTrade.getQty(), create_top_of_book_alloc);
@@ -168,7 +171,7 @@ namespace md_handler {
 
             const std::string &response_str = resp_stream.str();
             // logging.info this:
-            std::cout << "create req: " << request_json << std::endl << "create resp: " << response_str;
+            std::cout << "create req: " << request_json << std::endl << "create resp: " << response_str << std::endl;
 
             if(response_str.length() > 10 && response_str[2] == '_' && response_str[3] == 'i' &&
                response_str[4] == 'd' && response_str[6] == ':' && response_str[7] == '"'){
@@ -179,11 +182,11 @@ namespace md_handler {
                     return id;
                 }
                 else{
-                    std::cerr << "Web-call failed to uri: " << post_uri << " for symbol: " << symbol << " response:\n" << response_str;
+                    std::cerr << "Web-call failed to uri: " << post_uri << " for symbol: " << symbol << " response:\n" << response_str << std::endl;
                 }
             }
             else{
-                std::cout << "http request failed for uri:" << patch_uri << "response: " << response_str << std::endl;
+                std::cout << "http request failed for uri:" << post_uri << " response: " << response_str << std::endl;
             }
             return "";
         }
@@ -270,7 +273,8 @@ namespace md_handler {
 
         //return id if successful , empty string if failed - logging done internally
         std::string patch_data(const std::string& top_of_book_db_id,
-                        const md_handler::MD_LastTrade &aggregated_last_trade_data){
+                        const md_handler::MD_MktOverview &aggregated_mkt_overview){
+            const md_handler::MD_LastTrade &aggregated_last_trade_data = aggregated_mkt_overview.getLastTrade()
             try{
                 request = Poco::Net::HTTPRequest(Poco::Net::HTTPRequest::HTTP_PATCH, patch_uri);
                 request.setContentType("application/json");
@@ -285,6 +289,9 @@ namespace md_handler {
                 id_textPart.SetString(top_of_book_db_id.c_str(), update_top_of_book_alloc);
                 update_top_of_book.AddMember("_id", id_textPart, update_top_of_book_alloc);
 
+                if (aggregated_mkt_overviewgetTotalTradingSecSize() != 0)
+                    update_top_of_book.AddMember("total_trading_sec_size", aggregated_mkt_overviewgetTotalTradingSecSize(), update_top_of_book_alloc);
+
                 rapidjson::Value last_trade_object(rapidjson::kObjectType);
                 last_trade_object.AddMember("px", aggregated_last_trade_data.getPx(), update_top_of_book_alloc);
                 last_trade_object.AddMember("qty", aggregated_last_trade_data.getQty(), update_top_of_book_alloc);
@@ -295,19 +302,19 @@ namespace md_handler {
                 }
                 update_top_of_book.AddMember("last_trade", last_trade_object, update_top_of_book_alloc);
 
-                //market trade volume is repeated type on top of book
-                {
-                    rapidjson::Value market_trade_volume_arr(rapidjson::kArrayType);
-
-                    {
-                        rapidjson::Value market_trade_volume_object(rapidjson::kObjectType);
-                        market_trade_volume_object.AddMember("participation_period_last_trade_qty_sum",
-                                                             aggregated_last_trade_data.getLastTradeQtySum(), update_top_of_book_alloc);
-                        market_trade_volume_object.AddMember("applicable_period_seconds", aggregated_last_trade_data.getApplicablePeriodSeconds(), update_top_of_book_alloc);
-                        market_trade_volume_arr.PushBack(market_trade_volume_object, update_top_of_book_alloc);
-                    }
-                    update_top_of_book.AddMember("market_trade_volume", market_trade_volume_arr, update_top_of_book_alloc);
-                }
+                //market trade volume is repeated type on top of book (buggy - supress for now)
+//                {
+//                    rapidjson::Value market_trade_volume_arr(rapidjson::kArrayType);
+//
+//                    {
+//                        rapidjson::Value market_trade_volume_object(rapidjson::kObjectType);
+//                        market_trade_volume_object.AddMember("participation_period_last_trade_qty_sum",
+//                                                             aggregated_last_trade_data.getLastTradeQtySum(), update_top_of_book_alloc);
+//                        market_trade_volume_object.AddMember("applicable_period_seconds", aggregated_last_trade_data.getApplicablePeriodSeconds(), update_top_of_book_alloc);
+//                        market_trade_volume_arr.PushBack(market_trade_volume_object, update_top_of_book_alloc);
+//                    }
+//                    update_top_of_book.AddMember("market_trade_volume", market_trade_volume_arr, update_top_of_book_alloc);
+//                }
 
                 if (not last_trade_str_date_time.empty()){
                     rapidjson::Value date_time_textPart;

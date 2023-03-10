@@ -46,7 +46,7 @@ class StratExecutor:
         self._cancel_orders_processed_slice: int = 0
         self._top_of_books_update_date_time: DateTime | None = None
 
-        self.last_order_time_stamp: DateTime | None = None
+        self.last_order_timestamp: DateTime | None = None
 
         self.leg1_notional: float = 0
         self.leg2_notional: float = 0
@@ -144,7 +144,7 @@ class StratExecutor:
                           f"{order_limits.max_order_qty}, found: {qty} ")
             checks_passed = False
         # TODO urgent - temp check - remove
-        if self.last_order_time_stamp.add(minutes=2) < DateTime.now():  # allow orders only after 2 min
+        if self.last_order_timestamp.add(minutes=2) < DateTime.now():  # allow orders only after 2 min
             checks_passed = False
         return checks_passed
 
@@ -237,7 +237,7 @@ class StratExecutor:
                             f", qty: {leg2.bid_quote.qty}")
                         return False
         if order_placed:
-            self.last_order_time_stamp = DateTime.now()
+            self.last_order_timestamp = DateTime.now()
             self.leg1_notional += posted_leg1_notional
             self.leg2_notional += posted_leg2_notional
             logging.debug(f"strat-matched ToB: {[str(tob) for tob in top_of_books]}")
@@ -270,9 +270,20 @@ class StratExecutor:
                     break
                 self.strat_cache.notify_semaphore.acquire()
 
-                # 0. get pair-strat: no checking if it's updated since last checked (required for TOB extraction &
-                # get consumable_allowed_participation_volume
-                consumable_allowed_participation_volume: int | None = None
+                # 1. check if portfolio status has updated since we last checked
+                portfolio_status_tuple = self.trading_data_manager.trading_cache.get_portfolio_status()
+                if portfolio_status_tuple is None:
+                    logging.warning(
+                        "no portfolio status found yet - strat will not trigger until portfolio status arrives")
+                    continue
+                if portfolio_status_tuple is not None:
+                    portfolio_status, self._portfolio_status_update_date_time = portfolio_status_tuple
+                    # If kill switch is enabled - don't act, just return
+                    if portfolio_status.kill_switch:
+                        continue
+                # else no update - do we need this processed again ?
+
+                # 2. get pair-strat: no checking if it's updated since last checked (required for TOB extraction &
                 pair_strat_tuple = self.strat_cache.get_pair_strat()
                 if pair_strat_tuple is not None:
                     pair_strat, pair_strat_update_date_time = pair_strat_tuple
@@ -283,7 +294,7 @@ class StratExecutor:
                     logging.error(f"pair_strat_tuple is None for: {self.strat_cache}")
                     return -1
 
-                # 1. computing consumable_allowed_participation_volume
+                # 2.5. computing consumable_allowed_participation_volume
                 buy_consumable_allowed_participation_volume: int
                 sell_consumable_allowed_participation_volume: int
                 buy_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
@@ -297,19 +308,6 @@ class StratExecutor:
                     last_sec_market_trade_vol_obj.buy_side_last_sec_trade_vol
                 sell_consumable_allowed_participation_volume = \
                     last_sec_market_trade_vol_obj.sell_side_last_sec_trade_vol
-
-                # 1. check if portfolio status has updated since we last checked
-                portfolio_status_tuple = self.trading_data_manager.trading_cache.get_portfolio_status()
-                if portfolio_status_tuple is None:
-                    logging.warning(
-                        "no portfolio status found yet - strat will not trigger until portfolio status arrives")
-                    continue
-                if portfolio_status_tuple is not None:
-                    portfolio_status, self._portfolio_status_update_date_time = portfolio_status_tuple
-                    # If kill switch is enabled - don't act, just return
-                    if portfolio_status.kill_switch:
-                        continue
-                # else no update - do we need this processed again ?
 
                 # 3. check if any cxl order is requested and send out
                 cancel_orders_and_date_tuple = self.strat_cache.get_cancel_orders(self._cancel_orders_update_date_time)

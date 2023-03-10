@@ -4,6 +4,7 @@ import sys
 import os
 from pendulum import DateTime
 from threading import Lock
+
 from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
@@ -217,8 +218,15 @@ def is_service_up():
         portfolio_status_list: List[
             PortfolioStatusBaseModel] = strat_manager_service_web_client_internal.get_all_portfolio_status_client()
         if 0 == len(portfolio_status_list):  # no portfolio status set yet, create one
-            portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(kill_switch=False,
-                                                                                  portfolio_alerts=[])
+            portfolio_status: PortfolioStatusBaseModel = \
+                PortfolioStatusBaseModel(_id=1, kill_switch=False,
+                                         portfolio_alerts=[],
+                                         overall_buy_notional=0,
+                                         overall_sell_notional=0,
+                                         overall_buy_fill_notional=0,
+                                         overall_sell_fill_notional=0,
+                                         current_period_available_buy_order_count=0,
+                                         current_period_available_sell_order_count=0)
             strat_manager_service_web_client_internal.create_portfolio_status_client(portfolio_status)
         return True
     except Exception as e:

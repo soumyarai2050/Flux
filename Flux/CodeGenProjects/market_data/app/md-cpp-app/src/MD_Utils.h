@@ -1,6 +1,8 @@
 
 #pragma once
 
+#include <cmath>
+#include <limits>
 #include <ctime>
 #include <string>
 #include <chrono>

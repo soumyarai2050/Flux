@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
 set(POCO_INCLUDE_DIR "/usr/local/include")
-# Set the library directory for POCO /usr/local/lib
 set(POCO_LIB_DIR /usr/local/lib)
 
 IF (APPLE)

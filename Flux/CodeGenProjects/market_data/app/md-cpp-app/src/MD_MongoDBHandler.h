@@ -3,10 +3,11 @@
 #include <sstream>
 #include <unordered_map>
 
-#include <bsoncxx/v_noabi/bsoncxx/builder/stream/document.hpp>
+#include <bsoncxx/builder/stream/document.hpp>
 #include <bsoncxx/json.hpp>
 #include <mongocxx/client.hpp>
 #include <mongocxx/instance.hpp>
+#include <mongocxx/pool.hpp>
 #include <Poco/Net/HTTPClientSession.h>
 #include <Poco/Net/HTTPRequest.h>
 #include <Poco/Net/HTTPResponse.h>
@@ -21,7 +22,7 @@ namespace md_handler {
 
 
 // TODO IMPORTANT get URI, DB-Name and Table-Name from config (quick get-env for now ?)
-    const std::string db_uri = "mongodb://localhost:27017";
+    const std::string db_uri = getenv("MONGO_URI") ? getenv("MONGO_URI") : "mongodb://localhost:27017";
     const std::string market_data_db_name = "market_data";
     const std::string market_data_history = "RawMarketDepthHistory";
     const std::string market_depth = "MarketDepth";
@@ -47,16 +48,19 @@ namespace md_handler {
         return query;
     }
 
-
-
     class MD_MongoDBHandler {
     public:
+        MD_MongoDBHandler(): client(pool.acquire()){
+            mongocxx::database market_data_db = (*client)[market_data_db_name];
+            std::cout << "Mongo URI: " << str_uri << std::endl;
+        }
         // The mongocxx::instance constructor & destructor initialize / shut-down the driver, thus mongocxx::instance must
         // be created before using the driver must remain alive for as long as the driver is in use
-        mongocxx::instance inst{};
-        mongocxx::client conn{mongocxx::uri{db_uri}};
-        mongocxx::database market_data_db = conn[market_data_db_name];
+        static mongocxx::instance inst;
+        static std::string str_uri;
+        static mongocxx::uri uri;
+        static mongocxx::pool pool;
+        mongocxx::pool::entry client;
+        mongocxx::database market_data_db;
     };
-
-
 }

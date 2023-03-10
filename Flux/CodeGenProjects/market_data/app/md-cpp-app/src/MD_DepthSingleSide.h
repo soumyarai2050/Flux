@@ -28,6 +28,15 @@ namespace md_handler {
             is_empty = false;
         }
 
+        friend std::ostream &operator<<(std::ostream &os, const MD_DepthSingleSide &side) {
+            os << "DepthSingleSide [qty: " << side.qty << " px: " << side.px << " position: " << side.position << " symbol: "
+               << side.symbol << " side: " << side.side << " cumulative_qty: " << side.cumulative_qty << " premium: "
+               << side.premium << " cumulative_notional: " << side.cumulative_notional << " cumulative_avg_px: "
+               << side.cumulative_avg_px << " milliseconds_since_epoch: " << side.milliseconds_since_epoch
+               << " position_symbol_side_key: " << side.position_symbol_side_key << " is_empty: " << side.is_empty << "]";
+            return os;
+        }
+
         MD_DepthSingleSide()=default;
 
         MD_DepthSingleSide(int8_t position_, std::string side_):position(position_), side(std::move(side_)){}
@@ -52,11 +61,13 @@ namespace md_handler {
         }
 
         void setQty(int64_t qty_) {
-            MD_DepthSingleSide::qty = qty_;
+            is_empty = false;
+            qty = qty_;
         }
 
         void setPx(double px_) {
-            MD_DepthSingleSide::px = px_;
+            is_empty = false;
+            px = px_;
         }
 
         void setSymbol(const std::string &symbol_) {
@@ -64,7 +75,8 @@ namespace md_handler {
         }
 
         void setPremium(double premium_) {
-            MD_DepthSingleSide::premium = premium_;
+            is_empty = false;
+            premium = premium_;
         }
 
         [[nodiscard]] double getPremium() const {

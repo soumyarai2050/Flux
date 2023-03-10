@@ -159,7 +159,7 @@ message Security{
 
 message MaxNotional{
   required float max_per_side_notional = 1 [(FluxFldHelp) = "non-changeable from UI: used as cap on max per side notional at time of strat creation"];
-  required float max_primary_notional = 2 [ (FluxFldHelp) = "runtime consumption: open+executed, max eqt notional derived applying hedge ratio"];
+  required float max_primary_notional = 2 [ (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
   required float sod = 3;
   required float available_pths = 4;
   required float available_locates = 5;

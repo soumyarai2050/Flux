@@ -23,7 +23,7 @@ message(WARNING ${BSON_INCLUDE_DIR})
 include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${POCO_INCLUDE_DIR} ${RapidJSON_INCLUDE_DIR})
 
 # adding the Google_Tests_run target
-add_executable(Google_Tests_run MD_Test.cpp)
+add_executable(Google_Tests_run MD_Test.cpp ../src/MD_TopOfBookPublisher.cpp)
 
 # linking Google_Tests_run with DateConverter_lib which will be tested
 #target_link_libraries(Google_Tests_run DateConverter_lib)

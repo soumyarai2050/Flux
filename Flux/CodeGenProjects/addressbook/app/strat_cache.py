@@ -160,6 +160,8 @@ class StratCache:
         if date_time is None or date_time < self._order_journals_update_date_time:
             if self._order_journals is not None:
                 return self._order_journals, self._order_journals_update_date_time
+            else:
+                return None
         else:
             return None
 

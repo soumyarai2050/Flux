@@ -10,18 +10,11 @@ namespace md_handler{
     public:
         explicit MD_LastTradeHandler(MD_MongoDBHandler &mongo_db_, const bool no_aggregate_ = true)
         :mongo_db(mongo_db_), no_aggregate(no_aggregate_) {
-            _init_overall_last_trade_qty_sum();
-            _UpdateTopOfBookCache();
+            UpdateTopOfBookCache_();
         }
 
-        void handle_last_trade_update(md_handler::MD_LastTrade &last_trade_data){
-            overall_last_trade_qty_sum+=last_trade_data.getQty();
-            last_trade_data.setLastTradeQtySum(overall_last_trade_qty_sum);
-
-            bsoncxx::document::view_or_value market_trade_volume_document = bsoncxx::builder::stream::document{}
-                << "participation_period_last_trade_qty_sum" << overall_last_trade_qty_sum
-                << "applicable_period_seconds" << 0
-                << bsoncxx::builder::stream::finalize;
+        void handle_mkt_overview(md_handler::MD_MktOverview &mkt_overview){
+            auto& last_trade_data = mkt_overview.getLastTrade();
 
             bsoncxx::document::view_or_value last_trade_document = bsoncxx::builder::stream::document{}
                 << symbol_key << last_trade_data.getSymbol()
@@ -32,17 +25,16 @@ namespace md_handler{
                 << "special_conditions" << last_trade_data.getSpecialConditions()
                 << "past_limit" << last_trade_data.getPastLimit()
                 << "unreported" << last_trade_data.getUnreported()
-                << "market_trade_volume" << market_trade_volume_document
                 << bsoncxx::builder::stream::finalize;
             auto last_trade_result = last_trade_collection.insert_one(last_trade_document);
 
             if(no_aggregate){
                 std::string dbId = md_handler::MD_TopOfBookPublisher::GetDBIdForSymbol(last_trade_data.getSymbol());
                 if (not dbId.empty()){
-                    top_of_book_publisher.patch_data(dbId, last_trade_data);
+                    top_of_book_publisher.patch_data(dbId, mkt_overview);
                 }
                 else{
-                    top_of_book_publisher.create_data(last_trade_data);
+                    top_of_book_publisher.create_data(mkt_overview);
                 }
             }
             else{
@@ -51,7 +43,7 @@ namespace md_handler{
                 auto last_trade_aggregate_result = last_trade_collection.aggregate(pipeline,
                                                                                    mongocxx::options::aggregate{});
                 // The loop just helps commit - without this commit does not trigger - though the code never enters loop
-                for (auto &last_trade: last_trade_aggregate_result) {}
+                for (auto &last_trade_: last_trade_aggregate_result) {}
 
 
                 for (auto& last_trade_doc: last_trade_collection.find({})){
@@ -70,27 +62,32 @@ namespace md_handler{
                                                                         time_in_ms, "", "", false, false,
                                                                         participation_period_last_trade_qty_sum,
                                                                         10);
-                    std::string dbId = top_of_book_publisher.GetDBIdForSymbol(symbol);
+                    md_handler::MD_MktOverview agg_mkt_overview(aggregated_last_trade_data, mkt_overview.getTotalTradingSecSize());
+                    std::string dbId = md_handler::MD_TopOfBookPublisher::GetDBIdForSymbol(symbol);
                     if (not dbId.empty()){
                         top_of_book_publisher.patch_data(dbId,
-                                                         aggregated_last_trade_data);
+                                                         agg_mkt_overview);
                     }
                     else{
-                        top_of_book_publisher.create_data(aggregated_last_trade_data);
+                        top_of_book_publisher.create_data(agg_mkt_overview);
                     }
                 }
             }
         }
 
+        void handle_last_trade_update(md_handler::MD_LastTrade &last_trade_data){
+            md_handler::MD_MktOverview mkt_overview(last_trade_data, 0);
+            handle_mkt_overview(mkt_overview);
+        }
+
     protected:
-        int64_t overall_last_trade_qty_sum{};
         MD_TopOfBookPublisher top_of_book_publisher;
         MD_MongoDBHandler &mongo_db;
         const bool no_aggregate;
         mongocxx::collection top_of_book_collection = mongo_db.market_data_db[top_of_book];
         mongocxx::collection last_trade_collection = mongo_db.market_data_db[last_trade];
 
-        void _UpdateTopOfBookCache(){
+        void UpdateTopOfBookCache_(){
             for (auto &&top_of_book_document: top_of_book_collection.find({})) {
                 std::ostringstream key_builder;
                 const std::string symbol = top_of_book_document["symbol"].get_string().value.data();
@@ -100,6 +97,7 @@ namespace md_handler{
 
         }
 
+        //buggy - last trade qty sum has to be computed per symbol - not used for now - fix before use
         void _init_overall_last_trade_qty_sum() {
             auto order = bsoncxx::builder::stream::document{} << "_id" << -1 << bsoncxx::builder::stream::finalize;
             auto opts = mongocxx::options::find{};
@@ -115,7 +113,8 @@ namespace md_handler{
             }
         }
 
-        static void update_pipeline(mongocxx::pipeline &pipeline, int64_t last_n_sec_total_qty) {
+        // n_sec defined period of time to aggregate the volume sum
+        static void update_pipeline(mongocxx::pipeline &pipeline, int64_t n_sec) {
             static const std::string dollar_qty_key = "$" + qty_key;
             static const std::string dollar_px_key = "$" + px_key;
             static const std::string dollar_symbol_key = "$" + symbol_key;
@@ -132,7 +131,7 @@ namespace md_handler{
                     kvp("market_trade_volume.participation_period_last_trade_qty_sum", make_document(
                         kvp("$sum", "$qty"),
                         kvp("window", make_document(
-                            kvp("range", make_array(-last_n_sec_total_qty, "current")),
+                            kvp("range", make_array(-n_sec, "current")),
                             kvp("unit", "second")
                         ))
                     ))

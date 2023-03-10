@@ -15,7 +15,7 @@ add_subdirectory(Google_tests)
 #target_link_libraries(example gtest_main)
 #add_test(NAME example_test COMMAND example)
 enable_testing()
-add_executable(md_handler src/MD_Replay.cpp src/MD_PreAgregation.cpp src/MD_TopOfBookPublisher.cpp)
+add_executable(md_handler src/MD_Replay.cpp src/MD_PreAgregation.cpp src/MD_TopOfBookPublisher.cpp src/MD_MongoDBHandler.cpp)
 
 
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:/usr/local/lib")

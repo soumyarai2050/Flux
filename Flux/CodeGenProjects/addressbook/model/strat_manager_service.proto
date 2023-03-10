@@ -284,11 +284,12 @@ message OrderLimits{
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 max_basis_points = 2 [(FluxFldValMax) = "15", (FluxFldHelp) = "basis-points a single order can consume, if set to 1, it`s 1/100 of: (1% of BBO), or 0.01% of BBO"];
+  optional int32 max_basis_points = 2 [(FluxFldValMax) = "15", (FluxFldHelp) = "basis-points a single order can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
   optional float max_px_deviation = 3 [default = 2, (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "max % deviation allowed from Last Traded px (if no last trading px, use closing px)"];
   optional int32 max_px_levels = 4 [(FluxFldHelp) = "max orderbook levels allowed to be consumed by single order"];
   optional int32 max_order_qty = 5;
-  optional int32 max_order_notional = 6 [(FluxFldHelp) = "order qty times limit px"];
+  optional int32 min_order_notional = 6 [(FluxFldHelp) = "order qty times limit px must be greater than this limit"];
+  optional int32 max_order_notional = 7 [(FluxFldHelp) = "order qty times limit px must be less than this limit"];
 }
 
 //Widget - 8
@@ -404,7 +405,6 @@ message StratCollection{
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
     UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
@@ -457,7 +457,7 @@ message StratBrief{
     w: 10,
     h: 12,
     layout: UI_TABLE,
-    is_repeated: True
+    is_repeated: true
   };
   option (FluxMsgJsonQuery) = {
       AggregateVarName: "get_strat_brief_from_symbol",
@@ -575,4 +575,49 @@ message OngoingStratSymbols{
       AggregateVarName: "get_ongoing_strats"
   };
   repeated string symbols = 1;
+}
+
+// Link impl Example models
+
+message Window{
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    UpdateDesc: AggregateType_UNSPECIFIED
+    PatchDesc: AggregateType_UNSPECIFIED
+    DeleteDesc: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required int32 x = 2;
+  required int32 y = 3;
+}
+
+message Door{
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    UpdateDesc: AggregateType_UNSPECIFIED
+    PatchDesc: AggregateType_UNSPECIFIED
+    DeleteDesc: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required int32 x = 2;
+  required int32 y = 3;
+}
+
+message House{
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    UpdateDesc: AggregateType_UNSPECIFIED
+    PatchDesc: AggregateType_UNSPECIFIED
+    DeleteDesc: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string name = 2;
+  required Window window = 3 [(FluxFldCollectionLink) = true];
+  repeated Door door = 4 [(FluxFldCollectionLink) = true];
 }

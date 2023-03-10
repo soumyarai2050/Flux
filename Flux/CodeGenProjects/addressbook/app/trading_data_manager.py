@@ -101,6 +101,8 @@ class TradingDataManager:
             order_limits_tuple = self.trading_cache.get_order_limits()
             if order_limits_tuple is None or order_limits_tuple[0] is None:
                 self.trading_cache.set_order_limits(order_limits_)
+                if self.order_limits_ws_cont.notify:
+                    StratCache.notify_all()
                 logging.info(f"Added order limits with id: {order_limits_.id}")
             else:
                 order_limits, _ = self.trading_cache.get_order_limits()

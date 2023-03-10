@@ -78,4 +78,23 @@ namespace md_handler {
     private:
         std::string symbol_side_key;
     };
+
+    class MD_MktOverview{
+    public:
+        [[nodiscard]] MD_LastTrade &getLastTrade() const {
+            return last_trade;
+        }
+        [[nodiscard]] long getTotalTradingSecSize() const {
+            return total_trading_sec_size;
+        }
+
+        MD_MktOverview(MD_LastTrade &last_trade_, const long total_trading_sec_size_)
+        :last_trade(last_trade_), total_trading_sec_size(total_trading_sec_size_){}
+    protected:
+        MD_LastTrade &last_trade;
+        long total_trading_sec_size;
+    };
 }
+
+
+

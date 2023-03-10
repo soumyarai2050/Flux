@@ -8,6 +8,8 @@
 #include "MD_MongoDBHandler.h"
 
 namespace md_handler {
+    using bsoncxx::v_noabi::builder::basic::make_document;
+	using bsoncxx::v_noabi::builder::basic::kvp;
     class MD_DepthHandler {
     public:
         explicit MD_DepthHandler(MD_MongoDBHandler &mongo_db_) : mongo_db(mongo_db_) {
@@ -15,7 +17,7 @@ namespace md_handler {
             // TODO LAZY performance test and see if non-composite symbol only index make a difference in large data set / adding position / depth makes a difference
             // market_depth_collection.create_index(make_document(kvp("symbol", 1)), {});
             market_depth_collection.create_index(
-                    bsoncxx::v_noabi::builder::basic::make_document(bsoncxx::v_noabi::builder::basic::kvp("symbol", 1), bsoncxx::v_noabi::builder::basic::kvp("side", 1)), {});
+                    make_document(kvp("symbol", 1), kvp("side", 1)), {});
 
             for (auto&& market_depth_document: market_depth_collection.find({})) {
 
@@ -36,7 +38,7 @@ namespace md_handler {
             }
         }
 
-        void insert_market_depth(MD_DepthSingleSide &market_depth_data){
+        void insert_or_update_market_depth(MD_DepthSingleSide &market_depth_data){
             // build document to insert
             bsoncxx::document::view_or_value market_depth_document = bsoncxx::builder::stream::document{}
                     //<< time_key << marketDataUpdateHolder_.time
@@ -67,10 +69,10 @@ namespace md_handler {
             } else {
                 // found - update existing document
                 ptr_holder = found->second;
-                auto update_filter = bsoncxx::v_noabi::builder::basic::make_document(
-                        bsoncxx::v_noabi::builder::basic::kvp("_id", ptr_holder->market_depth_id));
-                auto update_document = bsoncxx::v_noabi::builder::basic::make_document(
-                        bsoncxx::v_noabi::builder::basic::kvp("$set", market_depth_document));
+                auto update_filter = make_document(
+                        kvp("_id", ptr_holder->market_depth_id));
+                auto update_document = make_document(
+                        kvp("$set", market_depth_document));
                 market_depth_collection.update_one(update_filter.view(), update_document.view());
             }
             // irrespective of inserted or updated - let's aggregate
@@ -90,12 +92,12 @@ namespace md_handler {
         }
 
         void handle_md_update_(MD_DepthSingleSide &bid_market_depth,
-                              MD_DepthSingleSide &ask_market_depth)
+                               MD_DepthSingleSide &ask_market_depth)
         {
             if (not bid_market_depth.isEmpty())
-                insert_market_depth(bid_market_depth);
+                insert_or_update_market_depth(bid_market_depth);
             if (not ask_market_depth.isEmpty())
-                insert_market_depth(ask_market_depth);
+                insert_or_update_market_depth(ask_market_depth);
 
 
             // Now handle top of book update if this is a top of book update
@@ -152,61 +154,62 @@ namespace md_handler {
         update_pipeline(mongocxx::pipeline &pipeline, const std::string &security_id, const std::string &side) {
             static const std::string dollar_qty_key = "$" + qty_key;
             static const std::string dollar_px_key = "$" + px_key;
-            pipeline.append_stage(bsoncxx::v_noabi::builder::basic::make_document(
-                    bsoncxx::v_noabi::builder::basic::kvp("$match", bsoncxx::v_noabi::builder::basic::make_document(
-                            bsoncxx::v_noabi::builder::basic::kvp("$and", bsoncxx::v_noabi::builder::basic::make_array(
-                                    bsoncxx::v_noabi::builder::basic::make_document(
-                                            bsoncxx::v_noabi::builder::basic::kvp(symbol_key, security_id)),
-                                    bsoncxx::v_noabi::builder::basic::make_document(
-                                            bsoncxx::v_noabi::builder::basic::kvp(side_key, side))))
+            using bsoncxx::v_noabi::builder::basic::make_array;
+            pipeline.append_stage(make_document(
+                    kvp("$match", make_document(
+                            kvp("$and", make_array(
+                                    make_document(
+                                            kvp(symbol_key, security_id)),
+                                    make_document(
+                                            kvp(side_key, side))))
                     ))));
-            pipeline.append_stage(bsoncxx::v_noabi::builder::basic::make_document(
-                    bsoncxx::v_noabi::builder::basic::kvp("$project", bsoncxx::v_noabi::builder::basic::make_document(
-                            bsoncxx::v_noabi::builder::basic::kvp(operation_key, 0)
+            pipeline.append_stage(make_document(
+                    kvp("$project", make_document(
+                            kvp(operation_key, 0)
                     ))));
-            pipeline.append_stage(bsoncxx::v_noabi::builder::basic::make_document(
-                    bsoncxx::v_noabi::builder::basic::kvp("$setWindowFields", bsoncxx::v_noabi::builder::basic::make_document(
-                            bsoncxx::v_noabi::builder::basic::kvp("partitionBy", bsoncxx::v_noabi::builder::basic::make_document(
-                                    bsoncxx::v_noabi::builder::basic::kvp("symbol", "$symbol"),
-                                    bsoncxx::v_noabi::builder::basic::kvp("side", "$side")
+            pipeline.append_stage(make_document(
+                    kvp("$setWindowFields", make_document(
+                            kvp("partitionBy", make_document(
+                                    kvp("symbol", "$symbol"),
+                                    kvp("side", "$side")
                             )),
-                            bsoncxx::v_noabi::builder::basic::kvp("sortBy", bsoncxx::v_noabi::builder::basic::make_document(
-                                    bsoncxx::v_noabi::builder::basic::kvp("position", 1)
+                            kvp("sortBy", make_document(
+                                    kvp("position", 1)
                             )),
-                            bsoncxx::v_noabi::builder::basic::kvp("output", bsoncxx::v_noabi::builder::basic::make_document(
-                                    bsoncxx::v_noabi::builder::basic::kvp("cumulative_notional", bsoncxx::v_noabi::builder::basic::make_document(
-                                            bsoncxx::v_noabi::builder::basic::kvp("$sum", bsoncxx::v_noabi::builder::basic::make_document(
-                                                    bsoncxx::v_noabi::builder::basic::kvp("$multiply", bsoncxx::v_noabi::builder::basic::make_array(dollar_px_key, dollar_qty_key))
+                            kvp("output", make_document(
+                                    kvp("cumulative_notional", make_document(
+                                            kvp("$sum", make_document(
+                                                    kvp("$multiply", make_array(dollar_px_key, dollar_qty_key))
                                             )),
-                                            bsoncxx::v_noabi::builder::basic::kvp("window", bsoncxx::v_noabi::builder::basic::make_document(
-                                                    bsoncxx::v_noabi::builder::basic::kvp("documents", bsoncxx::v_noabi::builder::basic::make_array("unbounded", "current"))
+                                            kvp("window", make_document(
+                                                    kvp("documents", make_array("unbounded", "current"))
                                             ))
                                     )),
-                                    bsoncxx::v_noabi::builder::basic::kvp("cumulative_qty", bsoncxx::v_noabi::builder::basic::make_document(
-                                            bsoncxx::v_noabi::builder::basic::kvp("$sum", dollar_qty_key),
-                                            bsoncxx::v_noabi::builder::basic::kvp("window", bsoncxx::v_noabi::builder::basic::make_document(
-                                                    bsoncxx::v_noabi::builder::basic::kvp("documents", bsoncxx::v_noabi::builder::basic::make_array("unbounded", "current"))
+                                    kvp("cumulative_qty", make_document(
+                                            kvp("$sum", dollar_qty_key),
+                                            kvp("window", make_document(
+                                                    kvp("documents", make_array("unbounded", "current"))
                                             ))
                                     ))
                             ))
                     ))
             ));
 
-            pipeline.append_stage(bsoncxx::v_noabi::builder::basic::make_document(
-                    bsoncxx::v_noabi::builder::basic::kvp("$addFields", bsoncxx::v_noabi::builder::basic::make_document(
-                            bsoncxx::v_noabi::builder::basic::kvp("cumulative_avg_px", bsoncxx::v_noabi::builder::basic::make_document(
-                                    bsoncxx::v_noabi::builder::basic::kvp("$divide", bsoncxx::v_noabi::builder::basic::make_array("$cumulative_notional", "$cumulative_qty"))
+            pipeline.append_stage(make_document(
+                    kvp("$addFields", make_document(
+                            kvp("cumulative_avg_px", make_document(
+                                    kvp("$divide", make_array("$cumulative_notional", "$cumulative_qty"))
                             ))
                     ))
             ));
 
 
-            pipeline.append_stage(bsoncxx::v_noabi::builder::basic::make_document(
-                    bsoncxx::v_noabi::builder::basic::kvp("$merge", bsoncxx::v_noabi::builder::basic::make_document(
-                            bsoncxx::v_noabi::builder::basic::kvp("into", market_depth),
-                            bsoncxx::v_noabi::builder::basic::kvp("on", "_id"),
-                            bsoncxx::v_noabi::builder::basic::kvp("whenMatched", "replace"),
-                            bsoncxx::v_noabi::builder::basic::kvp("whenNotMatched", "insert")
+            pipeline.append_stage(make_document(
+                    kvp("$merge", make_document(
+                            kvp("into", market_depth),
+                            kvp("on", "_id"),
+                            kvp("whenMatched", "replace"),
+                            kvp("whenNotMatched", "insert")
                     ))
             ));
         }
