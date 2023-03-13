@@ -105,7 +105,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
     Object.entries(currentSchema.properties).map(([k, v]) => {
         let collection = {};
-        if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM].includes(v.type)) {
+        if (primitiveDataTypes.includes(v.type)) {
             collection.key = k;
             collection.tableTitle = objectxpath ? objectxpath + '.' + k : k;
             collection.sequenceNumber = sequence.sequence;
@@ -1167,7 +1167,7 @@ export function getTableColumns(collections, mode) {
     let columns = collections.map(collection => Object.assign({}, collection)).filter(collection => {
         if (collection.serverPopulate && mode === Modes.EDIT_MODE) {
             return false;
-        } else if ([DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.STRING, DataTypes.ENUM].includes(collection.type)) {
+        } else if (primitiveDataTypes.includes(collection.type)) {
             return true;
         } else if (collection.abbreviated && collection.abbreviated === "JSON") {
             return true;

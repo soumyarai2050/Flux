@@ -45,7 +45,6 @@ message TopOfBook {
   optional int64 last_update_date_time = 7 [(FluxFldValIsDateTime) = true];
 }
 
-
 message SideSpecificMarketDataBrief{
   optional float allowed_px_by_max_basis_points = 1 [(FluxFldHelp) = "(bbo_aggressive / 100) * (max_basis_points/100) + bbo_aggressive"];
   optional float allowed_px_by_max_deviation = 2 [(FluxFldHelp) = "last_px (+/-) (last_px/100 * max_px_deviation) : Sell Order use - , buy + "];
@@ -69,6 +68,37 @@ message MarketDataBrief{
   optional SideSpecificMarketDataBrief sell_market_data_brief = 5;
 }
 
+message SymbolOverview{
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIData) = {
+    x: 0,
+    y: 0,
+    w: 18,
+    h: 9,
+    layout: UI_TABLE,
+    is_repeated: true
+  };
+  option (FluxMsgJsonQuery) = {
+    AggregateVarName: "get_symbol_overview_from_symbol",
+    AggregateParams: "symbol",
+    AggregateParamsDataType: "str"
+  };
+  required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
+  optional float limit_up_px = 2;
+  optional float limit_dn_px = 3;
+  optional float conv_px = 4;
+  optional float closing_px = 5;
+  optional float open_px = 6;
+  optional int64 last_update_date_time = 7 [(FluxFldValIsDateTime) = true];
+  optional bool force_publish = 8 [(FluxFldHide) = "True"];
+}
 
 message BarData {
   option (FluxMsgJsonRoot) = {
@@ -154,18 +184,15 @@ message LastTrade {
   optional MarketTradeVolume market_trade_volume = 10;
 }
 
-message LastSecMarketTradeVol{
+message LastNSecMarketTradeVol{
   option (FluxMsgJsonQuery) = {
     AggregateVarName: "get_last_n_sec_total_qty",
-    AggregateParams: "buy_symbol",
-    AggregateParams: "sell_symbol",
+    AggregateParams: "symbol",
     AggregateParams: "last_n_sec",
-    AggregateParamsDataType: "str",
     AggregateParamsDataType: "str",
     AggregateParamsDataType: "int"
   };
-  optional int64 buy_side_last_sec_trade_vol = 1;
-  optional int64 sell_side_last_sec_trade_vol = 2;
+  optional int64 last_n_sec_trade_vol = 1;
 }
 
 message MarketDepth {

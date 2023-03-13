@@ -84,7 +84,7 @@ namespace md_handler {
         [[nodiscard]] MD_LastTrade &getLastTrade() const {
             return last_trade;
         }
-        [[nodiscard]] long getTotalTradingSecSize() const {
+        [[nodiscard]] int64_t getTotalTradingSecSize() const {
             return total_trading_sec_size;
         }
 
@@ -92,7 +92,7 @@ namespace md_handler {
         :last_trade(last_trade_), total_trading_sec_size(total_trading_sec_size_){}
     protected:
         MD_LastTrade &last_trade;
-        long total_trading_sec_size;
+        int64_t total_trading_sec_size;
     };
 }
 

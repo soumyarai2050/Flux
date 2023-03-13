@@ -19,11 +19,17 @@ class TradingDataManager:
         self.top_of_book_ws_cont = WSReader(f"{market_data_base_url}/get-all-top_of_book-ws", TopOfBookBaseModel,
                                             TopOfBookBaseModelList, self.handle_top_of_book_ws)
 
+        self.symbol_overview_ws_cont = WSReader(f"{market_data_base_url}/get-all-symbol_overview-ws",
+                                                SymbolOverviewBaseModel,
+                                                SymbolOverviewBaseModelList, self.handle_symbol_overview_ws)
+
         self.pair_strat_ws_cont = WSReader(f"{trading_base_url}/get-all-pair_strat-ws", PairStratBaseModel,
                                            PairStratBaseModelList, self.handle_pair_strat_ws, False)
+
         self.portfolio_status_ws_cont = WSReader(f"{trading_base_url}/get-all-portfolio_status-ws",
                                                  PortfolioStatusBaseModel,
                                                  PortfolioStatusBaseModelList, self.handle_portfolio_status_ws, False)
+
         self.portfolio_limits_ws_cont = WSReader(f"{trading_base_url}/get-all-portfolio_limits-ws",
                                                  PortfolioLimitsBaseModel,
                                                  PortfolioLimitsBaseModelList, self.handle_portfolio_limits_ws, False)
@@ -180,10 +186,21 @@ class TradingDataManager:
     def handle_order_journal_ws(self, order_journal_: OrderJournalBaseModel):  # NOQA
         key = StratCache.get_key_from_order_journal(order_journal_)
         strat_cache: StratCache = StratCache.get(key)
+        is_unack: bool = False
         if strat_cache is not None:
             with strat_cache.re_ent_lock:
                 strat_cache.set_order_journal(order_journal_)
+                if order_journal_.order_event in [OrderEventType.OE_NEW, OrderEventType.OE_CXL]:
+                    is_unack = True
+            cached_pair_strat: PairStratBaseModel
             cached_pair_strat, _ = strat_cache.get_pair_strat()
+            if order_journal_.order.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+                strat_cache.set_has_unack_leg1(is_unack)
+            elif order_journal_.order.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+                strat_cache.set_has_unack_leg2(is_unack)
+            else:
+                logging.error(f"unexpected: order general with non-matching symbol found in pre-matched strat-cache "
+                              f"with key: {key}, order journal symbol: {order_journal_.order.security.sec_id}")
             if self.order_journal_ws_cont.notify and cached_pair_strat is not None:
                 strat_cache.notify_semaphore.release()
             elif cached_pair_strat is None:
@@ -224,6 +241,30 @@ class TradingDataManager:
         else:
             logging.error(f"error: no ongoing pair strat matches this order_journal_: {new_order_}")
 
+    def handle_symbol_overview_ws(self, symbol_overview_: SymbolOverviewBaseModel):
+        key1, key2 = StratCache.get_key_from_symbol_overview(symbol_overview_)
+        strat_cache1: StratCache = StratCache.get(key1)
+        strat_cache2: StratCache = StratCache.get(key2)
+        updated: bool = False
+        if strat_cache1 is not None:
+            with strat_cache1.re_ent_lock:
+                strat_cache1.set_symbol_overview(symbol_overview_)
+            if self.symbol_overview_ws_cont.notify:
+                strat_cache1.notify_semaphore.release()
+            updated = True
+            # else not required - strat does not need this update notification
+        if strat_cache2 is not None:
+            with strat_cache2.re_ent_lock:
+                strat_cache2.set_symbol_overview(symbol_overview_)
+            if self.symbol_overview_ws_cont.notify:
+                strat_cache2.notify_semaphore.release()
+            updated = True
+            # else not required - strat does not need this update notification
+        if updated:
+            logging.debug(f"Updated symbol_overview cache for keys: {key1}, {key2};;;detail: {symbol_overview_}")
+        else:
+            logging.debug(f"no matching strat: for symbol_overview keys: {key1}, {key2};;;detail: {symbol_overview_}")
+
     def handle_top_of_book_ws(self, top_of_book_: TopOfBookBaseModel):
         key1, key2 = StratCache.get_key_from_top_of_book(top_of_book_)
         strat_cache1: StratCache = StratCache.get(key1)
@@ -244,9 +285,9 @@ class TradingDataManager:
             updated = True
             # else not required - strat does not need this update notification
         if updated:
-            logging.debug(f"Updated top_of_book cache for keys: {key1}, {key2} ;;; top_of_book: {top_of_book_}")
+            logging.debug(f"Updated top_of_book cache for keys: {key1}, {key2};;;TOB: {top_of_book_}")
         else:
-            logging.debug(f"no matching strat - ignoring TOB for keys: {key1}, {key2} ;;; top_of_book: {top_of_book_}")
+            logging.debug(f"no matching strat: for TOB keys: {key1}, {key2};;;TOB: {top_of_book_}")
 
     def handle_market_depth_ws(self, market_depth_: MarketDepthBaseModel):      # NOQA
         print(market_depth_)

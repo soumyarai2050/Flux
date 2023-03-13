@@ -10,6 +10,36 @@ from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
 from Flux.CodeGenProjects.addressbook.app.ws_helper import *
 
 
+class MarketDepthsCont:
+    def __init__(self, symbol: str):
+        self.symbol: str = symbol
+        self.bid_market_depths: List[MarketDepthBaseModel] = []
+        self.ask_market_depths: List[MarketDepthBaseModel] = []
+
+    def get_market_depths(self, side: Side):
+        if side == Side.BUY:
+            return self.bid_market_depths
+        elif side == Side.SELL:
+            return self.ask_market_depths
+        else:
+            logging.error(f"get_market_depths: Unsupported Side requested: {side}, returning empty list")
+            return []
+
+    def set_market_depth(self, market_depth: MarketDepthBaseModel):
+        if market_depth.side == TickTypeEnum.BID:
+            for bid_market_depth in self.bid_market_depths:
+                if bid_market_depth.position == market_depth.position:
+                    bid_market_depth = market_depth
+            else:
+                self.bid_market_depths.append(market_depth)
+        elif market_depth.side == TickTypeEnum.ASK:
+            for ask_market_depth in self.ask_market_depths:
+                if ask_market_depth.position == market_depth.position:
+                    ask_market_depth = market_depth
+            else:
+                self.ask_market_depths.append(market_depth)
+
+
 class StratCache:
     add_to_strat_cache_rlock: RLock = RLock()
 
@@ -98,6 +128,10 @@ class StratCache:
         return key1, key2
 
     @staticmethod
+    def get_key_from_symbol_overview(symbol_overview_: SymbolOverviewBaseModel):
+        return (symbol_overview_.symbol + "_BID"), (symbol_overview_.symbol + "_ASK")
+
+    @staticmethod
     def get_key_from_top_of_book(top_of_book: TopOfBookBaseModel) -> Tuple[str, str]:
         return (top_of_book.symbol + "_BID"), (top_of_book.symbol + "_ASK")
 
@@ -120,7 +154,7 @@ class StratCache:
         self._pair_strat = pair_strat
         self._pair_strat_update_date_time = DateTime.utcnow()
         if self._pair_strat is not None:
-            self.primary_leg_trading_symbol, self.secondary_leg_trading_symbol = self.get_trading_symbols()
+            self.leg1_trading_symbol, self.leg2_trading_symbol = self.get_trading_symbols()
         # else not required: passing None to clear pair_strat form cache is valid
         return self._pair_strat_update_date_time
 
@@ -222,6 +256,20 @@ class StratCache:
         self._new_orders_update_date_time = DateTime.utcnow()
         return self._new_orders_update_date_time
 
+    def get_symbol_overview(self, date_time: DateTime | None = None) -> Tuple[SymbolOverviewBaseModel, DateTime] | None:
+        if date_time is None or date_time < self._symbol_overview_update_date_time:
+            if self._symbol_overview is not None:
+                return self._symbol_overview, self._symbol_overview_update_date_time
+            else:
+                return None
+        else:
+            return None
+
+    def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel):
+        self._symbol_overview = symbol_overview_
+        self._symbol_overview_update_date_time = symbol_overview_.last_update_date_time
+        return self._symbol_overview_update_date_time
+
     def get_top_of_books(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
         if date_time is None or date_time < self._top_of_books_update_date_time:
             with self.re_ent_lock:
@@ -261,8 +309,42 @@ class StratCache:
                               f" {[str(tob) for tob in self._top_of_books]}, pair_strat: {self.get_pair_strat()}")
         # Adding tz awareness to make stored object's timezone comparable with initialized datetime in
         # get_top_of_books, else throws errors
-        self._top_of_books_update_date_time = top_of_book.last_update_date_time.replace(tzinfo=pytz.UTC)
+        self._top_of_books_update_date_time = top_of_book.last_update_date_time
         return self._top_of_books_update_date_time
+
+    def get_market_depths(self, symbol: str, side: Side, sorted_reverse: bool = False,
+                          date_time: DateTime | None = None) -> Tuple[List[MarketDepthBaseModel], DateTime] | None:
+        if date_time is None or date_time < self._market_depths_update_date_time:
+            with self.re_ent_lock:
+                if self._market_depths_conts is not None:
+                    _market_depths_by_symbol: MarketDepthsCont
+                    for stored_symbol, _market_depths_by_symbol in self._market_depths_conts:
+                        if stored_symbol == symbol:
+                            _market_depths_update_date_time = copy.deepcopy(self._market_depths_update_date_time)
+                            filtered_market_depths: List[MarketDepthBaseModel] = copy.deepcopy(
+                                _market_depths_by_symbol.get_market_depths(side))
+                            if sorted_reverse:
+                                filtered_market_depths.sort(reverse=True, key=lambda x: x.position)
+                            return filtered_market_depths, _market_depths_update_date_time
+        # if no match - return None
+        return None
+
+    def set_market_depth(self, market_depth: MarketDepthBaseModel) -> DateTime:
+        if self._market_depths_conts is None:
+            _market_depths_cont = MarketDepthsCont(market_depth.symbol)
+            _market_depths_cont.set_market_depth(market_depth)
+            self._market_depths_conts = [_market_depths_cont]
+        else:
+            _market_depths_cont: MarketDepthsCont
+            for _market_depths_cont in self._market_depths_conts:
+                if _market_depths_cont.symbol == market_depth.symbol:
+                    _market_depths_cont.set_market_depth(market_depth)
+            else:
+                _market_depths_cont = MarketDepthsCont(market_depth.symbol)
+                _market_depths_cont.set_market_depth(market_depth)
+                self._market_depths_conts.append(_market_depths_cont)
+        self._market_depths_update_date_time = market_depth.time
+        return self._market_depths_update_date_time
 
     @classmethod
     def notify_all(cls):
@@ -319,12 +401,26 @@ class StratCache:
 
     strat_cache_dict: Dict[str, 'StratCache'] = dict()
 
+    def set_has_unack_leg1(self, has_unack: bool):
+        self.unack_leg1 = has_unack
+
+    def has_unack_leg1(self) -> bool:
+        return self.unack_leg1
+
+    def set_has_unack_leg2(self, has_unack: bool):
+        self.unack_leg1 = has_unack
+
+    def has_unack_leg2(self) -> bool:
+        return self.unack_leg2
+
     def __init__(self):
         self.re_ent_lock: RLock = RLock()
         self.notify_semaphore = Semaphore()
         self.stopped = True  # used by consumer thread to stop processing
-        self.primary_leg_trading_symbol: str | None = None
-        self.secondary_leg_trading_symbol: str | None = None
+        self.leg1_trading_symbol: str | None = None
+        self.leg2_trading_symbol: str | None = None
+        self.unack_leg1: bool = False
+        self.unack_leg2: bool = False
 
         self._cancel_orders: List[CancelOrderBaseModel] | None = None
         self._cancel_orders_update_date_time: DateTime = DateTime.utcnow()
@@ -347,13 +443,21 @@ class StratCache:
         self._fills_journals: List[FillsJournalBaseModel] | None = None
         self._fills_journals_update_date_time: DateTime = DateTime.utcnow()
 
+        self._symbol_overview: SymbolOverviewBaseModel | None = None
+        self._symbol_overview_update_date_time: DateTime = DateTime.utcnow()
+
         self._top_of_books: List[TopOfBookBaseModel] | None = None
         self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
 
+        self._market_depths_conts: List[MarketDepthsCont] | None = None
+        self._market_depths_update_date_time: DateTime = DateTime.utcnow()
+
+
     def __str__(self):
-        return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.primary_leg_trading_symbol},  " \
-               f"secondary_leg_trading_symbol: {self.secondary_leg_trading_symbol}, pair_strat: {self._pair_strat}, " \
+        return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.leg1_trading_symbol},  " \
+               f"secondary_leg_trading_symbol: {self.leg2_trading_symbol}, pair_strat: {self._pair_strat}, " \
+               f"unack_leg1 {self.unack_leg1}, unack_leg2 {self.unack_leg2}" \
                f"strat_brief: {self._strat_brief}, cancel_orders: [{self._cancel_orders}], " \
                f"new_orders: [{self._new_orders}], order_snapshots: {self._order_snapshots}, " \
                f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
-               f"top of books: {self._top_of_books}"
+               f"_symbol_overview: {self._symbol_overview}, top of books: {self._top_of_books}"

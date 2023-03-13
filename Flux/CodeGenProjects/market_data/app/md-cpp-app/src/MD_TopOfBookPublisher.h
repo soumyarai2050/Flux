@@ -273,8 +273,8 @@ namespace md_handler {
 
         //return id if successful , empty string if failed - logging done internally
         std::string patch_data(const std::string& top_of_book_db_id,
-                        const md_handler::MD_MktOverview &aggregated_mkt_overview){
-            const md_handler::MD_LastTrade &aggregated_last_trade_data = aggregated_mkt_overview.getLastTrade()
+                               const md_handler::MD_MktOverview &aggregated_mkt_overview){
+            const md_handler::MD_LastTrade &aggregated_last_trade_data = aggregated_mkt_overview.getLastTrade();
             try{
                 request = Poco::Net::HTTPRequest(Poco::Net::HTTPRequest::HTTP_PATCH, patch_uri);
                 request.setContentType("application/json");
@@ -289,8 +289,8 @@ namespace md_handler {
                 id_textPart.SetString(top_of_book_db_id.c_str(), update_top_of_book_alloc);
                 update_top_of_book.AddMember("_id", id_textPart, update_top_of_book_alloc);
 
-                if (aggregated_mkt_overviewgetTotalTradingSecSize() != 0)
-                    update_top_of_book.AddMember("total_trading_sec_size", aggregated_mkt_overviewgetTotalTradingSecSize(), update_top_of_book_alloc);
+                if (aggregated_mkt_overview.getTotalTradingSecSize() != 0)
+                    update_top_of_book.AddMember("total_trading_sec_size", aggregated_mkt_overview.getTotalTradingSecSize(), update_top_of_book_alloc);
 
                 rapidjson::Value last_trade_object(rapidjson::kObjectType);
                 last_trade_object.AddMember("px", aggregated_last_trade_data.getPx(), update_top_of_book_alloc);

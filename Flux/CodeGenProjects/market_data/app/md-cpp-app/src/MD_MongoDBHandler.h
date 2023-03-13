@@ -12,6 +12,7 @@
 #include <Poco/Net/HTTPRequest.h>
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/StreamCopier.h>
+#include "MD_WebSocketServer.h"
 #include "MD_TopOfBookPublisher.h"
 #include "MD_DepthSingleSide.h"
 
@@ -50,8 +51,17 @@ namespace md_handler {
 
     class MD_MongoDBHandler {
     public:
-        MD_MongoDBHandler(): client(pool.acquire()){
-            mongocxx::database market_data_db = (*client)[market_data_db_name];
+        MD_MongoDBHandler(): client(pool.acquire()), market_data_db((*client)[market_data_db_name]){
+//            mongocxx::database market_data_db = (*client)[market_data_db_name];
+
+            // New thread to run the WebSocket server
+            std::thread websocket_thread([this]() {
+                webSocketServer.run();
+            });
+
+            // Detach the thread
+            websocket_thread.detach();
+
             std::cout << "Mongo URI: " << str_uri << std::endl;
         }
         // The mongocxx::instance constructor & destructor initialize / shut-down the driver, thus mongocxx::instance must
@@ -62,5 +72,7 @@ namespace md_handler {
         static mongocxx::pool pool;
         mongocxx::pool::entry client;
         mongocxx::database market_data_db;
+        // WS Server for any direct client publish
+        WebSocketServer webSocketServer;
     };
 }

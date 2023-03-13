@@ -53,7 +53,7 @@ if __name__ == '__main__':
         log_files: List[str] = [
             str(market_data_log_dir / f"market_data_beanie_logs_{datetime_str}.log"),
             str(log_dir / f"addressbook_beanie_logs_{datetime_str}.log"),
-            str(log_dir / f"strat_executer_{datetime_str}.log")
+            str(log_dir / f"strat_executor_{datetime_str}.log")
         ]
         configure_logger("debug", str(log_dir), f"addressbook_log_analyzer_{datetime_str}.log")
         AddressbookLogAnalyzer(log_files)

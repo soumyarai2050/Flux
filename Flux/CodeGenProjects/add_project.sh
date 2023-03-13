@@ -43,6 +43,8 @@ START_DIR=$PWD
 mkdir "$1"
 cd "$1" || (echo "cd $1 failed"; exit 1)
 cp -pr "$PWD"/../"$ORIG_GEN_PRJ"/. . || (echo "cp failed!"; exit 1)
+# copy the old prj tests inside new prj
+cp -pr "$PWD"/../../../tests/CodeGenProjects/"$ORIG_GEN_PRJ" . || (echo "cp failed!"; exit 1)
 if [ "$COPY_MODEL" = false ] ; then
   rm -rf model/*
 fi
@@ -68,5 +70,6 @@ if [ "$ExistingProjectCamelCaseName" != "$ExistingProjectTitleCaseName" ]; then
   find_rename_regex "$ExistingProjectTitleCaseName/$NewProjectTitleCaseName/g" -v
   find . -type f -exec gsed -i -E "s#$ExistingProjectTitleCaseName#$NewProjectTitleCaseName#g" {} +
 fi
+mv "$1" "$PWD"/../../../tests/CodeGenProjects/. || (echo "mv failed!"; exit 1)
 cd "$START_DIR" || (echo "cd $START_DIR failed"; exit 1)
 echo "Created Project $1 from $ORIG_GEN_PRJ"

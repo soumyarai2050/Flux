@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import TopOfBookBaseModel, \
-    MarketDepthBaseModel
+    MarketDepthBaseModel, SymbolOverviewBaseModel, TickTypeEnum
 
 
 # needed for list parsing - for now
@@ -21,12 +21,16 @@ class TopOfBookBaseModelList(BaseModel):
     __root__: List[TopOfBookBaseModel]
 
 
+class SymbolOverviewBaseModelList(BaseModel):
+    __root__: List[SymbolOverviewBaseModel]
+
+
 class PortfolioStatusBaseModelList(BaseModel):
     __root__: List[PortfolioStatusBaseModel]
 
 
 class PortfolioLimitsBaseModelList(BaseModel):
-    __root__: List[PortfolioStatusBaseModel]
+    __root__: List[PortfolioLimitsBaseModel]
 
 
 class OrderLimitsBaseModelList(BaseModel):

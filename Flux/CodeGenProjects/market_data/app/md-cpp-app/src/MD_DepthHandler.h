@@ -1,9 +1,4 @@
-//
-// Created by sumit kumar on 16/2/2023.
-//
-
-#ifndef MD_HANDLER_MD_DEPTHHANDLER_H
-#define MD_HANDLER_MD_DEPTHHANDLER_H
+#pragma once
 
 #include "MD_MongoDBHandler.h"
 
@@ -81,6 +76,7 @@ namespace md_handler {
             // The loop just helps commit - without this commit does not trigger - though the code never enters the loop
             // TODO - we may simplify this by getting size or iterator ?
             for (auto &&depth_doc: market_depth_result) {}
+
         }
 
         void handle_md_update(MD_DepthSingleSide &market_depth_data,
@@ -94,11 +90,33 @@ namespace md_handler {
         void handle_md_update_(MD_DepthSingleSide &bid_market_depth,
                                MD_DepthSingleSide &ask_market_depth)
         {
-            if (not bid_market_depth.isEmpty())
-                insert_or_update_market_depth(bid_market_depth);
-            if (not ask_market_depth.isEmpty())
-                insert_or_update_market_depth(ask_market_depth);
+            // serialize in JSON and call ws publish
+            auto serialize_market_depth = [this](const MD_DepthSingleSide& depth) {
+                boost::json::object md_json = {
+                        {"symbol", depth.getSymbol()},
+                        {"time", depth.getMillisecondsSinceEpoch()},
+                        {"side", depth.getSide()},
+                        {"px", depth.getPx()},
+                        {"qty", depth.getQty()},
+                        {"position", depth.getPosition()},
+                        {"market_maker", ""},
+                        {"is_smart_depth", true}
+                };
+                std::string serialized_market_depth_json = boost::json::serialize(md_json);
+                std::cout << md_json << std::endl;
+                mongo_db.webSocketServer.publish(serialized_market_depth_json);
+            };
 
+
+            if (not bid_market_depth.isEmpty()){
+                insert_or_update_market_depth(bid_market_depth);
+                serialize_market_depth(bid_market_depth);
+            }
+
+            if (not ask_market_depth.isEmpty()){
+                insert_or_update_market_depth(ask_market_depth);
+                serialize_market_depth(ask_market_depth);
+            }
 
             // Now handle top of book update if this is a top of book update
             std::string dbId;
@@ -215,5 +233,3 @@ namespace md_handler {
         }
     };
 }
-
-#endif //MD_HANDLER_MD_DEPTHHANDLER_H

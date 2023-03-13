@@ -99,6 +99,7 @@ namespace md_handler{
 
         //buggy - last trade qty sum has to be computed per symbol - not used for now - fix before use
         void _init_overall_last_trade_qty_sum() {
+            long overall_last_trade_qty_sum = 0;
             auto order = bsoncxx::builder::stream::document{} << "_id" << -1 << bsoncxx::builder::stream::finalize;
             auto opts = mongocxx::options::find{};
             opts.sort(order.view()).limit(1);

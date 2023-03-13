@@ -129,6 +129,17 @@ def get_top_of_book_from_symbol(symbol: str):  # NOQA
         }
     ]}
 
+
+def get_symbol_overview_from_symbol(symbol: str):
+    return {"aggregate": [
+        {
+            "$match": {
+                "symbol": symbol
+            }
+        }
+    ]}
+
+
 # {
 #     "$merge": {
 #         "into": "MarketDepth",

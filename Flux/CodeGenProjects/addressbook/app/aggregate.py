@@ -304,6 +304,22 @@ def get_limited_strat_alerts_obj(limit: int):
     ]
 
 
+def get_open_order_snapshots_for_symbol(symbol: str):
+    return {"aggregate": [
+        {
+            "$match": {
+                "$and": [
+                    {
+                        "order_brief.security.sec_id": symbol
+                    },
+                    {
+                        "order_status": "OE_ACKED"
+                    }
+                ]
+            },
+        }]}
+
+
 if __name__ == '__main__':
     with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
     print(with_symbol_agg_query)

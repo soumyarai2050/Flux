@@ -27,7 +27,7 @@
 ## Useful cmds:
 
 * Linux cmd to make .sh files to unix compatible 
-`find . -type d -name "node_modules" -prune -o -name "*.sh" | xargs dos2unix'` 
+`find . -type d -name "node_modules" -prune -o -name "*.sh" | xargs dos2unix` 
 
 ## MongoDb Utils
 * Export complete db: 

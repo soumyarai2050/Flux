@@ -213,7 +213,7 @@ def update_portfolio_status(overall_buy_notional: float | None, overall_sell_not
             exc_info=True)
 
 
-def is_service_up():
+def is_service_up(ignore_error: bool = False):
     try:
         portfolio_status_list: List[
             PortfolioStatusBaseModel] = strat_manager_service_web_client_internal.get_all_portfolio_status_client()
@@ -230,8 +230,10 @@ def is_service_up():
             strat_manager_service_web_client_internal.create_portfolio_status_client(portfolio_status)
         return True
     except Exception as e:
-        logging.error("service_up test failed - tried get_all_portfolio_status_client (and maybe create);;;"
-                      f"exception: {e}", exc_info=True)
+        if not ignore_error:
+            logging.error("service_up test failed - tried get_all_portfolio_status_client (and maybe create);;;"
+                          f"exception: {e}", exc_info=True)
+        # else not required - silently ignore error is true
         return False
 
 
@@ -240,11 +242,11 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Po
         eligible_brokers = []
     # else using provided value
 
-    rolling_max_order_count = RollingMaxOrderCount(max_order_count=5, order_count_period_seconds=2)
-    rolling_max_reject_count = RollingMaxOrderCount(max_order_count=5, order_count_period_seconds=2)
+    rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
+    rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
-    portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=5, max_open_notional_per_side=7_000,
-                                                    max_gross_n_open_notional=12_000,
+    portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
+                                                    max_gross_n_open_notional=2_400_000,
                                                     rolling_max_order_count=rolling_max_order_count,
                                                     rolling_max_reject_count=rolling_max_reject_count,
                                                     eligible_brokers=eligible_brokers)
@@ -254,8 +256,8 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Po
 @except_n_log_alert(severity=Severity.Severity_ERROR)
 def create_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> PortfolioLimitsBaseModel:
     portfolio_limits_obj = get_new_portfolio_limits(eligible_brokers)
-    portfolio_limits: PortfolioLimitsBaseModel = strat_manager_service_web_client_internal.create_portfolio_limits_client(
-        portfolio_limits_obj)
+    portfolio_limits: PortfolioLimitsBaseModel = \
+        strat_manager_service_web_client_internal.create_portfolio_limits_client(portfolio_limits_obj)
     logging.info(f"created portfolio_limits;;; {portfolio_limits_obj}")
     return portfolio_limits
 
@@ -280,8 +282,8 @@ def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
 
 
 def get_new_order_limits():
-    ord_limit_obj = OrderLimitsBaseModel(_id=1, max_basis_points=20, max_px_deviation=1, max_px_levels=2,
-                                         max_order_qty=10, min_order_notional=1_000, max_order_notional=9_000)
+    ord_limit_obj = OrderLimitsBaseModel(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                                         max_order_qty=500, min_order_notional=100, max_order_notional=90_000)
     return ord_limit_obj
 
 
@@ -309,17 +311,17 @@ def create_order_limits():
 
 
 def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:
-    cancel_rate: CancelRate = CancelRate(max_cancel_rate=20, applicable_period_seconds=0)
+    cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_min_orders=5)
     market_trade_volume_participation: MarketTradeVolumeParticipation = \
-        MarketTradeVolumeParticipation(max_participation_rate=30,
+        MarketTradeVolumeParticipation(max_participation_rate=40,
                                        applicable_period_seconds=180)
     market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=10, depth_levels=3)
-    residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=2500, residual_mark_seconds=4)
-    strat_limits: StratLimits = StratLimits(max_open_orders_per_side=200,
+    residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=30_000, residual_mark_seconds=4)
+    strat_limits: StratLimits = StratLimits(max_open_orders_per_side=5,
                                             max_cb_notional=300_000,
                                             max_open_cb_notional=30_000,
-                                            max_net_filled_notional=60_000,
-                                            max_concentration=1,
+                                            max_net_filled_notional=160_000,
+                                            max_concentration=10,
                                             limit_up_down_volume_participation_rate=1,
                                             eligible_brokers=eligible_brokers,
                                             cancel_rate=cancel_rate,
@@ -328,3 +330,23 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
                                             residual_restriction=residual_restriction
                                             )
     return strat_limits
+
+
+def get_consumable_participation_qty(
+        last_n_sec_trade_qty_and_order_qty_sum_obj_list: List[ExecutorCheckSnapshot],
+        max_participation_rate: float) -> int:
+    last_n_sec_trade_qty_and_order_qty_sum_obj = last_n_sec_trade_qty_and_order_qty_sum_obj_list[0]
+    participation_period_order_qty_sum = last_n_sec_trade_qty_and_order_qty_sum_obj.last_n_sec_order_qty
+    participation_period_last_trade_qty_sum = \
+        last_n_sec_trade_qty_and_order_qty_sum_obj.last_n_sec_trade_qty
+
+    return int(((participation_period_last_trade_qty_sum / 100) *
+                max_participation_rate) - participation_period_order_qty_sum)
+
+
+def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_period_seconds: int,
+                                          max_participation_rate: float) -> int:
+    last_n_sec_trade_qty_and_order_qty_sum_obj_list: List[ExecutorCheckSnapshot] = \
+        strat_manager_service_web_client_internal.get_executor_check_snapshot_query_client(
+            [symbol, side, applicable_period_seconds])
+    return get_consumable_participation_qty(last_n_sec_trade_qty_and_order_qty_sum_obj_list, max_participation_rate)

@@ -59,7 +59,7 @@ message StratStatus{
 
   optional int64 total_buy_qty = 2 [(FluxFldHelp) = "sum of all buy order qty in order brief of strat order snapshot"];
   optional int64 total_sell_qty = 3 [(FluxFldHelp) = "sum of all  sell order qty in order brief of strat order snapshot"];
-  optional int64 total_order_qty = 4 [(FluxFldHelp) = "sum of above total_buy_qty + total_sell_qty "];
+  optional int64 total_order_qty = 4 [(FluxFldHide) = "True", (FluxFldHelp) = "sum of above total_buy_qty + total_sell_qty "];
 
   optional int64 total_open_buy_qty = 5 [(FluxFldHelp) = "sum of all open buy order qty: StratOrderSnapshot-s order_brief.qty minus its filled_qty provided its state is ack or unack"];
   optional int64 total_open_sell_qty = 6 [(FluxFldHelp) = "sum of all open sell order qty: StratOrderSnapshot-s order_brief.qty minus its filled_qty provided its state is ack or unack"];
@@ -466,8 +466,8 @@ message StratBrief{
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional PairSideTradingBrief pair_buy_side_trading_brief = 2;
-  optional PairSideTradingBrief pair_sell_side_trading_brief = 3;
+  optional PairSideTradingBrief pair_buy_side_trading_brief = 2 [(FluxFldElaborateTitle) = true];
+  optional PairSideTradingBrief pair_sell_side_trading_brief = 3 [(FluxFldElaborateTitle) = true];
   optional float consumable_nett_filled_notional = 4 [ (FluxFldHelp) = "max_net_filled_notional - Absolute (filled_cb_notional - filled_egt_notional)"];
 }
 
@@ -475,13 +475,13 @@ message PairSideTradingBrief{
   required Security security = 1;
   required Side side = 2;
   required int64 last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
-  optional float consumable_open_orders = 4 [(FluxFldHelp) = "max_open_order_per_side - open_qty"];
+  optional float consumable_open_orders = 4 [(FluxFldHelp) = "max_open_orders_per_side - open_orders for this symbol side"];
   optional float consumable_notional = 5 [ (FluxFldHelp) = "max_cb_notional - filled_notional - open_notional"];
   optional float consumable_open_notional = 6 [(FluxFldHelp) = "max_open_cb_notional - open_notional"];
-  optional float consumable_concentration = 7 [(FluxFldHelp) = "(total_trading_security_size/100*max_concentration) - open_notional - filled_notional"];
-  optional float participation_period_order_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all order qty in the MarketTradeVolumeParticipation.applicable_period_seconds irrespective of how the order fared in the market: open, filled , cancelled; if applicable_period_seconds is 0 , directly use SymbolSideSnapshot.total_tty"];
+  optional int64 consumable_concentration = 7 [(FluxFldHelp) = "(total_trading_security_size/100*max_concentration) - (open_qty + filled_qty)"];
+  optional float participation_period_order_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all order qty in the MarketTradeVolumeParticipation.applicable_period_seconds irrespective of how the order fared in the market: open, filled , cancelled; if applicable_period_seconds is 0 , directly use SymbolSideSnapshot.total_qty"];
   optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
-  //True hybrid field - depends on both market data and order / fill update (order trigger re-evaluates these in-process (no DB update) to avoid otherwise race condition between trading and market data updates trying to update same value in DB). This means the value in DB only accounts for Trading updates - market data updates are only applied at the time of trading updates - i.e. no RT market data based recmpute and settign of value in DB
+  //True hybrid field - depends on both market data and order / fill update (order trigger re-evaluates these in-process (no DB update) to avoid otherwise race condition between trading and market data updates trying to update same value in DB). This means the value in DB only accounts for Trading updates - market data updates are only applied at the time of trading updates - i.e. no RT market data based recompute and setting of value in DB
   optional float indicative_consumable_participation_qty = 10 [(FluxFldHelp) = "((participation_period_last_trade_qty_sum / 100) * MarketTradeVolumeParticipation.max_participation_rate) - participation_period_order_qty_sum"];
   optional int64 residual_qty = 15 [(FluxFldHelp) = "0 or if non negative value of total_open_qty - other_leg_total_open_qty"];
   // Another hybrid total_trading_security_size (refer total_trading_security_size description to understand handling of such hybrids)
@@ -576,6 +576,31 @@ message OngoingStratSymbols{
   };
   repeated string symbols = 1;
 }
+
+message OpenOrderCount{
+  option (FluxMsgJsonQuery) = {
+      AggregateVarName: "get_open_order_count"
+      AggregateParams: "symbol",
+      AggregateParamsDataType: "str"
+  };
+  required int32 open_order_count = 1;
+}
+
+message ExecutorCheckSnapshot{
+  option (FluxMsgJsonQuery) = {
+      AggregateVarName: "get_executor_check_snapshot",
+      AggregateParams: "symbol",
+      AggregateParams: "side",
+      AggregateParams: "last_n_sec",
+      AggregateParamsDataType: "str",
+      AggregateParamsDataType: "str",
+      AggregateParamsDataType: "int"
+  };
+  optional int32 last_n_sec_trade_qty = 1;
+  optional int32 last_n_sec_order_qty = 2;
+  optional int32 rolling_new_order_count = 3;
+}
+
 
 // Link impl Example models
 
