@@ -3,8 +3,7 @@
 # - "addressbook_test" for pair_strat_project
 # TODO: Add impl to clean slate after test
 
-from datetime import datetime
-from pendulum import DateTime, local_timezone
+from pendulum import local_timezone
 import time
 import copy
 
@@ -210,7 +209,7 @@ def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot
                                         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                         expected_strat_limits: StratLimits,
                                         expected_strat_brief_obj: StratBriefBaseModel,
-                                        date_time_for_cmp: datetime):
+                                        date_time_for_cmp: DateTime):
     open_qty = expected_symbol_side_snapshot.total_qty - expected_symbol_side_snapshot.total_filled_qty - \
                expected_symbol_side_snapshot.total_cxled_qty
     open_notional = open_qty * expected_order_snapshot_obj.order_brief.px
@@ -248,7 +247,7 @@ def update_expected_strat_brief_for_sell(loop_count: int, expected_order_snapsho
                                          expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                          expected_strat_limits: StratLimits,
                                          expected_strat_brief_obj: StratBriefBaseModel,
-                                         date_time_for_cmp: datetime):
+                                         date_time_for_cmp: DateTime):
     open_qty = expected_symbol_side_snapshot.total_qty - expected_symbol_side_snapshot.total_filled_qty - \
                expected_symbol_side_snapshot.total_cxled_qty
     open_notional = open_qty * expected_order_snapshot_obj.order_brief.px
@@ -281,7 +280,7 @@ def update_expected_strat_brief_for_sell(loop_count: int, expected_order_snapsho
     expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = date_time_for_cmp
 
 
-def check_placed_buy_order_computes(loop_count: int, expected_pair_strat_frequency_: int, symbol: str,
+def check_placed_buy_order_computes(loop_count: int, symbol: str,
                                     buy_placed_order_journal: OrderJournalBaseModel,
                                     expected_order_snapshot_obj: OrderSnapshotBaseModel,
                                     expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -355,8 +354,8 @@ def check_placed_buy_order_computes(loop_count: int, expected_pair_strat_frequen
     assert expected_strat_brief_obj in strat_brief_list
 
     # Checking pair_strat
-    expected_pair_strat.last_active_date_time = buy_placed_order_journal.order_event_date_time
-    expected_pair_strat.frequency = expected_pair_strat_frequency_
+    expected_pair_strat.last_active_date_time = None
+    expected_pair_strat.frequency = None
     expected_pair_strat.strat_limits = expected_strat_limits
     expected_strat_status.total_buy_qty = 90 * loop_count
     expected_strat_status.total_order_qty = 90 * loop_count
@@ -392,6 +391,8 @@ def check_placed_buy_order_computes(loop_count: int, expected_pair_strat_frequen
     # removing id field from received obj list for comparison
     for pair_strat in pair_strat_list:
         pair_strat.id = None
+        pair_strat.last_active_date_time = None
+        pair_strat.frequency = None
     assert expected_pair_strat in pair_strat_list, f"{expected_pair_strat} not found in {pair_strat_list}"
 
     # expected portfolio_status
@@ -412,7 +413,7 @@ def check_placed_buy_order_computes(loop_count: int, expected_pair_strat_frequen
     assert expected_portfolio_status in portfolio_status_list
 
 
-def placed_buy_order_ack_receive(loop_count: int, buy_order_placed_date_time: datetime,
+def placed_buy_order_ack_receive(loop_count: int, buy_order_placed_date_time: DateTime,
                                  expected_order_journal: OrderJournalBaseModel,
                                  expected_order_snapshot_obj: OrderSnapshotBaseModel):
     """Checking after order's ACK status is received"""
@@ -437,8 +438,8 @@ def placed_buy_order_ack_receive(loop_count: int, buy_order_placed_date_time: da
     assert expected_order_snapshot_obj in order_snapshot_list
 
 
-def check_fill_receive_for_placed_buy_order(loop_count: int, pair_strat_frequency_counter: int,
-                                            buy_order_placed_date_time: datetime, symbol: str,
+def check_fill_receive_for_placed_buy_order(loop_count: int,
+                                            buy_order_placed_date_time: DateTime, symbol: str,
                                             buy_fill_journal: FillsJournalBaseModel,
                                             expected_order_snapshot_obj: OrderSnapshotBaseModel,
                                             expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -509,8 +510,8 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, pair_strat_frequenc
     assert expected_strat_brief_obj in strat_brief_list
 
     # Checking pair_strat
-    expected_pair_strat.last_active_date_time = buy_fill_journal.fill_date_time
-    expected_pair_strat.frequency = pair_strat_frequency_counter
+    expected_pair_strat.last_active_date_time = None
+    expected_pair_strat.frequency = None
     expected_pair_strat.strat_limits = expected_strat_limits
     expected_strat_status.total_buy_qty = 90 * loop_count
     expected_strat_status.total_order_qty = 90 * loop_count
@@ -544,7 +545,8 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, pair_strat_frequenc
     # removing id field from received obj list for comparison
     for pair_strat in pair_strat_list:
         pair_strat.id = None
-
+        pair_strat.frequency = None
+        pair_strat.last_active_date_time = None
     assert expected_pair_strat in pair_strat_list
 
     # expected portfolio_status
@@ -562,8 +564,7 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, pair_strat_frequenc
     assert expected_portfolio_status in portfolio_status_list
 
 
-def check_placed_sell_order_computes(loop_count: int, total_loop_count: int,
-                                     pair_strat_frequency_counter: int, symbol: str,
+def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, symbol: str,
                                      sell_placed_order_journal: OrderJournalBaseModel,
                                      expected_order_snapshot_obj: OrderSnapshotBaseModel,
                                      expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -632,8 +633,8 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int,
         assert False, f"{expected_strat_brief_obj.pair_sell_side_trading_brief} not found in {strat_brief_list}"
 
     # Checking pair_strat
-    expected_pair_strat.last_active_date_time = sell_placed_order_journal.order_event_date_time
-    expected_pair_strat.frequency = pair_strat_frequency_counter
+    expected_pair_strat.last_active_date_time = None
+    expected_pair_strat.frequency = None
     expected_pair_strat.strat_limits = expected_strat_limits
     expected_strat_status.total_buy_qty = 90 * total_loop_count
     expected_strat_status.total_sell_qty = 70 * loop_count
@@ -679,7 +680,8 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int,
     # removing id field from received obj list for comparison
     for pair_strat in pair_strat_list:
         pair_strat.id = None
-
+        pair_strat.last_active_date_time = None
+        pair_strat.frequency = None
     assert expected_pair_strat in pair_strat_list
 
     # expected portfolio_status
@@ -701,7 +703,7 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int,
     assert expected_portfolio_status in portfolio_status_list
 
 
-def placed_sell_order_ack_receive(loop_count: int, sell_order_placed_date_time: datetime,
+def placed_sell_order_ack_receive(loop_count: int, sell_order_placed_date_time: DateTime,
                                   total_loop_count: int, expected_order_journal: OrderJournalBaseModel,
                                   expected_order_snapshot_obj: OrderSnapshotBaseModel):
     """Checking after order's ACK status is received"""
@@ -727,8 +729,7 @@ def placed_sell_order_ack_receive(loop_count: int, sell_order_placed_date_time: 
 
 
 def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: int,
-                                             sell_order_placed_date_time: datetime,
-                                             pair_strat_frequency_counter: int, symbol: str,
+                                             sell_order_placed_date_time: DateTime, symbol: str,
                                              sell_fill_journal: FillsJournalBaseModel,
                                              expected_order_snapshot_obj: OrderSnapshotBaseModel,
                                              expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -783,8 +784,8 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     assert expected_symbol_side_snapshot in symbol_side_snapshot_list
 
     # Checking pair_strat
-    expected_pair_strat.last_active_date_time = expected_order_snapshot_obj.last_update_date_time
-    expected_pair_strat.frequency = pair_strat_frequency_counter
+    expected_pair_strat.last_active_date_time = None
+    expected_pair_strat.frequency = None
     expected_pair_strat.strat_limits = expected_strat_limits
     expected_strat_status.total_buy_qty = 90 * total_loop_count
     expected_strat_status.total_sell_qty = 70 * loop_count
@@ -827,6 +828,8 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     # removing id field from received obj list for comparison
     for pair_strat in pair_strat_list:
         pair_strat.id = None
+        pair_strat.frequency = None
+        pair_strat.last_active_date_time = None
     assert expected_pair_strat in pair_strat_list
 
     # Checking start_brief
@@ -871,98 +874,96 @@ class TopOfBookSide(StrEnum):
     Ask = auto()
 
 
-def run_top_of_book(loop_count: int, top_of_book_list: List[Dict], top_of_book_side: TopOfBookSide):
-    stored_ids = []
-    if top_of_book_side == TopOfBookSide.Bid:
-        for index, top_of_book_json in enumerate(top_of_book_list*2):
-            top_of_book_basemodel = TopOfBookBaseModel(**top_of_book_json)
-            if index > 1:
-                top_of_book_basemodel.id = stored_ids[index % 2]
-                top_of_book_basemodel.bid_quote.px = 110
-                updated_date_time = DateTime.now(local_timezone())
-                top_of_book_basemodel.bid_quote.last_update_date_time = updated_date_time
-                top_of_book_basemodel.last_update_date_time = updated_date_time
-            else:
-                if loop_count == 1:
-                    top_of_book_basemodel.bid_quote.px = 80
-                else:
-                    stored_top_of_books = market_data_web_client.get_all_top_of_book_client()
-                    if stored_top_of_books[0].symbol == "CB_Sec_1":
-                        stored_ids.append(stored_top_of_books[0].id)
-                        stored_ids.append(stored_top_of_books[1].id)
-                    else:
-                        stored_ids.append(stored_top_of_books[1].id)
-                        stored_ids.append(stored_top_of_books[0].id)
-                    top_of_book_basemodel.id = stored_ids[index % 2]
-                    top_of_book_basemodel.bid_quote.px = 80
+def _create_tob(top_of_book_json_list: List[Dict]):
+    buy_stored_tob: TopOfBookBaseModel | None = None
 
-            match index:
-                case 0 | 1:
-                    if loop_count == 1:
-                        stored_top_of_book_basemodel = \
-                            market_data_web_client.create_top_of_book_client(top_of_book_basemodel)
-                        stored_ids.append(stored_top_of_book_basemodel.id)
-                    else:
-                        stored_top_of_book_basemodel = \
-                            market_data_web_client.put_top_of_book_client(top_of_book_basemodel)
-                case other_index:
-                    stored_top_of_book_basemodel = \
-                        market_data_web_client.put_top_of_book_client(top_of_book_basemodel)
+    # For place order non-triggered run
+    for top_of_book_json in top_of_book_json_list:
+        top_of_book_basemodel = TopOfBookBaseModel(**top_of_book_json)
+        top_of_book_basemodel.bid_quote.px -= 10
+        stored_top_of_book_basemodel = \
+            market_data_web_client.create_top_of_book_client(top_of_book_basemodel)
+        top_of_book_basemodel.id = stored_top_of_book_basemodel.id
+        for market_trade_vol in stored_top_of_book_basemodel.market_trade_volume:
+            market_trade_vol.id = None
+        for market_trade_vol in top_of_book_basemodel.market_trade_volume:
+            market_trade_vol.id = None
+        assert stored_top_of_book_basemodel == top_of_book_basemodel
+        if stored_top_of_book_basemodel.symbol == "CB_Sec_1":
+            buy_stored_tob = stored_top_of_book_basemodel
 
-            top_of_book_basemodel.id = stored_top_of_book_basemodel.id
-            for market_trade_vol in top_of_book_basemodel.market_trade_volume:
-                market_trade_vol.id = None
-            for market_trade_vol in stored_top_of_book_basemodel.market_trade_volume:
-                market_trade_vol.id = None
-            # to tackle format diff because of time zone (present in top_of_book_basemodel but not
-            # in stored_top_of_book_basemodel) assigning both same time field
-            stored_top_of_book_basemodel.bid_quote.last_update_date_time = \
-                top_of_book_basemodel.bid_quote.last_update_date_time
-            stored_top_of_book_basemodel.ask_quote.last_update_date_time = \
-                top_of_book_basemodel.ask_quote.last_update_date_time
-            stored_top_of_book_basemodel.last_trade.last_update_date_time = \
-                top_of_book_basemodel.last_trade.last_update_date_time
-            stored_top_of_book_basemodel.last_update_date_time = top_of_book_basemodel.last_update_date_time
-            assert stored_top_of_book_basemodel == top_of_book_basemodel, \
-                f"stored obj {stored_top_of_book_basemodel} not equal to " \
-                f"created obj {top_of_book_basemodel}"
+    # For place order trigger run
+    top_of_book_basemodel = TopOfBookBaseModel(_id=buy_stored_tob.id)
+    top_of_book_basemodel.bid_quote = Quote()
+    top_of_book_basemodel.bid_quote.px = buy_stored_tob.bid_quote.px + 10
+    # update_date_time = DateTime.now(local_timezone())
+    update_date_time = DateTime.utcnow()
+    top_of_book_basemodel.bid_quote.last_update_date_time = update_date_time
+    top_of_book_basemodel.last_update_date_time = update_date_time
+    updated_tob = market_data_web_client.patch_top_of_book_client(top_of_book_basemodel)
+    for market_trade_vol in updated_tob.market_trade_volume:
+        market_trade_vol.id = None
+    assert updated_tob.bid_quote.px == top_of_book_basemodel.bid_quote.px
+
+
+def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side):
+    tob_obj = TopOfBookBaseModel(_id=stored_obj.id)
+    # update_date_time = DateTime.now(local_timezone())
+    update_date_time = DateTime.utcnow()
+    if Side.BUY == side:
+        tob_obj.bid_quote = Quote()
+        tob_obj.bid_quote.px = px
+        tob_obj.bid_quote.last_update_date_time = update_date_time
+        tob_obj.last_update_date_time = update_date_time
     else:
-        stored_top_of_books = market_data_web_client.get_all_top_of_book_client()
-        if stored_top_of_books[1].symbol == "EQT_Sec_1":
-            stored_ids.append(stored_top_of_books[1].id)
-            stored_ids.append(stored_top_of_books[0].id)
-        else:
-            stored_ids.append(stored_top_of_books[0].id)
-            stored_ids.append(stored_top_of_books[1].id)
+        tob_obj.ask_quote = Quote()
+        tob_obj.ask_quote.px = px
+        tob_obj.ask_quote.last_update_date_time = update_date_time
+        tob_obj.last_update_date_time = update_date_time
+    updated_tob_obj = market_data_web_client.patch_top_of_book_client(tob_obj)
 
-        for index, top_of_book_json in enumerate(top_of_book_list * 2):
-            top_of_book_basemodel = TopOfBookBaseModel(**top_of_book_json)
-            top_of_book_basemodel.id = stored_ids[index % 2]
-            if index > 1:
-                top_of_book_basemodel.ask_quote.px = 120
-                updated_date_time = DateTime.now(local_timezone())
-                top_of_book_basemodel.ask_quote.last_update_date_time = updated_date_time
-                top_of_book_basemodel.last_update_date_time = updated_date_time
-                top_of_book_basemodel.total_trading_security_size = 2 * top_of_book_basemodel.total_trading_security_size
-            else:
-                top_of_book_basemodel.ask_quote.px = 140
+    for market_trade_vol in updated_tob_obj.market_trade_volume:
+        market_trade_vol.id = None
+    if side == Side.BUY:
+        assert updated_tob_obj.bid_quote.px == tob_obj.bid_quote.px
+    else:
+        assert updated_tob_obj.ask_quote.px == tob_obj.bid_quote.px
 
-            stored_top_of_book_basemodel = \
-                market_data_web_client.put_top_of_book_client(top_of_book_basemodel)
 
-            top_of_book_basemodel.id = stored_top_of_book_basemodel.id
-            # to tackle format diff because of time zone (present in top_of_book_basemodel but not
-            # in stored_top_of_book_basemodel) assigning both same time field
-            stored_top_of_book_basemodel.bid_quote.last_update_date_time = \
-                top_of_book_basemodel.bid_quote.last_update_date_time
-            stored_top_of_book_basemodel.ask_quote.last_update_date_time = \
-                top_of_book_basemodel.ask_quote.last_update_date_time
-            stored_top_of_book_basemodel.last_trade.last_update_date_time = \
-                top_of_book_basemodel.last_trade.last_update_date_time
-            stored_top_of_book_basemodel.last_update_date_time = top_of_book_basemodel.last_update_date_time
-            assert stored_top_of_book_basemodel == top_of_book_basemodel, \
-                f"stored obj {stored_top_of_book_basemodel} not equal to " \
-                f"created obj {top_of_book_basemodel}"
+def _update_buy_tob():
+    buy_stored_tob: TopOfBookBaseModel | None = None
+
+    stored_tob_objs = market_data_web_client.get_all_top_of_book_client()
+    for tob_obj in stored_tob_objs:
+        if tob_obj.symbol == "CB_Sec_1":
+            buy_stored_tob = tob_obj
+
+    # For place order non-triggered run
+    _update_tob(buy_stored_tob, buy_stored_tob.bid_quote.px - 10, Side.BUY)
+    # For place order trigger run
+    _update_tob(buy_stored_tob, buy_stored_tob.bid_quote.px, Side.BUY)
+
+
+def run_buy_top_of_book(loop_count: int, top_of_book_json_list: List[Dict]):
+    if loop_count == 1:
+        _create_tob(top_of_book_json_list)
+    else:
+        _update_buy_tob()
+
+
+def run_sell_top_of_book():
+    sell_stored_tob: TopOfBookBaseModel | None = None
+
+    stored_tob_objs = market_data_web_client.get_all_top_of_book_client()
+    for tob_obj in stored_tob_objs:
+        if tob_obj.symbol == "EQT_Sec_1":
+            sell_stored_tob = tob_obj
+
+    # For place order non-triggered run
+    _update_tob(sell_stored_tob, sell_stored_tob.ask_quote.px - 10, Side.SELL)
+
+    # For place order trigger run
+    _update_tob(sell_stored_tob, sell_stored_tob.ask_quote.px, Side.SELL)
 
 
 def run_last_trade(last_trade_json_list: List[Dict]):
@@ -1047,6 +1048,39 @@ def create_market_depth(market_depth_basemodel_list):
         assert created_market_depth == market_depth_basemodel
 
 
+def wait_for_get_new_order_placed(wait_stop_px: int | float,
+                                  last_update_date_time: DateTime | None, side: Side):
+    loop_counter = 0
+    loop_limit = 10
+    while True:
+        time.sleep(2)
+
+        tob_obj_list = market_data_web_client.get_all_top_of_book_client()
+        if side == Side.BUY:
+            symbol_to_check = "CB_Sec_1"
+        else:
+            symbol_to_check = "EQT_Sec_1"
+        if last_update_date_time is None:
+            if tob_obj_list[0].symbol == symbol_to_check:
+                if tob_obj_list[0].bid_quote.px == wait_stop_px:
+                    return tob_obj_list[0].last_update_date_time
+            else:
+                if tob_obj_list[1].ask_quote.px == wait_stop_px:
+                    return tob_obj_list[1].last_update_date_time
+        else:
+            if tob_obj_list[0].symbol == symbol_to_check:
+                if tob_obj_list[0].last_update_date_time > last_update_date_time and \
+                        tob_obj_list[0].bid_quote.px == wait_stop_px:
+                    return tob_obj_list[0].last_update_date_time
+            else:
+                if tob_obj_list[1].last_update_date_time > last_update_date_time and \
+                        tob_obj_list[1].ask_quote.px == wait_stop_px:
+                    return tob_obj_list[1].last_update_date_time
+
+        if loop_counter == loop_limit:
+            assert False, f"Could not find any update after tob_list {tob_obj_list}"
+
+
 def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_sides_,
                         buy_order_, sell_order_, buy_fill_journal_, sell_fill_journal_,
                         expected_buy_order_snapshot_, expected_sell_order_snapshot_,
@@ -1061,7 +1095,6 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
 
     buy_symbol = pair_securities_with_sides_["security1"]["sec_id"]
     sell_symbol = pair_securities_with_sides_["security2"]["sec_id"]
-    pair_strat_frequency_counter = 2
 
     # running symbol_overview
     run_symbol_overview(symbol_overview_obj_list)
@@ -1079,6 +1112,8 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
     # Adding strat in strat_collection
     create_if_not_exists_and_validate_strat_collection(active_pair_strat)
 
+    buy_tob_last_update_date_time_tracker: DateTime | None = None
+    sell_tob_last_update_date_time_tracker: DateTime | None = None
     for loop_count in range(1, total_loop_count+1):
             expected_buy_order_snapshot = copy.deepcopy(expected_buy_order_snapshot_)
             expected_buy_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[0])
@@ -1095,9 +1130,12 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
             current_itr_expected_buy_order_journal_.order.order_id = f"O{loop_count}"
 
             # Running TopOfBook (this triggers expected buy order)
-            run_top_of_book(loop_count, top_of_book_list_, TopOfBookSide.Bid)
+            run_buy_top_of_book(loop_count, top_of_book_list_)
 
-            time.sleep(1)
+            # Waiting for tob to trigger place order
+            buy_tob_last_update_date_time_tracker = \
+                wait_for_get_new_order_placed(110, buy_tob_last_update_date_time_tracker, Side.BUY)
+
             stored_order_journal_list = \
                 strat_manager_service_web_client_.get_all_order_journal_client()
 
@@ -1106,12 +1144,12 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
                 if stored_order_journal.order_event == OrderEventType.OE_NEW and \
                         stored_order_journal.order.order_id == f"O{loop_count}":
                     placed_order_journal = stored_order_journal
-            assert placed_order_journal is not None, "Can't find any order_journal with order_event OE_NEW"
+            assert placed_order_journal is not None, f"Can't find any order_journal with order_id O{loop_count} " \
+                                                     f"order_event OE_NEW"
             create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
 
             # Checking placed order computations
-            pair_strat_frequency_counter += 1
-            check_placed_buy_order_computes(loop_count, pair_strat_frequency_counter, buy_symbol,
+            check_placed_buy_order_computes(loop_count, buy_symbol,
                                             placed_order_journal, expected_buy_order_snapshot,
                                             expected_buy_symbol_side_snapshot, expected_pair_strat,
                                             expected_strat_limits_, expected_strat_status,
@@ -1124,7 +1162,6 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
                                              current_itr_expected_buy_order_journal_.order.security.sec_id,
                                              current_itr_expected_buy_order_journal_.order.underlying_account)
 
-            # time.sleep(1)
             stored_order_journal_list = \
                 strat_manager_service_web_client_.get_all_order_journal_client()
             placed_order_journal_obj_ack_response = None
@@ -1144,9 +1181,7 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
             placed_fill_journal_obj = strat_manager_service_web_client_.get_all_fills_journal_client()[-1]
 
             # Checking Fill receive on placed order
-            pair_strat_frequency_counter += 1
-            check_fill_receive_for_placed_buy_order(loop_count, pair_strat_frequency_counter,
-                                                    create_buy_order_date_time, buy_symbol,
+            check_fill_receive_for_placed_buy_order(loop_count, create_buy_order_date_time, buy_symbol,
                                                     placed_fill_journal_obj,
                                                     expected_buy_order_snapshot, expected_buy_symbol_side_snapshot,
                                                     expected_pair_strat,
@@ -1155,7 +1190,6 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
 
             # Sleeping to let the order get cxlled
             time.sleep(residual_test_wait)
-            pair_strat_frequency_counter += 1
 
     for loop_count in range(1, total_loop_count+1):
             expected_sell_order_snapshot = copy.deepcopy(expected_sell_order_snapshot_)
@@ -1173,29 +1207,32 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
             current_itr_expected_sell_order_journal_.order.order_id = f"O{loop_count+total_loop_count}"
 
             # Running TopOfBook (this triggers expected buy order)
-            run_top_of_book(loop_count, top_of_book_list_, TopOfBookSide.Ask)
+            run_sell_top_of_book()
 
-            time.sleep(1)
+            # Waiting for tob to trigger place order
+            sell_tob_last_update_date_time_tracker = \
+                wait_for_get_new_order_placed(120, sell_tob_last_update_date_time_tracker, Side.SELL)
+
             stored_order_journal_list = \
                 strat_manager_service_web_client_.get_all_order_journal_client()
 
+            order_id: str = f"O{loop_count+total_loop_count}"
             placed_order_journal = None
             for stored_order_journal in stored_order_journal_list:
                 if stored_order_journal.order_event == OrderEventType.OE_NEW and \
                         stored_order_journal.order.order_id == f"O{loop_count+total_loop_count}":
                     placed_order_journal = stored_order_journal
-            assert placed_order_journal is not None, "Can't find any order_journal with order_event OE_NEW"
+            assert placed_order_journal is not None, f"Can't find any order_journal with order_id {order_id} " \
+                                                     f"order_event OE_NEW"
             create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
 
             # Checking placed order computations
-            pair_strat_frequency_counter += 1
-            check_placed_sell_order_computes(loop_count, total_loop_count, pair_strat_frequency_counter,
+            check_placed_sell_order_computes(loop_count, total_loop_count,
                                              sell_symbol, placed_order_journal, expected_sell_order_snapshot,
                                              expected_sell_symbol_side_snapshot, expected_pair_strat,
                                              expected_strat_limits_, expected_strat_status,
                                              expected_strat_brief_obj, expected_portfolio_status)
 
-            order_id: str = f"O{loop_count+total_loop_count}"
             TradeSimulator.process_order_ack(order_id, current_itr_expected_sell_order_journal_.order.px,
                                              current_itr_expected_sell_order_journal_.order.qty,
                                              current_itr_expected_sell_order_journal_.order.side,
@@ -1220,9 +1257,7 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
             placed_fill_journal_obj = strat_manager_service_web_client_.get_all_fills_journal_client()[-1]
 
             # Checking Fill receive on placed order
-            pair_strat_frequency_counter += 1
             check_fill_receive_for_placed_sell_order(loop_count, total_loop_count, create_sell_order_date_time,
-                                                     pair_strat_frequency_counter,
                                                      sell_symbol, placed_fill_journal_obj,
                                                      expected_sell_order_snapshot, expected_sell_symbol_side_snapshot,
                                                      expected_pair_strat, expected_strat_limits_,
@@ -1231,7 +1266,6 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
 
             # Sleeping to let the order get cxlled
             time.sleep(residual_test_wait)
-            pair_strat_frequency_counter += 1
 
 
 def test_clean_test_environment():

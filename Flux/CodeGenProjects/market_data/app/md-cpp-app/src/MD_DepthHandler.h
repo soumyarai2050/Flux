@@ -91,16 +91,14 @@ namespace md_handler {
                                MD_DepthSingleSide &ask_market_depth)
         {
             // serialize in JSON and call ws publish
-            auto serialize_market_depth = [this](const MD_DepthSingleSide& depth) {
+            auto serialize_n_publish_market_depth_ws = [this](const MD_DepthSingleSide& depth) {
                 boost::json::object md_json = {
                         {"symbol", depth.getSymbol()},
                         {"time", depth.getMillisecondsSinceEpoch()},
                         {"side", depth.getSide()},
                         {"px", depth.getPx()},
                         {"qty", depth.getQty()},
-                        {"position", depth.getPosition()},
-                        {"market_maker", ""},
-                        {"is_smart_depth", true}
+                        {"position", depth.getPosition()}
                 };
                 std::string serialized_market_depth_json = boost::json::serialize(md_json);
                 std::cout << md_json << std::endl;
@@ -110,12 +108,12 @@ namespace md_handler {
 
             if (not bid_market_depth.isEmpty()){
                 insert_or_update_market_depth(bid_market_depth);
-                serialize_market_depth(bid_market_depth);
+                serialize_n_publish_market_depth_ws(bid_market_depth);
             }
 
             if (not ask_market_depth.isEmpty()){
                 insert_or_update_market_depth(ask_market_depth);
-                serialize_market_depth(ask_market_depth);
+                serialize_n_publish_market_depth_ws(ask_market_depth);
             }
 
             // Now handle top of book update if this is a top of book update

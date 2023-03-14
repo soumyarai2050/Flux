@@ -22,10 +22,10 @@ int main()
     auto symbols_to_subscribe = mdManageSubscriptionSymbols.get();
     for (auto &symbol: symbols_to_subscribe)
         std::cout << symbol << std::endl;
+
     md_handler::MD_DepthHandler marketDepthHandler(mongo_db);
     md_handler::MD_LastTradeHandler lastTradeHandler(mongo_db);
     md_handler::MD_HistoryManager marketDataHistoryManager(mongo_db, marketDepthHandler, lastTradeHandler);
     marketDataHistoryManager.replay(md_handler::ReplyType::NOW_ACCELERATE);
     return 0;
 }
-

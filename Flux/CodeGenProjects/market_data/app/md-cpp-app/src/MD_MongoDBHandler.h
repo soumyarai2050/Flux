@@ -52,18 +52,20 @@ namespace md_handler {
     class MD_MongoDBHandler {
     public:
         MD_MongoDBHandler(): client(pool.acquire()), market_data_db((*client)[market_data_db_name]){
-//            mongocxx::database market_data_db = (*client)[market_data_db_name];
-
             // New thread to run the WebSocket server
-            std::thread websocket_thread([this]() {
-                webSocketServer.run();
-            });
 
-            // Detach the thread
-            websocket_thread.detach();
+            std::thread websocket_acceptor_thread_(&WebSocketServer::run, &webSocketServer);
+           websocket_acceptor_thread = std::move(websocket_acceptor_thread_);
+
 
             std::cout << "Mongo URI: " << str_uri << std::endl;
         }
+
+        ~MD_MongoDBHandler(){
+            webSocketServer.Shutdown();
+            websocket_acceptor_thread.join();
+        }
+
         // The mongocxx::instance constructor & destructor initialize / shut-down the driver, thus mongocxx::instance must
         // be created before using the driver must remain alive for as long as the driver is in use
         static mongocxx::instance inst;
@@ -74,5 +76,6 @@ namespace md_handler {
         mongocxx::database market_data_db;
         // WS Server for any direct client publish
         WebSocketServer webSocketServer;
+        std::thread websocket_acceptor_thread;
     };
 }

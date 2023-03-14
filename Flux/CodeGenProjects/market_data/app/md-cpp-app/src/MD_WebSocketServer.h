@@ -9,6 +9,7 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/json/src.hpp>
+#include "boost/asio.hpp"
 
 #include "MD_DepthSingleSide.h"
 
@@ -20,18 +21,48 @@ using tcp = boost::asio::ip::tcp;
 
 class WebSocketServer {
 public:
-    WebSocketServer() : acceptor_(ioc_, tcp::endpoint{tcp::v4(), 8080}) {}
+    WebSocketServer() : acceptor_(ioc_, tcp::endpoint{tcp::v4(), 8083}), timer_(ioc_, boost::posix_time::seconds(10)) {}
 
-    [[noreturn]] void run() {
-        while (true) {
-            tcp::socket socket{ioc_};
-            acceptor_.accept(socket);
-            std::thread{&WebSocketServer::session, this, std::move(socket)}.detach();
-        }
+    void run() {
+        tcp::socket socket{ioc_};
+
+        timer_.async_wait([&](boost::system::error_code ec) {
+            if (!ec) {
+                std::cout << "Timeout reached, check and shut down server if requested." << std::endl;
+				if(shutdown){
+	                ioc_.stop();
+	                Shutdown();
+				}
+				# else continue waiting for next connection
+            }
+        });
+
+        acceptor_.async_accept(socket, [&](boost::system::error_code ec) {
+            timer_.cancel();
+
+            if (!ec) {
+                std::thread ws_client_thread {&WebSocketServer::session, this, std::move(socket)};
+                ws_client_thread.detach();
+                ws_client_threads.push_back(std::move(ws_client_thread));
+            }
+
+            run();
+        });
+        ioc_.run();
+
     }
+
     ~WebSocketServer(){
+        shutdown = true;
+        for (auto &ws_client_thread: ws_client_threads)
+            ws_client_thread.join();
         // Clear the WebSocket connections vector
         ws_vector.clear();
+
+    }
+
+    void Shutdown(){
+        shutdown = true;
     }
 
     void publish(const std::string& send_string)
@@ -65,9 +96,7 @@ private:
 
     void session(tcp::socket socket) {
         try {
-
             std::shared_ptr<websocket::stream<tcp::socket>> ws_ptr = std::make_shared<websocket::stream<tcp::socket>>(std::move(socket));
-
             try {
                 ws_ptr->accept();
             }
@@ -88,8 +117,11 @@ private:
     }
 
     std::vector<std::shared_ptr<websocket::stream<tcp::socket>>> ws_vector;
+    std::vector <std::thread> ws_client_threads;
+    bool shutdown = false;
     net::io_context ioc_;
     tcp::acceptor acceptor_;
+    boost::asio::deadline_timer timer_;
     std::string host_ = "127.0.0.1";
     std::string port_ = "8040";
     std::string target_ = "/market_data/get-all-market_depth";

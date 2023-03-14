@@ -118,7 +118,6 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         static_data_service_state.handle_exception(e)
                         static_data_service_state.ready = False  # forces re-init in next iteration
 
-    # Example 0 of 5: pre- and post-launch server
     def app_launch_pre(self):
         app_launch_pre_thread = threading.Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
@@ -330,7 +329,6 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
     async def _update_order_snapshot_from_order_journal(self, order_journal_obj: OrderJournal):
         match order_journal_obj.order_event:
             case OrderEventType.OE_NEW:
-                # importing routes here otherwise at the time of launch callback's set instance is called by
                 # importing routes here otherwise at the time of launch callback's set instance is called by
                 # routes call before set_instance file call and set_instance file throws error that
                 # 'set instance called more than once in one session'
@@ -623,20 +621,28 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if symbol_side_snapshot_.order_create_count > existing_pair_strat.strat_limits.cancel_rate.waived_min_orders:
             if strat_brief_.pair_buy_side_trading_brief.all_bkr_cxlled_qty > 0:
                 if (consumable_cxl_qty := strat_brief_.pair_buy_side_trading_brief.consumable_cxl_qty) <= 0:
-                    logging.error(f"Consumable cxl qty breached allowed for symbol: "
-                                  f"{strat_brief_.pair_buy_side_trading_brief.security.sec_id}, "
-                                  f"consumable_cxl-qty {consumable_cxl_qty}")
+                    err_str_: str = f"Consumable qty can't be <= 0, currently is {consumable_cxl_qty} " \
+                                     f"for symbol {strat_brief_.pair_buy_side_trading_brief.security.sec_id} and " \
+                                    f"side {Side.BUY}"
+                    alert_brief: str = err_str_
+                    alert_details: str = f"strat details: {updated_pair_strat_}"
+                    alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
                     updated_pair_strat_.strat_status.strat_state = StratState.StratState_PAUSED
+                    updated_pair_strat_.strat_status.strat_alerts = [alert]
                 # else not required: if consumable_cxl-qty is allowed then ignore
             # else not required: if there is not even a single buy order then consumable_cxl-qty will
             # become 0 in that case too, so ignoring this case if buy side all_bkr_cxlled_qty is 0
 
             if strat_brief_.pair_sell_side_trading_brief.all_bkr_cxlled_qty > 0:
                 if (consumable_cxl_qty := strat_brief_.pair_sell_side_trading_brief.consumable_cxl_qty) <= 0:
-                    logging.error(f"Consumable cxl qty breached allowed for symbol: "
-                                  f"{strat_brief_.pair_sell_side_trading_brief.security.sec_id}, "
-                                  f"consumable_cxl-qty {consumable_cxl_qty}")
+                    err_str_: str = f"Consumable qty can't be <= 0, currently is {consumable_cxl_qty} " \
+                                    f"for symbol {strat_brief_.pair_buy_side_trading_brief.security.sec_id} and " \
+                                    f"side {Side.BUY}"
+                    alert_brief: str = err_str_
+                    alert_details: str = f"strat details: {updated_pair_strat_}"
+                    alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
                     updated_pair_strat_.strat_status.strat_state = StratState.StratState_PAUSED
+                    updated_pair_strat_.strat_status.strat_alerts = [alert]
                 # else not required: if consumable_cxl-qty is allowed then ignore
             # else not required: if there is not even a single sell order then consumable_cxl-qty will
             # become 0 in that case too, so ignoring this case if sell side all_bkr_cxlled_qty is 0
@@ -765,7 +771,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
         order_count_period_seconds = \
             portfolio_limits_obj.rolling_max_order_count.rolling_tx_count_period_seconds
-        max_order_count = portfolio_limits_obj.rolling_max_order_count.max_rolling_tx_count
+        max_rolling_order_count = portfolio_limits_obj.rolling_max_order_count.max_rolling_tx_count
 
         order_counts_updated_order_journals = \
             await underlying_get_last_n_sec_orders_by_event_query_http(order_journal_obj.order.security.sec_id,
@@ -774,7 +780,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
         for queried_order_journal in reversed(order_counts_updated_order_journals):
             if queried_order_journal.id == order_journal_obj.id:
-                return max_order_count - queried_order_journal.current_period_order_count
+                return max_rolling_order_count - queried_order_journal.current_period_order_count
         else:
             err_str_ = f"List of query received order_journals doesn't have current order_journal, " \
                        f"current order_journal {order_journal_obj}, list of received " \
@@ -1198,6 +1204,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 logging.debug(
                     f"Created SymbolSideSnapshot {created_symbol_side_snapshot} for security {security} and "
                     f"side {side} in pre call of pair_strat {pair_strat_obj}")
+            # else not required: Avoiding creation if symbol_side_snapshot is received as None, that signifies that
+            # _get_symbol_side_snapshot_from_symbol_side internally has some error which must have been added to alert
 
     async def _update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat,
                                      updated_pair_strat_obj: PairStrat) -> bool | None:
@@ -1245,6 +1253,17 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             raise HTTPException(status_code=503, detail="update_pair_strat_pre not ready - service is not "
+                                                        "initialized yet")
+
+        updated_pair_strat_obj.frequency += 1
+        await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
+        updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
+        logging.debug(f"further updated by _update_pair_strat_pre: {updated_pair_strat_obj}")
+
+    async def partial_update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
+        if not self.service_ready:
+            # raise service unavailable 503 exception, let the caller retry
+            raise HTTPException(status_code=503, detail="partial_update_pair_strat_pre not ready - service is not "
                                                         "initialized yet")
 
         updated_pair_strat_obj.frequency += 1

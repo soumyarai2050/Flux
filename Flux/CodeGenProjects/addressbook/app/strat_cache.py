@@ -8,6 +8,7 @@ from pendulum import DateTime
 
 from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
 from Flux.CodeGenProjects.addressbook.app.ws_helper import *
+from Flux.CodeGenProjects.addressbook.generated.data import Side
 
 
 class MarketDepthsCont:
@@ -256,19 +257,20 @@ class StratCache:
         self._new_orders_update_date_time = DateTime.utcnow()
         return self._new_orders_update_date_time
 
-    def get_symbol_overview(self, date_time: DateTime | None = None) -> Tuple[SymbolOverviewBaseModel, DateTime] | None:
-        if date_time is None or date_time < self._symbol_overview_update_date_time:
-            if self._symbol_overview is not None:
-                return self._symbol_overview, self._symbol_overview_update_date_time
-            else:
-                return None
-        else:
-            return None
+    def get_symbol_overview(self, symbol, date_time: DateTime | None = None) -> Tuple[SymbolOverviewBaseModel, DateTime] | None:
+        for symbol_overview in self._symbol_overviews:
+            if symbol_overview is not None and symbol_overview.symbol == symbol:
+                if date_time is None or date_time < symbol_overview.last_update_date_time:
+                    return symbol_overview, symbol_overview.last_update_date_time
+        # if no match - return None
+        return None
 
     def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel):
-        self._symbol_overview = symbol_overview_
-        self._symbol_overview_update_date_time = symbol_overview_.last_update_date_time
-        return self._symbol_overview_update_date_time
+        if symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+            self._symbol_overviews[0] = symbol_overview_
+        elif symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+            self._symbol_overviews[1] = symbol_overview_
+        return symbol_overview_.last_update_date_time
 
     def get_top_of_books(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
         if date_time is None or date_time < self._top_of_books_update_date_time:
@@ -443,15 +445,14 @@ class StratCache:
         self._fills_journals: List[FillsJournalBaseModel] | None = None
         self._fills_journals_update_date_time: DateTime = DateTime.utcnow()
 
-        self._symbol_overview: SymbolOverviewBaseModel | None = None
-        self._symbol_overview_update_date_time: DateTime = DateTime.utcnow()
+        self._symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]
+        self._symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
 
         self._top_of_books: List[TopOfBookBaseModel] | None = None
         self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
 
         self._market_depths_conts: List[MarketDepthsCont] | None = None
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
-
 
     def __str__(self):
         return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.leg1_trading_symbol},  " \
@@ -460,4 +461,5 @@ class StratCache:
                f"strat_brief: {self._strat_brief}, cancel_orders: [{self._cancel_orders}], " \
                f"new_orders: [{self._new_orders}], order_snapshots: {self._order_snapshots}, " \
                f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
-               f"_symbol_overview: {self._symbol_overview}, top of books: {self._top_of_books}"
+               f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self._symbol_overviews]}, " \
+               f"top of books: {self._top_of_books}"

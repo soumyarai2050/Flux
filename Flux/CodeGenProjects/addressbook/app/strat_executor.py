@@ -32,6 +32,8 @@ class StratExecutor:
         self.is_test_run: bool = config_dict.get("is_test_run")
         self.trading_data_manager: TradingDataManager = trading_data_manager
         self.strat_cache: StratCache = strat_cache
+        self.trading_account = "trading-account"
+        self.exchange = "exchange"
 
         self._portfolio_status_update_date_time: DateTime | None = None
         self._strat_brief_update_date_time: DateTime | None = None
@@ -181,8 +183,8 @@ class StratExecutor:
             logging.error(error_msg)
             return False
 
-        if self.check_new_order_limits(top_of_book, strat_brief, order_limits, px, qty, side, system_symbol, account,
-                                       exchange):
+        if self.check_new_order(top_of_book, strat_brief, order_limits, px, qty, side, system_symbol, account,
+                                exchange):
             if self.trading_link.place_new_order(px, qty, side, trading_symbol, system_symbol, account, exchange):
                 self.set_unack(system_symbol, True)
         else:
@@ -192,21 +194,21 @@ class StratExecutor:
                            order_notional: float, system_symbol: str):
         # max_open_orders_per_side check
         check_passed = True
-
         symbol_overview: SymbolOverviewBaseModel | None = None
-        symbol_overview_tuple = self.strat_cache.get_symbol_overview()
-        if symbol_overview_tuple:
-            symbol_overview, _ = symbol_overview_tuple
-            if not symbol_overview:
-                logging.error(f"blocked generated SELL order, symbol_overview missing: limit down check can't be "
+        if side == Side.SELL:
+            symbol_overview_tuple = \
+                self.strat_cache.get_symbol_overview(strat_brief.pair_sell_side_trading_brief.security.sec_id)
+            if symbol_overview_tuple:
+                symbol_overview, _ = symbol_overview_tuple
+                if not symbol_overview:
+                    logging.error(f"blocked generated SELL order, symbol_overview missing: limit down check can't be "
+                                  f"applied")
+                    return False
+            else:
+                logging.error(f"blocked generated SELL order, symbol_overview_tuple missing: limit down check can't be "
                               f"applied")
                 return False
-        else:
-            logging.error(f"blocked generated SELL order, symbol_overview_tuple missing: limit down check can't be "
-                          f"applied")
-            return False
 
-        if side == Side.SELL:
             if strat_brief.pair_sell_side_trading_brief.consumable_open_orders < 0:
                 logging.error(f"blocked generated SELL order, not enough consumable_open_orders: "
                               f"{strat_brief.pair_sell_side_trading_brief.consumable_open_orders} ")
@@ -232,6 +234,19 @@ class StratExecutor:
                 check_passed = False
 
         elif side == Side.BUY:
+            symbol_overview_tuple = \
+                self.strat_cache.get_symbol_overview(strat_brief.pair_buy_side_trading_brief.security.sec_id)
+            if symbol_overview_tuple:
+                symbol_overview, _ = symbol_overview_tuple
+                if not symbol_overview:
+                    logging.error(f"blocked generated BUY order, symbol_overview missing: limit down check can't be "
+                                  f"applied")
+                    return False
+            else:
+                logging.error(f"blocked generated BUY order, symbol_overview_tuple missing: limit down check can't be "
+                              f"applied")
+                return False
+
             if strat_brief.pair_buy_side_trading_brief.consumable_open_orders < 0:
                 logging.error(f"blocked generated BUY order, not enough consumable_open_orders: "
                               f"{strat_brief.pair_buy_side_trading_brief.consumable_open_orders} ")
@@ -344,9 +359,9 @@ class StratExecutor:
             return max(min_px_by_deviation, min_px_by_basis_point, px_by_max_level)
 
 
-    def check_new_order_limits(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
-                               order_limits: OrderLimitsBaseModel, px: float,
-                               qty: int, side: Side, system_symbol: str, account: str, exchange: str) -> bool:
+    def check_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
+                        order_limits: OrderLimitsBaseModel, px: float,
+                        qty: int, side: Side, system_symbol: str, account: str, exchange: str) -> bool:
         pair_strat_tuple = self.strat_cache.get_pair_strat()
         checks_passed: bool = True
 
@@ -455,7 +470,7 @@ class StratExecutor:
         order_placed: bool = self.place_new_order(trade_tob, strat_brief, order_limits, new_order.px, new_order.qty,
                                                   new_order.side, trading_symbol=new_order.security.sec_id,
                                                   system_symbol=new_order.security.sec_id,
-                                                  account="trading-account", exchange="exchange")
+                                                  account=self.trading_account, exchange=self.exchange)
         return order_placed
 
     def _check_tob_and_place_order(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
@@ -476,7 +491,7 @@ class StratExecutor:
                         order_placed = self.place_new_order(leg1_tob, strat_brief, order_limits, leg1_tob.ask_quote.px,
                                                             leg1_tob.ask_quote.qty,
                                                             Side.BUY, self.strat_cache.leg1_trading_symbol,
-                                                            leg1_tob.symbol, "trading-account", "exchange-name")
+                                                            leg1_tob.symbol, self.trading_account, self.exchange)
                         if order_placed:
                             posted_leg1_notional = leg1_tob.ask_quote.px * leg1_tob.ask_quote.qty
                     else:
@@ -489,7 +504,7 @@ class StratExecutor:
                         order_placed = self.place_new_order(leg1_tob, strat_brief, order_limits, leg1_tob.bid_quote.px,
                                                             leg1_tob.bid_quote.qty,
                                                             Side.SELL, self.strat_cache.leg1_trading_symbol,
-                                                            leg1_tob.symbol, "trading-account", "exchange-name")
+                                                            leg1_tob.symbol, self.trading_account, self.exchange)
                         if order_placed:
                             posted_leg1_notional = leg1_tob.bid_quote.px * leg1_tob.bid_quote.qty
                     else:
@@ -504,9 +519,9 @@ class StratExecutor:
                     if not (leg2_tob.ask_quote.qty == 0 or math.isclose(leg2_tob.ask_quote.px, 0)):
                         order_placed = self.place_new_order(leg2_tob, strat_brief, order_limits, leg2_tob.ask_quote.px,
                                                             leg2_tob.ask_quote.qty, Side.BUY,
-                                                            trading_symbol=leg2_tob.symbol,
+                                                            trading_symbol=self.strat_cache.leg2_trading_symbol,
                                                             system_symbol=leg2_tob.symbol,
-                                                            account="trading-account", exchange="exchange-name")
+                                                            account=self.trading_account, exchange=self.exchange)
                         if order_placed:
                             posted_leg2_notional = leg2_tob.ask_quote.px * leg2_tob.ask_quote.qty
                     else:
@@ -518,9 +533,9 @@ class StratExecutor:
                     if not (leg2_tob.bid_quote.qty == 0 or math.isclose(leg2_tob.bid_quote.px, 0)):
                         order_placed = self.place_new_order(leg2_tob, strat_brief, order_limits, leg2_tob.bid_quote.px,
                                                             leg2_tob.bid_quote.qty, Side.SELL,
-                                                            trading_symbol=leg2_tob.symbol,
+                                                            trading_symbol=self.strat_cache.leg2_trading_symbol,
                                                             system_symbol=leg2_tob.symbol,
-                                                            account="trading-account", exchange="exchange-name")
+                                                            account=self.trading_account, exchange=self.exchange)
                         if order_placed:
                             posted_leg2_notional = leg2_tob.bid_quote.px * leg2_tob.bid_quote.qty
                     else:
@@ -538,6 +553,8 @@ class StratExecutor:
     def _check_tob_and_place_order_test(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
                                         order_limits: OrderLimitsBaseModel,
                                         top_of_books: List[TopOfBookBaseModel]) -> bool:
+        buy_top_of_book: TopOfBookBaseModel
+        sell_top_of_book: TopOfBookBaseModel
         if top_of_books[0].symbol == "CB_Sec_1":
             buy_top_of_book = top_of_books[0]
             sell_top_of_book = top_of_books[1]
@@ -549,14 +566,14 @@ class StratExecutor:
                 self._top_of_books_update_date_time:
             if buy_top_of_book.bid_quote.px == 110:
                 order_id = self.place_new_order(buy_top_of_book, strat_brief, order_limits, 100, 90, Side.BUY,
-                                                "CB_Sec_1", "CB_Sec_1", "Acc1", "Exch1")
+                                                buy_top_of_book.symbol, buy_top_of_book.symbol, "Acc1", "Exch1")
 
         # if sell_top_of_book.ask_quote.last_update_date_time == \
         #         self._top_of_books_update_date_time:
         if sell_top_of_book.total_trading_security_size == 200:
             if sell_top_of_book.ask_quote.px == 120:
                 order_id = self.place_new_order(sell_top_of_book, strat_brief, order_limits, 110, 70, Side.SELL,
-                                                "EQT_Sec_1", "EQT_Sec_1", "Acc1", "Exch1")
+                                                sell_top_of_book.symbol, sell_top_of_book.symbol, "Acc1", "Exch1")
         return True
 
     def internal_run(self):
@@ -580,7 +597,7 @@ class StratExecutor:
                         continue
                 # else no update - do we need this processed again ?
 
-                # 2. get pair-strat: no checking if it's updated since last checked (required for TOB extraction &
+                # 2. get pair-strat: no checking if it's updated since last checked (required for TOB extraction)
                 pair_strat_tuple = self.strat_cache.get_pair_strat()
                 if pair_strat_tuple is not None:
                     pair_strat, pair_strat_update_date_time = pair_strat_tuple
