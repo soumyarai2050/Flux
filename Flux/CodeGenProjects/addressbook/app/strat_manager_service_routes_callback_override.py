@@ -1,4 +1,5 @@
 # system imports
+import copy
 import logging
 import time
 from typing import List, Type, Tuple, Dict, FrozenSet, Set
@@ -13,7 +14,7 @@ from fastapi import HTTPException
 # project imports
 from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
 from FluxPythonUtils.scripts.utility_functions import avg_of_new_val_sum_to_avg, store_json_or_dict_to_file, \
-    load_json_dict_from_file, load_yaml_configurations, get_host_port_from_env
+    load_json_dict_from_file, load_yaml_configurations, get_host_port_from_env, compare_n_patch_dict
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import TopOfBookBaseModel, \
     SymbolOverviewBaseModel
@@ -497,7 +498,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         # routes call before set_instance file call and set_instance file throws error that
         # 'set instance called more than once in one session'
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            partial_update_pair_strat_http
+            underlying_partial_update_pair_strat_http
         pair_strat_obj = await get_single_exact_match_ongoing_strat_from_symbol_n_side(
             order_journal_obj.order.security.sec_id,
             order_journal_obj.order.side)
@@ -599,7 +600,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             if updated_residual is not None:
                 self._pause_strat_if_limits_breached(pair_strat_obj, updated_pair_strat_obj,
                                                      strat_brief, symbol_side_snapshot)
-            await partial_update_pair_strat_http(updated_pair_strat_obj)
+            await underlying_partial_update_pair_strat_http(updated_pair_strat_obj)
         else:
             logging.error(f"error: received pair_strat for symbol:{order_journal_obj.order.security.sec_id} "
                           f"and side:{order_journal_obj.order.side} as None")
@@ -877,6 +878,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 portfolio_status_obj.overall_buy_notional += \
                     (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.last_update_fill_px) - \
                     (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.order_brief.px)
+                if portfolio_status_obj.overall_buy_fill_notional is None:
+                    portfolio_status_obj.overall_buy_fill_notional = 0
                 portfolio_status_obj.overall_buy_fill_notional += \
                     order_snapshot_obj.last_update_fill_px * order_snapshot_obj.last_update_fill_qty
             case Side.SELL:
@@ -885,6 +888,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 portfolio_status_obj.overall_sell_notional += \
                     (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.last_update_fill_px) - \
                     (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.order_brief.px)
+                if portfolio_status_obj.overall_sell_fill_notional is None:
+                    portfolio_status_obj.overall_sell_fill_notional = 0
                 portfolio_status_obj.overall_sell_fill_notional += \
                     order_snapshot_obj.last_update_fill_px * order_snapshot_obj.last_update_fill_qty
             case other_:
@@ -914,7 +919,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 fills_journal_obj.order_id))
         if len(order_snapshot_objs) == 1:
             order_snapshot_obj = order_snapshot_objs[0]
-            if order_snapshot_obj.order_status != OrderStatusType.OE_DOD:
+            if order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
                 if (last_filled_qty := order_snapshot_obj.filled_qty) is not None:
                     updated_filled_qty = last_filled_qty + fills_journal_obj.fill_qty
                 else:
@@ -927,12 +932,19 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 last_update_fill_qty = fills_journal_obj.fill_qty
                 last_update_fill_px = fills_journal_obj.fill_px
 
+                if order_snapshot_obj.order_brief.qty == updated_filled_qty:
+                    order_status = OrderStatusType.OE_FILLED
+                elif order_snapshot_obj.order_brief.qty < updated_filled_qty:
+                    order_status = OrderStatusType.OE_OVER_FILLED
+                else:
+                    order_status = order_snapshot_obj.order_status
+
                 order_snapshot_obj = \
                     await underlying_partial_update_order_snapshot_http(OrderSnapshotOptional(
                         _id=order_snapshot_obj.id, filled_qty=updated_filled_qty, avg_fill_px=updated_avg_fill_px,
                         fill_notional=updated_fill_notional, last_update_fill_qty=last_update_fill_qty,
                         last_update_fill_px=last_update_fill_px,
-                        last_update_date_time=fills_journal_obj.fill_date_time))
+                        last_update_date_time=fills_journal_obj.fill_date_time, order_status=order_status))
                 symbol_side_snapshot = \
                     await self._update_symbol_side_snapshot_from_fills_journal(fills_journal_obj, order_snapshot_obj)
                 if symbol_side_snapshot is not None:
@@ -946,8 +958,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 # which would have got added to alert already
 
             else:
-                err_str_ = f"Fill received for snapshot having status OE_DOD - received: " \
-                           f"fill_journal - {fills_journal_obj}, snapshot - {order_snapshot_obj}"
+                err_str_ = f"Unsupported - Fill received for order_snapshot having status " \
+                           f"{order_snapshot_obj.order_status} - received: " \
+                           f"fill_journal - {fills_journal_obj}, order_snapshot - {order_snapshot_obj}"
                 await update_strat_alert_by_sec_and_side_async(order_snapshot_obj.order_brief.security.sec_id,
                                                                order_snapshot_obj.order_brief.side, err_str_)
 
@@ -1266,7 +1279,12 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             raise HTTPException(status_code=503, detail="partial_update_pair_strat_pre not ready - service is not "
                                                         "initialized yet")
 
-        updated_pair_strat_obj.frequency += 1
+        updated_pair_strat_obj.frequency = stored_pair_strat_obj.frequency + 1
+        updated_pydantic_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_pair_strat_obj.dict()),
+                                                         updated_pair_strat_obj.dict(exclude_unset=True,
+                                                                                     exclude_none=True))
+        updated_pair_strat_obj = PairStrat(**updated_pydantic_obj_dict)
+
         await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
         logging.debug(f"further updated by _update_pair_strat_pre: {updated_pair_strat_obj}")
@@ -1289,15 +1307,25 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     logging.error(err_str_)
             # else not required: avoiding force publish if no symbol_overview exists
 
+    async def _create_related_models_if_strat_is_active(self, stored_pair_strat_obj: PairStrat,
+                                                        updated_pair_strat_obj: PairStrat) -> None:
+        if stored_pair_strat_obj.strat_status.strat_state != StratState.StratState_ACTIVE:
+            if updated_pair_strat_obj.strat_status.strat_state == StratState.StratState_ACTIVE:
+                # creating strat_brief for both leg securities
+                await self._create_strat_brief_for_active_pair_strat(updated_pair_strat_obj)
+                # creating symbol_side_snapshot for both leg securities if not already exists
+                await self._create_symbol_snapshot_for_active_pair_strat(updated_pair_strat_obj)
+                # changing symbol_overview force_publish to True if exists
+                await self._force_publish_symbol_overview(updated_pair_strat_obj)
+            # else not required: if strat status is not active then avoiding creations
+        # else not required: If stored strat is already active then related models would have been already created
+
     async def update_pair_strat_post(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
-        if updated_pair_strat_obj.strat_status.strat_state == StratState.StratState_ACTIVE:
-            # creating strat_brief for both leg securities
-            await self._create_strat_brief_for_active_pair_strat(updated_pair_strat_obj)
-            # creating symbol_side_snapshot for both leg securities if not already exists
-            await self._create_symbol_snapshot_for_active_pair_strat(updated_pair_strat_obj)
-            # changing symbol_overview force_publish to True if exists
-            await self._force_publish_symbol_overview(updated_pair_strat_obj)
-        # else not required: if strat status is not active then avoiding creations
+        await self._create_related_models_if_strat_is_active(stored_pair_strat_obj, updated_pair_strat_obj)
+
+    async def partial_update_pair_strat_post(self, stored_pair_strat_obj: PairStrat,
+                                             updated_pair_strat_obj: PairStratOptional):
+        await self._create_related_models_if_strat_is_active(stored_pair_strat_obj, updated_pair_strat_obj)
 
     async def get_order_of_matching_suffix_order_id(self, order_id: str) -> str | None:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \

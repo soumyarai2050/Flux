@@ -21,48 +21,43 @@ using tcp = boost::asio::ip::tcp;
 
 class WebSocketServer {
 public:
-    WebSocketServer() : acceptor_(ioc_, tcp::endpoint{tcp::v4(), 8083}), timer_(ioc_, boost::posix_time::seconds(10)) {}
+    WebSocketServer() : acceptor_(io_context_, tcp::endpoint{tcp::v4(), 8083}), timer_(io_context_, boost::posix_time::seconds(60)) {}
 
     void run() {
-        tcp::socket socket{ioc_};
+        std::shared_ptr socket = std::make_shared<tcp::socket>(io_context_);
+        acceptor_.async_accept(*socket, [&](const boost::system::error_code &ec) {
+            timer_.cancel(); // cancel the timer when a connection is accepted
+            if (!ec) {
+                session(std::move(*socket));
+                // Create a new socket object to be used for the next connection
+                socket = std::make_shared<tcp::socket>(io_context_);
+            } else if (ec != boost::asio::error::operation_aborted) {
+                std::cerr << "Error accepting connection: " << ec.message() << std::endl;
+            }
+            timer_.expires_from_now(boost::posix_time::seconds(60)); // reset the timer
+            run();
+        });
 
         timer_.async_wait([&](boost::system::error_code ec) {
             if (!ec) {
-                std::cout << "Timeout reached, check and shut down server if requested." << std::endl;
-				if(shutdown){
-	                ioc_.stop();
-	                Shutdown();
-				}
-				# else continue waiting for next connection
+                Shutdown();
+                std::cout << "Timeout reached" << std::endl;
+                if(shutdown)
+                    io_context_.stop();
+                else
+                    io_context_.run();
+
+            } else if (ec != boost::asio::error::operation_aborted) {
+                std::cerr << "Error accepting connection: " << ec.message() << std::endl;
             }
         });
 
-        acceptor_.async_accept(socket, [&](boost::system::error_code ec) {
-            timer_.cancel();
-
-            if (!ec) {
-                std::thread ws_client_thread {&WebSocketServer::session, this, std::move(socket)};
-                ws_client_thread.detach();
-                ws_client_threads.push_back(std::move(ws_client_thread));
-            }
-
-            run();
-        });
-        ioc_.run();
-
+        io_context_.run();
     }
 
     ~WebSocketServer(){
         shutdown = true;
-        for (auto &ws_client_thread: ws_client_threads)
-            ws_client_thread.join();
-        // Clear the WebSocket connections vector
         ws_vector.clear();
-
-    }
-
-    void Shutdown(){
-        shutdown = true;
     }
 
     void publish(const std::string& send_string)
@@ -71,6 +66,11 @@ public:
             ws_ptr->write(net::buffer(send_string));
         }
     }
+
+    void Shutdown(){
+        shutdown = true;
+    }
+
 private:
     auto get_market_depth_snapshot_json() {
 
@@ -119,10 +119,11 @@ private:
     std::vector<std::shared_ptr<websocket::stream<tcp::socket>>> ws_vector;
     std::vector <std::thread> ws_client_threads;
     bool shutdown = false;
-    net::io_context ioc_;
+    net::io_context io_context_;
     tcp::acceptor acceptor_;
     boost::asio::deadline_timer timer_;
     std::string host_ = "127.0.0.1";
     std::string port_ = "8040";
     std::string target_ = "/market_data/get-all-market_depth";
+    int num_connections_ = 0;
 };

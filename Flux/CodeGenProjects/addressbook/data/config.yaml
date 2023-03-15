@@ -1,7 +1,4 @@
 mongo_server: "mongodb://localhost:27017"
 min_refresh_interval: 5
-buy_sec_id: "CB_Sec_1"
-sell_sec_id: "EQT_Sec_1"
-underlying_account: "Acc1"
-market_depth_lvl: 2
 is_test_run: True
+simulate_reverse_path: False

@@ -5,10 +5,12 @@ import copy
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from tests.CodeGenProjects.addressbook.app.test_strat_manager_service_routes_callback_override import \
-    create_n_validate_strat, create_if_not_exists_and_validate_strat_collection, run_top_of_book, TopOfBookSide
+    create_n_validate_strat, create_if_not_exists_and_validate_strat_collection, run_buy_top_of_book, \
+    run_sell_top_of_book, TopOfBookSide, run_symbol_overview, run_last_trade, create_market_depth, \
+    wait_for_get_new_order_placed
 
 
-def util_create_pair_strat_n_strat_collection(pair_strat, strat_limits, strat_status):
+def create_pair_strat_n_strat_collection(pair_strat, strat_limits, strat_status):
     # Creating Strat
     active_pair_strat = create_n_validate_strat(pair_strat, strat_limits, strat_status)
     # Adding strat in strat_collection
@@ -16,10 +18,88 @@ def util_create_pair_strat_n_strat_collection(pair_strat, strat_limits, strat_st
     return active_pair_strat
 
 
+def place_buy_order(buy_order, loop_count, top_of_book_list):
+    current_itr_expected_buy_order_journal_ = copy.deepcopy(buy_order)
+    current_itr_expected_buy_order_journal_.order.order_id = f"O{loop_count}"
+    # Running TopOfBook (this triggers expected buy order)
+    run_buy_top_of_book(loop_count, top_of_book_list)
+
+
+def place_sell_order(sell_order, loop_count):
+    current_itr_expected_sell_order_journal_ = copy.deepcopy(sell_order)
+    current_itr_expected_sell_order_journal_.order.order_id = f"O{loop_count}"
+    # Running TopOfBook (this triggers expected sell order)
+    run_sell_top_of_book()
+
+
+def override_strat_limits(strat_limits):
+    return strat_limits
+
+
+def test_place_order_and_check_fill(strat_manager_service_web_client_, pair_strat_, expected_start_status_,
+                                    expected_strat_limits_, top_of_book_list_, buy_order_, sell_order_,
+                                    symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list):
+    """
+    Send order and verify that it is fully filled using TradeSimulator by setting simulate_reverse_path as True
+    """
+
+    # running symbol overview
+    run_symbol_overview(symbol_overview_obj_list)
+    # run last trade
+    run_last_trade(last_trade_fixture_list)
+    # create market depth
+    create_market_depth(market_depth_basemodel_list)
+
+    expected_strat_limits_ = override_strat_limits(expected_strat_limits_)
+    create_pair_strat_n_strat_collection(pair_strat_, expected_strat_limits_, expected_start_status_)
+
+    buy_tob_last_update_date_time_tracker: DateTime | None = None
+    sell_tob_last_update_date_time_tracker: DateTime | None = None
+    total_loop_count = 5
+    # sending 5 buy orders
+    for loop_count in range(1, total_loop_count + 1):
+        place_buy_order(buy_order_, loop_count, top_of_book_list_)
+
+        # Waiting for tob to trigger place order
+        buy_tob_last_update_date_time_tracker = \
+            wait_for_get_new_order_placed(110, buy_tob_last_update_date_time_tracker, Side.BUY)
+
+        stored_order_journal_list = strat_manager_service_web_client_.get_all_order_journal_client()
+        placed_order_journal = None
+        for stored_order_journal in stored_order_journal_list:
+            if stored_order_journal.order_event == OrderEventType.OE_NEW and \
+                    stored_order_journal.order.order_id == f"O{loop_count}":
+                placed_order_journal = stored_order_journal
+        assert placed_order_journal is not None, f"Can't find any order_journal with order_event: " \
+                                                 f"{OrderEventType.OE_NEW}, order_id: 0{loop_count}"
+        order_id = f"O{loop_count}"
+        assert placed_order_journal.order_event == OrderEventType.OE_NEW
+        assert placed_order_journal.order.order_id == order_id
+
+        time.sleep(5)
+
+        stored_order_journal_list = strat_manager_service_web_client_.get_all_order_journal_client()
+        placed_order_journal_ack = None
+        for stored_order_journal in stored_order_journal_list:
+            if stored_order_journal.order_event == OrderEventType.OE_ACK and \
+                    stored_order_journal.order.order_id == f"O{loop_count}":
+                placed_order_journal_ack = stored_order_journal
+        assert placed_order_journal_ack is not None, f"Can't find any order_journal with order_event: " \
+                                                     f"{OrderEventType.OE_ACK}, order_id: {order_id}"
+        assert placed_order_journal_ack.order.order_id == order_id
+
+        time.sleep(5)
+
+        placed_fill_journal = strat_manager_service_web_client_.get_all_fills_journal_client()[-1]
+        assert placed_fill_journal.order_id == order_id
+        assert placed_fill_journal.fill_px == buy_order_.order.px
+        assert placed_fill_journal.fill_qty == buy_order_.order.qty  # fully filled
+
+
 def test_max_cancel_rate(strat_manager_service_web_client_, pair_strat_, expected_strat_limits_, expected_start_status_,
                          top_of_book_list_, buy_order_):
-    active_pair_strat = util_create_pair_strat_n_strat_collection(pair_strat_, expected_strat_limits_,
-                                                                  expected_start_status_)
+    active_pair_strat = create_pair_strat_n_strat_collection(pair_strat_, expected_strat_limits_,
+                                                             expected_start_status_)
 
     max_cancel_rate = active_pair_strat.strat_limits.cancel_rate.max_cancel_rate
     waived_min_orders = active_pair_strat.strat_limits.cancel_rate.waived_min_orders
@@ -122,7 +202,7 @@ def test_max_open_orders_per_side(strat_manager_service_web_client_, pair_strat_
 
 def test_consumable_cxl_qty(strat_manager_service_web_client_, pair_strat_, expected_start_status_,
                             expected_strat_limits_, buy_order_, top_of_book_list_,
-                            pair_securities_with_sides_, expected_strat_brief_):
+                            pair_securities_with_sides_, expected_strat_brief_, buy_fill_journal_):
     active_pair_strat = util_create_pair_strat_n_strat_collection(pair_strat_, expected_strat_limits_,
                                                                   expected_start_status_)
 
@@ -166,6 +246,15 @@ def test_consumable_cxl_qty(strat_manager_service_web_client_, pair_strat_, expe
         assert placed_order_journal_ack is not None, "Can't find any order_journal with order_event OE_ACK"
         assert placed_order_journal_ack.order.order_id == order_id
 
+        if loop_count <= cxl_threshold:
+            buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
+            TradeSimulator.process_fill(order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
+                                        Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
+        else:
+            # cancel the order
+            TradeSimulator.place_cxl_order(order_id, current_itr_expected_buy_order_journal_.order.side,
+                                           current_itr_expected_buy_order_journal_.order.security.sec_id,
+                                           current_itr_expected_buy_order_journal_.order.underlying_account)
         # cancel the order
         TradeSimulator.place_cxl_order(order_id, current_itr_expected_buy_order_journal_.order.side,
                                        current_itr_expected_buy_order_journal_.order.security.sec_id,

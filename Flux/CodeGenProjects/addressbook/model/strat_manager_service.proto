@@ -250,12 +250,12 @@ message StratLimits{
     layout: UI_TABLE
   };
 
-  optional int32 max_open_orders_per_side = 1 [(FluxFldHelp) = "max simultaneous open orders allowed per side for this strat"];
-  optional float max_cb_notional = 2 [(FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
-  optional float max_open_cb_notional = 3 [(FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
-  optional int32 max_net_filled_notional = 4  [(FluxFldHelp) = "absolute [buy - sell] maximum notional allowed for this strat"];
-  optional float max_concentration = 5 [(FluxFldHelp) = "max symbol specific concentration % (w.r.t. market total for the symbol)"];
-  optional float limit_up_down_volume_participation_rate = 6 [(FluxFldHelp) = "At limit up down: % participation allowed against open interest on specific side of outstanding queue"];
+  optional int32 max_open_orders_per_side = 1 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open orders allowed per side for this strat"];
+  optional float max_cb_notional = 2 [(FluxFldValMax) = "10000000", (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
+  optional float max_open_cb_notional = 3 [(FluxFldValMax) = "5000000", (FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
+  optional int32 max_net_filled_notional = 4  [(FluxFldValMax) = "5000000", (FluxFldHelp) = "absolute [buy - sell] maximum notional allowed for this strat"];
+  optional float max_concentration = 5 [(FluxFldValMax) = "10", (FluxFldHelp) = "max symbol specific concentration % (w.r.t. market total for the symbol)"];
+  optional float limit_up_down_volume_participation_rate = 6 [(FluxFldValMax) = "30", (FluxFldHelp) = "At limit up down: % participation allowed against open interest on specific side of outstanding queue"];
   optional CancelRate cancel_rate = 7 [(FluxFldHelp) = "Allowed cxl size (side agnostic) as % of (open + executed + cxlled) volume (per broker per symbol) within configured interval; no time window implies SOD: window-start & checking-time as end"];
   optional MarketTradeVolumeParticipation market_trade_volume_participation = 8 [(FluxFldHelp) = "% participation against market traded volume within configured interval (sent with top of the book); no time window implies SOD: window-start & checking-time as end"];
   optional OpenInterestParticipation market_depth = 9 [(FluxFldHelp) = "% participation against open interest on specific side across specified depth levels"];
@@ -284,12 +284,13 @@ message OrderLimits{
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 max_basis_points = 2 [(FluxFldValMax) = "15", (FluxFldHelp) = "basis-points a single order can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
-  optional float max_px_deviation = 3 [default = 2, (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "max % deviation allowed from Last Traded px (if no last trading px, use closing px)"];
-  optional int32 max_px_levels = 4 [(FluxFldHelp) = "max orderbook levels allowed to be consumed by single order"];
-  optional int32 max_order_qty = 5;
-  optional int32 min_order_notional = 6 [(FluxFldHelp) = "order qty times limit px must be greater than this limit"];
-  optional int32 max_order_notional = 7 [(FluxFldHelp) = "order qty times limit px must be less than this limit"];
+  optional int32 max_basis_points = 2 [(FluxFldValMax) = "1000", (FluxFldHelp) = "basis-points a single order can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
+  optional float max_px_deviation = 3 [default = 2, (FluxFldValMax) = "2", (FluxFldNameColor) = "ERROR", (FluxFldHelp) = "max % deviation allowed from Last Traded px (if no last trading px, use closing px)"];
+  optional int32 max_px_levels = 4 [(FluxFldValMax) = "20", (FluxFldHelp) = "max orderbook levels allowed to be consumed by single order"];
+  optional int32 max_order_qty = 5[(FluxFldValMax) = "1000000", (FluxFldHelp) = "max qty for securities that trade in shares"];
+  optional int32 max_contract_qty = 6 [(FluxFldValMax) = "10000", (FluxFldHelp) = "max qty for securities that trade in contracts"];
+  optional int32 min_order_notional = 7 [(FluxFldValMin) = "5000", (FluxFldHelp) = "order qty times limit px must be greater than this limit"];
+  optional int32 max_order_notional = 8 [(FluxFldValMax) = "500000", (FluxFldHelp) = "order qty times limit px must be less than this limit"];
 }
 
 //Widget - 8
@@ -314,11 +315,11 @@ message PortfolioLimits{
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 max_open_baskets = 2 [(FluxFldHelp) = "max simultaneous open orders allowed per side for this portfolio"];
-  optional int32 max_open_notional_per_side = 3;
-  optional float max_gross_n_open_notional = 4 [(FluxFldHelp) = "aggregated buy+sell: open+executed max allowed notional"];
-  optional RollingMaxOrderCount rolling_max_order_count = 5 [(FluxFldHelp) = "Allowed order count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
-  optional RollingMaxOrderCount rolling_max_reject_count = 6 [(FluxFldHelp) = "Allowed rejection count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
+  optional int32 max_open_baskets = 2 [(FluxFldValMin) = "50", (FluxFldHelp) = "max simultaneous open orders allowed per side for this portfolio"];
+  optional int32 max_open_notional_per_side = 3[(FluxFldValMax) = "10000000"];
+  optional float max_gross_n_open_notional = 4 [(FluxFldValMax) = "50000000", (FluxFldHelp) = "aggregated buy+sell: open+executed max allowed notional"];
+  optional RollingMaxOrderCount rolling_max_order_count = 5 [(FluxFldElaborateTitle) = true, (FluxFldHelp) = "Allowed order count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
+  optional RollingMaxOrderCount rolling_max_reject_count = 6 [(FluxFldElaborateTitle) = true, (FluxFldHelp) = "Allowed rejection count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
   // auto update symbol's availability when allocated/consumed by strat(block strat creation if not enough availability), this has both limit and status in Position
   repeated Broker eligible_brokers = 7;
 }
@@ -483,7 +484,7 @@ message PairSideTradingBrief{
   optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
   //True hybrid field - depends on both market data and order / fill update (order trigger re-evaluates these in-process (no DB update) to avoid otherwise race condition between trading and market data updates trying to update same value in DB). This means the value in DB only accounts for Trading updates - market data updates are only applied at the time of trading updates - i.e. no RT market data based recompute and setting of value in DB
   optional float indicative_consumable_participation_qty = 10 [(FluxFldHelp) = "((participation_period_last_trade_qty_sum / 100) * MarketTradeVolumeParticipation.max_participation_rate) - participation_period_order_qty_sum"];
-  optional int64 residual_qty = 15 [(FluxFldHelp) = "0 or if non negative value of total_open_qty - other_leg_total_open_qty"];
+  optional int64 residual_qty = 15 [(FluxFldHelp) = "For DOD order: Any un-filled qty (which is order qty - fill qty)"];
   // Another hybrid total_trading_security_size (refer total_trading_security_size description to understand handling of such hybrids)
   optional float indicative_consumable_residual = 11 [(FluxFldHelp) = "max_residual - ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px))"];
   optional float all_bkr_cxlled_qty = 12 [(FluxFldHelp) = "sum of all bkr cancels for this leg"];

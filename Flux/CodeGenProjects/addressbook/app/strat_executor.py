@@ -167,7 +167,7 @@ class StratExecutor:
             if self.strat_cache.has_unack_leg1():
                 return True
 
-        if self.strat_cache.leg2_trading_symbol == symbol:
+        elif self.strat_cache.leg2_trading_symbol == symbol:
             if self.strat_cache.has_unack_leg2():
                 return True
 
@@ -185,8 +185,11 @@ class StratExecutor:
 
         if self.check_new_order(top_of_book, strat_brief, order_limits, px, qty, side, system_symbol, account,
                                 exchange):
-            if self.trading_link.place_new_order(px, qty, side, trading_symbol, system_symbol, account, exchange):
-                self.set_unack(system_symbol, True)
+            # set unack for subsequent orders this symbol to be blocked until this order goes through
+            self.set_unack(system_symbol, True)
+            if not self.trading_link.place_new_order(px, qty, side, trading_symbol, system_symbol, account, exchange):
+                # reset unack for subsequent orders to go through - this order did fail to go through
+                self.set_unack(system_symbol, False)
         else:
             return False
 
@@ -267,7 +270,7 @@ class StratExecutor:
              self.strat_limit.market_trade_volume_participation.max_participation_rate)
 
         if consumable_participation_qty - qty < 0:
-            logging.error(f"blocked generated order, not enough consumable_participation_qty available"
+            logging.error(f"blocked generated order, not enough consumable_participation_qty available, "
                           f"expected higher than order qty: {qty}, found {consumable_participation_qty}")
             check_passed = False
 
@@ -568,9 +571,8 @@ class StratExecutor:
                 order_id = self.place_new_order(buy_top_of_book, strat_brief, order_limits, 100, 90, Side.BUY,
                                                 buy_top_of_book.symbol, buy_top_of_book.symbol, "Acc1", "Exch1")
 
-        # if sell_top_of_book.ask_quote.last_update_date_time == \
-        #         self._top_of_books_update_date_time:
-        if sell_top_of_book.total_trading_security_size == 200:
+        if sell_top_of_book.ask_quote.last_update_date_time == \
+                self._top_of_books_update_date_time:
             if sell_top_of_book.ask_quote.px == 120:
                 order_id = self.place_new_order(sell_top_of_book, strat_brief, order_limits, 110, 70, Side.SELL,
                                                 sell_top_of_book.symbol, sell_top_of_book.symbol, "Acc1", "Exch1")
@@ -651,7 +653,9 @@ class StratExecutor:
                     continue  # go next run - we don't stop processing for one faulty tob update
 
                 strat_brief: StratBriefBaseModel | None = None
-                strat_brief_tuple = self.strat_cache.get_strat_brief(self._strat_brief_update_date_time)
+                # strat doesn't need to check if strat_brief is updated or not
+                # strat_brief_tuple = self.strat_cache.get_strat_brief(self._strat_brief_update_date_time)
+                strat_brief_tuple = self.strat_cache.get_strat_brief()
                 if strat_brief_tuple:
                     strat_brief, self._strat_brief_update_date_time = strat_brief_tuple
                     if strat_brief:

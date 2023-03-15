@@ -1,19 +1,24 @@
+import logging
 from threading import Thread
 from typing import Callable
 
+from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from trading_cache import *
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import \
     is_ongoing_pair_strat
 from Flux.CodeGenProjects.addressbook.app.trading_link import TradingLinkBase, get_trading_link
+
 trading_link: TradingLinkBase = get_trading_link()
+
+host, port = get_host_port_from_env()
 
 
 class TradingDataManager:
     def __init__(self, executor_trigger_method: Callable):
-        trading_base_url: str = "ws://127.0.0.1:8020/addressbook"
-        market_data_base_url: str = "ws://127.0.0.1:8040/market_data"
-        cpp_ws_url: str = "ws://127.0.0.1:8083/"
+        trading_base_url: str = f"ws://{host}:{port}/addressbook"
+        market_data_base_url: str = f"ws://{host}:8040/market_data"
+        cpp_ws_url: str = f"ws://{host}:8083/"
         self.trading_cache: TradingCache = TradingCache()
 
         self.top_of_book_ws_cont = WSReader(f"{market_data_base_url}/get-all-top_of_book-ws", TopOfBookBaseModel,
@@ -37,6 +42,8 @@ class TradingDataManager:
                                              OrderLimitsBaseModelList, self.handle_order_limits_ws, False)
         self.order_journal_ws_cont = WSReader(f"{trading_base_url}/get-all-order_journal-ws", OrderJournalBaseModel,
                                               OrderJournalBaseModelList, self.handle_order_journal_ws, False)
+        self.fill_journal_ws_cont = WSReader(f"{trading_base_url}/get-all-fills_journal-ws", FillsJournalBaseModel,
+                                             FillsJournalBaseModelList, self.handle_fill_journal_ws, False)
         self.strat_brief_ws_cont = WSReader(f"{trading_base_url}/get-all-strat_brief-ws", StratBriefBaseModel,
                                             StratBriefBaseModelList, self.handle_strat_brief_ws, False)
         self.cancel_order_ws_cont = WSReader(f"{trading_base_url}/get-all-cancel_order-ws", CancelOrderBaseModel,
@@ -183,7 +190,34 @@ class TradingDataManager:
                           "we discard this and expect algo to get snapshot with explicit web query - maybe we wire "
                           f"explicit web query in ongoing pair-strat notification;;;strat_brief: {strat_brief_}")
 
-    def handle_order_journal_ws(self, order_journal_: OrderJournalBaseModel):  # NOQA
+    def handle_fill_journal_ws(self, fill_journal_: FillsJournalBaseModel):
+        key, symbol = StratCache.get_key_n_symbol_from_fill_journal(fill_journal_)
+        if key is None or symbol is None:
+            logging.error(f"error: no ongoing pair strat matches this fill_journal_: {fill_journal_}")
+            return
+        strat_cache: StratCache = StratCache.get(key)
+        if strat_cache is not None:
+            with strat_cache.re_ent_lock:
+                strat_cache.set_fills_journal(fill_journal_)
+            cached_pair_strat: PairStratBaseModel
+            cached_pair_strat, _ = strat_cache.get_pair_strat()
+            if symbol == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+                strat_cache.set_has_unack_leg1(False)
+            elif symbol == cached_pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+                strat_cache.set_has_unack_leg2(False)
+            else:
+                logging.error(f"unexpected: fills general with non-matching symbol found in pre-matched strat-cache "
+                              f"with key: {key}, fill journal symbol: {symbol}")
+            if self.fill_journal_ws_cont.notify and cached_pair_strat is not None:
+                strat_cache.notify_semaphore.release()
+            elif cached_pair_strat is None:
+                logging.error(f"error: no ongoing pair strat matches this fill_journal_: {fill_journal_}")
+            # else not required - strat does not need this update notification
+            logging.debug(f"Updated fill_journal cache for key: {key} ;;; fill_journal: {fill_journal_}")
+        else:
+            logging.error(f"error: no ongoing pair strat matches received fill journal: {fill_journal_}")
+
+    def handle_order_journal_ws(self, order_journal_: OrderJournalBaseModel):
         key = StratCache.get_key_from_order_journal(order_journal_)
         strat_cache: StratCache = StratCache.get(key)
         is_unack: bool = False
@@ -192,6 +226,9 @@ class TradingDataManager:
                 strat_cache.set_order_journal(order_journal_)
                 if order_journal_.order_event in [OrderEventType.OE_NEW, OrderEventType.OE_CXL]:
                     is_unack = True
+                    if order_journal_.order_event == OrderEventType.OE_NEW:
+                        StratCache.order_id_to_symbol_side_tuple_dict[order_journal_.order.order_id] = \
+                            (order_journal_.order.security.sec_id, order_journal_.order.side)
             cached_pair_strat: PairStratBaseModel
             cached_pair_strat, _ = strat_cache.get_pair_strat()
             if order_journal_.order.security.sec_id == cached_pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
@@ -209,6 +246,7 @@ class TradingDataManager:
             logging.debug(f"Updated order_journal cache for key: {key} ;;; order_journal: {order_journal_}")
         else:
             logging.error(f"error: no ongoing pair strat matches received order journal: {order_journal_}")
+
     def handle_cancel_order_ws(self, cancel_order_: CancelOrderBaseModel):  # NOQA
         key = StratCache.get_key_from_cancel_order(cancel_order_)
         strat_cache: StratCache = StratCache.get(key)
@@ -289,5 +327,5 @@ class TradingDataManager:
         else:
             logging.debug(f"no matching strat: for TOB keys: {key1}, {key2};;;TOB: {top_of_book_}")
 
-    def handle_market_depth_ws(self, market_depth_: MarketDepthBaseModel):      # NOQA
+    def handle_market_depth_ws(self, market_depth_: MarketDepthBaseModel):
         print(market_depth_)

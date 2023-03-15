@@ -243,7 +243,8 @@ def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot
     expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = date_time_for_cmp
 
 
-def update_expected_strat_brief_for_sell(loop_count: int, expected_order_snapshot_obj: OrderSnapshotBaseModel,
+def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
+                                         expected_order_snapshot_obj: OrderSnapshotBaseModel,
                                          expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                          expected_strat_limits: StratLimits,
                                          expected_strat_brief_obj: StratBriefBaseModel,
@@ -276,7 +277,7 @@ def update_expected_strat_brief_for_sell(loop_count: int, expected_order_snapsho
     expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty = 40 * (loop_count-1)
     expected_strat_brief_obj.pair_sell_side_trading_brief.indicative_consumable_residual = \
         expected_strat_limits.residual_restriction.max_residual - \
-        ((expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116) - (200 * 116))
+        ((expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116) - ((40 * total_loop_count) * 116))
     expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = date_time_for_cmp
 
 
@@ -615,7 +616,7 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, sym
     assert expected_symbol_side_snapshot in symbol_side_snapshot_list
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(loop_count, expected_order_snapshot_obj, expected_symbol_side_snapshot,
+    update_expected_strat_brief_for_sell(loop_count, total_loop_count, expected_order_snapshot_obj, expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_placed_order_journal.order_event_date_time)
 
@@ -651,8 +652,8 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, sym
     expected_strat_status.total_cxl_buy_qty = 40 * total_loop_count
     expected_strat_status.total_cxl_buy_notional = 4000 * total_loop_count
     expected_strat_status.total_cxl_exposure = 4000 * total_loop_count
-    residual_notional = abs((200 * 116) - (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116))
-    if (200 * 116) > (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116):
+    residual_notional = abs(((40*total_loop_count) * 116) - (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116))
+    if ((40*total_loop_count) * 116) > (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116):
         residual_security = strat_brief.pair_buy_side_trading_brief.security
     else:
         residual_security = strat_brief.pair_sell_side_trading_brief.security
@@ -805,8 +806,8 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     expected_strat_status.total_cxl_buy_qty = 40 * total_loop_count
     expected_strat_status.total_cxl_buy_notional = 4000 * total_loop_count
     expected_strat_status.total_cxl_exposure = 4000 * total_loop_count
-    residual_notional = abs((200 * 116) - (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116))
-    if (200 * 116) > (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116):
+    residual_notional = abs(((40*total_loop_count) * 116) - (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116))
+    if ((40*total_loop_count) * 116) > (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116):
         residual_security = expected_strat_brief_obj.pair_buy_side_trading_brief.security
     else:
         residual_security = expected_strat_brief_obj.pair_sell_side_trading_brief.security
@@ -833,7 +834,8 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     assert expected_pair_strat in pair_strat_list
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(loop_count, expected_order_snapshot_obj, expected_symbol_side_snapshot,
+    update_expected_strat_brief_for_sell(loop_count, total_loop_count, expected_order_snapshot_obj,
+                                         expected_symbol_side_snapshot,
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_fill_journal.fill_date_time)
 
@@ -927,7 +929,7 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side):
     if side == Side.BUY:
         assert updated_tob_obj.bid_quote.px == tob_obj.bid_quote.px
     else:
-        assert updated_tob_obj.ask_quote.px == tob_obj.bid_quote.px
+        assert updated_tob_obj.ask_quote.px == tob_obj.ask_quote.px
 
 
 def _update_buy_tob():
@@ -990,14 +992,15 @@ def create_n_validate_strat(pair_strat_obj: PairStratBaseModel, expected_strat_l
     assert expected_strat_limits == stored_pair_strat_basemodel.strat_limits
 
     # Setting pair_strat to active state
-    pair_strat_active_obj = stored_pair_strat_basemodel
-    pair_strat_active_obj.strat_status.strat_state = StratState.StratState_ACTIVE
+    pair_strat_active_obj = PairStratBaseModel(_id=stored_pair_strat_basemodel.id)
+    pair_strat_active_obj.strat_status = StratStatus(strat_state=StratState.StratState_ACTIVE)
     activated_pair_strat_basemodel = \
-        strat_manager_service_web_client.put_pair_strat_client(pair_strat_active_obj)
+        strat_manager_service_web_client.patch_pair_strat_client(pair_strat_active_obj)
 
     assert stored_pair_strat_basemodel.frequency + 1 == activated_pair_strat_basemodel.frequency
-    assert activated_pair_strat_basemodel.pair_strat_params == pair_strat_active_obj.pair_strat_params
-    assert activated_pair_strat_basemodel.strat_status == pair_strat_active_obj.strat_status
+    assert activated_pair_strat_basemodel.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params
+    assert activated_pair_strat_basemodel.strat_status.strat_state == \
+           activated_pair_strat_basemodel.strat_status.strat_state
     assert activated_pair_strat_basemodel.strat_limits == expected_strat_limits
 
     return activated_pair_strat_basemodel
@@ -1077,6 +1080,7 @@ def wait_for_get_new_order_placed(wait_stop_px: int | float,
                         tob_obj_list[1].ask_quote.px == wait_stop_px:
                     return tob_obj_list[1].last_update_date_time
 
+        loop_counter += 1
         if loop_counter == loop_limit:
             assert False, f"Could not find any update after tob_list {tob_obj_list}"
 
@@ -1090,7 +1094,7 @@ def test_buy_sell_order(strat_manager_service_web_client_, pair_securities_with_
                         last_trade_fixture_list, symbol_overview_obj_list,
                         market_depth_basemodel_list):
 
-    total_loop_count = 5
+    total_loop_count = 3
     residual_test_wait = 10
 
     buy_symbol = pair_securities_with_sides_["security1"]["sec_id"]

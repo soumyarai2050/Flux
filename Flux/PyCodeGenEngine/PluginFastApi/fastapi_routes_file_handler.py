@@ -194,14 +194,14 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += " " * indent_count + \
                       f"        updated_{message_name_snake_cased}_obj = " \
                       f"await generic_put_http({message.proto.name}, " \
-                      f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated, " \
+                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj), {message_name_snake_cased}_updated, " \
                       f"filter_agg_pipeline)\n"
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiRoutesFileHandler.aggregation_type_filter:
                 output_str += " "*indent_count + \
                               f"        updated_{message_name_snake_cased}_obj = await generic_put_http(" \
-                              f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                              f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                               f"{message_name_snake_cased}_updated, {self._get_filter_configs_var_name(message)}, " \
                               f"has_links={msg_has_links})\n"
             case FastapiRoutesFileHandler.aggregation_type_update:
@@ -210,7 +210,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                                                                      FastapiRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " "*indent_count + \
                               f"        updated_{message_name_snake_cased}_obj = await generic_put_http(" \
-                              f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                              f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                               f"{message_name_snake_cased}_updated, " \
                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links})\n"
             case FastapiRoutesFileHandler.aggregation_type_both:
@@ -219,13 +219,13 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                                                                      FastapiRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " "*indent_count + \
                               f"        updated_{message_name_snake_cased}_obj = await generic_put_http(" \
-                              f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                              f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                               f"{message_name_snake_cased}_updated, {self._get_filter_configs_var_name(message)}, " \
                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links})\n"
             case other:
                 output_str += " "*indent_count + \
                               f"        updated_{message_name_snake_cased}_obj = await generic_put_http(" \
-                              f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                              f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                               f"{message_name_snake_cased}_updated, has_links={msg_has_links})\n"
         output_str += " "*indent_count + f"    await callback_class.update_{message_name_snake_cased}_post(" \
                       f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
@@ -266,14 +266,14 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
                       f"        updated_{message_name_snake_cased}_obj = await generic_patch_http(" \
-                      f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                      f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                       f"{message_name_snake_cased}_updated, filter_agg_pipeline, has_links={msg_has_links})\n"
         output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiRoutesFileHandler.aggregation_type_filter:
                 output_str += " "*indent_count + \
                               f"        updated_{message_name_snake_cased}_obj =  await generic_patch_http(" \
-                              f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                              f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                               f"{message_name_snake_cased}_updated, {self._get_filter_configs_var_name(message)}, " \
                               f"has_links={msg_has_links})\n"
             case FastapiRoutesFileHandler.aggregation_type_update:
@@ -282,7 +282,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                                                                      FastapiRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " "*indent_count + \
                               f"        updated_{message_name_snake_cased}_obj =  await generic_patch_http(" \
-                              f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                              f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                               f"{message_name_snake_cased}_updated, " \
                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links})\n"
             case FastapiRoutesFileHandler.aggregation_type_both:
@@ -291,13 +291,13 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                                                                      FastapiRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " "*indent_count + \
                               f"        updated_{message_name_snake_cased}_obj =  await generic_patch_http(" \
-                              f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                              f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                               f"{message_name_snake_cased}_updated, {self._get_filter_configs_var_name(message)}, " \
                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links})\n"
             case other:
                 output_str += " "*indent_count + \
                               f"        updated_{message_name_snake_cased}_obj =  await generic_patch_http(" \
-                              f"{message.proto.name}, stored_{message_name_snake_cased}_obj, " \
+                              f"{message.proto.name}, copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
                               f"{message_name_snake_cased}_updated, has_links={msg_has_links})\n"
         output_str += " "*indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_post(" \
                       f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"

@@ -93,6 +93,23 @@ class StratCache:
         return key
 
     @staticmethod
+    def get_key_n_symbol_from_fill_journal(fill_journal: FillsJournalBaseModel):
+        key: str | None = None
+        symbol: str | None = None
+        symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict[fill_journal.order_id]
+        if not symbol_side_tuple:
+            logging.error(f"Unknown order id: {fill_journal.order_id} found for fill;;;fill_journal: {fill_journal}")
+            return None
+        symbol, side = symbol_side_tuple
+
+        if symbol is not None and side == Side.BUY:
+            key = symbol + "_BID"
+        elif symbol is not None and side == Side.SELL:
+            key = symbol + "_ASK"
+        # else not required - returning None (default value of key)
+        return key, symbol
+
+    @staticmethod
     def get_key_from_strat_brief(strat_brief: StratBriefBaseModel):
         key1: str | None = None
         if strat_brief.pair_buy_side_trading_brief.security.sec_id is not None:
@@ -401,7 +418,8 @@ class StratCache:
                         strat_cache = strat_cache2
         return strat_cache
 
-    strat_cache_dict: Dict[str, 'StratCache'] = dict()
+    strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
+    order_id_to_symbol_side_tuple_dict: Dict[str|int, Tuple[str, Side]] = dict()
 
     def set_has_unack_leg1(self, has_unack: bool):
         self.unack_leg1 = has_unack
@@ -410,7 +428,7 @@ class StratCache:
         return self.unack_leg1
 
     def set_has_unack_leg2(self, has_unack: bool):
-        self.unack_leg1 = has_unack
+        self.unack_leg2 = has_unack
 
     def has_unack_leg2(self) -> bool:
         return self.unack_leg2

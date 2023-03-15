@@ -19,7 +19,7 @@ from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_impo
 
 host, port = get_host_port_from_env()
 debug_mode: bool = False if (debug_env := os.getenv("DEBUG")) is None or len(debug_env) == 0 or debug_env == "0" \
-    else debug_env
+    else True
 
 
 class AddressbookLogAnalyzer(LogAnalyzer):
