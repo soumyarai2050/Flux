@@ -6,23 +6,9 @@ from pendulum import DateTime
 os.environ["DBType"] = "beanie"
 
 # Project Imports
-from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client import MarketDataServiceWebClient
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
-    StratManagerServiceWebClient
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import \
-    MarketDepthBaseModel, TopOfBookBaseModel, SymbolOverviewBaseModel
+    MarketDepthBaseModel, SymbolOverviewBaseModel
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
-
-
-@pytest.fixture(scope="session")
-def market_data_service_web_client_fixture():
-    market_data_service_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient()
-    yield market_data_service_web_client
-
-@pytest.fixture(scope="session")
-def strat_manager_service_web_client_():
-    strat_manager_service_web_client: StratManagerServiceWebClient = StratManagerServiceWebClient()
-    yield strat_manager_service_web_client
 
 
 @pytest.fixture(scope="session")
@@ -143,52 +129,6 @@ def top_of_book_list_():
 
 
 @pytest.fixture(scope='session')
-def set_market_depth(market_data_service_web_client_fixture, market_depth_basemodel_list):
-    # Cleaning market data if already exists
-    stored_market_depth_objs = market_data_service_web_client_fixture.get_all_market_depth_client()
-    for market_depth_obj in stored_market_depth_objs:
-        market_data_service_web_client_fixture.delete_market_depth_client(market_depth_obj.id)
-
-    for idx, market_depth_basemodel in enumerate(market_depth_basemodel_list):
-        stored_market_depth_basemodel = \
-            market_data_service_web_client_fixture.create_market_depth_client(market_depth_basemodel)
-
-        # to tackle format diff because of time zone (present in market_depth_basemodel but not
-        # in stored_market_depth_basemodel) assigning both same time field
-        stored_market_depth_basemodel.id = None
-        stored_market_depth_basemodel.time = market_depth_basemodel.time
-        assert stored_market_depth_basemodel == market_depth_basemodel, \
-            f"stored obj {stored_market_depth_basemodel} not equal to " \
-            f"created obj {market_depth_basemodel}"
-    yield
-
-
-@pytest.fixture(scope='session')
-def set_top_of_book(market_data_service_web_client_fixture, top_of_book_list_):
-    # Cleaning top of books if already exists
-    stored_top_of_book_objs = market_data_service_web_client_fixture.get_all_top_of_book_client()
-    for top_of_book_obj in stored_top_of_book_objs:
-        market_data_service_web_client_fixture.delete_top_of_book_client(top_of_book_obj.id)
-
-    for input_data in top_of_book_list_:
-        top_of_book_basemodel = TopOfBookBaseModel(**input_data)
-        stored_top_of_book_basemodel = \
-            market_data_service_web_client_fixture.create_top_of_book_client(top_of_book_basemodel)
-
-        top_of_book_basemodel.id = stored_top_of_book_basemodel.id
-        # to tackle format diff because of time zone (present in top_of_book_basemodel but not
-        # in stored_top_of_book_basemodel) assigning both same time field
-        stored_top_of_book_basemodel.bid_quote.last_update_date_time = top_of_book_basemodel.bid_quote.last_update_date_time
-        stored_top_of_book_basemodel.ask_quote.last_update_date_time = top_of_book_basemodel.ask_quote.last_update_date_time
-        stored_top_of_book_basemodel.last_trade.last_update_date_time = top_of_book_basemodel.last_trade.last_update_date_time
-        stored_top_of_book_basemodel.last_update_date_time = top_of_book_basemodel.last_update_date_time
-        assert stored_top_of_book_basemodel == top_of_book_basemodel, \
-            f"stored obj {stored_top_of_book_basemodel} not equal to " \
-            f"created obj {top_of_book_basemodel}"
-    yield
-
-
-@pytest.fixture(scope='session')
 def pair_securities_with_sides_():
     yield {
         "security1": {"sec_id": "CB_Sec_1", "sec_type": "TICKER"}, "side1": "BUY",
@@ -275,7 +215,6 @@ def expected_start_status_(pair_securities_with_sides_):
 
 @pytest.fixture(scope="session")
 def expected_strat_limits_():
-    # TODO: find way to get it from override pre call of pair_strat create, hard-coding for now
     yield StratLimits(**{
       "max_open_orders_per_side": 5,
       "max_cb_notional": 300000,
@@ -302,6 +241,25 @@ def expected_strat_limits_():
       },
       "eligible_brokers": []
     })
+
+
+@pytest.fixture(scope="session")
+def expected_order_limits_():
+    yield OrderLimitsBaseModel(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                                         max_order_qty=500, min_order_notional=100, max_order_notional=90_000)
+
+
+@pytest.fixture(scope="session")
+def expected_portfolio_limits_():
+    rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
+    rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
+
+    portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
+                                                    max_gross_n_open_notional=2_400_000,
+                                                    rolling_max_order_count=rolling_max_order_count,
+                                                    rolling_max_reject_count=rolling_max_reject_count,
+                                                    eligible_brokers=[])
+    yield portfolio_limits_obj
 
 
 @pytest.fixture(scope='session')
@@ -361,29 +319,6 @@ def delete_existing_strats_and_snapshots(strat_manager_service_web_client_):
     yield
 
 
-@pytest.fixture(scope='session')
-def pair_strat_input_data(delete_existing_strats_and_snapshots, strat_manager_service_web_client_,
-                          pair_strat_, expected_start_status_, expected_strat_limits_):
-    stored_pair_strat_basemodel = \
-        strat_manager_service_web_client_.create_pair_strat_client(pair_strat_)
-
-    assert pair_strat_.frequency == stored_pair_strat_basemodel.frequency
-    assert pair_strat_.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params
-    assert expected_start_status_ == stored_pair_strat_basemodel.strat_status
-    assert expected_strat_limits_ == stored_pair_strat_basemodel.strat_limits
-
-    # Setting pair_strat to active state
-    pair_strat_active_obj = stored_pair_strat_basemodel
-    pair_strat_active_obj.strat_status.strat_state = StratState.StratState_ACTIVE
-    activated_pair_strat_basemodel = \
-        strat_manager_service_web_client_.put_pair_strat_client(pair_strat_active_obj)
-
-    assert stored_pair_strat_basemodel.frequency+1 == activated_pair_strat_basemodel.frequency
-    assert activated_pair_strat_basemodel.pair_strat_params == pair_strat_active_obj.pair_strat_params
-    assert activated_pair_strat_basemodel.strat_status == pair_strat_active_obj.strat_status
-    assert activated_pair_strat_basemodel.strat_limits == expected_strat_limits_
-
-
 def empty_pair_side_trading_brief_obj(symbol: str, side: str, sec_type: str | None = SecurityType.TICKER):
     return PairSideTradingBrief(**{
         "security": {
@@ -416,6 +351,7 @@ def expected_strat_brief_(pair_securities_with_sides_):
     yield StratBriefBaseModel(pair_buy_side_trading_brief=pair_buy_side_trading_brief,
                               pair_sell_side_trading_brief=pair_sell_side_trading_brief,
                               consumable_nett_filled_notional=0)
+
 
 @pytest.fixture(scope="session")
 def expected_symbol_side_snapshot_():

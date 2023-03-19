@@ -4,6 +4,12 @@
     width: 100%;
 }
 
+.progress_bar_cell {
+    height: 25px !important;
+    border-radius: 0px;
+    width: 100%;
+}
+
 .critical :global .MuiLinearProgress-bar1Determinate {
     background-color: #9C0006 !important;
     animation: blink 0.5s step-start infinite;

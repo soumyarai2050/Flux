@@ -44,7 +44,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str = f"    async def update_{message_name_snake_cased}_pre(self, " \
                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
-        output_str += "        pass\n\n"
+        output_str += f"        return updated_{message_name_snake_cased}_obj\n\n"
         output_str += f"    async def update_{message_name_snake_cased}_post(self, " \
                       f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                       f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
@@ -56,7 +56,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}Optional):\n"
-        output_str += "        pass\n\n"
+        output_str += f"        return updated_{message_name_snake_cased}_obj\n\n"
         output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
                       f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                       f"updated_{message_name_snake_cased}_obj: {message.proto.name}Optional):\n"

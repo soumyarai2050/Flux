@@ -100,7 +100,7 @@ message Quote{
 // one can design to make entry with the cheapest option first & clear the most expensive used position first
 message Position{
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional bool pos_disable = 2 [default = false, (FluxFldButton) = {
+  optional bool pos_disable = 2 [default = false, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "disable",
     pressed_caption: "enable",
     value_color_map: "true=DEBUG,false=SUCCESS",
@@ -123,7 +123,7 @@ message Position{
   // T+1 and onwards recurring daily cost
   optional float carry_cost = 9;
   optional int32 priority = 10 [default = 10, (FluxFldHelp) = "default priority: 10,  orders to respect specified priority (lower value is higher priority), duplicates allowed"];
-  optional float premium_percentage = 11 [default = 2];
+  optional float premium_percentage = 11 [default = 2, (FluxFldNumberFormat) = "%"];
 }
 
 message SecPosition{
@@ -135,7 +135,7 @@ message SecPosition{
 
 message Broker{
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required bool bkr_disable = 2 [default=false, (FluxFldButton) = {
+  required bool bkr_disable = 2 [default=false, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "disable",
     pressed_caption: "enable",
     value_color_map: "true=DEBUG,false=SUCCESS"
@@ -183,7 +183,7 @@ message OrderBrief{
 
 message Alert{
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional bool dismiss = 2 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldButton) = {
+  optional bool dismiss = 2 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "dismiss",
     pressed_caption: "undo",
     value_color_map: "true=DEBUG,false=INFO"
@@ -206,7 +206,7 @@ message Residual{
 }
 
 message MarketTradeVolumeParticipation{
-    required float max_participation_rate = 1 [(FluxFldValMax) = "30", (FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
+    required float max_participation_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "30", (FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
     optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, unset value implies seconds from SOD till time of checking"];
 }
 
@@ -216,12 +216,12 @@ message OpenInterestParticipation{
 }
 
 message CancelRate{
-  required int32 max_cancel_rate = 1 [(FluxFldValMax) = "20", (FluxFldHelp) = "% of total size sent to market [BUY+SELL] - ignoring what happened to the qty on exchange (e.g. reject / cancelled are also counted)"];
+  required int32 max_cancel_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "20", (FluxFldHelp) = "% of total size sent to market [BUY+SELL] - ignoring what happened to the qty on exchange (e.g. reject / cancelled are also counted)"];
   optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
   optional int32 waived_min_orders = 3 [(FluxFldHelp) = "enforce check only after waived_min_orders have been sent to market irrespective of the participant order outcome -ack, reject, cancelled, lapsed"];
 }
 
 message RollingMaxOrderCount{
   required int32 max_rolling_tx_count = 1 [(FluxFldHelp) = "max new orders count allowed per period defined below"];
-  optional int32 rolling_tx_count_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
+  optional int32 rolling_tx_count_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above count enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
 }

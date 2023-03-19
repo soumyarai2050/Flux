@@ -6,7 +6,7 @@ import {
 } from '@mui/material';
 import { Settings, Close, Visibility, VisibilityOff } from '@mui/icons-material';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
-import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections } from '../utils';
+import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, stableSort, getComparator } from '../utils';
 import { DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
@@ -14,7 +14,7 @@ import TableHead from './TableHead';
 import FullScreenModal from './Modal';
 import Row from './Row';
 import { Icon } from './Icon';
-import Alert from './Alert';
+import { AlertErrorMessage } from './Alert';
 import classes from './TableWidget.module.css';
 
 
@@ -69,22 +69,6 @@ const TableWidget = (props) => {
         return updatedCells;
     }
 
-    function getComparator(order, orderBy) {
-        return order === 'desc'
-            ? (a, b) => descendingComparator(a, b, orderBy)
-            : (a, b) => -descendingComparator(a, b, orderBy);
-    }
-
-    function descendingComparator(a, b, orderBy) {
-        if (b[orderBy] < a[orderBy]) {
-            return -1;
-        }
-        if (b[orderBy] > a[orderBy]) {
-            return 1;
-        }
-        return 0;
-    }
-
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
     };
@@ -109,20 +93,6 @@ const TableWidget = (props) => {
         }
         setSelectAll(e.target.checked);
         setHeadCells(updatedHeadCells);
-    }
-
-    // This method is created for cross-browser compatibility, if you don't
-    // need to support IE11, you can use Array.prototype.sort() directly
-    function stableSort(array, comparator) {
-        const stabilizedThis = array.map((el, index) => [el, index]);
-        stabilizedThis.sort((a, b) => {
-            const order = comparator(a[0], b[0]);
-            if (order !== 0) {
-                return order;
-            }
-            return a[1] - b[1];
-        });
-        return stabilizedThis.map((el) => el[0]);
     }
 
     const handleRequestSort = (event, property) => {
@@ -468,7 +438,7 @@ const TableWidget = (props) => {
                 </Dialog>
             </FullScreenModal>
 
-            {props.error && <Alert open={props.error ? true : false} onClose={props.onResetError} severity='error'>{props.error}</Alert>}
+            {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
         </WidgetContainer>
     )
 }

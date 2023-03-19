@@ -1,8 +1,9 @@
-import React from 'react';
-import classes from './Alert.module.css';
+import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { Snackbar, Alert as AlertComponent, IconButton } from '@mui/material';
 import { Close } from '@mui/icons-material';
-import PropTypes from 'prop-types';
+import AbbreviatedJson from './AbbreviatedJson';
+import classes from './Alert.module.css';
 
 const Alert = (props) => {
     return (
@@ -29,6 +30,33 @@ Alert.propTypes = {
     onClose: PropTypes.func.isRequired,
     severity: PropTypes.string,
     children: PropTypes.any.isRequired
+}
+
+export const AlertErrorMessage = (props) => {
+    const { code, status, message, detail, payload } = props.error;
+    const [open, setOpen] = useState(false);
+
+    const onOpenAbbreviatedField = () => {
+        setOpen(true);
+    }
+
+    const onCloseAbbreviatedField = () => {
+        setOpen(false);
+    }
+
+    return (
+        <Alert open={props.open} onClose={props.onClose} severity={props.severity}>
+            <span>error status: {status}, code: {code}, message: {message}, detail: {detail}</span>
+            {payload && (
+                <>
+                    <span>, payload: </span>
+                    <span className={classes.abbreviated_json} onClick={onOpenAbbreviatedField}>
+                        <AbbreviatedJson open={open} onClose={onCloseAbbreviatedField} src={payload} />
+                    </span>
+                </>
+            )}
+        </Alert>
+    )
 }
 
 export default Alert;

@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import _, { cloneDeep, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener } from '@mui/material';
+import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener, InputAdornment } from '@mui/material';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
@@ -136,6 +136,15 @@ const Cell = (props) => {
                 max = getValueFromReduxStoreFromXpath(state, max);
             }
 
+            let inputProps = {};
+            if(collection.numberFormat) {
+                if (collection.numberFormat === "%") {
+                    inputProps = {
+                        endAdornment: <InputAdornment position="end">%</InputAdornment>
+                    }
+                }
+            } 
+
             return (
                 <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <NumericFormat
@@ -147,6 +156,7 @@ const Cell = (props) => {
                         decimalScale={decimalScale}
                         autoFocus
                         disabled={disabled}
+                        InputProps={inputProps}
                         customInput={TextField}
                         isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
                         onValueChange={(values, sourceInfo) => props.onTextChange(sourceInfo.event, type, xpath, values.value)}
@@ -237,7 +247,7 @@ const Cell = (props) => {
         }
 
         return (
-            <TableCell className={`${classes.cell} ${classes.button}`} align='center' size='medium'>
+            <TableCell className={`${classes.cell} ${classes.cell_no_padding}`} align='center' size='medium'>
                 <ValueBasedToggleButton
                     size={size}
                     shape={shape}
@@ -245,7 +255,7 @@ const Cell = (props) => {
                     value={value}
                     caption={caption}
                     xpath={dataxpath}
-                    disabled={dataRemove ? true : false}
+                    disabled={dataRemove || disabled ? true : false}
                     action={collection.button.action}
                     onClick={props.onButtonClick}
                 />
@@ -274,8 +284,9 @@ const Cell = (props) => {
         let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 
         return (
-            <TableCell className={classes.cell} align='center' size='medium'>
+            <TableCell className={`${classes.cell} ${classes.cell_no_padding}`} align='center' size='medium'>
                 <ValueBasedProgressBarWithHover
+                    inlineTable={true}
                     collection={collection}
                     value={value}
                     min={min}
@@ -330,20 +341,31 @@ const Cell = (props) => {
     let dataModified = previousValue !== currentValue;
     let tableCellRemove = dataRemove ? classes.remove : '';
     let disabledClass = disabled ? classes.disabled : '';
+    if(props.ignoreDisable) {
+        disabledClass = "";
+    }
+     
 
     let value = currentValue !== undefined && currentValue !== null ? currentValue.toLocaleString() : '';
+    let numberSuffix = ""
+    if(collection.numberFormat) {
+        if (collection.numberFormat === "%") {
+            numberSuffix = " %"
+        }
+    } 
+
     if (mode === Modes.EDIT_MODE && dataModified) {
         let originalValue = previousValue !== undefined && previousValue !== null ? previousValue.toLocaleString() : '';
         return (
             <TableCell className={`${classes.cell} ${tableCellColorClass} ${disabledClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                <span className={classes.previous}>{originalValue}</span>
-                <span className={classes.modified}>{value}</span>
+                <span className={classes.previous}>{originalValue}{numberSuffix}</span>
+                <span className={classes.modified}>{value}{numberSuffix}</span>
             </TableCell>
         )
     } else {
         return (
             <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                <span>{value}</span>
+                <span>{value}{numberSuffix}</span>
             </TableCell>
         )
     }

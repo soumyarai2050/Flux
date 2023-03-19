@@ -80,6 +80,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                         self.get_non_repeated_valued_custom_option_value(field.proto.options,
                                                                          JsSliceFileGenPlugin.flux_fld_abbreviated)
                     dependent_message_name = abbreviated_option_value.split(".")[0][1:]
+                    if ":" in dependent_message_name:
+                        dependent_message_name = dependent_message_name.split(":")[-1]
                     self.dependent_to_abbreviated_message_relation_dict[dependent_message_name] = message.proto.name
                 # else not required: Avoid if field doesn't contain abbreviated option
             else:
@@ -92,9 +94,12 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if not self.current_message_is_dependent:
             output_str += "import { API_ROOT_URL, DB_ID } from '../constants';\n"
             if message.proto.name not in self.dependent_to_abbreviated_message_relation_dict.values():
-                output_str += "import { addxpath, clearxpath, getObjectWithLeastId } from '../utils';\n"
+                # Independent case
+                output_str += "import { addxpath, clearxpath, getErrorDetails, getObjectWithLeastId } from '../utils';\n"
             else:
-                output_str += "import { addxpath, clearxpath, generateObjectFromSchema, getObjectWithLeastId } from " \
+                # abbreviated case
+                output_str += "import { addxpath, clearxpath, generateObjectFromSchema, " \
+                              "getObjectWithLeastId, getErrorDetails } from " \
                               "'../utils';\n"
             output_str += "\n"
         else:
@@ -103,7 +108,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             if message_name in self.dependent_to_abbreviated_message_relation_dict:
                 dependent_message_name = self.dependent_to_abbreviated_message_relation_dict[message_name]
             output_str += "import { API_ROOT_URL, DB_ID, Modes, NEW_ITEM_ID } from '../constants';\n"
-            output_str += "import { addxpath, clearxpath } from '../utils';\n"
+            output_str += "import { addxpath, clearxpath, getErrorDetails } from '../utils';\n"
             if dependent_message_name is not None:
                 output_str += "import { setModified"+f"{dependent_message_name}, " \
                                                      f""+"update"+f"{dependent_message_name}"+" } from './" + \
@@ -116,16 +121,17 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         if message_name not in self.dependent_to_abbreviated_message_relation_dict.values():
             output_str = f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
-                         f" () => " + "{\n"
+                         " (payload, { rejectWithValue }) => " + "{\n"
             output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
-            output_str += "        .then(res => res.data);\n"
+            output_str += "        .then(res => res.data)\n"
+            output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
             output_str += "})\n\n"
         else:
             output_str = f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/" \
-                         f"getAll', (payload,"+" {dispatch, getState}) => " + "{\n"
+                         "getAll', (payload, { dispatch, getState, rejectWithValue }) => " + "{\n"
             output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
             output_str += "        .then(res => {\n"
-            output_str += "            if(res.data.length === 0) {\n"
+            output_str += "            if (res.data.length === 0) {\n"
             output_str += "                let state = getState();\n"
             output_str += "                let schema = state.schema.schema;\n"
             output_str += f"                let currentSchema = _.get(schema, '{message_name_snake_cased}');\n"
@@ -133,16 +139,18 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"                dispatch(create{message_name}(updatedData));\n"
             output_str += "            }\n"
             output_str += "            return res.data;\n"
-            output_str += "        });\n"
+            output_str += "        })\n"
+            output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)))\n"
             output_str += "})\n\n"
         return output_str
 
     def handle_get_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:   # NOQA
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = f"export const get{message_name} = createAsyncThunk('{message_name_camel_cased}/get', (id) => " + \
-                     "{\n"
+        output_str = f"export const get{message_name} = createAsyncThunk('{message_name_camel_cased}/get', " \
+                     "(id, { rejectWithValue }) => " + "{\n"
         output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-{message_name_snake_cased}"+"/${id}`)\n"
-        output_str += "        .then(res => res.data);\n"
+        output_str += "        .then(res => res.data)\n"
+        output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
         output_str += "})\n\n"
         return output_str
 
@@ -150,10 +158,11 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         if not self.current_message_is_dependent:
             output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', " \
-                         f"(payload) => " + "{\n"
+                         "(payload, { rejectWithValue }) => " + "{\n"
             output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + \
                           "`, payload)\n"
-            output_str += "        .then(res => res.data);\n"
+            output_str += "        .then(res => res.data)\n"
+            output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
             output_str += "})\n\n"
             return output_str
         else:
@@ -180,19 +189,21 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        });\n"
                 output_str += "})\n\n"
                 return output_str
+        return ""
 
     def handle_update_export_out_str(self, message: protogen.Message, message_name: str,
                                      message_name_camel_cased: str) -> str:    # NOQA
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const update{message_name} = createAsyncThunk('{message_name_camel_cased}/update', " \
-                     f"(payload) => "+"{\n"
+                     "(payload, { rejectWithValue }) => "+"{\n"
         option_val_dict = self.get_complex_option_values_as_list_of_dict(message, JsSliceFileGenPlugin.flux_msg_json_root)[0]
 
         if JsSliceFileGenPlugin.flux_json_root_patch_field in option_val_dict:
             output_str += "    return axios.patch(`${API_ROOT_URL}/patch-"+f"{message_name_snake_cased}"+"`, payload)\n"
         else:
             output_str += "    return axios.put(`${API_ROOT_URL}/put-"+f"{message_name_snake_cased}"+"`, payload)\n"
-        output_str += "        .then(res => res.data);\n"
+        output_str += "        .then(res => res.data)\n"
+        output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
         output_str += "})\n\n"
         return output_str
 
@@ -224,7 +235,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [getAll{message_name}.rejected]: (state, action) => " + "{\n"
-        output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
+        output_str += "            let { code, message, detail, status } = action.payload;\n"
+        output_str += "            state.error = { code, message, detail, status };\n"
         output_str += f"            state.loading = false;\n"
         if message_name in self.repeated_layout_msg_name_list:
             output_str += "        }\n"
@@ -244,7 +256,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.loading = false;\n"
         output_str += "        },\n"
         output_str += f"        [get{message_name}.rejected]: (state, action) => " + "{\n"
-        output_str += f"            state.error = action.error.code + ': ' + action.error.message;\n"
+        output_str += "            let { code, message, detail, status } = action.payload;\n"
+        output_str += "            state.error = { code, message, detail, status };\n"
         output_str += "            state.loading = false;\n"
         output_str += "        },\n"
         return output_str
@@ -265,8 +278,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        },\n"
         output_str += f"        [create{message_name}.rejected]: (state, action) => " + "{\n"
         output_str += f"            let updatedData = clearxpath(cloneDeep(state.modified{message_name}));\n"
-        output_str += f"            state.error = action.error.code + ': ' + action.error.message + " \
-                      f"'- ' + JSON.stringify(updatedData);\n"
+        output_str += "            let { code, message, detail, status } = action.payload;\n"
+        output_str += "            state.error = { code, message, detail, status, payload: updatedData };\n"
         output_str += "            state.loading = false;\n"
         output_str += f"            state.modified{message_name} = " \
                       f"addxpath(cloneDeep(state.{message_name_camel_cased}));\n"
@@ -285,8 +298,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        },\n"
         output_str += f"        [update{message_name}.rejected]: (state, action) => " + "{\n"
         output_str += f"            let updatedData = clearxpath(cloneDeep(state.modified{message_name}));\n"
-        output_str += f"            state.error = action.error.code + ': ' + action.error.message + " \
-                      f"'- ' + JSON.stringify(updatedData);\n"
+        output_str += "            let { code, message, detail, status } = action.payload;\n"
+        output_str += "            state.error = { code, message, detail, status, payload: updatedData };\n"
         output_str += f"            state.loading = false;\n"
         output_str += f"            state.modified{message_name} = " \
                       f"addxpath(cloneDeep(state.{message_name_camel_cased}));\n"

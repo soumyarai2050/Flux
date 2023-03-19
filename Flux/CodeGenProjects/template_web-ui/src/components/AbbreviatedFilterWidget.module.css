@@ -23,3 +23,16 @@
 .list_item_selected {
     background-color: rgba(25, 118, 210, 0.2) !important;
 }
+
+.container {
+    background-color: white;
+    margin-top: 10px;
+}
+
+.table {
+    min-width: 400px;
+}
+
+.cell {
+    padding: 4px 8px !important;
+}

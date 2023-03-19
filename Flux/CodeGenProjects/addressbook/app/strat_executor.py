@@ -556,26 +556,55 @@ class StratExecutor:
     def _check_tob_and_place_order_test(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
                                         order_limits: OrderLimitsBaseModel,
                                         top_of_books: List[TopOfBookBaseModel]) -> bool:
-        buy_top_of_book: TopOfBookBaseModel
-        sell_top_of_book: TopOfBookBaseModel
-        if top_of_books[0].symbol == "CB_Sec_1":
-            buy_top_of_book = top_of_books[0]
-            sell_top_of_book = top_of_books[1]
+        buy_top_of_book: TopOfBookBaseModel | None = None
+        sell_top_of_book: TopOfBookBaseModel | None = None
+        buy_symbol_prefix = "CB_Sec"
+        sell_symbol_prefix = "EQT_Sec"
+
+        latest_update_date_time: DateTime | None = None
+        for top_of_book in top_of_books:
+            if latest_update_date_time is None:
+                if top_of_book.symbol.startswith(buy_symbol_prefix):
+                    buy_top_of_book = top_of_book
+                    sell_top_of_book = None
+                elif top_of_book.symbol.startswith(sell_symbol_prefix):
+                    sell_top_of_book = top_of_book
+                    buy_top_of_book = None
+                else:
+                    err_str_ = f"top_of_book with unsupported test symbol received, tob: {top_of_book}"
+                    logging.error(err_str_)
+                    raise Exception(err_str_)
+                latest_update_date_time = top_of_book.last_update_date_time
+            else:
+                if top_of_book.last_update_date_time > latest_update_date_time:
+                    if top_of_book.symbol.startswith(buy_symbol_prefix):
+                        buy_top_of_book = top_of_book
+                        sell_top_of_book = None
+                    elif top_of_book.symbol.startswith(sell_symbol_prefix):
+                        sell_top_of_book = top_of_book
+                        buy_top_of_book = None
+                    else:
+                        err_str_ = f"top_of_book with unsupported test symbol received, tob: {top_of_book}"
+                        logging.error(err_str_)
+                        raise Exception(err_str_)
+                    latest_update_date_time = top_of_book.last_update_date_time
+
+        if buy_top_of_book is not None:
+            if buy_top_of_book.bid_quote.last_update_date_time == \
+                    self._top_of_books_update_date_time:
+                if buy_top_of_book.bid_quote.px == 110:
+                    order_id = self.place_new_order(buy_top_of_book, strat_brief, order_limits, 100, 90, Side.BUY,
+                                                    buy_top_of_book.symbol, buy_top_of_book.symbol, "Acc1", "Exch1")
+        elif sell_top_of_book is not None:
+            if sell_top_of_book.ask_quote.last_update_date_time == \
+                    self._top_of_books_update_date_time:
+                if sell_top_of_book.ask_quote.px == 120:
+                    order_id = self.place_new_order(sell_top_of_book, strat_brief, order_limits, 110, 70, Side.SELL,
+                                                    sell_top_of_book.symbol, sell_top_of_book.symbol, "Acc1", "Exch1")
         else:
-            buy_top_of_book = top_of_books[1]
-            sell_top_of_book = top_of_books[0]
-
-        if buy_top_of_book.bid_quote.last_update_date_time == \
-                self._top_of_books_update_date_time:
-            if buy_top_of_book.bid_quote.px == 110:
-                order_id = self.place_new_order(buy_top_of_book, strat_brief, order_limits, 100, 90, Side.BUY,
-                                                buy_top_of_book.symbol, buy_top_of_book.symbol, "Acc1", "Exch1")
-
-        if sell_top_of_book.ask_quote.last_update_date_time == \
-                self._top_of_books_update_date_time:
-            if sell_top_of_book.ask_quote.px == 120:
-                order_id = self.place_new_order(sell_top_of_book, strat_brief, order_limits, 110, 70, Side.SELL,
-                                                sell_top_of_book.symbol, sell_top_of_book.symbol, "Acc1", "Exch1")
+            err_str_ = "TOB updates could not find any updated buy or sell tob"
+            logging.error(err_str_)
+            raise Exception(err_str_)
         return True
 
     def internal_run(self):
@@ -634,10 +663,7 @@ class StratExecutor:
                     top_of_books: List[TopOfBookBaseModel]
                     top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
                     if top_of_books is not None and len(top_of_books) == 2:
-                        if top_of_books[0].total_trading_security_size == 200 or top_of_books[1].total_trading_security_size == 200:
-                            logging.error("sell")
-                        else:
-                            pass
+                        pass
                     elif top_of_books is not None and len(top_of_books) == 1:
                         logging.debug(f"Needs both side's top_of_books to go further, found one "
                                       f"{top_of_books}, waiting for another to go further")

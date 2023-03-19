@@ -92,16 +92,25 @@ namespace md_handler {
         {
             // serialize in JSON and call ws publish
             auto serialize_n_publish_market_depth_ws = [this](const MD_DepthSingleSide& depth) {
+                bsoncxx::oid id = bsoncxx::oid();
                 boost::json::object md_json = {
+                        {"_id", id.to_string()},
                         {"symbol", depth.getSymbol()},
                         {"time", depth.getMillisecondsSinceEpoch()},
                         {"side", depth.getSide()},
                         {"px", depth.getPx()},
                         {"qty", depth.getQty()},
-                        {"position", depth.getPosition()}
+                        {"premium", nullptr},
+                        {"position", depth.getPosition()},
+                        {"market_maker", nullptr},
+                        {"is_smart_depth", nullptr},
+                        {"cumulative_notional", nullptr},
+                        {"cumulative_qty", nullptr},
+                        {"cumulative_avg_px", nullptr}
                 };
-                std::string serialized_market_depth_json = boost::json::serialize(md_json);
-                std::cout << md_json << std::endl;
+                boost::json::array md_array = { md_json };
+                std::string serialized_market_depth_json = boost::json::serialize(md_array);
+                std::cout << md_array << std::endl;
                 mongo_db.webSocketServer.publish(serialized_market_depth_json);
             };
 

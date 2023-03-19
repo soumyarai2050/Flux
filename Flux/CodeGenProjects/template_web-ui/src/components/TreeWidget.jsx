@@ -3,10 +3,10 @@ import WidgetContainer from './WidgetContainer';
 import InfinityMenu from 'react-infinity-menu-plus';
 import _, { cloneDeep } from 'lodash';
 import { generateTreeStructure, generateObjectFromSchema, addxpath, getDataxpath, setTreeState, getXpathKeyValuePairFromObject } from '../utils';
-import {Icon} from './Icon';
+import { Icon } from './Icon';
 import { UnfoldMore, UnfoldLess, VisibilityOff, Visibility } from '@mui/icons-material';
 import { MenuItem, Checkbox, FormControlLabel, Select } from '@mui/material';
-import Alert from './Alert';
+import { AlertErrorMessage } from './Alert';
 import PropTypes from 'prop-types';
 import { DataTypes } from '../constants';
 import classes from './TreeWidget.module.css';
@@ -215,7 +215,7 @@ const TreeWidget = (props) => {
                 disableDefaultHeaderContent={true}
                 onNodeMouseClick={onNodeMouseClick}
             />
-            {props.error && <Alert open={props.error ? true : false} onClose={props.onResetError} severity='error'>{props.error}</Alert>}
+            {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
         </WidgetContainer>
     )
 }

@@ -64,14 +64,14 @@
 .text_field {
     background-color: white;
     min-width: 50px !important;
-    width: 100px !important;
+    /* width: 100px !important; */
 }
 
 .checkbox {
     padding: 6px !important;
 }
 
-.button {
+.cell_no_padding {
     padding: 0px !important;
 }
 

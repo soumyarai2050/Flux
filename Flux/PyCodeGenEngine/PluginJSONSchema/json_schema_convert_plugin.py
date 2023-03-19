@@ -42,7 +42,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_val_min,
         BaseProtoPlugin.flux_fld_elaborated_title,
         BaseProtoPlugin.flux_fld_name_color,
-        BaseProtoPlugin.flux_fld_filter_enable
+        BaseProtoPlugin.flux_fld_filter_enable,
+        BaseProtoPlugin.flux_fld_no_common_key,
+        BaseProtoPlugin.flux_fld_number_format
     ]
     # Used to be added as property
     flx_fld_complex_attribute_options: List[str] = [
@@ -57,7 +59,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     ]
     # Used to be added as property
     flx_msg_simple_attribute_options: List[str] = [
-        BaseProtoPlugin.flux_msg_server_populate
+        BaseProtoPlugin.flux_msg_server_populate,
+        BaseProtoPlugin.flux_msg_ui_get_all_limit
     ]
 
     def __init__(self, base_dir_path: str):
@@ -256,7 +259,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         if value in ["True", "False", "true", "false"]:
             return "true" if value in ["True", "true"] else "false"
         # int check
-        elif value.isdigit():
+        elif value.lstrip("-").isdigit():
             return int(value)
         # float check
         elif re.match(r'^-?\d+(?:\.\d+)$', value) is not None:
@@ -268,20 +271,31 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     def __underlying_handle_options_value_having_msg_fld_name(self, option_val: str) -> str:
         temp_list = []
         option_value_dot_separated = option_val.split(".")
-        for option_val_str in option_value_dot_separated:
+
+        message_name_part = option_value_dot_separated[0]
+        if ":" in message_name_part:
+            message_name = message_name_part.split(":")[-1]
+        else:
+            message_name = message_name_part
+        if self.__response_field_case_style == "camel":
+            temp = self.__case_style_convert_method(message_name)
+            msg_name_case_styled = temp[0].upper() + temp[1:]
+        else:
+            msg_name_case_styled = self.__case_style_convert_method(message_name)
+
+        if ":" in message_name_part:
+            replace_str = message_name_part.split(':')[0]
+            temp_list.append(f"{replace_str}:{msg_name_case_styled}")
+        else:
+            temp_list.append(msg_name_case_styled)
+
+        for option_val_str in option_value_dot_separated[1:]:
             # checking id field
             if "id" == option_val_str:
                 temp_list.append("_id")
             # checking field names
-            elif "_" in option_val_str:
-                temp_list.append(self.__case_style_convert_method(option_val_str))
-            # checking message names
             else:
-                if self.__response_field_case_style == "camel":
-                    temp = self.__case_style_convert_method(option_val_str)
-                    temp_list.append(temp[0].upper() + temp[1:])
-                else:
-                    temp_list.append(self.__case_style_convert_method(option_val_str))
+                temp_list.append(self.__case_style_convert_method(option_val_str))
 
         temp_str = ".".join(temp_list)
         return temp_str
@@ -291,22 +305,23 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         if type(option_value).__name__ == "str" and \
                 (("-" in option_value or "." in option_value) and any(char.isalpha() for char in option_value)):
 
-            option_value_hyphen_separated = option_value[1:-1].split("-")
+            option_value_dollar_separated = option_value[1:-1].split("$")
             temp_list_1 = []
 
-            for option_val in option_value_hyphen_separated:
-                if '$' in option_val:
-                    option_val_dollar_separated = option_val.split('$')
+            for option_val in option_value_dollar_separated:
+                if '-' in option_val:
+                    option_val_hyphen_separated = option_val.split('-')
                     temp_list_2 = []
-                    for option_val in option_val_dollar_separated:
+                    for option_val in option_val_hyphen_separated:
                         temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val)
                         temp_list_2.append(temp_str)
-                    temp_str_dollar_joined = "$".join(temp_list_2)
+                    temp_str_dollar_joined = "-".join(temp_list_2)
                     temp_list_1.append(temp_str_dollar_joined)
                 else:
                     temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val)
                     temp_list_1.append(temp_str)
-            return '"' + "-".join(temp_list_1) + '"'
+            return '"' + "$".join(temp_list_1) + '"'
+
         else:
             return option_value
 

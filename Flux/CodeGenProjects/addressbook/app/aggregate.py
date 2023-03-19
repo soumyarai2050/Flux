@@ -304,6 +304,26 @@ def get_limited_strat_alerts_obj(limit: int):
     ]
 
 
+def get_limited_objs(limit: int):
+    if limit > 0:
+        return [
+            {
+                "$limit": limit
+            }
+        ]
+    elif limit < 0:
+        return [
+            {
+                "$sort": {"_id": -1},
+            },
+            {
+                "$limit": -limit
+            }
+        ]
+    else:
+        return []
+
+
 def get_open_order_snapshots_for_symbol(symbol: str):
     return {"aggregate": [
         {

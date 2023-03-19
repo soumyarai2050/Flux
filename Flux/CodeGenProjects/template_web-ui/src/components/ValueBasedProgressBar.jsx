@@ -26,9 +26,14 @@ export const ValueBasedProgressBarWithHover = (props) => {
         hoverText = props.value + '/' + props.max + ' | ' + props.percentage + '%';  
     }
 
+    let progressBarClass = classes.progress_bar;
+    if(props.inlineTable) {
+        progressBarClass = classes.progress_bar_cell;
+    }
+
     return (
         <Tooltip title={hoverText}>
-            <LinearProgress variant="determinate" value={percentage} className={`${classes.progress_bar} ${progressBarColorClass}`} />
+            <LinearProgress variant="determinate" value={percentage} className={`${progressBarClass} ${progressBarColorClass}`} />
         </Tooltip>
     )
 }

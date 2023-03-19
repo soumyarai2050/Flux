@@ -1,7 +1,7 @@
 import React from 'react';
 import { useSelector } from 'react-redux';
 import { ColorTypes, DataTypes, Modes } from '../constants';
-import { Select, MenuItem, TextField, Autocomplete, Checkbox } from '@mui/material';
+import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment } from '@mui/material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
 import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue } from '../utils';
@@ -117,6 +117,16 @@ const NodeField = (props) => {
         }
 
         let value = props.data.value ? props.data.value : 0;
+
+        let inputProps = {};
+        if(props.data.numberFormat) {
+            if (props.data.numberFormat === "%") {
+                inputProps = {
+                    endAdornment: <InputAdornment position="end">%</InputAdornment>
+                }
+            }
+        } 
+
         return (
             <NumericFormat
                 className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
@@ -137,6 +147,7 @@ const NodeField = (props) => {
                 variant='outlined'
                 decimalScale={decimalScale}
                 placeholder={props.data.placeholder}
+                InputProps={inputProps}
                 inputProps={{
                     style: { padding: '6px 10px' },
                     dataxpath: props.data.dataxpath,

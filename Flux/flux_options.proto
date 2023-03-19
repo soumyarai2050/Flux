@@ -21,7 +21,7 @@ message FluxMsgNestedFldValFilter{
   repeated bool bool_val_filters = 3;
 }
 
-message FluxMsgAggAfterFilter{
+message FluxMsgMainCrudOperationsAgg{
   required string agg_var_name = 1;
   repeated string agg_params = 2; // string of all params, case conversion is required where it's used
 }
@@ -98,7 +98,7 @@ extend google.protobuf.MessageOptions
   repeated UsageParamNameOption FluxMsgOrmUsageParam = 52157;
   repeated FluxMsgNestedFldValFilter FluxMsgNestedFldValFilterParam = 52158;
   optional string FluxMsgAggregateQueryVarName = 52159;
-  optional FluxMsgAggAfterFilter FluxMsgAdditionalAggAfterFilter = 52160;
+  optional FluxMsgMainCrudOperationsAgg FluxMsgMainCRUDOperationsAgg = 52160;
 
 
   //Service Options - 53
@@ -148,6 +148,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgTitle = 55255; //Set this value to override default title value in schema
   repeated MessageJsonQuery FluxMsgJsonQuery = 55256;
   optional string FluxMsgCRUDSharedLock = 55257; // Name of shared lock to be used in multiple models in CRUD operations
+  optional string FluxMsgUIGetAllLimit = 55258;
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;
@@ -203,6 +204,8 @@ extend google.protobuf.FieldOptions
   optional string FluxFldNameColor = 55265; // One of the color class supported: [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]
   optional bool FluxFldElaborateTitle = 55266; //Set this value to override default title value of all sub-types with parents '.' seperated prefixed to child names
   optional bool FluxFldFilterEnable = 55267;
+  optional bool FluxFldNoCommonKey = 55268;
+  optional string FluxFldNumberFormat = 55269; // currently only symbol `%` is supported , in future we can add precision etc.
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

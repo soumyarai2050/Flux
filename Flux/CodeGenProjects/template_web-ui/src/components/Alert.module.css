@@ -11,3 +11,14 @@
     position: relative !important;
     left: 10px !important;
 }
+
+.abbreviated_json {
+    max-width: 150px;
+    display: inline-flex;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: underline;
+    color: yellow;
+    cursor: pointer;
+}

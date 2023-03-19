@@ -5,15 +5,34 @@ import { visuallyHidden } from '@mui/utils';
 import classes from './TableHead.module.css';
 
 const CustomHeadCell = (props) => {
-    const { order, orderBy, onRequestSort } = props;
+    const { order, orderBy, onRequestSort, prefixCells, suffixCells } = props;
 
     const createSortHandler = (property) => (event) => {
         onRequestSort(event, property);
     };
 
+    let emptyPrefixCells;
+    if (prefixCells && prefixCells > 0) {
+        emptyPrefixCells = Array(prefixCells).fill().map((_, i) => {
+            return (
+                <TableCell key={i} />
+            )
+        })
+    }
+
+    let emptySuffixCells;
+    if (suffixCells && suffixCells > 0) {
+        emptySuffixCells = Array(suffixCells).fill().map((_, i) => {
+            return (
+                <TableCell key={i} />
+            )
+        })
+    }
+
     return (
         <TableHead className={classes.head}>
             <TableRow>
+                {emptyPrefixCells}
                 {props.headCells.map((cell, index) => {
                     if (cell.key.startsWith('xpath_') || cell.hide) return;
 
@@ -47,6 +66,7 @@ const CustomHeadCell = (props) => {
                         </TableCell>
                     )
                 })}
+                {emptySuffixCells}
             </TableRow>
         </TableHead>
     );

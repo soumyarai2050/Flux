@@ -102,8 +102,11 @@ class BaseProtoPlugin(ABC):
     flux_fld_progress_bar:  str = "FluxFldProgressBar"
     flux_fld_filter_enable:  str = "FluxFldFilterEnable"
     flux_msg_server_populate:  str = "FluxMsgServerPopulate"
-    flux_msg_additional_agg_after_filter: str = "FluxMsgAdditionalAggAfterFilter"
+    flux_msg_main_crud_operations_agg: str = "FluxMsgMainCRUDOperationsAgg"
     flux_fld_collection_link: str = "FluxFldCollectionLink"
+    flux_fld_no_common_key: str = "FluxFldNoCommonKey"
+    flux_fld_number_format: str = "FluxFldNumberFormat"
+    flux_msg_ui_get_all_limit: str = "FluxMsgUIGetAllLimit"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: str = "ProtoPackageName"  # to be used in models as proto_package_name variable name

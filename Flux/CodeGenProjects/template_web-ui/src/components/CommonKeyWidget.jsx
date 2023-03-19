@@ -18,7 +18,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
         <Box ref={ref} className={classes.container}>
             {commonkeys.map((collection, i) => {
                 if (collection.value === undefined || collection.value === null) return;
-                if (collection.type === 'button') return;
+                // if (collection.type === 'button') return;
                 if (Array.isArray(collection.value) && collection.value.length === 0) return;
                 if (_.isObject(collection.value) && _.keys(collection.value).length === 0) return;
 
@@ -82,12 +82,6 @@ const CommonKey = (props) => {
         }
     }
 
-    let value = collection.value;
-    if (collection.type === DataTypes.STRING && isValidJsonString(value)) {
-        value = value.replace(/\\/g, '');
-        value = JSON.parse(value);
-    }
-
     let color;
     if (collection.color) {
         color = getColorTypeFromValue(collection, collection.value);
@@ -98,6 +92,20 @@ const CommonKey = (props) => {
     if (collection.nameColor) {
         let nameColor = collection.nameColor.toLowerCase();
         commonkeyTitleColorClass = classes[nameColor];
+    }
+
+    let value = collection.value;
+    if (value && collection.type === DataTypes.NUMBER) {
+        value.toLocaleString()
+    } else {
+        value = String(value);
+    }
+
+    let numberSuffix = ""
+    if (collection.numberFormat) {
+        if (collection.numberFormat === "%") {
+            numberSuffix = " %"
+        }
     }
 
     return (
@@ -111,7 +119,7 @@ const CommonKey = (props) => {
                 </span>
             ) : (
                 <span className={commonkeyColorClass}>
-                    {collection.type === DataTypes.NUMBER && collection.value ? collection.value.toLocaleString() : String(collection.value)}
+                    {value}{numberSuffix}
                 </span>
             )}
         </Box>

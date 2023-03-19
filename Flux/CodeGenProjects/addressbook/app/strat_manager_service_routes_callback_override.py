@@ -597,9 +597,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             updated_pair_strat_obj.strat_status = updated_strat_status_obj
             updated_pair_strat_obj.last_active_date_time = order_journal_obj.order_event_date_time
             updated_pair_strat_obj.frequency = pair_strat_obj.frequency + 1
-            if updated_residual is not None:
-                self._pause_strat_if_limits_breached(pair_strat_obj, updated_pair_strat_obj,
-                                                     strat_brief, symbol_side_snapshot)
+            self._pause_strat_if_limits_breached(pair_strat_obj, updated_pair_strat_obj,
+                                                 strat_brief, symbol_side_snapshot)
             await underlying_partial_update_pair_strat_http(updated_pair_strat_obj)
         else:
             logging.error(f"error: received pair_strat for symbol:{order_journal_obj.order.security.sec_id} "
@@ -609,15 +608,14 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
     def _pause_strat_if_limits_breached(self, existing_pair_strat: PairStrat,
                                         updated_pair_strat_: PairStrat, strat_brief_: StratBrief,
                                         symbol_side_snapshot_: SymbolSideSnapshot):
-        if (residual_notional := updated_pair_strat_.strat_status.residual.residual_notional) > \
-                (max_residual := existing_pair_strat.strat_limits.residual_restriction.max_residual):
-            alert_brief: str = f"residual notional: {residual_notional} > max residual: {max_residual}"
-            alert_details: str = f"strat details: {updated_pair_strat_}"
-            alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
-            updated_pair_strat_.strat_status.strat_state = StratState.StratState_PAUSED
-            updated_pair_strat_.strat_status.strat_alerts = [alert]
-
-        # else not required: if residual is in control then nothing to do
+        if (residual_notional := updated_pair_strat_.strat_status.residual.residual_notional) is not None:
+            if residual_notional > (max_residual := existing_pair_strat.strat_limits.residual_restriction.max_residual):
+                alert_brief: str = f"residual notional: {residual_notional} > max residual: {max_residual}"
+                alert_details: str = f"strat details: {updated_pair_strat_}"
+                alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
+                updated_pair_strat_.strat_status.strat_state = StratState.StratState_PAUSED
+                updated_pair_strat_.strat_status.strat_alerts = [alert]
+            # else not required: if residual is in control then nothing to do
 
         if symbol_side_snapshot_.order_create_count > existing_pair_strat.strat_limits.cancel_rate.waived_min_orders:
             if strat_brief_.pair_buy_side_trading_brief.all_bkr_cxlled_qty > 0:
@@ -684,8 +682,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             updated_residual = Residual(security=residual_security, residual_notional=residual_notional)
             return updated_residual
         else:
-            # If residual is 0, setting residual field as None
-            return
+            updated_residual = Residual(security=residual_security, residual_notional=0)
+            return updated_residual
 
     async def _update_pair_strat_from_fill_journal(self, order_snapshot_obj: OrderSnapshot,
                                                    symbol_side_snapshot: SymbolSideSnapshot,
@@ -756,9 +754,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             updated_pair_strat_obj.strat_status = updated_strat_status_obj
             updated_pair_strat_obj.last_active_date_time = order_snapshot_obj.last_update_date_time
             updated_pair_strat_obj.frequency = pair_strat_obj.frequency + 1
-            if updated_residual is not None:
-                self._pause_strat_if_limits_breached(pair_strat_obj, updated_pair_strat_obj,
-                                                     strat_brief_obj, symbol_side_snapshot)
+            self._pause_strat_if_limits_breached(pair_strat_obj, updated_pair_strat_obj,
+                                                 strat_brief_obj, symbol_side_snapshot)
             await partial_update_pair_strat_http(updated_pair_strat_obj)
         else:
             logging.error(f"error: received pair_strat for symbol:{order_snapshot_obj.order_brief.security.sec_id} "
@@ -1026,7 +1023,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         return []
 
     # synchronously called on webservice call
-    async def _add_pair_strat_status(self, pair_strat_obj: PairStrat):
+    def _add_pair_strat_status(self, pair_strat_obj: PairStrat):
         if pair_strat_obj.strat_status is None:  # add case
             strat_state: StratState = StratState.StratState_READY
             strat_alerts = self._apply_checks_n_alert(pair_strat_obj, is_create=True)
@@ -1043,11 +1040,12 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                                       total_fill_exposure=0.0, total_cxl_buy_qty=0.0,
                                                       total_cxl_sell_qty=0.0, avg_cxl_buy_px=0.0, avg_cxl_sell_px=0.0,
                                                       total_cxl_buy_notional=0.0, total_cxl_sell_notional=0.0,
-                                                      total_cxl_exposure=0.0, average_premium=0.0, balance_notional=0.0)
+                                                      total_cxl_exposure=0.0, average_premium=0.0,
+                                                      balance_notional=pair_strat_obj.strat_limits.max_cb_notional)
         else:
-            err_str_ = f"_add_pair_strat_status called with unexpected pre-set strat_status: {pair_strat_obj}"
-            await update_strat_alert_by_sec_and_side_async(pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id,
-                                                           pair_strat_obj.pair_strat_params.strat_leg1.side, err_str_)
+            pair_strat_obj.strat_status.strat_state = StratState.StratState_ERROR
+            err_str_ = f"_add_pair_strat_status called with unexpected pre-set strat_status for: {pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id}-{pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id}-{pair_strat_obj.id} "
+            logging.error(f"{err_str_};;;pair_strat: {pair_strat_obj}")
 
     @except_n_log_alert(severity=Severity.Severity_ERROR)
     async def create_pair_strat_pre(self, pair_strat_obj: PairStrat):
@@ -1062,8 +1060,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if pair_strat_obj.strat_limits is not None:
             raise Exception(
                 f"error: create_pair_strat_pre called with pre-set strat_limits, pair_strat_obj{pair_strat_obj}")
-        await self._add_pair_strat_status(pair_strat_obj)
         self._set_new_strat_limit(pair_strat_obj)
+        self._add_pair_strat_status(pair_strat_obj)
         self._set_derived_side(pair_strat_obj)
         self._set_derived_exchange(pair_strat_obj)
         # get security name from : pair_strat_params.strat_legs and then redact pattern
@@ -1091,9 +1089,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         pair_strat_obj.frequency = 1
         pair_strat_obj.last_active_date_time = DateTime.utcnow()
 
-    async def _create_strat_brief_for_active_pair_strat(self, pair_strat_obj: PairStrat):  # NOQA
+    async def _create_strat_brief_for_ready_to_active_pair_strat(self, pair_strat_obj: PairStrat):  # NOQA
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_read_strat_brief_http
+            underlying_read_strat_brief_http, underlying_delete_strat_brief_http
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_strat_brief_from_symbol
         symbol = pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
         side = pair_strat_obj.pair_strat_params.strat_leg1.side
@@ -1105,80 +1103,81 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             await update_strat_alert_by_sec_and_side_async(symbol, side, err_str_)
             return
         elif len(strat_brief_objs_list) == 1:
-            strat_manager_service_web_client.delete_strat_brief_client(strat_brief_objs_list[0].id)
-            logging.debug(f"Deleted already existing strat brief for symbol {symbol} and side {side}, "
-                          f"delete strat_brief - {strat_brief_objs_list[0]}")
-        # else not required: no strat_brief exists
-
-        consumable_open_orders = pair_strat_obj.strat_limits.max_open_orders_per_side
-        consumable_notional = pair_strat_obj.strat_limits.max_cb_notional
-        consumable_open_notional = pair_strat_obj.strat_limits.max_open_cb_notional
-        security_float = self.static_data.get_security_float_from_ticker(symbol)
-        if security_float is not None:
-            consumable_concentration = \
-                (security_float / 100) * pair_strat_obj.strat_limits.max_concentration
+            err_str_ = f"strat_brief must not exist for this symbol while strat is converting from ready to active," \
+                       f"received {strat_brief_objs_list} for symbol {symbol}"
+            await update_strat_alert_by_sec_and_side_async(symbol, side, err_str_)
+            return
         else:
-            consumable_concentration = 0
-        participation_period_order_qty_sum = 0
-        consumable_cxl_qty = 0
-        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_get_executor_check_snapshot_query_http
-        applicable_period_second = \
-            pair_strat_obj.strat_limits.market_trade_volume_participation.applicable_period_seconds
-        last_n_sec_trade_qty_and_order_qty_sum_obj_list = \
-            await underlying_get_executor_check_snapshot_query_http(symbol, side,
-                                                                    applicable_period_second)
-        indicative_consumable_participation_qty = \
-            get_consumable_participation_qty(last_n_sec_trade_qty_and_order_qty_sum_obj_list,
-                                             pair_strat_obj.strat_limits.market_trade_volume_participation.max_participation_rate)
-        residual_qty = 0
-        indicative_consumable_residual = pair_strat_obj.strat_limits.residual_restriction.max_residual
-        all_bkr_cxlled_qty = 0
-        open_notional = 0
-        open_qty = 0
+            # If no strat_brief exists for this symbol
+            consumable_open_orders = pair_strat_obj.strat_limits.max_open_orders_per_side
+            consumable_notional = pair_strat_obj.strat_limits.max_cb_notional
+            consumable_open_notional = pair_strat_obj.strat_limits.max_open_cb_notional
+            security_float = self.static_data.get_security_float_from_ticker(symbol)
+            if security_float is not None:
+                consumable_concentration = \
+                    (security_float / 100) * pair_strat_obj.strat_limits.max_concentration
+            else:
+                consumable_concentration = 0
+            participation_period_order_qty_sum = 0
+            consumable_cxl_qty = 0
+            from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+                underlying_get_executor_check_snapshot_query_http
+            applicable_period_second = \
+                pair_strat_obj.strat_limits.market_trade_volume_participation.applicable_period_seconds
+            last_n_sec_trade_qty_and_order_qty_sum_obj_list = \
+                await underlying_get_executor_check_snapshot_query_http(symbol, side,
+                                                                        applicable_period_second)
+            indicative_consumable_participation_qty = \
+                get_consumable_participation_qty(last_n_sec_trade_qty_and_order_qty_sum_obj_list,
+                                                 pair_strat_obj.strat_limits.market_trade_volume_participation.max_participation_rate)
+            residual_qty = 0
+            indicative_consumable_residual = pair_strat_obj.strat_limits.residual_restriction.max_residual
+            all_bkr_cxlled_qty = 0
+            open_notional = 0
+            open_qty = 0
 
-        sec1_pair_side_trading_brief_obj = \
-            PairSideTradingBrief(security=pair_strat_obj.pair_strat_params.strat_leg1.sec,
-                                 side=pair_strat_obj.pair_strat_params.strat_leg1.side,
-                                 last_update_date_time=DateTime.utcnow(),
-                                 consumable_open_orders=consumable_open_orders,
-                                 consumable_notional=consumable_notional,
-                                 consumable_open_notional=consumable_open_notional,
-                                 consumable_concentration=consumable_concentration,
-                                 participation_period_order_qty_sum=participation_period_order_qty_sum,
-                                 consumable_cxl_qty=consumable_cxl_qty,
-                                 indicative_consumable_participation_qty=indicative_consumable_participation_qty,
-                                 residual_qty=residual_qty,
-                                 indicative_consumable_residual=indicative_consumable_residual,
-                                 all_bkr_cxlled_qty=all_bkr_cxlled_qty,
-                                 open_notional=open_notional, open_qty=open_qty)
-        sec2_pair_side_trading_brief_obj = \
-            PairSideTradingBrief(security=pair_strat_obj.pair_strat_params.strat_leg2.sec,
-                                 side=pair_strat_obj.pair_strat_params.strat_leg2.side,
-                                 last_update_date_time=DateTime.utcnow(),
-                                 consumable_open_orders=consumable_open_orders,
-                                 consumable_notional=consumable_notional,
-                                 consumable_open_notional=consumable_open_notional,
-                                 consumable_concentration=consumable_concentration,
-                                 participation_period_order_qty_sum=participation_period_order_qty_sum,
-                                 consumable_cxl_qty=consumable_cxl_qty,
-                                 indicative_consumable_participation_qty=indicative_consumable_participation_qty,
-                                 residual_qty=residual_qty,
-                                 indicative_consumable_residual=indicative_consumable_residual,
-                                 all_bkr_cxlled_qty=all_bkr_cxlled_qty,
-                                 open_notional=open_notional, open_qty=open_qty)
+            sec1_pair_side_trading_brief_obj = \
+                PairSideTradingBrief(security=pair_strat_obj.pair_strat_params.strat_leg1.sec,
+                                     side=pair_strat_obj.pair_strat_params.strat_leg1.side,
+                                     last_update_date_time=DateTime.utcnow(),
+                                     consumable_open_orders=consumable_open_orders,
+                                     consumable_notional=consumable_notional,
+                                     consumable_open_notional=consumable_open_notional,
+                                     consumable_concentration=consumable_concentration,
+                                     participation_period_order_qty_sum=participation_period_order_qty_sum,
+                                     consumable_cxl_qty=consumable_cxl_qty,
+                                     indicative_consumable_participation_qty=indicative_consumable_participation_qty,
+                                     residual_qty=residual_qty,
+                                     indicative_consumable_residual=indicative_consumable_residual,
+                                     all_bkr_cxlled_qty=all_bkr_cxlled_qty,
+                                     open_notional=open_notional, open_qty=open_qty)
+            sec2_pair_side_trading_brief_obj = \
+                PairSideTradingBrief(security=pair_strat_obj.pair_strat_params.strat_leg2.sec,
+                                     side=pair_strat_obj.pair_strat_params.strat_leg2.side,
+                                     last_update_date_time=DateTime.utcnow(),
+                                     consumable_open_orders=consumable_open_orders,
+                                     consumable_notional=consumable_notional,
+                                     consumable_open_notional=consumable_open_notional,
+                                     consumable_concentration=consumable_concentration,
+                                     participation_period_order_qty_sum=participation_period_order_qty_sum,
+                                     consumable_cxl_qty=consumable_cxl_qty,
+                                     indicative_consumable_participation_qty=indicative_consumable_participation_qty,
+                                     residual_qty=residual_qty,
+                                     indicative_consumable_residual=indicative_consumable_residual,
+                                     all_bkr_cxlled_qty=all_bkr_cxlled_qty,
+                                     open_notional=open_notional, open_qty=open_qty)
 
-        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_create_strat_brief_http
-        strat_brief_obj: StratBrief = StratBrief(_id=StratBrief.next_id(),
-                                                 pair_buy_side_trading_brief=sec1_pair_side_trading_brief_obj,
-                                                 pair_sell_side_trading_brief=sec2_pair_side_trading_brief_obj,
-                                                 consumable_nett_filled_notional=0.0)
-        created_underlying_strat_brief = await underlying_create_strat_brief_http(strat_brief_obj)
-        logging.debug(f"Created strat brief {created_underlying_strat_brief} in pre call of pair_strat of "
-                      f"obj {pair_strat_obj}")
+            from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+                underlying_create_strat_brief_http
+            strat_brief_obj: StratBrief = StratBrief(_id=StratBrief.next_id(),
+                                                     pair_buy_side_trading_brief=sec1_pair_side_trading_brief_obj,
+                                                     pair_sell_side_trading_brief=sec2_pair_side_trading_brief_obj,
+                                                     consumable_nett_filled_notional=0.0)
+            created_underlying_strat_brief = await underlying_create_strat_brief_http(strat_brief_obj)
+            logging.debug(f"Created strat brief {created_underlying_strat_brief} in pre call of pair_strat of "
+                          f"obj {pair_strat_obj}")
 
-    async def _create_symbol_snapshot_for_active_pair_strat(self, pair_strat_obj: PairStrat):  # NOQA
+    async def _create_symbol_snapshot_for_ready_to_active_pair_strat(self, pair_strat_obj: PairStrat):  # NOQA
         pair_symbol_side_list = [
             (pair_strat_obj.pair_strat_params.strat_leg1.sec, pair_strat_obj.pair_strat_params.strat_leg1.side),
             (pair_strat_obj.pair_strat_params.strat_leg2.sec, pair_strat_obj.pair_strat_params.strat_leg2.side)
@@ -1189,10 +1188,11 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
             if symbol_side_snapshots is not None:
                 if len(symbol_side_snapshots) == 1:
-                    # Symbol and side snapshot already exists
-                    strat_manager_service_web_client.delete_symbol_side_snapshot_client(symbol_side_snapshots[0].id)
-                    logging.debug(f"cleaned already existing symbol_side_snapshot {symbol_side_snapshots} while "
-                                  f"updating pair_strat {pair_strat_obj}")
+                    err_str_ = f"SymbolSideSnapshot must not be present for this symbol and side when strat is " \
+                               f"converted converted from ready to active, received " \
+                               f"{symbol_side_snapshots} for security {security} and side {side}"
+                    await update_strat_alert_by_sec_and_side_async(security.sec_id, side, err_str_)
+                    return
                 elif len(symbol_side_snapshots) > 1:
                     err_str_ = f"SymbolSideSnapshot must be one per symbol and side, received " \
                                f"{symbol_side_snapshots} for security {security} and side {side}"
@@ -1259,6 +1259,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 if dict_dirty:
                     store_json_or_dict_to_file(self.pair_strat_id_n_today_activated_tickers_dict_file_name,
                                                self.pair_strat_id_n_today_activated_tickers_dict, PROJECT_DATA_DIR)
+
             # else not required: pair_strat_id_n_today_activated_tickers_dict is updated only if we activate a new strat
         return is_updated
 
@@ -1272,6 +1273,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
         logging.debug(f"further updated by _update_pair_strat_pre: {updated_pair_strat_obj}")
+        return updated_pair_strat_obj
 
     async def partial_update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
         if not self.service_ready:
@@ -1288,8 +1290,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
         logging.debug(f"further updated by _update_pair_strat_pre: {updated_pair_strat_obj}")
+        return updated_pair_strat_obj
 
-    async def _force_publish_symbol_overview(self, pair_strat: PairStrat) -> None:
+    async def _force_publish_symbol_overview_for_ready_to_active_strat(self, pair_strat: PairStrat) -> None:
         symbols_list = [pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
                         pair_strat.pair_strat_params.strat_leg2.sec.sec_id]
 
@@ -1309,14 +1312,14 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
     async def _create_related_models_if_strat_is_active(self, stored_pair_strat_obj: PairStrat,
                                                         updated_pair_strat_obj: PairStrat) -> None:
-        if stored_pair_strat_obj.strat_status.strat_state != StratState.StratState_ACTIVE:
+        if stored_pair_strat_obj.strat_status.strat_state == StratState.StratState_READY:
             if updated_pair_strat_obj.strat_status.strat_state == StratState.StratState_ACTIVE:
                 # creating strat_brief for both leg securities
-                await self._create_strat_brief_for_active_pair_strat(updated_pair_strat_obj)
+                await self._create_strat_brief_for_ready_to_active_pair_strat(updated_pair_strat_obj)
                 # creating symbol_side_snapshot for both leg securities if not already exists
-                await self._create_symbol_snapshot_for_active_pair_strat(updated_pair_strat_obj)
+                await self._create_symbol_snapshot_for_ready_to_active_pair_strat(updated_pair_strat_obj)
                 # changing symbol_overview force_publish to True if exists
-                await self._force_publish_symbol_overview(updated_pair_strat_obj)
+                await self._force_publish_symbol_overview_for_ready_to_active_strat(updated_pair_strat_obj)
             # else not required: if strat status is not active then avoiding creations
         # else not required: If stored strat is already active then related models would have been already created
 
@@ -1595,32 +1598,126 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_last_n_sec_orders_by_event
         return await underlying_read_order_journal_http(get_last_n_sec_orders_by_event(symbol, last_n_sec, order_event))
 
-    async def get_ongoing_strats_query_pre(self, ongoing_strat_symbols_class_type: Type[OngoingStratSymbols]):
+    async def get_ongoing_strats_symbol_n_exch_query_pre(self,
+                                                         ongoing_strat_symbols_class_type: Type[OngoingStratsSymbolNExchange]):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_pair_strat_http
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 
         pair_strat_list: List[PairStrat] = await underlying_read_pair_strat_http(get_ongoing_pair_strat_filter())
-        ongoing_symbols: Set[str] = set()
+        ongoing_symbol_n_exch_set: Set[str] = set()
+        ongoing_strat_symbols_n_exchange = OngoingStratsSymbolNExchange(symbol_n_exchange=[])
 
+        before_len: int = 0
         for pair_strat in pair_strat_list:
-            buy_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-            sell_symbol = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
-            ongoing_symbols.add(buy_symbol)
-            ongoing_symbols.add(sell_symbol)
+            leg1_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+            leg1_exch = pair_strat.pair_strat_params.strat_leg1.exch_id
+            leg2_symbol = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+            leg2_exch = pair_strat.pair_strat_params.strat_leg2.exch_id
+            leg1_symbol_n_exch = SymbolNExchange(symbol=leg1_symbol, exchange=leg1_exch)
+            leg2_symbol_n_exch = SymbolNExchange(symbol=leg2_symbol, exchange=leg2_exch)
 
-        ongoing_strat_symbols = OngoingStratSymbols(symbols=list(ongoing_symbols))
-        return [ongoing_strat_symbols]
+            ongoing_symbol_n_exch_set.add(f"{leg1_symbol}_{leg1_exch}")
+            if len(ongoing_symbol_n_exch_set) == before_len+1:
+                ongoing_strat_symbols_n_exchange.symbol_n_exchange.append(leg1_symbol_n_exch)
+                before_len += 1
+
+            ongoing_symbol_n_exch_set.add(f"{leg2_symbol}_{leg2_exch}")
+            if len(ongoing_symbol_n_exch_set) == before_len+1:
+                ongoing_strat_symbols_n_exchange.symbol_n_exchange.append(leg2_symbol_n_exch)
+                before_len += 1
+        return [ongoing_strat_symbols_n_exchange]
 
     @staticmethod
     def get_id_from_strat_key(unloaded_strat_key: str) -> int:
-        parts: List[str] = (unloaded_strat_key.split("_"))
+        parts: List[str] = (unloaded_strat_key.split("-"))
         return int(parts[-1])
 
-    async def update_strat_collection_pre(self, stored_strat_collection_obj: StratCollection,
-                                          updated_strat_collection_obj: StratCollection):
+    async def _delete_strat_brief_for_unload_strat(self, pair_strat_obj: PairStrat):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_read_pair_strat_by_id_http
+            underlying_read_strat_brief_http, underlying_delete_strat_brief_http
+        from Flux.CodeGenProjects.addressbook.app.aggregate import get_strat_brief_from_symbol
+        symbol = pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
+
+        # since strat_brief has both symbols as pair_strat has, so any symbol will give same strat_brief
+        strat_brief_objs_list = await underlying_read_strat_brief_http(get_strat_brief_from_symbol(symbol))
+
+        if len(strat_brief_objs_list) > 1:
+            err_str_ = f"strat_brief must be only one per symbol received {strat_brief_objs_list} for symbol {symbol}"
+            logging.error(err_str_)
+            return
+        elif len(strat_brief_objs_list) == 1:
+            strat_brief_obj = strat_brief_objs_list[0]
+            await underlying_delete_strat_brief_http(strat_brief_obj.id)
+            return
+        else:
+            err_str_ = f"Could not find any strat_brief with symbol {symbol} already existing to be deleted " \
+                       f"while strat unload, pair_strat: {pair_strat_obj}"
+            logging.error(err_str_)
+            return
+
+    async def _delete_symbol_side_snapshot_from_unload_strat(self, pair_strat_obj):
+        pair_symbol_side_list = [
+            (pair_strat_obj.pair_strat_params.strat_leg1.sec, pair_strat_obj.pair_strat_params.strat_leg1.side),
+            (pair_strat_obj.pair_strat_params.strat_leg2.sec, pair_strat_obj.pair_strat_params.strat_leg2.side)
+        ]
+
+        for security, side in pair_symbol_side_list:
+            symbol_side_snapshots = await self._get_symbol_side_snapshot_from_symbol_side(security.sec_id, side)
+
+            if len(symbol_side_snapshots) == 1:
+                from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+                    underlying_delete_symbol_side_snapshot_http
+                symbol_side_snapshot = symbol_side_snapshots[0]
+                await underlying_delete_symbol_side_snapshot_http(symbol_side_snapshot.id)
+                return
+            elif len(symbol_side_snapshots) > 1:
+                err_str_ = f"SymbolSideSnapshot must be one per symbol and side, received " \
+                           f"{symbol_side_snapshots} for security {security} and side {side}"
+                logging.error(err_str_)
+                return
+            else:
+                err_str_ = f"Could not find symbol_side_snapshot for symbol {security.sec_id} and " \
+                           f"side {side}, must be present already to be deleted while strat unload, " \
+                           f"pair_strat: {pair_strat_obj}"
+                logging.error(err_str_)
+                return
+
+    async def _force_unpublish_symbol_overview_from_unload_strat(self, pair_strat_obj: PairStrat):
+        symbols_list = [pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id,
+                        pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id]
+
+        for symbol in symbols_list:
+            symbol_overview_obj_list = \
+                market_data_service_web_client.get_symbol_overview_from_symbol_query_client([symbol])
+            if len(symbol_overview_obj_list) != 0:
+                if len(symbol_overview_obj_list) == 1:
+                    updated_symbol_overview = SymbolOverviewBaseModel(_id=symbol_overview_obj_list[0].id,
+                                                                      force_publish=False)
+                    market_data_service_web_client.patch_symbol_overview_client(updated_symbol_overview)
+                else:
+                    err_str_ = f"symbol_overview must be one per symbol received {symbol_overview_obj_list} " \
+                               f"for symbol {symbol}"
+                    logging.error(err_str_)
+            else:
+                err_str_ = f"Could not find symbol_overview for symbol {symbol} while unloading " \
+                           f"pair_strat {pair_strat_obj}"
+                logging.error(err_str_)
+
+    async def _delete_strat_relative_models(self, pair_strat_obj: PairStrat):
+        # deleting related strat_brief
+        await self._delete_strat_brief_for_unload_strat(pair_strat_obj)
+
+        # deleting related symbol_side_snapshot
+        await self._delete_symbol_side_snapshot_from_unload_strat(pair_strat_obj)
+
+        # Force un-publish related symbol_overview
+        await self._force_unpublish_symbol_overview_from_unload_strat(pair_strat_obj)
+
+    async def unload_pair_strats(self, stored_strat_collection_obj: StratCollection,
+                                 updated_strat_collection_obj: StratCollection) -> None:
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            underlying_read_pair_strat_by_id_http, underlying_update_pair_strat_http
         updated_strat_collection_loaded_strat_keys_frozenset = frozenset(updated_strat_collection_obj.loaded_strat_keys)
         stored_strat_collection_loaded_strat_keys_frozenset = frozenset(stored_strat_collection_obj.loaded_strat_keys)
         # existing items in stored loaded frozenset but not in the updated stored frozen set need to move to done state
@@ -1629,13 +1726,66 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if len(unloaded_strat_keys_frozenset) != 0:
             unloaded_strat_key: str
             for unloaded_strat_key in unloaded_strat_keys_frozenset:
-                pair_strat_id: int = self.get_id_from_strat_key(unloaded_strat_key)
-                pair_strat = await underlying_read_pair_strat_by_id_http(pair_strat_id)
-                if is_ongoing_pair_strat(pair_strat):
-                    error_str = f"unloading and ongoing pair strat key: {unloaded_strat_key} is not supported, " \
-                                f"current strat status: {pair_strat.strat_status.strat_state}"
-                    logging.error(error_str)
-                    raise HTTPException(status_code=503, detail=error_str)
+                if unloaded_strat_key in updated_strat_collection_obj.buffered_strat_keys:  # unloaded not deleted
+                    pair_strat_id: int = self.get_id_from_strat_key(unloaded_strat_key)
+                    pair_strat = await underlying_read_pair_strat_by_id_http(pair_strat_id)
+                    if is_ongoing_pair_strat(pair_strat):
+                        error_str = f"unloading and ongoing pair strat key: {unloaded_strat_key} is not supported, " \
+                                    f"current strat status: {pair_strat.strat_status.strat_state}"
+                        logging.error(error_str)
+                        raise HTTPException(status_code=400, detail=error_str)
+                    elif pair_strat.strat_status.strat_state == StratState.StratState_DONE:
+                        # removing and updating relative models
+                        await self._delete_strat_relative_models(pair_strat)
+
+                        updated_pair_strat = PairStratOptional(_id=pair_strat.id,
+                                                               pair_strat_params=pair_strat.pair_strat_params)
+                        await underlying_update_pair_strat_http(updated_pair_strat)
+
+                # else: deleted not unloaded - nothing to do , DB will remove entry
+
+    async def reload_pair_strats(self, stored_strat_collection_obj: StratCollection,
+                                 updated_strat_collection_obj: StratCollection) -> None:
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            underlying_read_pair_strat_by_id_http, underlying_delete_pair_strat_http, underlying_create_pair_strat_http
+        updated_strat_collection_buffered_strat_keys_frozenset = frozenset(
+            updated_strat_collection_obj.buffered_strat_keys)
+        stored_strat_collection_buffered_strat_keys_frozenset = frozenset(
+            stored_strat_collection_obj.buffered_strat_keys)
+        # existing items in stored buffered frozenset but not in the updated stored frozen set need to
+        # move to ready state
+        reloaded_strat_keys_frozenset = stored_strat_collection_buffered_strat_keys_frozenset.difference(
+            updated_strat_collection_buffered_strat_keys_frozenset)
+        if len(reloaded_strat_keys_frozenset) != 0:
+            reloaded_strat_key: str
+            for reloaded_strat_key in reloaded_strat_keys_frozenset:
+                if reloaded_strat_key in updated_strat_collection_obj.loaded_strat_keys:  # loaded not deleted
+                    pair_strat_id: int = self.get_id_from_strat_key(reloaded_strat_key)
+                    pair_strat = await underlying_read_pair_strat_by_id_http(pair_strat_id)
+                    if is_ongoing_pair_strat(pair_strat):
+                        error_str = f"reloading and ongoing pair strat key: {reloaded_strat_key} is not supported, " \
+                                    f"current strat status: {pair_strat.strat_status.strat_state}"
+                        logging.error(error_str)
+                        raise HTTPException(status_code=400, detail=error_str)
+                    elif pair_strat.strat_status.strat_state == StratState.StratState_READY:
+                        # deleting existing pair_strat and then recreating strat with same id and pair_strat_params
+                        # so that new pair_strat is loaded with the latest limits
+                        existing_pair_strat_params = pair_strat.pair_strat_params
+                        await underlying_delete_pair_strat_http(pair_strat_id)
+                        new_pair_strat = PairStrat(_id=pair_strat_id, pair_strat_params=existing_pair_strat_params)
+                        await underlying_create_pair_strat_http(new_pair_strat)
+                # else: deleted not loaded - nothing to do , DB will remove entry
+
+    async def update_strat_collection_pre(self, stored_strat_collection_obj: StratCollection,
+                                          updated_strat_collection_obj: StratCollection):
+
+        # handling unloading pair_strats
+        await self.unload_pair_strats(stored_strat_collection_obj, updated_strat_collection_obj)
+
+        # handling reloading pair_strat
+        await self.reload_pair_strats(stored_strat_collection_obj, updated_strat_collection_obj)
+
+        return updated_strat_collection_obj
 
     async def get_executor_check_snapshot_query_pre(self, executor_check_snapshot_class_type: Type[
         ExecutorCheckSnapshot], symbol: str, side: Side, last_n_sec: int):

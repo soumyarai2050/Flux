@@ -68,7 +68,7 @@ public:
             boost::json::value jv = boost::json::parse( response_body );
             boost::json::array const& arr = jv.as_array();
             boost::json::object const& obj = arr[0].as_object();
-            auto vc = value_to< std::vector< std::string > >( obj.at( "symbols" ) );
+            auto vc = boost::json::value_to< std::vector< std::string > >( obj.at( "symbols" ) );
 //            boost::json::array const& arr1 = obj.at( "symbols" ).as_array();
 //            for (auto &val: arr1)
 //                std::cout << val << std::endl;

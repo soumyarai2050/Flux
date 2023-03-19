@@ -140,6 +140,26 @@ def get_symbol_overview_from_symbol(symbol: str):
     ]}
 
 
+def get_limited_objs(limit: int):
+    if limit > 0:
+        return [
+            {
+                "$limit": limit
+            }
+        ]
+    elif limit < 0:
+        return [
+            {
+                "$sort": {"_id": -1},
+            },
+            {
+                "$limit": -limit
+            }
+        ]
+    else:
+        return []
+
+
 # {
 #     "$merge": {
 #         "into": "MarketDepth",

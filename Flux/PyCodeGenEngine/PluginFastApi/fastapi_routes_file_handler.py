@@ -188,7 +188,8 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += mutex_handling_str
         output_str += " "*indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
                       f"{message.proto.name}, {message_name_snake_cased}_updated.id, has_links={msg_has_links})\n"
-        output_str += " "*indent_count + f"    await callback_class.update_{message_name_snake_cased}_pre(" \
+        output_str += " "*indent_count + f"    {message_name_snake_cased}_updated = " \
+                                         f"await callback_class.update_{message_name_snake_cased}_pre(" \
                       f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -261,7 +262,8 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += mutex_handling_str
         output_str += " "*indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
                       f"{message.proto.name}, {message_name_snake_cased}_updated.id, has_links={msg_has_links})\n"
-        output_str += " "*indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_pre(" \
+        output_str += " "*indent_count + f"    {message_name_snake_cased}_updated = " \
+                                         f"await callback_class.partial_update_{message_name_snake_cased}_pre(" \
                       f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -756,14 +758,16 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 field_name_list.append(field_name)
         if field_name_list:
             return_str = "_n_".join(field_name_list)
-            if BaseFastapiPlugin.flux_msg_additional_agg_after_filter in str(message.proto.options):
+            if BaseFastapiPlugin.flux_msg_main_crud_operations_agg in str(message.proto.options):
                 additional_agg_option_val_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(message,
-                                                                   BaseFastapiPlugin.flux_msg_additional_agg_after_filter)
+                                                                   BaseFastapiPlugin.flux_msg_main_crud_operations_agg)
                 additional_agg_name = additional_agg_option_val_list_of_dict[0]["agg_var_name"]
                 return_str += f"_n_{additional_agg_name}"
             return_str += "_filter_config"
             return return_str
+        elif BaseFastapiPlugin.flux_msg_main_crud_operations_agg in str(message.proto.options):
+            return f"{message.proto.name}_limit_filter_config"
         else:
             return ""
 
@@ -802,10 +806,10 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 raise Exception(err_str)
 
         additional_agg_str = ""
-        if self.flux_msg_additional_agg_after_filter in str(message.proto.options):
+        if self.flux_msg_main_crud_operations_agg in str(message.proto.options):
             additional_agg_option_val_list_of_dict = \
                 self.get_complex_option_values_as_list_of_dict(message,
-                                                               BaseFastapiPlugin.flux_msg_additional_agg_after_filter)[0]
+                                                               BaseFastapiPlugin.flux_msg_main_crud_operations_agg)[0]
 
             agg_params = additional_agg_option_val_list_of_dict["agg_params"]
             if isinstance(agg_params, list):
@@ -823,7 +827,10 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             if additional_agg_str:
                 return_str += f", 'agg': {additional_agg_str}"
             return_str += "}\n"
-
+            return return_str
+        elif additional_agg_str:
+            var_name = self._get_filter_configs_var_name(message)
+            return_str = f"{var_name}: Final[Dict[str, Any]] = " + "{'agg': " + f"{additional_agg_str}" + "}\n"
             return return_str
         else:
             return ""
@@ -840,7 +847,8 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                   f"{crud_option_field_name} of enum type "
         match aggregation_type:
             case FastapiRoutesFileHandler.aggregation_type_both:
-                if not (FastapiRoutesFileHandler.flux_msg_aggregate_query_var_name in str(message.proto.options) and
+                if not ((FastapiRoutesFileHandler.flux_msg_aggregate_query_var_name in str(message.proto.options) or
+                         FastapiRoutesFileHandler.flux_msg_main_crud_operations_agg in str(message.proto.options)) and
                         FastapiRoutesFileHandler.flux_msg_nested_fld_val_filter_param in str(message.proto.options)):
                     err_str += f"{aggregation_type} but not has" \
                                f"both {FastapiRoutesFileHandler.flux_msg_nested_fld_val_filter_param} and " \
@@ -848,7 +856,8 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                     logging.exception(err_str)
                     raise Exception(err_str)
             case FastapiRoutesFileHandler.aggregation_type_filter:
-                if FastapiRoutesFileHandler.flux_msg_nested_fld_val_filter_param not in str(message.proto.options):
+                if not (FastapiRoutesFileHandler.flux_msg_nested_fld_val_filter_param in str(message.proto.options) or
+                        FastapiRoutesFileHandler.flux_msg_main_crud_operations_agg in str(message.proto.options)):
                     err_str += f"{aggregation_type} but not has" \
                                f"{FastapiRoutesFileHandler.flux_msg_nested_fld_val_filter_param} option set"
                     logging.exception(err_str)

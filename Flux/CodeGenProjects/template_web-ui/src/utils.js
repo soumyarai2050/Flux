@@ -42,7 +42,9 @@ const fieldProps = [
     { propertyName: "progress_bar", usageName: "progressBar" },
     { propertyName: "elaborate_title", usageName: "elaborateTitle" },
     { propertyName: "name_color", usageName: "nameColor" },
-    { propertyName: "filter_enable", usageName: "filterEnable" }
+    { propertyName: "filter_enable", usageName: "filterEnable" },
+    { propertyName: "number_format", usageName: "numberFormat" },
+    { propertyName: "no_common_key", usageName: "noCommonKey" }
 ]
 
 // properties supported explicitly on the array types
@@ -1016,6 +1018,17 @@ export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
     }
 }
 
+export function getAbbreviatedKeyFromId(keyArray, abbreviated, id) {
+    let abbreviatedKey;
+    keyArray.forEach(key => {
+        let keyId = getIdFromAbbreviatedKey(abbreviated, key);
+        if (keyId === id) {
+            abbreviatedKey = key;
+        }
+    })
+    return abbreviatedKey;
+}
+
 export function getAlertBubbleCount(data, alertBubbleSourceXpath) {
     let alertBubbleCount = 0;
     if (_.get(data, alertBubbleSourceXpath)) {
@@ -1183,7 +1196,7 @@ export function getTableColumns(collections, mode) {
 
 export function getCommonKeyCollections(rows, tableColumns, hide = true) {
     if (rows.length > 1) {
-        tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => column.type !== 'button');
+        tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKey);
     }
     let commonKeyCollections = [];
     if (rows.length > 0) {
@@ -1322,4 +1335,43 @@ export function getXpathKeyValuePairFromObject(object, dict = {}) {
         return;
     });
     return dict;
+}
+
+export function getComparator(order, orderBy) {
+    return order === 'desc'
+        ? (a, b) => descendingComparator(a, b, orderBy)
+        : (a, b) => -descendingComparator(a, b, orderBy);
+}
+
+export function descendingComparator(a, b, orderBy) {
+    if (b[orderBy] < a[orderBy]) {
+        return -1;
+    }
+    if (b[orderBy] > a[orderBy]) {
+        return 1;
+    }
+    return 0;
+}
+
+// This method is created for cross-browser compatibility, if you don't
+// need to support IE11, you can use Array.prototype.sort() directly
+export function stableSort(array, comparator) {
+    const stabilizedThis = array.map((el, index) => [el, index]);
+    stabilizedThis.sort((a, b) => {
+        const order = comparator(a[0], b[0]);
+        if (order !== 0) {
+            return order;
+        }
+        return a[1] - b[1];
+    });
+    return stabilizedThis.map((el) => el[0]);
+}
+
+export function getErrorDetails(error) {
+    return {
+        code: error.code,
+        message: error.message,
+        detail: error.response ? error.response.data ? error.response.data.detail : '' : '',
+        status: error.response ? error.response.status : ''
+    }
 }
