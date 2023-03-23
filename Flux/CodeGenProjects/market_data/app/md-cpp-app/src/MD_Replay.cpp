@@ -18,7 +18,7 @@ int main()
 {
     md_handler::MD_MongoDBHandler mongo_db;
     MD_ManageSubscriptionSymbols mdManageSubscriptionSymbols("127.0.0.1", "8020",
-                                                             "/pair_strat_engine/query-get_ongoing_strats/");
+                                                             "/pair_strat_engine/query-get_ongoing_strats_symbol_n_exch/");
     auto symbols_to_subscribe = mdManageSubscriptionSymbols.get();
     for (auto &symbol: symbols_to_subscribe)
         std::cout << symbol << std::endl;

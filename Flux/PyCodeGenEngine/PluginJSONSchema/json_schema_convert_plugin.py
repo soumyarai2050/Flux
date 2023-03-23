@@ -354,6 +354,19 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                         raise Exception(err_str)
                     # else not required: If help option value contains string without "'" (single quotation mark),
                     # then proceeding for further processing, since "'" causes issues with json once generated
+
+                    # Adding Max/min Val option value in help comment if present
+                    if JsonSchemaConvertPlugin.flux_fld_val_max in str(field_or_message_obj.proto.options):
+                        max_val = \
+                            self.get_non_repeated_valued_custom_option_value(field_or_message_obj.proto.options,
+                                                                             JsonSchemaConvertPlugin.flux_fld_val_max)
+                        option_value = f'{option_value[:-1]}, Max Value: {max_val[1:-1]}"'
+                    if JsonSchemaConvertPlugin.flux_fld_val_min in str(field_or_message_obj.proto.options):
+                        min_val = \
+                            self.get_non_repeated_valued_custom_option_value(field_or_message_obj.proto.options,
+                                                                             JsonSchemaConvertPlugin.flux_fld_val_min)
+                        option_value = f'{option_value[:-1]}, Min Value: {min_val[1:-1]}"'
+
                 # else not required: if option is not flux_fld_help then avoiding check
 
                 if '"' in option_value[-1]:

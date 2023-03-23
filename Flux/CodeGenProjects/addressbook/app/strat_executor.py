@@ -1,4 +1,3 @@
-import logging
 import os
 import time
 from pathlib import PurePath
@@ -616,6 +615,7 @@ class StratExecutor:
                 self.strat_cache.notify_semaphore.acquire()
 
                 # 1. check if portfolio status has updated since we last checked
+                portfolio_status: PortfolioStatusBaseModel | None = None
                 portfolio_status_tuple = self.trading_data_manager.trading_cache.get_portfolio_status()
                 if portfolio_status_tuple is None:
                     logging.warning(
@@ -623,9 +623,6 @@ class StratExecutor:
                     continue
                 if portfolio_status_tuple is not None:
                     portfolio_status, self._portfolio_status_update_date_time = portfolio_status_tuple
-                    # If kill switch is enabled - don't act, just return
-                    if portfolio_status.kill_switch:
-                        continue
                 # else no update - do we need this processed again ?
 
                 # 2. get pair-strat: no checking if it's updated since last checked (required for TOB extraction)
@@ -654,29 +651,6 @@ class StratExecutor:
                             self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side,
                                                               cancel_order.security.sec_id)
                 # else no cancel_order to process
-
-                # 4. check if top_of_book is updated
-                top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(
-                    self._top_of_books_update_date_time)
-
-                if top_of_book_and_date_tuple is not None:
-                    top_of_books: List[TopOfBookBaseModel]
-                    top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
-                    if top_of_books is not None and len(top_of_books) == 2:
-                        pass
-                    elif top_of_books is not None and len(top_of_books) == 1:
-                        logging.debug(f"Needs both side's top_of_books to go further, found one "
-                                      f"{top_of_books}, waiting for another to go further")
-                        continue
-                    else:
-                        logging.error(f"expected 1 / 2 TOB , received: "
-                                      f"{len(top_of_books) if top_of_books is not None else 0} in tob update!;;;"
-                                      f"received-TOBs: "
-                                      f"{[str(tob) for tob in top_of_books] if top_of_books is not None else None}!")
-                        continue  # go next run - we don't stop processing for one faulty tob update
-                else:
-                    logging.error(f"expected 1 / 2 TOB for strat: {self.strat_cache}, received none: can't proceed")
-                    continue  # go next run - we don't stop processing for one faulty tob update
 
                 strat_brief: StratBriefBaseModel | None = None
                 # strat doesn't need to check if strat_brief is updated or not
@@ -712,6 +686,29 @@ class StratExecutor:
                     logging.error(f"order_limits_tuple not found for strat: {self.strat_cache}, can't proceed")
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
+                # 4. check if top_of_book is updated
+                top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(
+                    self._top_of_books_update_date_time)
+
+                if top_of_book_and_date_tuple is not None:
+                    top_of_books: List[TopOfBookBaseModel]
+                    top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
+                    if top_of_books is not None and len(top_of_books) == 2:
+                        pass
+                    elif top_of_books is not None and len(top_of_books) == 1:
+                        logging.debug(f"Needs both side's top_of_books to go further, found one "
+                                      f"{top_of_books}, waiting for another to go further")
+                        continue
+                    else:
+                        logging.error(f"expected 1 / 2 TOB , received: "
+                                      f"{len(top_of_books) if top_of_books is not None else 0} in tob update!;;;"
+                                      f"received-TOBs: "
+                                      f"{[str(tob) for tob in top_of_books] if top_of_books is not None else None}!")
+                        continue  # go next run - we don't stop processing for one faulty tob update
+                else:
+                    logging.error(f"expected 1 / 2 TOB for strat: {self.strat_cache}, received none: can't proceed")
+                    continue  # go next run - we don't stop processing for one faulty tob update
+
                 # 5. If any manual new_order requested: apply risk checks (maybe no strat param checks?) & send out
                 new_orders_and_date_tuple = self.strat_cache.get_new_orders(self._new_orders_update_date_time)
                 if new_orders_and_date_tuple is not None:
@@ -722,9 +719,20 @@ class StratExecutor:
                                                                           self._new_orders_processed_slice:final_slice]
                         self._new_orders_processed_slice = final_slice
                         for new_order in unprocessed_new_orders:
-                            self._check_tob_n_place_non_systematic_order(new_order, pair_strat, strat_brief,
-                                                                         order_limits, top_of_books)
+                            if portfolio_status and not portfolio_status.kill_switch:
+                                self._check_tob_n_place_non_systematic_order(new_order, pair_strat, strat_brief,
+                                                                             order_limits, top_of_books)
+                                continue
+                            else:
+                                # reject the order citing kill switch in force
+                                logging.error("Portfolio_status kill switch's state is True, so ignored "
+                                              "non-systematic new order call")
+                                continue
                 # else no new_order to process, ignore and move to next step
+
+                # If kill switch is enabled - don't act, just return
+                if portfolio_status.kill_switch:
+                    continue
 
                 if not self.is_test_run:
                     self._check_tob_and_place_order(pair_strat, strat_brief, order_limits, top_of_books)

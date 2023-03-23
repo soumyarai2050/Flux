@@ -98,7 +98,7 @@ def get_strat_brief_from_symbol(security_id: str):
     ]}
 
 
-def get_order_snapshot_order_id_filter_json(order_id: str):  # NOQA
+def get_order_snapshot_order_id_filter_json(order_id: str):
     return {"aggregate": [
         {
             "$match": {
@@ -108,7 +108,7 @@ def get_order_snapshot_order_id_filter_json(order_id: str):  # NOQA
     ]}
 
 
-def get_order_snapshot_from_sec_symbol(symbol: str):  # NOQA
+def get_order_snapshot_from_sec_symbol(symbol: str):
     return {"aggregate": [
         {
             "$match": {
@@ -118,7 +118,7 @@ def get_order_snapshot_from_sec_symbol(symbol: str):  # NOQA
     ]}
 
 
-def get_symbol_side_snapshot_from_symbol_side(security_id: str, side: str):  # NOQA
+def get_symbol_side_snapshot_from_symbol_side(security_id: str, side: str):
     return {"aggregate": [
         {
             "$match": {

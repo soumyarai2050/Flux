@@ -17,13 +17,18 @@ export const ValueBasedProgressBarWithHover = (props) => {
 
     let progressBarColorClass = classes[color];
 
+    let maxFieldName = '';
+    if(props.maxFieldName) {
+        maxFieldName = props.maxFieldName + ': ';
+    }
+
     let hoverText = '';
     if(props.hoverType === HoverTextType.HoverTextType_VALUE) {
-        hoverText = props.value + '/' + props.max;
+        hoverText = `${props.valueFieldName}: ${props.value.toLocaleString()}/${maxFieldName}${props.max.toLocaleString()}`;
     } else if(props.hoverType === HoverTextType.HoverTextType_PERCENTAGE) {
-        hoverText = props.percentage + '%';
+        hoverText = props.percentage + ' %';
     } else if(props.hoverType === HoverTextType.HoverTextType_VALUE_AND_PERCENTAGE) {
-        hoverText = props.value + '/' + props.max + ' | ' + props.percentage + '%';  
+        hoverText = `${props.valueFieldName}: ${props.value.toLocaleString()}/${maxFieldName}${props.max.toLocaleString()}|${props.percentage} %`;  
     }
 
     let progressBarClass = classes.progress_bar;

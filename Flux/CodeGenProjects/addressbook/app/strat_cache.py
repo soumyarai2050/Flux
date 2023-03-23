@@ -8,7 +8,6 @@ from pendulum import DateTime
 
 from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
 from Flux.CodeGenProjects.addressbook.app.ws_helper import *
-from Flux.CodeGenProjects.addressbook.generated.data import Side
 
 
 class MarketDepthsCont:
@@ -275,19 +274,28 @@ class StratCache:
         return self._new_orders_update_date_time
 
     def get_symbol_overview(self, symbol, date_time: DateTime | None = None) -> Tuple[SymbolOverviewBaseModel, DateTime] | None:
-        for symbol_overview in self._symbol_overviews:
-            if symbol_overview is not None and symbol_overview.symbol == symbol:
-                if date_time is None or date_time < symbol_overview.last_update_date_time:
-                    return symbol_overview, symbol_overview.last_update_date_time
+        if date_time is None or date_time < self.symbol_overviews_update_date_time:
+            for symbol_overview in self.symbol_overviews:
+                if symbol_overview is not None and symbol_overview.symbol == symbol:
+                    if date_time is None or date_time < symbol_overview.last_update_date_time:
+                        return symbol_overview, symbol_overview.last_update_date_time
         # if no match - return None
         return None
 
     def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel):
         if symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
-            self._symbol_overviews[0] = symbol_overview_
+            self.symbol_overviews[0] = symbol_overview_
+            self.symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
+            return symbol_overview_.last_update_date_time
         elif symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
-            self._symbol_overviews[1] = symbol_overview_
-        return symbol_overview_.last_update_date_time
+            self.symbol_overviews[1] = symbol_overview_
+            self.symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
+            return symbol_overview_.last_update_date_time
+        else:
+            logging.error(f"set_symbol_overview called with non matching symbol: {symbol_overview_.symbol}, "
+                          f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
+                          f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+            return None
 
     def get_top_of_books(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
         if date_time is None or date_time < self._top_of_books_update_date_time:
@@ -296,40 +304,22 @@ class StratCache:
                     _top_of_books_update_date_time = copy.deepcopy(self._top_of_books_update_date_time)
                     _top_of_books = copy.deepcopy(self._top_of_books)
                     return _top_of_books, _top_of_books_update_date_time
-                else:
-                    return None
+        # all else's return None
+        return None
+
+    def set_top_of_book(self, top_of_book: TopOfBookBaseModel) -> DateTime | None:
+        if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+            self._top_of_books[0] = top_of_book
+            self._top_of_books_update_date_time = top_of_book.last_update_date_time
+            return top_of_book.last_update_date_time
+        elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+            self._top_of_books[1] = top_of_book
+            self._top_of_books_update_date_time = top_of_book.last_update_date_time
+            return top_of_book.last_update_date_time
         else:
-            return None
-
-    def set_top_of_book(self, top_of_book: TopOfBookBaseModel) -> DateTime:
-        if self._top_of_books is None:
-            self._top_of_books = list()
-
-        match len(self._top_of_books):
-            case 0:
-                self._top_of_books.append(top_of_book)
-            case 1:
-                if self._top_of_books[0].symbol != top_of_book.symbol:
-                    self._top_of_books.append(top_of_book)
-                else:
-                    self._top_of_books[0] = top_of_book
-            case 2:
-                if self._top_of_books[0].symbol == top_of_book.symbol:
-                    self._top_of_books[0] = top_of_book
-                elif self._top_of_books[1].symbol == top_of_book.symbol:
-                    self._top_of_books[1] = top_of_book
-                else:
-                    logging.error(f"Unexpected: ToB symbol: {top_of_book.symbol} not in strat symbols: "
-                                  f"{self._top_of_books[0].symbol} {self._top_of_books[1].symbol};;; ToB: {top_of_book}, "
-                                  f"pair_strat: {self.get_pair_strat()}")
-            case unexpected_len_ToB:
-                logging.error(f"Unexpected: expected <= 2 ToB, found: {unexpected_len_ToB} in strat TOB symbols: "
-                              f"{[tob.symbol for tob in self._top_of_books]};;; ToB passed: {top_of_book}, ToB stored:"
-                              f" {[str(tob) for tob in self._top_of_books]}, pair_strat: {self.get_pair_strat()}")
-        # Adding tz awareness to make stored object's timezone comparable with initialized datetime in
-        # get_top_of_books, else throws errors
-        self._top_of_books_update_date_time = top_of_book.last_update_date_time
-        return self._top_of_books_update_date_time
+            logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "
+                          f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
+                          f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
 
     def get_market_depths(self, symbol: str, side: Side, sorted_reverse: bool = False,
                           date_time: DateTime | None = None) -> Tuple[List[MarketDepthBaseModel], DateTime] | None:
@@ -463,10 +453,10 @@ class StratCache:
         self._fills_journals: List[FillsJournalBaseModel] | None = None
         self._fills_journals_update_date_time: DateTime = DateTime.utcnow()
 
-        self._symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]
-        self._symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
+        self.symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]  # pre-create space for 2 legs
+        self.symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
 
-        self._top_of_books: List[TopOfBookBaseModel] | None = None
+        self._top_of_books: List[TopOfBookBaseModel | None] = [None, None]  # pre-create space for 2 legs
         self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
 
         self._market_depths_conts: List[MarketDepthsCont] | None = None
@@ -479,5 +469,6 @@ class StratCache:
                f"strat_brief: {self._strat_brief}, cancel_orders: [{self._cancel_orders}], " \
                f"new_orders: [{self._new_orders}], order_snapshots: {self._order_snapshots}, " \
                f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
-               f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self._symbol_overviews]}, " \
-               f"top of books: {self._top_of_books}"
+               f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self.symbol_overviews]}, " \
+               f"top of books: {self._top_of_books}, " \
+               f"market_depth: {[str(market_depth) for market_depth in self._market_depths_conts]}"

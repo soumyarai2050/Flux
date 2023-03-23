@@ -144,7 +144,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "})\n\n"
         return output_str
 
-    def handle_get_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:   # NOQA
+    def handle_get_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const get{message_name} = createAsyncThunk('{message_name_camel_cased}/get', " \
                      "(id, { rejectWithValue }) => " + "{\n"
@@ -192,7 +192,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         return ""
 
     def handle_update_export_out_str(self, message: protogen.Message, message_name: str,
-                                     message_name_camel_cased: str) -> str:    # NOQA
+                                     message_name_camel_cased: str) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const update{message_name} = createAsyncThunk('{message_name_camel_cased}/update', " \
                      "(payload, { rejectWithValue }) => "+"{\n"
@@ -244,7 +244,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        },\n"
         return output_str
 
-    def handle_get_out_str(self, message_name: str, message_name_camel_cased: str) -> str:  # NOQA
+    def handle_get_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
         output_str = f"        [get{message_name}.pending]: (state) => " + "{\n"
         output_str += f"            state.loading = true;\n"
         output_str += f"            state.error = null;\n"
@@ -286,7 +286,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        },\n"
         return output_str
 
-    def handle_update_out_str(self, message_name: str, message_name_camel_cased: str) -> str:   # NOQA
+    def handle_update_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
         output_str = f"        [update{message_name}.pending]: (state) => " + "{\n"
         output_str += f"            state.loading = true;\n"
         output_str += f"            state.error = null;\n"
@@ -326,6 +326,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    error: null,\n"
             output_str += "    mode: Modes.READ_MODE,\n"
             output_str += "    createMode: false,\n"
+            output_str += "    changes: {},\n"
             output_str += "    userChanges: {},\n"
             output_str += "    discardedChanges: {},\n"
             output_str += "    openConfirmSavePopup: false\n"
@@ -342,7 +343,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"    name: '{message_name_camel_cased}',\n"
         output_str += "    initialState: initialState,\n"
         output_str += "    reducers: {\n"
-        output_str += f"        set{message_name}Array: (state, action) => "+"{\n"  # NOQA
+        output_str += f"        set{message_name}Array: (state, action) => "+"{\n"
         output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
         output_str += "        },\n"
         output_str += f"        set{message_name}: (state, action) => " + "{\n"
@@ -351,7 +352,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"        reset{message_name}: (state) => " + "{\n"
         output_str += f"            state.{message_name_camel_cased} = initialState.{message_name_camel_cased};\n"
         output_str += "        },\n"
-        output_str += f"        setModified{message_name}: (state, action) => " + "{\n"     # NOQA
+        output_str += f"        setModified{message_name}: (state, action) => " + "{\n"
         output_str += f"            state.modified{message_name} = action.payload;\n"
         output_str += "        },\n"
         if message_name not in self.repeated_layout_msg_name_list:
@@ -381,6 +382,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        },\n"
             output_str += "        setOpenConfirmSavePopup: (state, action) => {\n"
             output_str += "            state.openConfirmSavePopup = action.payload;\n"
+            output_str += "        },\n"
+            output_str += "        setChanges: (state, action) => {\n"
+            output_str += "            state.changes = action.payload;\n"
         output_str += "        }\n"
         output_str += "    },\n"
         output_str += "    extraReducers: {\n"
@@ -406,7 +410,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += " }" + f" = {message_name_camel_cased}Slice.actions;\n"
             else:
                 output_str += f", setMode, setCreateMode" + \
-                              ", setUserChanges, setDiscardedChanges, setOpenConfirmSavePopup }" + \
+                              ", setUserChanges, setDiscardedChanges, setOpenConfirmSavePopup, setChanges }" + \
                               f" = {message_name_camel_cased}Slice.actions;\n"
         return output_str
 

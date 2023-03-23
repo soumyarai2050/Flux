@@ -67,12 +67,20 @@ public:
             response_body = boost::beast::buffers_to_string(res.body().data());
             boost::json::value jv = boost::json::parse( response_body );
             boost::json::array const& arr = jv.as_array();
-            boost::json::object const& obj = arr[0].as_object();
-            auto vc = boost::json::value_to< std::vector< std::string > >( obj.at( "symbols" ) );
-//            boost::json::array const& arr1 = obj.at( "symbols" ).as_array();
-//            for (auto &val: arr1)
-//                std::cout << val << std::endl;
-            return vc;
+            if (!arr.empty() && arr[0].is_object()) {
+                boost::json::object const& obj = arr[0].as_object();
+                if (obj.contains("symbol_n_exchange")) {
+                    auto vc = boost::json::value_to< std::vector< std::string > >( obj.at( "symbol_n_exchange" ) );
+                    return vc;
+                } else {
+                    std::cerr << "No 'symbols' field found in the response." << std::endl;
+                    return empty_vector;
+                }
+            }
+            else {
+                std::cerr << "No object found in the response." << std::endl;
+                return empty_vector;
+            }
         }
         else{
             std::cerr << "symbol request failed for host: " << host_port << std::endl;

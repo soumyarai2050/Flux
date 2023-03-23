@@ -95,8 +95,8 @@ const CommonKey = (props) => {
     }
 
     let value = collection.value;
-    if (value && collection.type === DataTypes.NUMBER) {
-        value.toLocaleString()
+    if (value && (collection.type === DataTypes.NUMBER || typeof (value) === DataTypes.NUMBER)) {
+        value = value.toLocaleString()
     } else {
         value = String(value);
     }

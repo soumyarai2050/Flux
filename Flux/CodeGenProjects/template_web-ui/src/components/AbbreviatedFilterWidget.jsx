@@ -174,6 +174,7 @@ const AbbreviatedFilterWidget = (props) => {
                                                         }
                                                         if (typeof (collection.max) === DataTypes.STRING) {
                                                             let max = collection.max;
+                                                            collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
                                                             collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1))
                                                         }
 

@@ -2,3 +2,5 @@ mongo_server: "mongodb://localhost:27017"
 min_refresh_interval: 5
 is_test_run: True
 simulate_reverse_path: False
+fill_percent: 100
+is_non_systematic_order_check_run: False

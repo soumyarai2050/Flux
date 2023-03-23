@@ -27,7 +27,8 @@
     "react-scripts": "5.0.1",
     "react-spinners": "^0.13.6",
     "universal-cookie": "^4.0.4",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "xlsx": "^0.18.5"
   },
   "scripts": {
     # @@protoc_insertion_point(port_handling)

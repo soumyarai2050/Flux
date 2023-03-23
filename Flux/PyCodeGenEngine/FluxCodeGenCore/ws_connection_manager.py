@@ -84,7 +84,7 @@ class PathWSConnectionManager(WSConnectionManager):
             if ws in self.active_ws_set:
                 self.active_ws_set.remove(ws)
             else:
-                logging.error("Unexpected! likely bug, ws: {ws} not in active_ws_set: {str(self)}")
+                logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_set: {str(self)}")
             WSConnectionManager.remove_from_master_ws_set(ws)
 
     async def broadcast(self, json_str):

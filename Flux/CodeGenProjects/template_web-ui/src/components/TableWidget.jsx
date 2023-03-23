@@ -4,9 +4,10 @@ import {
     TableContainer, Table, TableBody, DialogTitle, DialogContent, DialogContentText,
     DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination
 } from '@mui/material';
-import { Settings, Close, Visibility, VisibilityOff } from '@mui/icons-material';
+import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp } from '@mui/icons-material';
+import { utils, writeFileXLSX } from 'xlsx';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
-import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, stableSort, getComparator } from '../utils';
+import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, stableSort, getComparator, getTableRowsFromData } from '../utils';
 import { DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
@@ -244,6 +245,17 @@ const TableWidget = (props) => {
         }
     }, [flux_toggle, flux_trigger_strat, props.onButtonToggle])
 
+    const exportToExcel = useCallback(() => {
+        let originalRows = getTableRowsFromData(props.collections, props.originalData, props.xpath);
+        originalRows.forEach(row => {
+            delete row['data-id'];
+        })
+        const ws = utils.json_to_sheet(originalRows);
+        const wb = utils.book_new();
+        utils.book_append_sheet(wb, ws, "Sheet1");
+        writeFileXLSX(wb, `${props.name}.xlsx`);
+    }, [props.collections, props.originalData, props.xpath])
+
     let menu = (
         <Fragment>
             {props.headerProps.menu}
@@ -253,6 +265,7 @@ const TableWidget = (props) => {
                 <Icon className={classes.icon} name="Hide" title='Hide hidden fields' onClick={() => setHide(true)}><VisibilityOff fontSize='small' /></Icon>
             )}
             <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
+            <Icon className={classes.icon} name="Export" title="Export" onClick={exportToExcel}><FileDownload fontSize='small' /></Icon>
             <Select
                 className={classes.dropdown}
                 open={showSettings}
@@ -286,6 +299,11 @@ const TableWidget = (props) => {
                                     />
                                 }
                             />
+                            {cell.help &&
+                                <Icon title={cell.help}>
+                                    <LiveHelp color='primary' />
+                                </Icon>
+                            }
                         </MenuItem>
                     )
                 })}

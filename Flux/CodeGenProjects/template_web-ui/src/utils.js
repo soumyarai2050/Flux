@@ -1220,7 +1220,7 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true) {
     return commonKeyCollections;
 }
 
-function getTableRowsFromData(collections, data, xpath) {
+export function getTableRowsFromData(collections, data, xpath) {
     let trees = generateRowTrees(cloneDeep(data), collections, xpath);
     let rows = generateRowsFromTree(trees, collections, xpath);
     return rows;
@@ -1374,4 +1374,31 @@ export function getErrorDetails(error) {
         detail: error.response ? error.response.data ? error.response.data.detail : '' : '',
         status: error.response ? error.response.status : ''
     }
+}
+
+export function createObjectFromXpathDict(obj, xpath, value) {
+    let o = { [DB_ID]: obj[DB_ID] };
+    let currentObj = o;
+    let currentXpath;
+    xpath.split('.').forEach((f, i) => {
+        currentXpath = currentXpath ? currentXpath + '.' + f : f;
+        let fieldName = f.indexOf('[') === -1 ? f : f.substring(0, f.indexOf('['));
+        let fieldType = f.indexOf('[') === -1 ? DataTypes.OBJECT : DataTypes.ARRAY;
+        _.keys(currentObj).forEach(k => {
+            if (k !== DB_ID) {
+                delete currentObj[k];
+            }
+        })
+        if (fieldType === DataTypes.OBJECT) {
+            currentObj[fieldName] = _.cloneDeep(_.get(obj, currentXpath));
+            if (i === xpath.split('.').length - 1) {
+                currentObj[fieldName] = value;
+            }
+            currentObj = currentObj[fieldName];
+        } else {
+            currentObj[fieldName] = [_.cloneDeep(_.get(obj, currentXpath))];
+            currentObj = currentObj[fieldName][0];
+        }
+    })
+    return o;
 }

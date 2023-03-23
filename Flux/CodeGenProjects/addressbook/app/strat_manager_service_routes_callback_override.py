@@ -188,7 +188,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
                                                            order_journal_obj.order.side, err_str_)
 
-    async def _check_state_and_get_order_snapshot_obj(self, order_journal_obj: OrderJournal,  # NOQA
+    async def _check_state_and_get_order_snapshot_obj(self, order_journal_obj: OrderJournal,
                                                       expected_status_list: List[str]) -> OrderSnapshot | None:
         """
         Checks if order_snapshot holding order_id of passed order_journal has expected status
@@ -228,7 +228,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             await underlying_create_symbol_side_snapshot_http(symbol_side_snapshot_obj)
         return symbol_side_snapshot_obj
 
-    async def _create_update_symbol_side_snapshot_from_order_journal(self, order_journal_obj: OrderJournal,  # NOQA
+    async def _create_update_symbol_side_snapshot_from_order_journal(self, order_journal_obj: OrderJournal,
                                                                      order_snapshot_obj: OrderSnapshot
                                                                      ) -> SymbolSideSnapshot | None:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
@@ -284,7 +284,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                                            order_journal_obj.order.side, err_str_)
             return
 
-    async def _update_symbol_side_snapshot_from_fills_journal(self, fills_journal: FillsJournal,  # NOQA
+    async def _update_symbol_side_snapshot_from_fills_journal(self, fills_journal: FillsJournal,
                                                               order_snapshot_obj: OrderSnapshot) -> SymbolSideSnapshot:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_symbol_side_snapshot_http, \
@@ -762,7 +762,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                           f"and side:{order_snapshot_obj.order_brief.side} as None")
             return
 
-    async def _get_max_order_counts(self, order_journal_obj: OrderJournal) -> int | None:  # NOQA
+    async def _get_max_order_counts(self, order_journal_obj: OrderJournal) -> int | None:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_portfolio_limits_by_id_http, underlying_get_last_n_sec_orders_by_event_query_http
         portfolio_limits_obj = await underlying_read_portfolio_limits_by_id_http(1)
@@ -989,10 +989,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
         return await underlying_read_pair_strat_http(get_ongoing_pair_strat_filter(security_id))
 
-    def _set_new_strat_limit(self, pair_strat_obj: PairStrat) -> None:  # NOQA
+    def _set_new_strat_limit(self, pair_strat_obj: PairStrat) -> None:
         pair_strat_obj.strat_limits = get_new_strat_limits()
 
-    def _set_derived_side(self, pair_strat_obj: PairStrat):  # NOQA
+    def _set_derived_side(self, pair_strat_obj: PairStrat):
         raise_error = False
         if pair_strat_obj.pair_strat_params.strat_leg2.side is None:
             if pair_strat_obj.pair_strat_params.strat_leg1.side == Side.BUY:
@@ -1010,7 +1010,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                             f"{pair_strat_obj.pair_strat_params.strat_leg1.side} leg2: "
                             f"{pair_strat_obj.pair_strat_params.strat_leg2.side} in pair strat: {pair_strat_obj}")
 
-    def _set_derived_exchange(self, pair_strat_obj: PairStrat):  # NOQA
+    def _set_derived_exchange(self, pair_strat_obj: PairStrat):
         """
         update the exchange of derived (if we have one)
         """
@@ -1089,7 +1089,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         pair_strat_obj.frequency = 1
         pair_strat_obj.last_active_date_time = DateTime.utcnow()
 
-    async def _create_strat_brief_for_ready_to_active_pair_strat(self, pair_strat_obj: PairStrat):  # NOQA
+    async def _create_strat_brief_for_ready_to_active_pair_strat(self, pair_strat_obj: PairStrat):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_strat_brief_http, underlying_delete_strat_brief_http
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_strat_brief_from_symbol
@@ -1177,7 +1177,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             logging.debug(f"Created strat brief {created_underlying_strat_brief} in pre call of pair_strat of "
                           f"obj {pair_strat_obj}")
 
-    async def _create_symbol_snapshot_for_ready_to_active_pair_strat(self, pair_strat_obj: PairStrat):  # NOQA
+    async def _create_symbol_snapshot_for_ready_to_active_pair_strat(self, pair_strat_obj: PairStrat):
         pair_symbol_side_list = [
             (pair_strat_obj.pair_strat_params.strat_leg1.sec, pair_strat_obj.pair_strat_params.strat_leg1.side),
             (pair_strat_obj.pair_strat_params.strat_leg2.sec, pair_strat_obj.pair_strat_params.strat_leg2.side)
@@ -1269,6 +1269,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             raise HTTPException(status_code=503, detail="update_pair_strat_pre not ready - service is not "
                                                         "initialized yet")
 
+        if updated_pair_strat_obj.frequency is None:
+            updated_pair_strat_obj.frequency = 0
         updated_pair_strat_obj.frequency += 1
         await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
@@ -1341,7 +1343,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         else:
             return None
 
-    async def _get_order_limits(self) -> OrderLimits:  # NOQA
+    async def _get_order_limits(self) -> OrderLimits:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_order_limits_http
         order_limits_objs: List[OrderLimits] = await underlying_read_order_limits_http()
@@ -1354,7 +1356,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             logging.exception(err_str_)
             raise Exception(err_str_)
 
-    async def _get_ongoing_pair_strat_from_symbol(self, symbol: str) -> PairStrat:  # NOQA
+    async def _get_ongoing_pair_strat_from_symbol(self, symbol: str) -> PairStrat:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_pair_strat_http
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
@@ -1378,7 +1380,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         else:
             return top_of_book_list[0]
 
-    async def _get_participation_period_order_qty_sum(self, symbol: str, strat_limits_obj: StratLimits,  # NOQA
+    async def _get_participation_period_order_qty_sum(self, symbol: str, strat_limits_obj: StratLimits,
                                                       symbol_side_snapshot: SymbolSideSnapshot) -> int:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_order_snapshot_http
@@ -1398,7 +1400,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                            f"get last {sum_period} sec total order sum"
                 await update_strat_alert_by_sec_and_side_async(symbol, symbol_side_snapshot.side, err_str_)
 
-    def _get_participation_period_last_trade_qty_sum(self, top_of_book: TopOfBookBaseModel,  # NOQA
+    def _get_participation_period_last_trade_qty_sum(self, top_of_book: TopOfBookBaseModel,
                                                      applicable_period_seconds: int):
         market_trade_volume_list = top_of_book.market_trade_volume
 
@@ -1670,7 +1672,6 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     underlying_delete_symbol_side_snapshot_http
                 symbol_side_snapshot = symbol_side_snapshots[0]
                 await underlying_delete_symbol_side_snapshot_http(symbol_side_snapshot.id)
-                return
             elif len(symbol_side_snapshots) > 1:
                 err_str_ = f"SymbolSideSnapshot must be one per symbol and side, received " \
                            f"{symbol_side_snapshots} for security {security} and side {side}"
@@ -1682,6 +1683,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                            f"pair_strat: {pair_strat_obj}"
                 logging.error(err_str_)
                 return
+        return
 
     async def _force_unpublish_symbol_overview_from_unload_strat(self, pair_strat_obj: PairStrat):
         symbols_list = [pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id,
@@ -1738,8 +1740,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         # removing and updating relative models
                         await self._delete_strat_relative_models(pair_strat)
 
+                        empty_strat_status = StratStatus(strat_state=StratState.StratState_READY)
                         updated_pair_strat = PairStratOptional(_id=pair_strat.id,
-                                                               pair_strat_params=pair_strat.pair_strat_params)
+                                                               pair_strat_params=pair_strat.pair_strat_params,
+                                                               strat_status=empty_strat_status)
                         await underlying_update_pair_strat_http(updated_pair_strat)
 
                 # else: deleted not unloaded - nothing to do , DB will remove entry

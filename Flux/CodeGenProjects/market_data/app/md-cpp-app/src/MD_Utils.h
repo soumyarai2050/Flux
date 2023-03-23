@@ -7,6 +7,9 @@
 #include <string>
 #include <chrono>
 
+#include <bsoncxx/builder/stream/document.hpp>
+#include <bsoncxx/json.hpp>
+
 namespace md_handler{
 
     template<typename T>

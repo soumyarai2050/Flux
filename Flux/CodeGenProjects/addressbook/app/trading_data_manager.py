@@ -247,7 +247,7 @@ class TradingDataManager:
         else:
             logging.error(f"error: no ongoing pair strat matches received order journal: {order_journal_}")
 
-    def handle_cancel_order_ws(self, cancel_order_: CancelOrderBaseModel):  # NOQA
+    def handle_cancel_order_ws(self, cancel_order_: CancelOrderBaseModel):
         key = StratCache.get_key_from_cancel_order(cancel_order_)
         strat_cache: StratCache = StratCache.get(key)
         if strat_cache is not None:
@@ -263,7 +263,7 @@ class TradingDataManager:
         else:
             logging.error(f"error: no ongoing pair strat matches this order_journal_: {cancel_order_}")
 
-    def handle_new_order_ws(self, new_order_: NewOrderBaseModel):  # NOQA
+    def handle_new_order_ws(self, new_order_: NewOrderBaseModel):
         key = StratCache.get_key_from_new_order(new_order_)
         strat_cache: StratCache = StratCache.get(key)
         if strat_cache is not None:

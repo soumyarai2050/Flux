@@ -92,12 +92,15 @@ const DynamicMenu = (props) => {
                 if (collection.type === 'progressBar') {
                     let value = collection.value;
 
+                    let maxFieldName = collection.maxFieldName;
+                    let valueFieldName = collection.key;
                     let min = collection.min;
                     if (typeof (min) === DataTypes.STRING) {
                         min = getValueFromReduxStoreFromXpath(state, min);
                     }
                     let max = collection.max;
                     if (typeof (max) === DataTypes.STRING) {
+                        maxFieldName = max.substring(max.lastIndexOf(".") + 1);
                         max = getValueFromReduxStoreFromXpath(state, max);
                     }
                     let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
@@ -109,11 +112,23 @@ const DynamicMenu = (props) => {
                                 value={value}
                                 min={min}
                                 max={max}
+                                valueFieldName={valueFieldName}
+                                maxFieldName={maxFieldName}
                                 hoverType={hoverType}
                             />
                         </Box>
                     )
                 } else if (collection.type === 'button') {
+                    let value = collection.value;
+                    let disabledCaptions = {};
+                    if (collection.button.disabled_captions) {
+                        collection.button.disabled_captions.split(',').forEach(valueCaptionPair => {
+                            let [buttonValue, caption] = valueCaptionPair.split('=');
+                            disabledCaptions[buttonValue] = caption;
+                        })
+                    }
+                    let isDisabledValue = _.keys(disabledCaptions).includes(String(value)) ? true : false;
+                    let disabledCaption = isDisabledValue ? disabledCaptions[String(value)] : '';
                     let checked = String(collection.value) === collection.button.pressed_value_as_text;
                     let xpath = collection.xpath;
                     let color = getColorTypeFromValue(collection, String(collection.value));
@@ -121,7 +136,9 @@ const DynamicMenu = (props) => {
                     let shape = getShapeFromValue(collection.button.button_type);
                     let caption = String(collection.value);
 
-                    if (checked && collection.button.pressed_caption) {
+                    if (isDisabledValue) {
+                        caption = disabledCaption;
+                    } else if (checked && collection.button.pressed_caption) {
                         caption = collection.button.pressed_caption;
                     } else if (!checked && collection.button.unpressed_caption) {
                         caption = collection.button.unpressed_caption;
@@ -136,6 +153,7 @@ const DynamicMenu = (props) => {
                             color={color}
                             value={collection.value}
                             caption={caption}
+                            disabled={isDisabledValue}
                             xpath={xpath}
                             action={collection.button.action}
                             onClick={onClick}
@@ -149,6 +167,15 @@ const DynamicMenu = (props) => {
                     let value = _.get(props.data, collection.key);
                     if (value === undefined || value === null) return;
 
+                    let disabledCaptions = {};
+                    if (collection.button.disabled_captions) {
+                        collection.button.disabled_captions.split(',').forEach(valueCaptionPair => {
+                            let [buttonValue, caption] = valueCaptionPair.split('=');
+                            disabledCaptions[buttonValue] = caption;
+                        })
+                    }
+                    let isDisabledValue = _.keys(disabledCaptions).includes(String(value)) ? true : false;
+                    let disabledCaption = isDisabledValue ? disabledCaptions[String(value)] : '';
                     let checked = String(value) === collection.button.pressed_value_as_text;
                     let xpath = _.get(props.data, `xpath_${collection.key}`) ? _.get(props.data, `xpath_${collection.key}`) : '';
                     let color = getColorTypeFromValue(collection, String(value));
@@ -156,7 +183,9 @@ const DynamicMenu = (props) => {
                     let shape = getShapeFromValue(collection.button.button_type);
                     let caption = String(value);
 
-                    if (checked && collection.button.pressed_caption) {
+                    if (isDisabledValue) {
+                        caption = disabledCaption;
+                    } else if (checked && collection.button.pressed_caption) {
                         caption = collection.button.pressed_caption;
                     } else if (!checked && collection.button.unpressed_caption) {
                         caption = collection.button.unpressed_caption;
@@ -171,6 +200,7 @@ const DynamicMenu = (props) => {
                             color={color}
                             value={value}
                             caption={caption}
+                            disabled={isDisabledValue}
                             xpath={xpath}
                             action={collection.button.action}
                             onClick={onClick}

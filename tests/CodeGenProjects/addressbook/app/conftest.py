@@ -11,7 +11,7 @@ from Flux.CodeGenProjects.market_data.generated.market_data_service_model_import
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def market_depth_basemodel_list():
     input_data = []
 
@@ -92,7 +92,7 @@ def market_depth_basemodel_list():
     yield market_depth_basemodel_list
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def top_of_book_list_():
     input_data = []
     for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
@@ -128,7 +128,7 @@ def top_of_book_list_():
     yield input_data
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def pair_securities_with_sides_():
     yield {
         "security1": {"sec_id": "CB_Sec_1", "sec_type": "TICKER"}, "side1": "BUY",
@@ -136,7 +136,7 @@ def pair_securities_with_sides_():
     }
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def last_trade_fixture_list():
     input_data = []
     for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
@@ -160,7 +160,7 @@ def last_trade_fixture_list():
     yield input_data
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def symbol_overview_obj_list():
     symbol_overview_obj_list = []
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
@@ -179,7 +179,7 @@ def symbol_overview_obj_list():
     yield symbol_overview_obj_list
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def expected_start_status_(pair_securities_with_sides_):
     yield StratStatus(**{
       "strat_state": "StratState_READY",
@@ -208,12 +208,12 @@ def expected_start_status_(pair_securities_with_sides_):
       "total_cxl_sell_notional": 0,
       "total_cxl_exposure": 0,
       "average_premium": 0,
-      "balance_notional": 0,
+      "balance_notional": 300000,
       "strat_alerts": []
     })
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def expected_strat_limits_():
     yield StratLimits(**{
       "max_open_orders_per_side": 5,
@@ -236,20 +236,20 @@ def expected_strat_limits_():
         "depth_levels": 3
       },
       "residual_restriction": {
-        "max_residual": 30_000,
+        "max_residual": 50_000,
         "residual_mark_seconds": 4
       },
       "eligible_brokers": []
     })
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def expected_order_limits_():
     yield OrderLimitsBaseModel(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                                         max_order_qty=500, min_order_notional=100, max_order_notional=90_000)
+                               max_order_qty=500, min_order_notional=100, max_order_notional=90_000)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def expected_portfolio_limits_():
     rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
@@ -262,7 +262,7 @@ def expected_portfolio_limits_():
     yield portfolio_limits_obj
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def pair_strat_(pair_securities_with_sides_):
     yield PairStratBaseModel(**{
       "last_active_date_time": "2023-02-13T20:30:31.165Z",
@@ -279,13 +279,13 @@ def pair_strat_(pair_securities_with_sides_):
           "side": pair_securities_with_sides_["side2"]
         },
         "exch_response_max_seconds": 5,
-        "common_premium_percentage": 40,
+        "common_premium": 40,
         "hedge_ratio": 5
       }
     })
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture()
 def delete_existing_strats_and_snapshots(strat_manager_service_web_client_):
     # Cleaning order journal if already exists
     stored_order_journal_objs = strat_manager_service_web_client_.get_all_order_journal_client()
@@ -342,7 +342,7 @@ def empty_pair_side_trading_brief_obj(symbol: str, side: str, sec_type: str | No
     })
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def expected_strat_brief_(pair_securities_with_sides_):
     pair_buy_side_trading_brief = empty_pair_side_trading_brief_obj(pair_securities_with_sides_["security1"]["sec_id"],
                                                                     pair_securities_with_sides_["side1"])
@@ -353,7 +353,7 @@ def expected_strat_brief_(pair_securities_with_sides_):
                               consumable_nett_filled_notional=0)
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def expected_symbol_side_snapshot_():
     yield [
         SymbolSideSnapshotBaseModel(**{
@@ -397,7 +397,7 @@ def expected_symbol_side_snapshot_():
     ]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def expected_portfolio_status_():
     yield PortfolioStatusBaseModel(**{
         "kill_switch": False,
@@ -411,7 +411,7 @@ def expected_portfolio_status_():
     })
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def buy_order_(pair_securities_with_sides_):
     yield OrderJournalBaseModel(**{
         "order": {
@@ -421,7 +421,7 @@ def buy_order_(pair_securities_with_sides_):
             "px": 100,
             "qty": 90,
             "order_notional": 0,
-            "underlying_account": "Acc1",
+            "underlying_account": "trading-account",
             "text": [
               "test_string"
             ]
@@ -431,7 +431,7 @@ def buy_order_(pair_securities_with_sides_):
     })
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def expected_buy_order_snapshot_(pair_securities_with_sides_):
     yield OrderSnapshotBaseModel(**{
         "order_brief": {
@@ -441,7 +441,7 @@ def expected_buy_order_snapshot_(pair_securities_with_sides_):
             "px": 0,
             "qty": 0,
             "order_notional": 0,
-            "underlying_account": "Acc1",
+            "underlying_account": "trading-account",
             "text": []
         },
         "filled_qty": 0,
@@ -458,20 +458,20 @@ def expected_buy_order_snapshot_(pair_securities_with_sides_):
     })
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def buy_fill_journal_():
     yield FillsJournalBaseModel(**{
         "order_id": "O1",
         "fill_px": 90,
         "fill_qty": 50,
         "fill_notional": 0,
-        "underlying_account": "Acc1",
+        "underlying_account": "trading-account",
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F1"
     })
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def order_cxl_request(strat_manager_service_web_client_, buy_order_):
     placed_order_ack_obj = copy.deepcopy(buy_order_)
     placed_order_ack_obj.order_event = "OE_CXL"
@@ -482,7 +482,7 @@ def order_cxl_request(strat_manager_service_web_client_, buy_order_):
     yield created_order_journal_obj
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def sell_order_(pair_securities_with_sides_):
     yield OrderJournalBaseModel(**{
         "order": {
@@ -492,7 +492,7 @@ def sell_order_(pair_securities_with_sides_):
             "px": 110,
             "qty": 70,
             "order_notional": 0,
-            "underlying_account": "Acc1",
+            "underlying_account": "trading-account",
             "text": [
               "test_string"
             ]
@@ -501,7 +501,8 @@ def sell_order_(pair_securities_with_sides_):
         "order_event": "OE_NEW"
     })
 
-@pytest.fixture(scope="session")
+
+@pytest.fixture()
 def expected_sell_order_snapshot_(pair_securities_with_sides_):
     yield OrderSnapshotBaseModel(**{
         "order_brief": {
@@ -511,7 +512,7 @@ def expected_sell_order_snapshot_(pair_securities_with_sides_):
             "px": 0,
             "qty": 0,
             "order_notional": 0,
-            "underlying_account": "Acc1",
+            "underlying_account": "trading-account",
             "text": []
         },
         "filled_qty": 0,
@@ -528,14 +529,14 @@ def expected_sell_order_snapshot_(pair_securities_with_sides_):
     })
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def sell_fill_journal_():
     yield FillsJournalBaseModel(**{
         "order_id": "O2",
         "fill_px": 120,
         "fill_qty": 30,
         "fill_notional": 0,
-        "underlying_account": "Acc1",
+        "underlying_account": "trading-account",
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F2"
     })

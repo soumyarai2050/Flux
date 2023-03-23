@@ -986,7 +986,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
 
         return output_str
 
-    def handle_CRUD_task(self) -> str:  # NOQA
+    def handle_CRUD_task(self) -> str:
         output_str = ""
         for message in self.root_message_list:
             if BaseFastapiPlugin.flux_msg_json_root in str(message.proto.options):
@@ -1009,7 +1009,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         # else not required: if no message is found with agg_query option then returning empty list
         return agg_query_var_list
 
-    def _handle_CRUD_shared_locks_declaration(self):    # NOQA
+    def _handle_CRUD_shared_locks_declaration(self):
         output_str = ""
         for lock_name in self.shared_lock_name_to_pydentic_class_dict:
             output_str += f"{lock_name} = RLock()\n"

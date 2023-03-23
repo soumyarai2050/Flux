@@ -137,13 +137,13 @@ const Cell = (props) => {
             }
 
             let inputProps = {};
-            if(collection.numberFormat) {
+            if (collection.numberFormat) {
                 if (collection.numberFormat === "%") {
                     inputProps = {
                         endAdornment: <InputAdornment position="end">%</InputAdornment>
                     }
                 }
-            } 
+            }
 
             return (
                 <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
@@ -234,13 +234,24 @@ const Cell = (props) => {
             )
         }
 
+        let disabledCaptions = {};
+        if (collection.button.disabled_captions) {
+            collection.button.disabled_captions.split(',').forEach(valueCaptionPair => {
+                let [buttonValue, caption] = valueCaptionPair.split('=');
+                disabledCaptions[buttonValue] = caption;
+            })
+        }
+        let isDisabledValue = _.keys(disabledCaptions).includes(String(value)) ? true : false;
+        let disabledCaption = isDisabledValue ? disabledCaptions[String(value)] : '';
         let checked = String(value) === collection.button.pressed_value_as_text;
         let color = getColorTypeFromValue(collection, String(value));
         let size = getSizeFromValue(collection.button.button_size);
         let shape = getShapeFromValue(collection.button.button_type);
         let caption = String(value);
 
-        if (checked && collection.button.pressed_caption) {
+        if (isDisabledValue) {
+            caption = disabledCaption;
+        } else if (checked && collection.button.pressed_caption) {
             caption = collection.button.pressed_caption;
         } else if (!checked && collection.button.unpressed_caption) {
             caption = collection.button.unpressed_caption;
@@ -255,7 +266,7 @@ const Cell = (props) => {
                     value={value}
                     caption={caption}
                     xpath={dataxpath}
-                    disabled={dataRemove || disabled ? true : false}
+                    disabled={dataRemove || disabled || isDisabledValue ? true : false}
                     action={collection.button.action}
                     onClick={props.onButtonClick}
                 />
@@ -272,6 +283,8 @@ const Cell = (props) => {
             )
         }
 
+        let maxFieldName = collection.maxFieldName;
+        let valueFieldName = props.name;
         let min = collection.min;
         if (typeof (min) === DataTypes.STRING) {
             min = getValueFromReduxStoreFromXpath(state, min);
@@ -279,6 +292,7 @@ const Cell = (props) => {
 
         let max = collection.max;
         if (typeof (max) === DataTypes.STRING) {
+            maxFieldName = max.substring(max.lastIndexOf(".") + 1);
             max = getValueFromReduxStoreFromXpath(state, max);
         }
         let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
@@ -291,6 +305,8 @@ const Cell = (props) => {
                     value={value}
                     min={min}
                     max={max}
+                    valueFieldName={valueFieldName}
+                    maxFieldName={maxFieldName}
                     hoverType={hoverType}
                 />
             </TableCell>
@@ -341,18 +357,18 @@ const Cell = (props) => {
     let dataModified = previousValue !== currentValue;
     let tableCellRemove = dataRemove ? classes.remove : '';
     let disabledClass = disabled ? classes.disabled : '';
-    if(props.ignoreDisable) {
+    if (props.ignoreDisable) {
         disabledClass = "";
     }
-     
+
 
     let value = currentValue !== undefined && currentValue !== null ? currentValue.toLocaleString() : '';
     let numberSuffix = ""
-    if(collection.numberFormat) {
+    if (collection.numberFormat) {
         if (collection.numberFormat === "%") {
             numberSuffix = " %"
         }
-    } 
+    }
 
     if (mode === Modes.EDIT_MODE && dataModified) {
         let originalValue = previousValue !== undefined && previousValue !== null ? previousValue.toLocaleString() : '';

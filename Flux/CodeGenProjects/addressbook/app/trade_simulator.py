@@ -11,6 +11,7 @@ class TradeSimulator(TradingLinkBase):
     order_id_counter: ClassVar[int] = 0
     fill_id_counter: ClassVar[int] = 0
     simulate_reverse_path: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_reverse_path") if TradingLinkBase.config_dict is not None else None
+    fill_percent: ClassVar[int | None] = TradingLinkBase.config_dict.get("fill_percent") if TradingLinkBase.config_dict is not None else None
 
     def __init__(self):
         pass
@@ -19,7 +20,8 @@ class TradeSimulator(TradingLinkBase):
     def place_new_order(cls, px: float, qty: int, side: Side, sec_id: str, system_sec_id: str,
                         account: str, exchange: str | None = None, text: List[str] | None = None):
         cls.order_id_counter += 1
-        order_id: str = f"O{cls.order_id_counter}"
+        create_date_time = DateTime.utcnow()
+        order_id: str = f"{sec_id}-{create_date_time}"
         security = Security(sec_id=sec_id)
 
         order_brief = OrderBrief(order_id=order_id, security=security, side=side, px=px, qty=qty,
@@ -28,7 +30,7 @@ class TradeSimulator(TradingLinkBase):
         add_to_texts(order_brief, msg)
 
         order_journal = OrderJournalBaseModel(order=order_brief,
-                                              order_event_date_time=DateTime.utcnow(),
+                                              order_event_date_time=create_date_time,
                                               order_event=OrderEventType.OE_NEW)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
         if cls.simulate_reverse_path:
@@ -58,6 +60,8 @@ class TradeSimulator(TradingLinkBase):
         """Simulates Order's fills"""
 
         # simulate fill
+        if cls.fill_percent:
+            qty = int((cls.fill_percent / 100) * qty)
         fill_journal = FillsJournalBaseModel(order_id=order_id, fill_px=px, fill_qty=qty,
                                              underlying_account=underlying_account,
                                              fill_date_time=DateTime.utcnow(),

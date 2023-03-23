@@ -11,7 +11,7 @@ from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from tests.CodeGenProjects.addressbook.app.test_strat_manager_service_routes_callback_override import \
     create_n_validate_strat, create_if_not_exists_and_validate_strat_collection, run_buy_top_of_book, \
     run_sell_top_of_book, TopOfBookSide, run_symbol_overview, run_last_trade, create_market_depth, \
-    wait_for_get_new_order_placed
+    wait_for_get_new_order_placed_from_tob
 
 PAIR_STRAT_DATA_DIR = (
         PurePath(
@@ -101,7 +101,7 @@ def test_place_order_and_check_fill(strat_manager_service_web_client_, pair_stra
 
         # Waiting for tob to trigger place order
         buy_tob_last_update_date_time_tracker = \
-            wait_for_get_new_order_placed(110, buy_tob_last_update_date_time_tracker, Side.BUY)
+            wait_for_get_new_order_placed_from_tob(110, buy_tob_last_update_date_time_tracker, Side.BUY)
 
         stored_order_journal_list = strat_manager_service_web_client_.get_all_order_journal_client()
         placed_order_journal = None
@@ -138,7 +138,7 @@ def test_place_order_and_check_fill(strat_manager_service_web_client_, pair_stra
 
         # Waiting for tob to trigger place order
         sell_tob_last_update_date_time_tracker = \
-            wait_for_get_new_order_placed(120, sell_tob_last_update_date_time_tracker, Side.SELL)
+            wait_for_get_new_order_placed_from_tob(120, sell_tob_last_update_date_time_tracker, Side.SELL)
 
         stored_order_journal_list = strat_manager_service_web_client_.get_all_order_journal_client()
         placed_order_journal = None
@@ -204,7 +204,7 @@ def test_max_cancel_rate(strat_manager_service_web_client_, pair_strat_, expecte
 
         # Waiting for tob to trigger place order
         buy_tob_last_update_date_time_tracker = \
-            wait_for_get_new_order_placed(110, buy_tob_last_update_date_time_tracker, Side.BUY)
+            wait_for_get_new_order_placed_from_tob(110, buy_tob_last_update_date_time_tracker, Side.BUY)
 
         stored_order_journal_list = strat_manager_service_web_client_.get_all_order_journal_client()
         placed_order_journal = None
@@ -287,7 +287,7 @@ def test_max_open_orders_per_side(strat_manager_service_web_client_, pair_strat_
 
         # Waiting for tob to trigger place order
         buy_tob_last_update_date_time_tracker = \
-            wait_for_get_new_order_placed(110, buy_tob_last_update_date_time_tracker, Side.BUY)
+            wait_for_get_new_order_placed_from_tob(110, buy_tob_last_update_date_time_tracker, Side.BUY)
 
         stored_order_journal_list = strat_manager_service_web_client_.get_all_order_journal_client()
         placed_order_journal = None
