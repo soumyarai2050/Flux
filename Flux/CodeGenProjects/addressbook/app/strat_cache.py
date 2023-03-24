@@ -320,6 +320,7 @@ class StratCache:
             logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "
                           f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
                           f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+            return None
 
     def get_market_depths(self, symbol: str, side: Side, sorted_reverse: bool = False,
                           date_time: DateTime | None = None) -> Tuple[List[MarketDepthBaseModel], DateTime] | None:

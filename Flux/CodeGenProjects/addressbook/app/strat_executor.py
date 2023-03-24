@@ -85,7 +85,21 @@ class StratExecutor:
             for market_depth in market_depths:
                 self.strat_cache.set_market_depth(market_depth)
 
-    def get_market_depth(self, symbol: str, side: Side) -> List[MarketDepthBaseModel]:
+    def update_symbol_overviews_from_http(self):
+        symbol_overviews: List[SymbolOverviewBaseModel] = \
+            self.trading_link.market_data_service_web_client.get_all_symbol_overview_client()
+        if symbol_overviews:
+            for symbol_overview in symbol_overviews:
+                self.strat_cache.set_symbol_overview(symbol_overview)
+
+    def update_tobs_from_http(self):
+        tobs: List[TopOfBookBaseModel] = \
+            self.trading_link.market_data_service_web_client.get_all_top_of_book_client()
+        if tobs:
+            for tob in tobs:
+                self.strat_cache.set_top_of_book(tob)
+
+    def get_market_depths(self, symbol: str, side: Side) -> List[MarketDepthBaseModel]:
         market_depths = self.trading_link.market_data_service_web_client.get_market_depth_from_index_client(symbol)
         # store for subsequent reference
         if market_depths:
@@ -189,6 +203,9 @@ class StratExecutor:
             if not self.trading_link.place_new_order(px, qty, side, trading_symbol, system_symbol, account, exchange):
                 # reset unack for subsequent orders to go through - this order did fail to go through
                 self.set_unack(system_symbol, False)
+                return False
+            else:
+                return True  # order sent out successfully
         else:
             return False
 
@@ -314,7 +331,7 @@ class StratExecutor:
         aggressive_quote: QuoteOptional | None = None
         # TODO important - check and change reference px in cases where last px is not available
         if top_of_book.last_trade is None or math.isclose(top_of_book.last_trade.px, 0):
-            # symbol_overview_tuple =  self.strat_cache.get_symbol_overview()
+            # symbol_overview_tuple =  self.strat_cache.get_symbol_overview(top_of_book.symbol)
             logging.error(f"blocked generated order, symbol: {top_of_book.symbol}, side: {side} as "
                           f"top_of_book.last_trade.px is none or 0")
             return 0
@@ -325,7 +342,7 @@ class StratExecutor:
 
         px_by_max_level: float = 0
         aggressive_side = Side.BUY if side == Side.SELL else Side.SELL
-        market_depths: List[MarketDepthBaseModel] = self.get_market_depth(system_symbol, aggressive_side)
+        market_depths: List[MarketDepthBaseModel] = self.get_market_depths(system_symbol, aggressive_side)
         for market_depth in market_depths:
             if market_depth.position <= order_limits.max_px_levels:
                 px_by_max_level = market_depth.px
@@ -360,7 +377,6 @@ class StratExecutor:
                     order_limits.max_basis_points / 100))
             return max(min_px_by_deviation, min_px_by_basis_point, px_by_max_level)
 
-
     def check_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
                         order_limits: OrderLimitsBaseModel, px: float,
                         qty: int, side: Side, system_symbol: str, account: str, exchange: str) -> bool:
@@ -368,13 +384,13 @@ class StratExecutor:
         checks_passed: bool = True
 
         order_notional = px * qty
+        if order_limits.min_order_notional > order_notional:
+            logging.warning(f"blocked order opportunity < min_order_notional limit: "
+                            f"{order_notional} < {order_limits.min_order_notional}")
+            checks_passed = False
         if order_limits.max_order_notional < order_notional:
             logging.error(f"blocked generated order, breaches max_order_notional limit, expected less than: "
                           f"{order_limits.max_order_notional}, found: {order_notional} ")
-            checks_passed = False
-        if order_limits.min_order_notional > order_notional:
-            logging.error(f"blocked generated order, breaches min_order_notional limit, expected more than: "
-                          f"{order_limits.min_order_notional}, found: {order_notional} ")
             checks_passed = False
         if order_limits.max_order_qty < qty:
             logging.error(f"blocked generated order, breaches max_order_qty limit, expected less than: "
@@ -422,6 +438,8 @@ class StratExecutor:
         return checks_passed
 
     def run(self):
+        self.update_symbol_overviews_from_http()
+        self.update_tobs_from_http()
         ret_val: int = -5000
         while 1:
             try:
@@ -445,8 +463,10 @@ class StratExecutor:
                         pair_strat_basemodel.strat_status.strat_alerts = [alert]
                         self.trading_link.strat_manager_service_web_client.patch_pair_strat_client(pair_strat_basemodel)
                         logging.debug(f"Pair Strat with id: {pair_strat_id} Marked Done")
+                        ret_val = 0
                     else:
                         logging.error(f"unexpected - Pair Strat with id {pair_strat_id} was already Marked Done")
+                        ret_val = -4000  # helps find the error location
                     break
 
     def _check_tob_n_place_non_systematic_order(self, new_order: NewOrderBaseModel, pair_strat: PairStratBaseModel,
@@ -593,13 +613,15 @@ class StratExecutor:
                     self._top_of_books_update_date_time:
                 if buy_top_of_book.bid_quote.px == 110:
                     order_id = self.place_new_order(buy_top_of_book, strat_brief, order_limits, 100, 90, Side.BUY,
-                                                    buy_top_of_book.symbol, buy_top_of_book.symbol, "Acc1", "Exch1")
+                                                    buy_top_of_book.symbol, buy_top_of_book.symbol,
+                                                    self.trading_account, "Exch1")
         elif sell_top_of_book is not None:
             if sell_top_of_book.ask_quote.last_update_date_time == \
                     self._top_of_books_update_date_time:
                 if sell_top_of_book.ask_quote.px == 120:
                     order_id = self.place_new_order(sell_top_of_book, strat_brief, order_limits, 110, 70, Side.SELL,
-                                                    sell_top_of_book.symbol, sell_top_of_book.symbol, "Acc1", "Exch1")
+                                                    sell_top_of_book.symbol, sell_top_of_book.symbol,
+                                                    self.trading_account, "Exch1")
         else:
             err_str_ = "TOB updates could not find any updated buy or sell tob"
             logging.error(err_str_)
@@ -650,6 +672,8 @@ class StratExecutor:
                         for cancel_order in unprocessed_cancel_orders:
                             self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side,
                                                               cancel_order.security.sec_id)
+                        if unprocessed_cancel_orders:
+                            continue
                 # else no cancel_order to process
 
                 strat_brief: StratBriefBaseModel | None = None
@@ -672,9 +696,9 @@ class StratExecutor:
                 if order_limits_tuple:
                     order_limits, _ = order_limits_tuple
                     if order_limits:
-                        if (order_limits.max_order_notional - strat_brief.pair_sell_side_trading_brief.consumable_notional) + order_limits.min_order_notional > order_limits.max_order_notional:
+                        if strat_brief.pair_sell_side_trading_brief.consumable_notional < order_limits.min_order_notional:
                             # this leg of strat is done
-                            if (order_limits.max_order_notional - strat_brief.pair_buy_side_trading_brief.consumable_notional) + order_limits.min_order_notional > order_limits.max_order_notional:
+                            if strat_brief.pair_buy_side_trading_brief.consumable_notional < order_limits.min_order_notional:
                                 # both sides are done - graceful shutdown the strat
                                 return 0
                             # else not required, more notional to consume on buy leg
@@ -686,27 +710,31 @@ class StratExecutor:
                     logging.error(f"order_limits_tuple not found for strat: {self.strat_cache}, can't proceed")
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
-                # 4. check if top_of_book is updated
-                top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(
-                    self._top_of_books_update_date_time)
+                # 4. get top_of_book (new or old to be checked by respective strat based on strat requirement)
+                top_of_book_and_date_tuple = self.strat_cache.get_top_of_books()
 
                 if top_of_book_and_date_tuple is not None:
                     top_of_books: List[TopOfBookBaseModel]
                     top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
                     if top_of_books is not None and len(top_of_books) == 2:
-                        pass
+                        if top_of_books[0] is not None and top_of_books[1] is not None:
+                            pass
+                        else:
+                            logging.error(f"strats need both sides of TOB to be present, found  0 or 1 - triggering "
+                                          f"force update;;;tob found: {top_of_books[0]}, {top_of_books[1]}")
+                            self.update_tobs_from_http()
                     elif top_of_books is not None and len(top_of_books) == 1:
-                        logging.debug(f"Needs both side's top_of_books to go further, found one "
-                                      f"{top_of_books}, waiting for another to go further")
+                        logging.error(f"Unexpected! found one tob, this should never happen - likely bug"
+                                      f"{[str(tob) for tob in top_of_books]}, ignoring this round")
                         continue
                     else:
-                        logging.error(f"expected 1 / 2 TOB , received: "
+                        logging.error(f"unexpected , received: "
                                       f"{len(top_of_books) if top_of_books is not None else 0} in tob update!;;;"
                                       f"received-TOBs: "
                                       f"{[str(tob) for tob in top_of_books] if top_of_books is not None else None}!")
                         continue  # go next run - we don't stop processing for one faulty tob update
                 else:
-                    logging.error(f"expected 1 / 2 TOB for strat: {self.strat_cache}, received none: can't proceed")
+                    logging.error(f"unexpected top_of_book_and_date_tuple is None for strat: {self.strat_cache}")
                     continue  # go next run - we don't stop processing for one faulty tob update
 
                 # 5. If any manual new_order requested: apply risk checks (maybe no strat param checks?) & send out

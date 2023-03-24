@@ -55,13 +55,18 @@ class TradeSimulator(TradingLinkBase):
         if cls.simulate_reverse_path:
             cls.process_fill(order_id, px, qty, side, sec_id, underlying_account)
 
+    @staticmethod
+    def get_partial_allowed_fill_qty(qty: int):
+        qty = int((TradeSimulator.fill_percent / 100) * qty)
+        return qty
+
     @classmethod
     def process_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
         """Simulates Order's fills"""
 
         # simulate fill
         if cls.fill_percent:
-            qty = int((cls.fill_percent / 100) * qty)
+            qty = cls.get_partial_allowed_fill_qty(qty)
         fill_journal = FillsJournalBaseModel(order_id=order_id, fill_px=px, fill_qty=qty,
                                              underlying_account=underlying_account,
                                              fill_date_time=DateTime.utcnow(),
@@ -70,7 +75,7 @@ class TradeSimulator(TradingLinkBase):
 
     @classmethod
     def place_cxl_order(cls, order_id: str, side: Side | None = None, sec_id: str | None = None,
-                        underlying_account: str | None = "Acc1"):
+                        underlying_account: str | None = "trading-account"):
         """
         cls.simulate_reverse_path or not - always simulate cancel order's Ack
         """

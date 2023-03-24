@@ -16,6 +16,7 @@ from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client i
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from FluxPythonUtils.scripts.utility_functions import drop_mongo_collections, clean_mongo_collections
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase
 
 strat_manager_service_web_client: StratManagerServiceWebClient = StratManagerServiceWebClient()
 market_data_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient()
@@ -776,7 +777,8 @@ class TopOfBookSide(StrEnum):
     Ask = auto()
 
 
-def _create_tob(buy_symbol: str, sell_symbol: str, top_of_book_json_list: List[Dict]):
+def _create_tob(buy_symbol: str, sell_symbol: str, top_of_book_json_list: List[Dict],
+                is_non_systematic_run: bool | None = None):
     buy_stored_tob: TopOfBookBaseModel | None = None
 
     # For place order non-triggered run
@@ -804,12 +806,13 @@ def _create_tob(buy_symbol: str, sell_symbol: str, top_of_book_json_list: List[D
     buy_top_of_book_basemodel = TopOfBookBaseModel(_id=buy_stored_tob.id)
     buy_top_of_book_basemodel.symbol = buy_symbol
     buy_top_of_book_basemodel.bid_quote = Quote()
-    buy_top_of_book_basemodel.bid_quote.px = buy_stored_tob.bid_quote.px + 10
-    # update_date_time = DateTime.now(local_timezone())
+    if not is_non_systematic_run:
+        buy_top_of_book_basemodel.bid_quote.px = buy_stored_tob.bid_quote.px + 10
+    else:
+        buy_top_of_book_basemodel.bid_quote.px = buy_stored_tob.bid_quote.px
     update_date_time = DateTime.utcnow()
     buy_top_of_book_basemodel.bid_quote.last_update_date_time = update_date_time
     buy_top_of_book_basemodel.last_update_date_time = update_date_time
-    # top_of_book_basemodel.total_trading_security_size = 200
     updated_tob = market_data_web_client.patch_top_of_book_client(buy_top_of_book_basemodel)
     for market_trade_vol in updated_tob.market_trade_volume:
         market_trade_vol.id = None
@@ -840,7 +843,7 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side):
         assert updated_tob_obj.ask_quote.px == tob_obj.ask_quote.px
 
 
-def _update_buy_tob(buy_symbol: str):
+def _update_buy_tob(buy_symbol: str, is_non_systematic_run: bool | None = None):
     buy_stored_tob: TopOfBookBaseModel | None = None
 
     stored_tob_objs = market_data_web_client.get_all_top_of_book_client()
@@ -850,18 +853,23 @@ def _update_buy_tob(buy_symbol: str):
 
     # For place order non-triggered run
     _update_tob(buy_stored_tob, buy_stored_tob.bid_quote.px - 10, Side.BUY)
-    # For place order trigger run
-    _update_tob(buy_stored_tob, buy_stored_tob.bid_quote.px, Side.BUY)
-
-
-def run_buy_top_of_book(loop_count: int, buy_symbol: str, sell_symbol: str, top_of_book_json_list: List[Dict]):
-    if loop_count == 1:
-        _create_tob(buy_symbol, sell_symbol, top_of_book_json_list)
+    if is_non_systematic_run:
+        px = buy_stored_tob.bid_quote.px - 10
     else:
-        _update_buy_tob(buy_symbol)
+        # For place order trigger run
+        px = buy_stored_tob.bid_quote.px
+    _update_tob(buy_stored_tob, px, Side.BUY)
 
 
-def run_sell_top_of_book(sell_symbol: str):
+def run_buy_top_of_book(loop_count: int, buy_symbol: str, sell_symbol: str,
+                        top_of_book_json_list: List[Dict], is_non_systematic_run: bool | None = None):
+    if loop_count == 1:
+        _create_tob(buy_symbol, sell_symbol, top_of_book_json_list, is_non_systematic_run)
+    else:
+        _update_buy_tob(buy_symbol, is_non_systematic_run)
+
+
+def run_sell_top_of_book(sell_symbol: str, is_non_systematic_run: bool | None = None):
     sell_stored_tob: TopOfBookBaseModel | None = None
 
     stored_tob_objs = market_data_web_client.get_all_top_of_book_client()
@@ -872,8 +880,12 @@ def run_sell_top_of_book(sell_symbol: str):
     # For place order non-triggered run
     _update_tob(sell_stored_tob, sell_stored_tob.ask_quote.px - 10, Side.SELL)
 
-    # For place order trigger run
-    _update_tob(sell_stored_tob, sell_stored_tob.ask_quote.px, Side.SELL)
+    if is_non_systematic_run:
+        px = sell_stored_tob.ask_quote.px - 10
+    else:
+        # For place order trigger run
+        px = sell_stored_tob.ask_quote.px
+    _update_tob(sell_stored_tob, px, Side.SELL)
 
 
 def run_last_trade(buy_symbol: str, sell_symbol: str, last_trade_json_list: List[Dict]):
@@ -1040,10 +1052,11 @@ def verify_portfolio_status(total_loop_count: int, symbol_pair_count: int,
     assert expected_portfolio_status in portfolio_status_list
 
 
-def get_latest_order_journal_with_status_and_symbol(stored_order_journal_list,
-                                                    expected_order_event, expected_symbol,
+def get_latest_order_journal_with_status_and_symbol(expected_order_event, expected_symbol,
                                                     expect_no_order: bool | None = None):
     placed_order_journal = None
+
+    stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
     for stored_order_journal in stored_order_journal_list:
         if stored_order_journal.order_event == expected_order_event and \
                 stored_order_journal.order.security.sec_id == expected_symbol:
@@ -1059,8 +1072,10 @@ def get_latest_order_journal_with_status_and_symbol(stored_order_journal_list,
     return placed_order_journal
 
 
-def get_latest_fill_journal_with_order_id(stored_fill_journals: List[FillsJournalBaseModel], expected_order_id: str):
+def get_latest_fill_journal_from_order_id(expected_order_id: str):
     found_fill_journal = None
+
+    stored_fill_journals = strat_manager_service_web_client.get_all_fills_journal_client()
     for stored_fill_journal in stored_fill_journals:
         if stored_fill_journal.order_id == expected_order_id:
             found_fill_journal = stored_fill_journal
@@ -1149,7 +1164,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         current_itr_expected_buy_order_journal_.order.security.sec_id = buy_symbol
 
         # Running TopOfBook (this triggers expected buy order)
-        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
+        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_, is_non_systematic_run)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, created tob")
 
         if not is_non_systematic_run:
@@ -1163,11 +1178,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
             time.sleep(2)
 
-        stored_order_journal_list = \
-            strat_manager_service_web_client.get_all_order_journal_client()
-
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(stored_order_journal_list,
-                                                                               OrderEventType.OE_NEW,
+        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol)
         create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
         order_id = placed_order_journal.order.order_id
@@ -1187,11 +1198,8 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
                                          current_itr_expected_buy_order_journal_.order.security.sec_id,
                                          current_itr_expected_buy_order_journal_.order.underlying_account)
 
-        stored_order_journal_list = \
-            strat_manager_service_web_client.get_all_order_journal_client()
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(stored_order_journal_list,
-                                                            OrderEventType.OE_ACK, buy_symbol)
+            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol)
 
         # Checking Ack response on placed order
         placed_buy_order_ack_receive(loop_count, order_id, create_buy_order_date_time,
@@ -1202,8 +1210,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         TradeSimulator.process_fill(order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
                                     Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_objs = strat_manager_service_web_client.get_all_fills_journal_client()
-        placed_fill_journal_obj = get_latest_fill_journal_with_order_id(placed_fill_journal_objs, order_id)
+        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id)
 
         # Checking Fill receive on placed order
         check_fill_receive_for_placed_buy_order(loop_count, order_id, create_buy_order_date_time,
@@ -1243,7 +1250,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         current_itr_expected_sell_order_journal_.order.security.sec_id = sell_symbol
 
         # Running TopOfBook (this triggers expected buy order)
-        run_sell_top_of_book(sell_symbol)
+        run_sell_top_of_book(sell_symbol, is_non_systematic_run)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, created tob")
 
         if not is_non_systematic_run:
@@ -1258,12 +1265,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
             time.sleep(2)
 
-        stored_order_journal_list = \
-            strat_manager_service_web_client.get_all_order_journal_client()
-
-        # order_id: str = f"O{loop_count + total_loop_count + ((symbol_pair_counter - 1) * (2 * total_loop_count))}"
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(stored_order_journal_list,
-                                                                               OrderEventType.OE_NEW, sell_symbol)
+        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol)
         create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
         order_id = placed_order_journal.order.order_id
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
@@ -1282,11 +1284,8 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
                                          current_itr_expected_sell_order_journal_.order.security.sec_id,
                                          current_itr_expected_sell_order_journal_.order.underlying_account)
 
-        stored_order_journal_list = \
-            strat_manager_service_web_client.get_all_order_journal_client()
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(stored_order_journal_list,
-                                                            OrderEventType.OE_ACK, sell_symbol)
+            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol)
 
         # Checking Ack response on placed order
         placed_sell_order_ack_receive(loop_count, order_id, create_sell_order_date_time,
@@ -1298,8 +1297,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         TradeSimulator.process_fill(order_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
                                     Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
 
-        placed_fill_journal_objs = strat_manager_service_web_client.get_all_fills_journal_client()
-        placed_fill_journal_obj = get_latest_fill_journal_with_order_id(placed_fill_journal_objs, order_id)
+        placed_fill_journal_obj = get_latest_fill_journal_from_order_id(order_id)
 
         # Checking Fill receive on placed order
         check_fill_receive_for_placed_sell_order(loop_count, total_loop_count, order_id,
@@ -1313,6 +1311,13 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         # Sleeping to let the order get cxlled
         time.sleep(residual_test_wait)
 
+
+def get_pair_strat_from_symbol(symbol: str):
+    pair_strat_obj_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    for pair_strat_obj in pair_strat_obj_list:
+        if pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id == symbol or \
+                pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id == symbol:
+            return pair_strat_obj
 
 def test_clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_):
     # cleaning all collections
@@ -1342,6 +1347,11 @@ def buy_sell_symbol_list():
     ]
 
 
+@pytest.fixture(scope="session")
+def residual_wait_sec() -> int:
+    yield 10
+
+
 # Run Strat_executor before starting this test
 def test_buy_sell_order_multi_pair_serialized(pair_securities_with_sides_, buy_order_, sell_order_, buy_fill_journal_,
                                               sell_fill_journal_, expected_buy_order_snapshot_,
@@ -1351,9 +1361,9 @@ def test_buy_sell_order_multi_pair_serialized(pair_securities_with_sides_, buy_o
                                               last_trade_fixture_list, symbol_overview_obj_list,
                                               market_depth_basemodel_list, expected_order_limits_,
                                               expected_portfolio_limits_, total_loop_counts_per_side,
-                                              buy_sell_symbol_list):
+                                              buy_sell_symbol_list, residual_wait_sec):
     total_loop_count = total_loop_counts_per_side
-    residual_test_wait = 10
+    residual_test_wait = residual_wait_sec
 
     symbol_pair_counter = 0
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
@@ -1431,8 +1441,7 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(pair_securities_wit
                              market_depth_basemodel_list, is_non_systematic_run=True)
 
 
-# Run Strat_executor before starting this test and
-# make is_non_systematic_order_check_run True in config.yaml
+# Run Strat_executor before starting this test
 def test_buy_sell_non_systematic_order_multi_pair_parallel(pair_securities_with_sides_, buy_order_, sell_order_,
                                                            buy_fill_journal_,
                                                            sell_fill_journal_, expected_buy_order_snapshot_,
@@ -1494,22 +1503,20 @@ def test_validate_kill_switch_systematic(buy_sell_symbol_list, pair_strat_, expe
         assert updated_portfolio_status.kill_switch, "Unexpected Portfolio_status kill switch"
 
         run_buy_top_of_book(1, buy_symbol, sell_symbol, top_of_book_list_)
-        stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
+
         # internally checking buy order
         order_journal = \
-            get_latest_order_journal_with_status_and_symbol(stored_order_journal_list, OrderEventType.OE_NEW,
+            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                             buy_symbol, expect_no_order=True)
 
         run_sell_top_of_book(sell_symbol)
-        stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
         # internally checking sell order
         order_journal = \
-            get_latest_order_journal_with_status_and_symbol(stored_order_journal_list, OrderEventType.OE_NEW,
+            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                             sell_symbol, expect_no_order=True)
 
 
-# Run Strat_executor before starting this test and
-# make is_non_systematic_order_check_run True in config.yaml
+# Run Strat_executor before starting this test
 def test_validate_kill_switch_non_systematic(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                              expected_start_status_, symbol_overview_obj_list,
                                              last_trade_fixture_list, market_depth_basemodel_list,
@@ -1526,20 +1533,78 @@ def test_validate_kill_switch_non_systematic(buy_sell_symbol_list, pair_strat_, 
         # placing buy order
         place_new_order(buy_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty)
         time.sleep(2)
-        stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
         # internally checking buy order
         order_journal = \
-            get_latest_order_journal_with_status_and_symbol(stored_order_journal_list, OrderEventType.OE_NEW,
+            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                             buy_symbol, expect_no_order=True)
 
         # placing sell order
         place_new_order(sell_symbol, Side.SELL, sell_order_.order.px, sell_order_.order.qty)
         time.sleep(2)
-        stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
         # internally checking sell order
         order_journal = \
-            get_latest_order_journal_with_status_and_symbol(stored_order_journal_list, OrderEventType.OE_NEW,
+            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                             sell_symbol, expect_no_order=True)
+
+
+# Run Strat_executor before starting this test
+def test_simulated_partial_fills(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                                 expected_start_status_, symbol_overview_obj_list,
+                                 last_trade_fixture_list, market_depth_basemodel_list,
+                                 top_of_book_list_, buy_order_, sell_order_,
+                                 total_loop_counts_per_side, residual_wait_sec):
+    fil_percent: int | None = TradingLinkBase.config_dict.get("fill_percent") \
+        if TradingLinkBase.config_dict is not None else None
+    partial_filled_qty: int | None = None
+    unfilled_amount: int | None = None
+
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list)
+
+        # buy fills check
+        for loop_count in range(1, total_loop_counts_per_side+1):
+            run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
+            time.sleep(2)   # delay for order to get placed
+
+            new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                                buy_symbol)
+            partial_filled_qty = TradeSimulator.get_partial_allowed_fill_qty(new_order_journal.order.qty)
+            unfilled_amount = new_order_journal.order.qty - partial_filled_qty
+
+            latest_fill_journal = get_latest_fill_journal_from_order_id(new_order_journal.order.order_id)
+            assert latest_fill_journal.fill_qty == partial_filled_qty
+
+            # wait to get unfilled order qty cancelled
+            time.sleep(residual_wait_sec)
+
+        pair_strat_obj = get_pair_strat_from_symbol(buy_symbol)
+        assert partial_filled_qty*total_loop_counts_per_side == pair_strat_obj.strat_status.total_fill_buy_qty
+        assert unfilled_amount * total_loop_counts_per_side == pair_strat_obj.strat_status.total_cxl_buy_qty
+
+        # sell fills check
+        for loop_count in range(1, total_loop_counts_per_side+1):
+            run_sell_top_of_book(sell_symbol)
+            time.sleep(2)   # delay for order to get placed
+
+            new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                                sell_symbol)
+            partial_filled_qty = TradeSimulator.get_partial_allowed_fill_qty(new_order_journal.order.qty)
+            unfilled_amount = new_order_journal.order.qty - partial_filled_qty
+
+            latest_fill_journal = get_latest_fill_journal_from_order_id(new_order_journal.order.order_id)
+            assert latest_fill_journal.fill_qty == partial_filled_qty
+
+            # wait to get unfilled order qty cancelled
+            time.sleep(residual_wait_sec)
+
+        pair_strat_obj = get_pair_strat_from_symbol(sell_symbol)
+        assert partial_filled_qty*total_loop_counts_per_side == pair_strat_obj.strat_status.total_fill_sell_qty
+        assert unfilled_amount * total_loop_counts_per_side == pair_strat_obj.strat_status.total_cxl_sell_qty
+
+def test_rej_orders():
+    pass
 
 
 def test_drop_test_environment():

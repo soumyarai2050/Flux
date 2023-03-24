@@ -62,7 +62,7 @@ const TableWidget = (props) => {
             updatedCells = updatedCells.filter(cell => !cell.hide);
         }
         updatedCells = updatedCells.filter(cell => {
-            if (commonkeys.filter(commonkey => commonkey.key === cell.key).length > 0 && props.mode !== Modes.EDIT_MODE) {
+            if (commonkeys.filter(commonkey => commonkey.key === cell.key && commonkey.tableTitle === cell.tableTitle).length > 0 && props.mode !== Modes.EDIT_MODE) {
                 return false;
             }
             return true;

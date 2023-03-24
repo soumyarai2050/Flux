@@ -160,8 +160,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             await underlying_read_symbol_side_snapshot_http(get_symbol_side_snapshot_from_symbol_side(symbol, side))
 
         if len(symbol_side_snapshot_objs) > 1:
-            err_str = f"Found multiple objects of symbol_side_snapshot for symbol {symbol} and side {side}"
-            await update_strat_alert_by_sec_and_side_async(symbol, side, err_str)
+            err_str_ = f"Found multiple objects of symbol_side_snapshot for symbol {symbol} and side {side}"
+            await update_strat_alert_by_sec_and_side_async(symbol, side, err_str_)
             return None
         else:
             return symbol_side_snapshot_objs
@@ -767,13 +767,13 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             underlying_read_portfolio_limits_by_id_http, underlying_get_last_n_sec_orders_by_event_query_http
         portfolio_limits_obj = await underlying_read_portfolio_limits_by_id_http(1)
 
-        order_count_period_seconds = \
+        rolling_order_count_period_seconds = \
             portfolio_limits_obj.rolling_max_order_count.rolling_tx_count_period_seconds
         max_rolling_order_count = portfolio_limits_obj.rolling_max_order_count.max_rolling_tx_count
 
         order_counts_updated_order_journals = \
             await underlying_get_last_n_sec_orders_by_event_query_http(order_journal_obj.order.security.sec_id,
-                                                                       order_count_period_seconds,
+                                                                       rolling_order_count_period_seconds,
                                                                        OrderEventType.OE_NEW)
 
         for queried_order_journal in reversed(order_counts_updated_order_journals):
@@ -1836,12 +1836,12 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             underlying_read_portfolio_limits_by_id_http, underlying_get_last_n_sec_orders_by_event_query_http
         portfolio_limits_obj = await underlying_read_portfolio_limits_by_id_http(1)
 
-        order_count_period_seconds = \
+        rolling_order_count_period_seconds = \
             portfolio_limits_obj.rolling_max_order_count.rolling_tx_count_period_seconds
 
         order_counts_updated_order_journals = \
             await underlying_get_last_n_sec_orders_by_event_query_http(symbol,
-                                                                       order_count_period_seconds,
+                                                                       rolling_order_count_period_seconds,
                                                                        OrderEventType.OE_NEW)
         if len(order_counts_updated_order_journals) > 0:
             rolling_new_order_count = order_counts_updated_order_journals[-1].current_period_order_count

@@ -171,24 +171,28 @@ class TradingDataManager:
             # else not required - non-ongoing pair strat is not to exist in cache
 
     def handle_strat_brief_ws(self, strat_brief_: StratBriefBaseModel):
-        key1, key2 = StratCache.get_key_from_strat_brief(strat_brief_)
-        strat_cache: StratCache = StratCache.get(key1, key2)
-        if strat_cache is not None:
-            with strat_cache.re_ent_lock:
-                strat_cache.set_strat_brief(strat_brief_)
-            cached_pair_strat_tuple = strat_cache.get_pair_strat()
-            if self.strat_brief_ws_cont.notify and cached_pair_strat_tuple is not None and \
-                    cached_pair_strat_tuple[0] is not None:
-                cached_pair_strat, _ = cached_pair_strat_tuple
-                strat_cache.notify_semaphore.release()
-            elif (cached_pair_strat_tuple is None) or (cached_pair_strat_tuple[0] is None):
-                logging.warning(f"ignoring: no ongoing pair strat matches this strat_brief: {strat_brief_}")
-            # else not required - strat does not need this update notification
-            logging.debug(f"Updated strat_brief cache for key: {key1} {key2} ;;; strat_brief: {strat_brief_}")
+        if strat_brief_.pair_buy_side_trading_brief and strat_brief_.pair_sell_side_trading_brief:
+            key1, key2 = StratCache.get_key_from_strat_brief(strat_brief_)
+            strat_cache: StratCache = StratCache.get(key1, key2)
+            if strat_cache is not None:
+                with strat_cache.re_ent_lock:
+                    strat_cache.set_strat_brief(strat_brief_)
+                cached_pair_strat_tuple = strat_cache.get_pair_strat()
+                if self.strat_brief_ws_cont.notify and cached_pair_strat_tuple is not None and \
+                        cached_pair_strat_tuple[0] is not None:
+                    cached_pair_strat, _ = cached_pair_strat_tuple
+                    strat_cache.notify_semaphore.release()
+                elif (cached_pair_strat_tuple is None) or (cached_pair_strat_tuple[0] is None):
+                    logging.warning(f"ignoring: no ongoing pair strat matches this strat_brief: {strat_brief_}")
+                # else not required - strat does not need this update notification
+                logging.debug(f"Updated strat_brief cache for key: {key1} {key2} ;;; strat_brief: {strat_brief_}")
+            else:
+                logging.debug("either a non-ongoing strat-brief or one before corresponding active pair_strat: "
+                              "we discard this and expect algo to get snapshot with explicit web query - maybe we wire "
+                              f"explicit web query in ongoing pair-strat notification;;;strat_brief: {strat_brief_}")
         else:
-            logging.debug("either a non-ongoing strat-brief or one before corresponding active pair_strat: "
-                          "we discard this and expect algo to get snapshot with explicit web query - maybe we wire "
-                          f"explicit web query in ongoing pair-strat notification;;;strat_brief: {strat_brief_}")
+            logging.error(f"ignoring strat brief update - missing required pair_buy_side_trading_brief or pair_sell_"
+                          f"side_trading_brief;;;strat_brief: {strat_brief_}")
 
     def handle_fill_journal_ws(self, fill_journal_: FillsJournalBaseModel):
         key, symbol = StratCache.get_key_n_symbol_from_fill_journal(fill_journal_)

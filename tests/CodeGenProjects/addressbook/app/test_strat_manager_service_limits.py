@@ -1,17 +1,7 @@
-import time
-import copy
 from pathlib import PurePath
-import pytest
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
-    StratManagerServiceWebClient
 
 from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
-from tests.CodeGenProjects.addressbook.app.test_strat_manager_service_routes_callback_override import \
-    create_n_validate_strat, create_if_not_exists_and_validate_strat_collection, run_buy_top_of_book, \
-    run_sell_top_of_book, TopOfBookSide, run_symbol_overview, run_last_trade, create_market_depth, \
-    wait_for_get_new_order_placed_from_tob
+from tests.CodeGenProjects.addressbook.app.test_strat_manager_service_routes_callback_override import *
 
 PAIR_STRAT_DATA_DIR = (
         PurePath(
@@ -404,3 +394,38 @@ def test_consumable_cxl_qty(strat_manager_service_web_client_, pair_strat_, expe
             assert pair_strat.strat_status.strat_state == StratState.StratState_PAUSED
         else:
             assert pair_strat.strat_status.strat_state == StratState.StratState_ACTIVE
+
+
+def test_add_fake_data_to_tob(buy_sell_symbol_list, top_of_book_list_):
+    # taking only one pair
+    buy_symbol, sell_symbol = buy_sell_symbol_list[0]
+    id_list = []
+
+    for loop_count in range(1000000):
+        if loop_count == 0:
+            for tob_json in top_of_book_list_:
+                tob_obj = TopOfBookBaseModel(**tob_json)
+                tob_obj.bid_quote.px = loop_count + 1
+                tob_obj.bid_quote.qty = loop_count + 1
+                tob_obj.ask_quote.px = loop_count + 1
+                tob_obj.ask_quote.qty = loop_count + 1
+                tob_obj.last_trade.px = loop_count + 1
+                tob_obj.last_trade.qty = loop_count + 1
+
+                created_tob = market_data_web_client.create_top_of_book_client(tob_obj)
+                id_list.append(created_tob.id)
+        else:
+            for tob_id in id_list:
+                quote = Quote()
+                tob_obj = TopOfBookBaseModel(_id=tob_id)
+                tob_obj.bid_quote = quote
+                tob_obj.ask_quote = quote
+                tob_obj.last_trade = quote
+                tob_obj.bid_quote.px = loop_count + 1
+                tob_obj.bid_quote.qty = loop_count + 1
+                tob_obj.ask_quote.px = loop_count + 1
+                tob_obj.ask_quote.qty = loop_count + 1
+                tob_obj.last_trade.px = loop_count + 1
+                tob_obj.last_trade.qty = loop_count + 1
+                updated_obj = market_data_web_client.patch_top_of_book_client(tob_obj)
+

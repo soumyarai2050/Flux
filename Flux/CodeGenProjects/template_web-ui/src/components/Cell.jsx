@@ -389,7 +389,7 @@ const Cell = (props) => {
 
 Cell.propTypes = {
     mode: PropTypes.oneOf([Modes.READ_MODE, Modes.EDIT_MODE]).isRequired,
-    rowindex: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
+    rowindex: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     name: PropTypes.string.isRequired,
     elaborateTitle: PropTypes.string.isRequired,
     currentValue: PropTypes.any,
