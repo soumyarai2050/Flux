@@ -20,7 +20,7 @@ def test_execute_python_script(code_gen_engine_env_manager: CodeGenEngineEnvMana
 
 def test_init_env_and_update_sys_path(code_gen_engine_env_manager: CodeGenEngineEnvManager, root_dir: PurePath):
 
-    project_name: str = "addressbook"
+    project_name: str = "pair_strat_engine"
     config_file_name: str = "_"
     plugin_name: str = "PluginFastApi"
     project_dir_name: str = "CodeGenProjects"

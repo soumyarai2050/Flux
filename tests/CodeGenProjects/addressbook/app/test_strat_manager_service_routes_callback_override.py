@@ -1335,7 +1335,7 @@ def test_clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_
 
 @pytest.fixture(scope="session")
 def total_loop_counts_per_side():
-    total_loop_counts_per_side = 2
+    total_loop_counts_per_side = 5
     yield total_loop_counts_per_side
 
 
@@ -1603,8 +1603,109 @@ def test_simulated_partial_fills(buy_sell_symbol_list, pair_strat_, expected_str
         assert partial_filled_qty*total_loop_counts_per_side == pair_strat_obj.strat_status.total_fill_sell_qty
         assert unfilled_amount * total_loop_counts_per_side == pair_strat_obj.strat_status.total_cxl_sell_qty
 
-def test_rej_orders():
-    pass
+
+def test_rej_orders(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                    expected_start_status_, symbol_overview_obj_list,
+                    last_trade_fixture_list, market_depth_basemodel_list,
+                    top_of_book_list_, buy_order_, sell_order_,
+                    total_loop_counts_per_side, residual_wait_sec):
+    # if simulate_new_to_reject_orders is True then test case fill check orders with OE_NEW and OE_REJ combination
+    simulate_new_to_reject_orders: bool | None = \
+        TradingLinkBase.config_dict.get("simulate_new_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+    # if simulate_new_to_reject_orders is True then test case fill check orders with OE_ACK and OE_REJ combination
+    simulate_ack_to_reject_orders: bool | None = \
+        TradingLinkBase.config_dict.get("simulate_ack_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+    continues_buy_count: int | None = \
+        TradingLinkBase.config_dict.get("continues_buy_count") if TradingLinkBase.config_dict is not None else None
+    continues_buy_rej_count: int | None = \
+        TradingLinkBase.config_dict.get("continues_buy_rej_count") if TradingLinkBase.config_dict is not None else None
+    continues_sell_count: int | None = \
+        TradingLinkBase.config_dict.get("continues_sell_count") if TradingLinkBase.config_dict is not None else None
+    continues_sell_rej_count: int | None = \
+        TradingLinkBase.config_dict.get("continues_sell_rej_count") if TradingLinkBase.config_dict is not None else None
+
+    assert continues_buy_count is not None
+    assert continues_buy_rej_count is not None
+    assert continues_sell_count is not None
+    assert continues_sell_rej_count is not None
+
+    buy_order_counts = 0
+    buy_rej_counts = 0
+    sell_order_counts = 0
+    sell_rej_counts = 0
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        # explicitly setting waived_min_orders to 10 for this test case
+        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list)
+        # buy fills check
+        last_id = None
+        for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
+            time.sleep(2)  # delay for order to get placed
+
+            if buy_order_counts < continues_buy_count:
+                check_order_event = OrderEventType.OE_ACK
+                buy_order_counts += 1
+                time.sleep(10)
+            else:
+                if buy_rej_counts < continues_buy_rej_count:
+                    check_order_event = OrderEventType.OE_REJ
+                    buy_rej_counts += 1
+                else:
+                    check_order_event = OrderEventType.OE_ACK
+                    buy_order_counts = 1
+                    buy_rej_counts = 0
+                    time.sleep(10)
+
+            # internally checks order_journal is not None else raises assert exception internally
+            latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, buy_symbol)
+            if last_id is None:
+                last_id = latest_order_journal.id
+            else:
+                assert last_id != latest_order_journal.id, f"No new order_journal received for event " \
+                                                           f"{check_order_event} buy_symbol"
+                last_id = latest_order_journal.id
+
+            if simulate_ack_to_reject_orders:
+                if check_order_event != OrderEventType.OE_REJ:
+                    # internally checks fills_journal is not None else raises assert exception internally
+                    latest_fill_journal = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id)
+
+        # sell fills check
+        last_id = None
+        for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_sell_top_of_book(sell_symbol)
+            time.sleep(2)  # delay for order to get placed
+
+            if sell_order_counts < continues_sell_count:
+                check_order_event = OrderEventType.OE_ACK
+                sell_order_counts += 1
+                time.sleep(10)
+            else:
+                if sell_rej_counts < continues_sell_rej_count:
+                    check_order_event = OrderEventType.OE_REJ
+                    sell_rej_counts += 1
+                else:
+                    check_order_event = OrderEventType.OE_ACK
+                    sell_order_counts = 1
+                    sell_rej_counts = 0
+                    time.sleep(10)
+
+            # internally checks order_journal is not None else raises assert exception internally
+            latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, sell_symbol)
+            if last_id is None:
+                last_id = latest_order_journal.id
+            else:
+                assert last_id != latest_order_journal.id, f"No new order_journal received for event " \
+                                                           f"{check_order_event} sell_symbol"
+                last_id = latest_order_journal.id
+
+            if simulate_ack_to_reject_orders:
+                if check_order_event != OrderEventType.OE_REJ:
+                    # internally checks fills_journal is not None else raises assert exception internally
+                    latest_fill_journal = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id)
 
 
 def test_drop_test_environment():

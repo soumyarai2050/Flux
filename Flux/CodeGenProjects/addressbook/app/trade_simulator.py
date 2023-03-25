@@ -8,18 +8,66 @@ from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBa
 
 
 class TradeSimulator(TradingLinkBase):
-    order_id_counter: ClassVar[int] = 0
-    fill_id_counter: ClassVar[int] = 0
+    buy_order_counter: ClassVar[int] = 0
+    sell_order_counter: ClassVar[int] = 0
+    buy_rej_counter: ClassVar[int] = 0
+    sell_rej_counter: ClassVar[int] = 0
     simulate_reverse_path: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_reverse_path") if TradingLinkBase.config_dict is not None else None
+    simulate_new_to_reject_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_new_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+    simulate_ack_to_reject_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_ack_to_reject_orders") if TradingLinkBase.config_dict is not None else None
     fill_percent: ClassVar[int | None] = TradingLinkBase.config_dict.get("fill_percent") if TradingLinkBase.config_dict is not None else None
+    continues_buy_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_buy_count") if TradingLinkBase.config_dict is not None else None
+    continues_buy_rej_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_buy_rej_count") if TradingLinkBase.config_dict is not None else None
+    continues_sell_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_sell_count") if TradingLinkBase.config_dict is not None else None
+    continues_sell_rej_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_sell_rej_count") if TradingLinkBase.config_dict is not None else None
 
     def __init__(self):
         pass
 
     @classmethod
+    def check_do_reject(cls, side: Side):
+        if side == Side.BUY:
+            if cls.continues_buy_count is not None and cls.continues_buy_rej_count is not None:
+                if cls.buy_order_counter < cls.continues_buy_count:
+                    cls.buy_order_counter += 1
+                    return False
+                else:
+                    if cls.buy_rej_counter < cls.continues_buy_rej_count:
+                        cls.buy_rej_counter += 1
+                        return True
+                    else:
+                        cls.buy_order_counter = 1
+                        cls.buy_rej_counter = 0
+                        return False
+            else:
+                return False
+        else:
+            if cls.continues_sell_count is not None and cls.continues_sell_rej_count is not None:
+                if cls.sell_order_counter < cls.continues_sell_count:
+                    cls.sell_order_counter += 1
+                    return False
+                else:
+                    if cls.sell_rej_counter < cls.continues_sell_rej_count:
+                        cls.sell_rej_counter += 1
+                        return True
+                    else:
+                        cls.sell_order_counter = 1
+                        cls.sell_rej_counter = 0
+                        return False
+            else:
+                return False
+
+    @classmethod
+    def process_order_reject(cls, order_brief: OrderBrief):
+        create_date_time = DateTime.utcnow()
+        order_journal = OrderJournalBaseModel(order=order_brief,
+                                              order_event_date_time=create_date_time,
+                                              order_event=OrderEventType.OE_REJ)
+        TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
+
+    @classmethod
     def place_new_order(cls, px: float, qty: int, side: Side, sec_id: str, system_sec_id: str,
                         account: str, exchange: str | None = None, text: List[str] | None = None):
-        cls.order_id_counter += 1
         create_date_time = DateTime.utcnow()
         order_id: str = f"{sec_id}-{create_date_time}"
         security = Security(sec_id=sec_id)
@@ -34,7 +82,10 @@ class TradeSimulator(TradingLinkBase):
                                               order_event=OrderEventType.OE_NEW)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
         if cls.simulate_reverse_path:
-            cls.process_order_ack(order_id, px, qty, side, sec_id, account)
+            if cls.simulate_new_to_reject_orders and cls.check_do_reject(side):
+                cls.process_order_reject(order_brief)
+            else:
+                cls.process_order_ack(order_id, px, qty, side, sec_id, account)
         return True  # indicates order send success (send false otherwise)
 
     @classmethod
@@ -53,11 +104,14 @@ class TradeSimulator(TradingLinkBase):
                                                   order_event=OrderEventType.OE_ACK)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal_obj)
         if cls.simulate_reverse_path:
-            cls.process_fill(order_id, px, qty, side, sec_id, underlying_account)
+            if cls.simulate_ack_to_reject_orders and cls.check_do_reject(side):
+                cls.process_order_reject(order_brief_obj)
+            else:
+                cls.process_fill(order_id, px, qty, side, sec_id, underlying_account)
 
-    @staticmethod
-    def get_partial_allowed_fill_qty(qty: int):
-        qty = int((TradeSimulator.fill_percent / 100) * qty)
+    @classmethod
+    def get_partial_allowed_fill_qty(cls, qty: int):
+        qty = int((cls.fill_percent / 100) * qty)
         return qty
 
     @classmethod

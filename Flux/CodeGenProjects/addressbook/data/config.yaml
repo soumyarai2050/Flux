@@ -2,10 +2,12 @@ mongo_server: "mongodb://localhost:27017"
 min_refresh_interval: 5
 is_test_run: True
 simulate_reverse_path: False
-#fill_percent: 50
+#fill_percent: 100
 
 # to test rej functionality
-#continues_buy_count: 5
-#continues_buy_rej_count: 2
-#continues_sell_count: 5
+#simulate_new_to_reject_orders: False   # to test out orders with new and reject order_event
+#simulate_ack_to_reject_orders: True   # to test out orders with ack and reject order_event
+#continues_buy_count: 3
+#continues_buy_rej_count: 1
+#continues_sell_count: 3
 #continues_sell_rej_count: 2

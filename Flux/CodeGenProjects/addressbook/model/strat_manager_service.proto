@@ -124,8 +124,8 @@ message OrderJournal{
       AggregateParamsDataType: "str"
   };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-10";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-10"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
+  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional OrderBrief order = 2;
@@ -235,7 +235,7 @@ message FillsJournal{
     is_repeated: True
   };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-10";
+  option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-10"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];

@@ -451,8 +451,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
                     underlying_partial_update_order_snapshot_http
                 order_snapshot_obj = \
-                    await self._check_state_and_get_order_snapshot_obj(order_journal_obj, [OrderStatusType.OE_ACKED])
-
+                    await self._check_state_and_get_order_snapshot_obj(order_journal_obj, [OrderStatusType.OE_UNACK,
+                                                                                           OrderStatusType.OE_ACKED])
                 if order_snapshot_obj is not None:
                     order_brief_obj = OrderBrief(**order_snapshot_obj.order_brief.dict())
                     order_brief_obj.text.extend(order_journal_obj.order.text)
@@ -620,7 +620,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if symbol_side_snapshot_.order_create_count > existing_pair_strat.strat_limits.cancel_rate.waived_min_orders:
             if strat_brief_.pair_buy_side_trading_brief.all_bkr_cxlled_qty > 0:
                 if (consumable_cxl_qty := strat_brief_.pair_buy_side_trading_brief.consumable_cxl_qty) <= 0:
-                    err_str_: str = f"Consumable qty can't be <= 0, currently is {consumable_cxl_qty} " \
+                    err_str_: str = f"Consumable cxl qty can't be <= 0, currently is {consumable_cxl_qty} " \
                                      f"for symbol {strat_brief_.pair_buy_side_trading_brief.security.sec_id} and " \
                                     f"side {Side.BUY}"
                     alert_brief: str = err_str_

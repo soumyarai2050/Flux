@@ -149,7 +149,8 @@ class TradingDataManager:
                         logging.error(f"Unexpected: unable to proceed proceed with pair_strat key: {key_leg_1};;;"
                                       f"existing entry found in strat_thread_dict: "
                                       f"{self.strat_thread_dict[key_leg_1]}, new requested: {pair_strat_}")
-                    self.strat_thread_dict[key_leg_1] = (strat_executor, strat_executor_thread)
+                    else:
+                        self.strat_thread_dict[key_leg_1] = (strat_executor, strat_executor_thread)
                 else:
                     strat_cache.set_pair_strat(pair_strat_)
             if self.strat_brief_ws_cont.notify:
@@ -163,11 +164,12 @@ class TradingDataManager:
                     strat_cache.stopped = True  # demon thread will tear down itself
                     # strat_cache.set_pair_strat(None)  # avoids crash if strat thread is using strat_cache
                     # enables future re-activation, stops any processing until then
-                    self.strat_thread_dict.pop(key_leg_1)
+                    if key_leg_1 in self.strat_thread_dict:
+                        self.strat_thread_dict.pop(key_leg_1)
                     # don't join on trading thread - let the demon self shutdown
                     strat_cache.notify_semaphore.release()
-                logging.warning(f"handle_pair_strat_ws: removed cache entry of non ongoing pair strat from trading:"
-                                f" {pair_strat_}")
+                logging.warning(f"handle_pair_strat_ws: removed cache entry of non ongoing pair strat from trading;;;"
+                                f"pair_strat: {pair_strat_}")
             # else not required - non-ongoing pair strat is not to exist in cache
 
     def handle_strat_brief_ws(self, strat_brief_: StratBriefBaseModel):
