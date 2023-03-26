@@ -4,9 +4,14 @@ is_test_run: True
 simulate_reverse_path: False
 #fill_percent: 100
 
-# to test rej functionality
-#simulate_new_to_reject_orders: False   # to test out orders with new and reject order_event
-#simulate_ack_to_reject_orders: True   # to test out orders with ack and reject order_event
+# to simulate rej functionality
+#simulate_new_to_reject_orders: False   # to simulate out orders with new and reject order_event
+#simulate_ack_to_reject_orders: False   # to simulate out orders with ack and reject order_event
+
+# to simulate cxl-rej functionality
+#simulate_cxl_rej_orders: False
+
+# counts to be used in rej and cxl_rej simulations
 #continues_buy_count: 3
 #continues_buy_rej_count: 1
 #continues_sell_count: 3

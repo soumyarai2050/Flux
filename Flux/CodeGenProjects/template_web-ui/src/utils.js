@@ -419,7 +419,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     if (attributes.hasOwnProperty('type') && primitiveDataTypes.includes(attributes.type)) {
         node.id = propname;
         node.key = propname;
-        node.required = currentSchema.required.filter(p => p === propname) ? true : false;
+        node.required = currentSchema.required.filter(p => p === propname).length > 0 ? true : false;
         node.xpath = xpath ? xpath + '.' + propname : propname;
         node.dataxpath = dataxpath ? dataxpath + '.' + propname : propname;
         node.parentcollection = currentSchema.title;
@@ -554,6 +554,9 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps) {
         Object.keys(currentSchema.properties).map((propname) => {
             if (callerProps.xpath && callerProps.xpath !== propname) return;
             let metadataProp = currentSchema.properties[propname];
+            if (!currentSchema.required.includes(propname)) {
+                metadataProp.required = [];
+            }
             if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
                 addSimpleNode(childNode, schema, currentSchema, propname, callerProps);
             }
@@ -578,6 +581,10 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
         let metadata = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
         metadata = cloneDeep(metadata);
 
+        if (currentSchema.hasOwnProperty('required') && currentSchema.required.length === 0) {
+            metadata.required = [];
+        }
+
         if (currentSchema.hasOwnProperty('orm_no_update') || metadata.hasOwnProperty('orm_no_update')) {
             metadata.orm_no_update = metadata.no_orm_update ? metadata.no_orm_update : currentSchema.orm_no_update;
         }
@@ -598,6 +605,9 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
         if (metadata.hasOwnProperty('properties')) {
             Object.keys(metadata.properties).forEach((prop) => {
                 let metadataProp = metadata.properties[prop];
+                if (!metadata.required.includes(prop)) {
+                    metadataProp.required = [];
+                }
                 if (metadata.hasOwnProperty('ui_update_only')) {
                     metadataProp.ui_update_only = metadata.ui_update_only;
                 }
@@ -1401,4 +1411,35 @@ export function createObjectFromXpathDict(obj, xpath, value) {
         }
     })
     return o;
+}
+
+export function applyWebSocketUpdate(arr, obj, uiLimit) {
+    let updatedArr = arr.filter(o => o[DB_ID] !== obj[DB_ID]);
+    // if obj is not deleted object
+    if (Object.keys(obj) !== 1) {
+        let index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);
+        // if index is not equal to -1, it is updated obj. If updated, replace the obj at the index
+        if (index !== -1) {
+            updatedArr.splice(index, 0, obj);
+        } else {
+            if (uiLimit) {
+                // if uiLimit is positive, remove the top object and add the latest obj at the end
+                // otherwise remove the last object and add the latest obj at the top
+                if (uiLimit >= 0) {
+                    if (updatedArr.length >= Math.abs(uiLimit)) {
+                        updatedArr.shift();
+                    }
+                    updatedArr.push(obj);
+                } else {
+                    if (updatedArr.length >= Math.abs(uiLimit)) {
+                        updatedArr.pop();
+                    }
+                    updatedArr.splice(0, 0, obj);
+                }
+            } else {
+                updatedArr.push(obj);
+            }
+        }
+    }
+    return updatedArr;
 }

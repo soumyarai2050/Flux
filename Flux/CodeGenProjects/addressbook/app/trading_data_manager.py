@@ -6,7 +6,7 @@ from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from trading_cache import *
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import \
-    is_ongoing_pair_strat
+    is_ongoing_pair_strat, get_order_journal_key
 from Flux.CodeGenProjects.addressbook.app.trading_link import TradingLinkBase, get_trading_link
 
 trading_link: TradingLinkBase = get_trading_link()
@@ -20,7 +20,6 @@ class TradingDataManager:
         market_data_base_url: str = f"ws://{host}:8040/market_data"
         cpp_ws_url: str = f"ws://{host}:8083/"
         self.trading_cache: TradingCache = TradingCache()
-
         self.top_of_book_ws_cont = WSReader(f"{market_data_base_url}/get-all-top_of_book-ws", TopOfBookBaseModel,
                                             TopOfBookBaseModelList, self.handle_top_of_book_ws)
 
@@ -161,9 +160,9 @@ class TradingDataManager:
             if strat_cache is not None:
                 # remove if this pair strat is in our cache - it's no more ongoing
                 with strat_cache.re_ent_lock:
-                    strat_cache.stopped = True  # demon thread will tear down itself
-                    # strat_cache.set_pair_strat(None)  # avoids crash if strat thread is using strat_cache
-                    # enables future re-activation, stops any processing until then
+                    # demon thread will tear down itself if strat_cache.stopped is True, it will also invoke
+                    # set_pair_strat(NOne) on cache enabling future reactivation, stops any processing until then
+                    strat_cache.stopped = True
                     if key_leg_1 in self.strat_thread_dict:
                         self.strat_thread_dict.pop(key_leg_1)
                     # don't join on trading thread - let the demon self shutdown
@@ -249,9 +248,10 @@ class TradingDataManager:
             elif cached_pair_strat is None:
                 logging.error(f"error: no ongoing pair strat matches this order_journal_: {order_journal_}")
             # else not required - strat does not need this update notification
-            logging.debug(f"Updated order_journal cache for key: {key} ;;; order_journal: {order_journal_}")
+            logging.debug(f"Updated order_journal cache for key: {key};;;order_journal: {order_journal_}")
         else:
-            logging.error(f"error: no ongoing pair strat matches received order journal: {order_journal_}")
+            logging.error(f"error: no ongoing pair strat matches received order journal key: {key};;;"
+                          f"order_journal: {order_journal_}")
 
     def handle_cancel_order_ws(self, cancel_order_: CancelOrderBaseModel):
         key = StratCache.get_key_from_cancel_order(cancel_order_)
@@ -263,11 +263,13 @@ class TradingDataManager:
             if self.cancel_order_ws_cont.notify and cached_pair_strat is not None:
                 strat_cache.notify_semaphore.release()
             elif cached_pair_strat is None:
-                logging.error(f"error: no ongoing pair strat matches this cancel_order: {cancel_order_}")
+                logging.error(f"error: cancel_order key: {key} matched strat_cache with None pair_strat ;;;"
+                              f"cancel_order: {cancel_order_}, strat_cache: {strat_cache}")
             # else not required - strat does not need this update notification
             logging.debug(f"Updated cancel_order cache for key: {key} ;;; cancel_order: {cancel_order_}")
         else:
-            logging.error(f"error: no ongoing pair strat matches this order_journal_: {cancel_order_}")
+            logging.error(f"error: no ongoing pair strat matches this cancel_order key: {key};;;"
+                          f"cancel_order: {cancel_order_}")
 
     def handle_new_order_ws(self, new_order_: NewOrderBaseModel):
         key = StratCache.get_key_from_new_order(new_order_)
@@ -279,13 +281,19 @@ class TradingDataManager:
             if self.new_order_ws_cont.notify and cached_pair_strat is not None:
                 strat_cache.notify_semaphore.release()
             elif cached_pair_strat is None:
-                logging.error(f"error: no ongoing pair strat matches this order_journal_: {new_order_}")
+                logging.error(f"error: new_order_ key: {key}matched strat_cache with None pair_strat ;;;new_order_: "
+                              f"{new_order_}, strat_cache: {strat_cache}")
             # else not required - strat does not need this update notification
-            logging.debug(f"Updated new_order cache for key: {key} ;;; order_journal: {new_order_}")
+            logging.debug(f"Updated new_order cache for key: {key} ;;; new_order_: {new_order_}")
         else:
-            logging.error(f"error: no ongoing pair strat matches this order_journal_: {new_order_}")
+            logging.error(f"error: no ongoing pair strat matches this new_order_ key: {key};;;new_order_: "
+                          f"{new_order_}, strat_cache: {strat_cache}")
 
     def handle_symbol_overview_ws(self, symbol_overview_: SymbolOverviewBaseModel):
+        if symbol_overview_.symbol in StratCache.fx_symbol_overview_dict:
+            # fx_symbol_overview_dict is pre initialized with supported fx pair symbols and None objects
+            StratCache.fx_symbol_overview_dict[symbol_overview_.symbol] = symbol_overview_
+            StratCache.notify_all()
         key1, key2 = StratCache.get_key_from_symbol_overview(symbol_overview_)
         strat_cache1: StratCache = StratCache.get(key1)
         strat_cache2: StratCache = StratCache.get(key2)
@@ -310,6 +318,9 @@ class TradingDataManager:
             logging.debug(f"no matching strat: for symbol_overview keys: {key1}, {key2};;;detail: {symbol_overview_}")
 
     def handle_top_of_book_ws(self, top_of_book_: TopOfBookBaseModel):
+        if top_of_book_.symbol in StratCache.fx_symbol_overview_dict:
+            # if we need fx TOB: StratCache needs to collect reference here (like we do in symbol_overview)
+            return  # No use-case for fx TOB at this time
         key1, key2 = StratCache.get_key_from_top_of_book(top_of_book_)
         strat_cache1: StratCache = StratCache.get(key1)
         strat_cache2: StratCache = StratCache.get(key2)

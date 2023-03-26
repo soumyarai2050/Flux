@@ -6,6 +6,7 @@ import copy
 import pytz
 from pendulum import DateTime
 
+from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import get_pair_strat_key
 from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
 from Flux.CodeGenProjects.addressbook.app.ws_helper import *
 
@@ -15,6 +16,11 @@ class MarketDepthsCont:
         self.symbol: str = symbol
         self.bid_market_depths: List[MarketDepthBaseModel] = []
         self.ask_market_depths: List[MarketDepthBaseModel] = []
+
+    def __str__(self):
+        return f"{self.symbol} " \
+               f"bid_market_depths: {[str(bid_market_depth) for bid_market_depth in self.bid_market_depths] if self.bid_market_depths else str(None)} " \
+               f"ask_market_depths: {[str(ask_market_depth) for ask_market_depth in self.ask_market_depths] if self.ask_market_depths else str(None)}"
 
     def get_market_depths(self, side: Side):
         if side == Side.BUY:
@@ -94,8 +100,8 @@ class StratCache:
     @staticmethod
     def get_key_n_symbol_from_fill_journal(fill_journal: FillsJournalBaseModel):
         key: str | None = None
-        symbol: str | None = None
-        symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict[fill_journal.order_id]
+        symbol: str
+        symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict.get(fill_journal.order_id)
         if not symbol_side_tuple:
             logging.error(f"Unknown order id: {fill_journal.order_id} found for fill;;;fill_journal: {fill_journal}")
             return None
@@ -160,6 +166,16 @@ class StratCache:
                 return None
         else:
             return None
+
+    def get_pair_strat_(self) -> PairStratBaseModel | None:
+        return self._pair_strat
+
+    def get_metadata(self, system_symbol: str):
+        """function to check system symbol's corresponding trading_symbol, account, exchange (maybe fx in future ?)"""
+        trading_symbol: str = system_symbol
+        account = "trading_account"
+        exchange = "trading_exchange"
+        return trading_symbol, account, exchange
 
     def get_trading_symbols(self):
         primary_ticker = self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id
@@ -409,9 +425,6 @@ class StratCache:
                         strat_cache = strat_cache2
         return strat_cache
 
-    strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
-    order_id_to_symbol_side_tuple_dict: Dict[str|int, Tuple[str, Side]] = dict()
-
     def set_has_unack_leg1(self, has_unack: bool):
         self.unack_leg1 = has_unack
 
@@ -424,6 +437,11 @@ class StratCache:
     def has_unack_leg2(self) -> bool:
         return self.unack_leg2
 
+    strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
+    order_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
+    # fx_symbol_overview_dict must be preloaded with supported fx pairs for system to work
+    fx_symbol_overview_dict: Dict[str, SymbolOverviewBaseModel | None] = {"USD|SGD", None}
+
     def __init__(self):
         self.re_ent_lock: RLock = RLock()
         self.notify_semaphore = Semaphore()
@@ -432,6 +450,11 @@ class StratCache:
         self.leg2_trading_symbol: str | None = None
         self.unack_leg1: bool = False
         self.unack_leg2: bool = False
+
+        # all fx always against usd - these are reused across strats
+        self.leg1_fx_symbol: str = "USD|SGD"  # get this from static data based on leg1 symbol
+        self.leg1_fx_tob: TopOfBookBaseModel | None = None
+        self.leg1_fx_symbol_overview: SymbolOverviewBaseModel | None = None
 
         self._cancel_orders: List[CancelOrderBaseModel] | None = None
         self._cancel_orders_update_date_time: DateTime = DateTime.utcnow()
@@ -463,6 +486,9 @@ class StratCache:
         self._market_depths_conts: List[MarketDepthsCont] | None = None
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
+    def get_key(self):
+        return f"{get_pair_strat_key(self._pair_strat)}"
+
     def __str__(self):
         return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.leg1_trading_symbol},  " \
                f"secondary_leg_trading_symbol: {self.leg2_trading_symbol}, pair_strat: {self._pair_strat}, " \
@@ -470,6 +496,6 @@ class StratCache:
                f"strat_brief: {self._strat_brief}, cancel_orders: [{self._cancel_orders}], " \
                f"new_orders: [{self._new_orders}], order_snapshots: {self._order_snapshots}, " \
                f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
-               f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self.symbol_overviews]}, " \
-               f"top of books: {self._top_of_books}, " \
-               f"market_depth: {[str(market_depth) for market_depth in self._market_depths_conts]}"
+               f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self.symbol_overviews] if self.symbol_overviews else str(None)}, " \
+               f"top of books: {[str(top_of_book) for top_of_book in self._top_of_books] if self._top_of_books else str(None)}, " \
+               f"market_depth: {[str(market_depth) for market_depth in self._market_depths_conts] if self._market_depths_conts else str(None)}"

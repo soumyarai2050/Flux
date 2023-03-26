@@ -154,7 +154,7 @@ message Broker{
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
 message Security{
     required string sec_id = 1 [(FluxFldUIPlaceholder) = "SelectSecurity", (FluxFldSticky) = true];
-    optional SecurityType sec_type = 2 [default = SEC_TYPE_UNSPECIFIED];
+    optional SecurityType sec_type = 2 [default = SEC_TYPE_UNSPECIFIED, (FluxFldHide) = "True"];
 }
 
 message MaxNotional{

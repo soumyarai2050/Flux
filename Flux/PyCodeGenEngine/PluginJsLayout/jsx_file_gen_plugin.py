@@ -64,7 +64,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         message_name_camel_cased = message_name[0].lower() + message_name[1:]
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "import {\n"
-            output_str += f"    getAll{message_name}, set{message_name}Array, set{message_name}, setModified{message_name}, resetError\n"
+            output_str += f"    getAll{message_name}, resetError, set{message_name}Ws\n"
         elif layout_type == JsxFileGenPlugin.non_root_type:
             output_str += "import {\n"
             output_str += f"    getAll{message_name}, get{message_name}, create{message_name}, update{message_name},\n"
@@ -140,23 +140,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         return output_str
 
     def handle_non_abbreviated_return(self, message_name: str, message_name_camel_cased: str, layout_type: str) -> str:
-        if layout_type == JsxFileGenPlugin.repeated_root_type or layout_type == JsxFileGenPlugin.repeated_non_root_type:
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str = "    const onCloseConfirmPopup = () => { }\n\n"
-            output_str += '    const onClearFilter = () => {\n'
-            output_str += f'        dispatch(set{message_name}({message_name_camel_cased}Array));\n'
-            output_str += '    }\n\n'
             output_str += '    let menu = (\n'
             output_str += '        <DynamicMenu\n'
             output_str += '            collections={collections}\n'
             output_str += '            currentSchema={currentSchema}\n'
             output_str += '            commonKeyCollections={commonKeyCollections}\n'
-            output_str += '            data={modified'+f'{message_name}'+'}\n'
+            output_str += '            data={modifiedData}\n'
             output_str += '            disabled={mode !== Modes.EDIT_MODE}\n'
             output_str += '            filter={filter}\n'
             output_str += '            onFilterChange={setFilter}\n'
             output_str += '            onButtonToggle={onButtonToggle}\n'
-            output_str += '            onApplyFilter={onApplyFilter}\n'
-            output_str += '            onClearFilter={onClearFilter}\n'
             output_str += '        />\n'
             output_str += '    )\n\n'
         else:
@@ -256,8 +251,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                        mode: mode,\n"
             output_str += "                        layout: props.layout,\n"
         output_str += "                        menu: menu,\n"
-        if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type or \
-                layout_type == JsxFileGenPlugin.repeated_non_root_type:
+        if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type:
             if layout_type != JsxFileGenPlugin.repeated_root_type:
                 output_str += "                        onChangeMode: onChangeMode,\n"
                 output_str += "                        onChangeLayout: props.onChangeLayout,\n"
@@ -266,8 +260,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    }}\n"
             output_str += "                    name={props.name}\n"
             output_str += "                    schema={schema}\n"
-            output_str += "                    data={modified"+f"{message_name}"+"}\n"
-            output_str += "                    originalData={"+f"{message_name_camel_cased}"+"}\n"
+            if layout_type == JsxFileGenPlugin.repeated_root_type:
+                output_str += "                    data={modifiedData}\n"
+                output_str += "                    originalData={originalData}\n"
+            else:
+                output_str += "                    data={modified" + f"{message_name}" + "}\n"
+                output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
         else:
             root_msg_name = self.root_message.proto.name
             root_message_name_camel_cased = root_msg_name[0].lower() + root_msg_name[1:]
@@ -299,10 +297,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                        mode: mode,\n"
         output_str += "                        layout: props.layout,\n"
         output_str += "                        menu: menu,\n"
-        if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type or \
-                layout_type == JsxFileGenPlugin.repeated_non_root_type:
-            if layout_type != JsxFileGenPlugin.repeated_root_type and \
-                    layout_type != JsxFileGenPlugin.repeated_non_root_type:
+        if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type:
+            if layout_type != JsxFileGenPlugin.repeated_root_type:
                 output_str += "                        onChangeMode: onChangeMode,\n"
             output_str += "                        onChangeLayout: props.onChangeLayout,\n"
             output_str += "                        onSave: onSave,\n"
@@ -310,8 +306,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    }}\n"
             output_str += "                    name={props.name}\n"
             output_str += "                    schema={schema}\n"
-            output_str += "                    data={modified"+f"{message_name}"+"}\n"
-            output_str += "                    originalData={"+f"{message_name_camel_cased}"+"}\n"
+            if layout_type == JsxFileGenPlugin.repeated_root_type:
+                output_str += "                    data={modifiedData}\n"
+                output_str += "                    originalData={originalData}\n"
+            else:
+                output_str += "                    data={modified" + f"{message_name}" + "}\n"
+                output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
         else:
             root_msg_name = self.root_message.proto.name
             root_message_name_camel_cased = root_msg_name[0].lower() + root_msg_name[1:]
@@ -357,17 +357,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str = ""
         match layout_type:
             case JsxFileGenPlugin.repeated_root_type:
-                output_str += "    const { " + f"{message_name_camel_cased}Array, {message_name_camel_cased}, " \
-                              f"modified{message_name}, loading, error " + \
+                output_str += "    const { " + f"{message_name_camel_cased}, loading, error " + \
                               "} = useSelector(state => " + f"state.{message_name_camel_cased});\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
-                output_str += "    const [getAllWebsocket, setGetAllWebsocket] = useState();\n"
-                output_str += "    const [userChanges, setUserChanges] = useState({});\n"
-                output_str += "    const [discardedChanges, setDiscardedChanges] = useState({});\n"
-                output_str += "    const [changes, setChanges] = useState({});\n"
-                output_str += "    const [openPopup, setOpenPopup] = useState(false);\n"
-                output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
+                output_str += "    const [discardedChanges,] = useState({});\n"
+                output_str += "    const [changes,] = useState({});\n"
+                output_str += "    const [openPopup,] = useState(false);\n"
+                output_str += "    const [openConfirmSavePopup,] = useState(false);\n"
                 output_str += "    const [filter, setFilter] = useState({});\n"
                 output_str += "    const dict = useRef({});\n"
             case JsxFileGenPlugin.root_type:
@@ -597,13 +594,17 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type:
             if layout_type == JsxFileGenPlugin.repeated_root_type:
                 output_str += "    let uiLimit = currentSchema.ui_get_all_limit;\n"
-            output_str += "    useEffect(() => {\n"
-            output_str += f"        dispatch(getAll{message_name}());\n"
-            output_str += "    }, []);\n\n"
-            output_str += "    useEffect(() => {\n"
-            output_str += f"        let updatedData = addxpath(cloneDeep({message_name_camel_cased}));\n"
-            output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
-            output_str += "    }, "+f"[{message_name_camel_cased}])\n\n"
+                output_str += "    useEffect(() => {\n"
+                output_str += f"        dispatch(getAll{message_name}());\n"
+                output_str += "    }, []);\n\n"
+            else:
+                output_str += "    useEffect(() => {\n"
+                output_str += f"        dispatch(getAll{message_name}());\n"
+                output_str += "    }, []);\n\n"
+                output_str += "    useEffect(() => {\n"
+                output_str += f"        let updatedData = addxpath(cloneDeep({message_name_camel_cased}));\n"
+                output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
+                output_str += "    }, "+f"[{message_name_camel_cased}])\n\n"
         elif layout_type == JsxFileGenPlugin.abbreviated_type:
             output_str += "    let collections = schemaCollections[props.name];\n\n"
             output_str += "    let bufferedKeyName = collections.filter(collection => collection.key.includes" \
@@ -628,8 +629,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "    }, []);\n\n"
         if layout_type != JsxFileGenPlugin.non_root_type:
-            if layout_type != JsxFileGenPlugin.repeated_root_type and \
-                    layout_type != JsxFileGenPlugin.repeated_non_root_type:
+            if layout_type != JsxFileGenPlugin.repeated_root_type:
                 output_str += "    useEffect(() => {\n"
                 output_str += f"        if ({message_name_camel_cased}Array.length > 0 && !selected{message_name}Id) "+"{\n"
                 output_str += f"            let object = getObjectWithLeastId({message_name_camel_cased}Array);\n"
@@ -647,85 +647,55 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        }\n"
                 output_str += "    }, "+f"[{abbreviated_dependent_msg_name_camel_cased}, " \
                                         f"selected{self.abbreviated_dependent_message_name}Id])\n\n"
-            output_str += "    useEffect(() => {\n"
-            output_str += "        let socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
-                          "'ws')}/get-all-"+f"{message_name_snake_cased}"+"-ws`);\n"
-            output_str += "        setGetAllWebsocket(socket);\n"
-            output_str += "        // close the websocket on re-render\n"
-            output_str += "        return () => socket.close();\n"
-            output_str += "    }, [])\n\n"
             if layout_type == JsxFileGenPlugin.repeated_root_type:
-                output_str += "    const onApplyFilter = () => {\n"
-                output_str += f"        let updatedData = cloneDeep({message_name_camel_cased}Array);\n"
-                output_str += "        Object.keys(filter).forEach(key => {\n"
-                output_str += '            let values = filter[key].split(",").map(val => ' \
-                              'val.trim()).filter(val => val !== "");\n'
-                output_str += f"            updatedData = updatedData.filter(data => " \
-                              f"values.includes(_.get(data, key)))\n"
-                output_str += "        })\n"
-                output_str += f"        dispatch(set{message_name}(updatedData));\n"
-                output_str += "    }\n\n"
-                output_str += "    const applyWebSocketUpdate = (arr, obj, uiLimit) => {\n"
-                output_str += "        let updatedArr = arr.filter(o => o[DB_ID] !== obj[DB_ID]);\n"
-                output_str += "        // if obj is not deleted object\n"
-                output_str += "        if (Object.keys(obj) !== 1) {\n"
-                output_str += "            let index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);\n"
-                output_str += "            // if index is not equal to -1, it is updated obj. If updated, " \
-                              "replace the obj at the index\n"
-                output_str += "            if (index !== -1) {\n"
-                output_str += "                updatedArr.splice(index, 0, obj);\n"
-                output_str += "            } else {\n"
-                output_str += "                if (uiLimit) {\n"
-                output_str += "                    // if uiLimit is positive, remove the top object and add " \
-                              "the latest obj at the end\n"
-                output_str += "                    // otherwise remove the last object and add the latest " \
-                              "obj at the top\n"
-                output_str += "                    if (uiLimit >= 0) {\n"
-                output_str += "                        if(updatedArr.length >= Math.abs(uiLimit)) {\n"
-                output_str += "                            updatedArr.shift();\n"
-                output_str += "                        }\n"
-                output_str += "                        updatedArr.push(obj);\n"
-                output_str += "                    } else {\n"
-                output_str += "                        if(updatedArr.length >= Math.abs(uiLimit)) {\n"
-                output_str += "                            updatedArr.pop();\n"
-                output_str += "                        }\n"
-                output_str += "                        updatedArr.splice(0, 0, obj);\n"
-                output_str += "                    }\n"
-                output_str += "                } else {\n"
-                output_str += "                    updatedArr.push(obj);\n"
-                output_str += "                }\n"
-                output_str += "            }\n"
-                output_str += "        }\n"
-                output_str += "        return updatedArr;\n"
-                output_str += "    }\n\n"
                 output_str += "    const flush = useCallback(() => {\n"
                 output_str += "        if (_.keys(dict.current).length > 0) {\n"
-                output_str += f"            let updated{message_name} = cloneDeep({message_name_camel_cased});\n"
-                output_str += f"            let updated{message_name}Array = cloneDeep({message_name_camel_cased}Array);\n"
-                output_str += "            _.entries(dict.current).map(([k, v]) => {\n"
-                output_str += "                let updatedData = v;\n"
-                output_str += f"                updated{message_name} = applyWebSocketUpdate(updated{message_name}, updatedData, uiLimit);\n"
-                output_str += f"                updated{message_name}Array = applyWebSocketUpdate(updated{message_name}Array, updatedData, uiLimit);\n"
-                output_str += "            })\n"
+                output_str += f"            dispatch(set{message_name}Ws(" \
+                              "{ dict: cloneDeep(dict.current), uiLimit }));\n"
                 output_str += "            dict.current = {};\n"
-                output_str += f"            dispatch(set{message_name}(updated{message_name}));\n"
-                output_str += f"            dispatch(set{message_name}Array(updated{message_name}Array));\n"
                 output_str += "        }\n"
-                output_str += "    }, "+f"[dict, {message_name_camel_cased}, {message_name_camel_cased}Array])\n\n"
-            output_str += "    useEffect(() => {\n"
-            output_str += "        if (getAllWebsocket) {\n"
-            output_str += "            getAllWebsocket.onmessage = (event) => {\n"
-            output_str += "                let updatedData = JSON.parse(event.data);\n"
-            output_str += "                if (Array.isArray(updatedData)) {\n"
-            if layout_type == JsxFileGenPlugin.repeated_root_type:
-                output_str += f"                    dispatch(set{message_name}(updatedData));\n"
-                output_str += f"                    dispatch(set{message_name}Array(updatedData));\n"
-                output_str += "                } else if (_.isObject(updatedData)) {\n"
-                output_str += f"                    dict.current[updatedData[DB_ID]] = updatedData;\n"
-                output_str += "                }\n"
-                output_str += "                setTimeout(flush, 100);\n"
+                output_str += "    }, "+f"[])\n\n"
+                output_str += "    useEffect(() => {\n"
+                output_str += "        let socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/get-all-" \
+                              f"{message_name_snake_cased}-ws`);\n"
+                output_str += "        socket.onmessage = (event) => {\n"
+                output_str += "            let updatedData = JSON.parse(event.data);\n"
+                output_str += "            if (Array.isArray(updatedData)) {\n"
+                output_str += "                updatedData.forEach(o => {\n"
+                output_str += "                    dict.current[o[DB_ID]] = o;\n"
+                output_str += "                })\n"
+                output_str += "            } else if (_.isObject(updatedData)) {\n"
+                output_str += "                dict.current[updatedData[DB_ID]] = updatedData;\n"
                 output_str += "            }\n"
+                output_str += "            setTimeout(flush, 100);\n"
+                output_str += "        }\n"
+                output_str += "        socket.onclose = (event) => {\n"
+                output_str += "            setMode(Modes.DISABLED_MODE);\n"
+                output_str += "        }\n"
+                output_str += "        // close the websocket on re-render\n"
+                output_str += "        return () => socket.close();\n"
+                output_str += "    }, [])\n\n"
+                output_str += "    const applyFilter = (arr) => {\n"
+                output_str += "        let updatedArr = cloneDeep(arr);\n"
+                output_str += "        Object.keys(filter).forEach(key => {\n"
+                output_str += '            let values = filter[key].split(",").map(val => val.trim()).filter(val => val !== "");\n'
+                output_str += "            updatedArr = updatedArr.filter(data => values.includes(_.get(data, key)))\n"
+                output_str += "        })\n"
+                output_str += "        return updatedArr;\n"
+                output_str += "    }\n\n"
             else:
+                output_str += "    useEffect(() => {\n"
+                output_str += "        let socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
+                              "'ws')}/get-all-" + f"{message_name_snake_cased}" + "-ws`);\n"
+                output_str += "        setGetAllWebsocket(socket);\n"
+                output_str += "        // close the websocket on re-render\n"
+                output_str += "        return () => socket.close();\n"
+                output_str += "    }, [])\n\n"
+                output_str += "    useEffect(() => {\n"
+                output_str += "        if (getAllWebsocket) {\n"
+                output_str += "            getAllWebsocket.onmessage = (event) => {\n"
+                output_str += "                let updatedData = JSON.parse(event.data);\n"
+                output_str += "                if (Array.isArray(updatedData)) {\n"
                 output_str += "                    if (updatedData.length === 0) {\n"
                 output_str += f"                        dispatch(resetSelected{message_name}Id());\n"
                 output_str += "                    }\n"
@@ -744,18 +714,20 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                }\n"
                 output_str += "            }\n"
             output_str += "\n"
-            output_str += "            getAllWebsocket.onclose = (event) => {\n"
-            if layout_type == self.root_type or layout_type == self.repeated_root_type:
-                output_str += "                setMode(Modes.DISABLED_MODE);\n"
-                output_str += "            }\n"
-                output_str += "        }\n"
-                output_str += "    }, "+f"[getAllWebsocket, {message_name_camel_cased}, " \
-                                        f"{message_name_camel_cased}Array])\n\n"
-            else:
-                output_str += "                dispatch(setMode(Modes.DISABLED_MODE));\n"
-                output_str += "            }\n"
-                output_str += "        }\n"
-                output_str += "    }, [getAllWebsocket])\n\n"
+            if layout_type != JsxFileGenPlugin.repeated_root_type:
+                if layout_type == JsxFileGenPlugin.root_type:
+                    output_str += "            getAllWebsocket.onclose = (event) => {\n"
+                    output_str += "                setMode(Modes.DISABLED_MODE);\n"
+                    output_str += "            }\n"
+                    output_str += "        }\n"
+                    output_str += "    }, "+f"[getAllWebsocket, {message_name_camel_cased}, " \
+                                            f"{message_name_camel_cased}Array])\n\n"
+                else:
+                    output_str += "            getAllWebsocket.onclose = (event) => {\n"
+                    output_str += "                dispatch(setMode(Modes.DISABLED_MODE));\n"
+                    output_str += "            }\n"
+                    output_str += "        }\n"
+                    output_str += "    }, [getAllWebsocket])\n\n"
 
         if layout_type == JsxFileGenPlugin.abbreviated_type:
             output_str += "    useEffect(() => {\n"
@@ -774,7 +746,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        }\n"
             output_str += "    }"+f", [{message_name_camel_cased}])\n\n\n"
         else:
-            if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type:
+            if layout_type == JsxFileGenPlugin.root_type:
                 output_str += "    useEffect(() => {\n"
                 output_str += f"        let updatedData = addxpath(cloneDeep({message_name_camel_cased}));\n"
                 output_str += f"        _.keys(userChanges).map(xpath => "+"{\n"
@@ -782,16 +754,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        })\n"
                 output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
                 output_str += "    }, " + f"[{message_name_camel_cased}])\n\n"
-                if JsxFileGenPlugin.root_type == layout_type:
-                    output_str += "    useEffect(() => {\n"
-                    output_str += "        if (selected"+f"{message_name}"+"Id) {\n"
-                    output_str += "            let socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
-                                  "'ws')}/get-"+f"{message_name_snake_cased}"+"-ws/${selected"+f"{message_name}"+"Id}`);\n"
-                    output_str += "            setWebsocket(socket);\n"
-                    output_str += "            // close the websocket on re-render\n"
-                    output_str += "            return () => socket.close();\n"
-                    output_str += "        }\n"
-                    output_str += "    }, [selected"+f"{message_name}"+"Id])\n\n"
+                output_str += "    useEffect(() => {\n"
+                output_str += "        if (selected"+f"{message_name}"+"Id) {\n"
+                output_str += "            let socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
+                              "'ws')}/get-"+f"{message_name_snake_cased}"+"-ws/${selected"+f"{message_name}"+"Id}`);\n"
+                output_str += "            setWebsocket(socket);\n"
+                output_str += "            // close the websocket on re-render\n"
+                output_str += "            return () => socket.close();\n"
+                output_str += "        }\n"
+                output_str += "    }, [selected"+f"{message_name}"+"Id])\n\n"
+            elif layout_type == JsxFileGenPlugin.repeated_root_type:
+                output_str += f"    let originalData = applyFilter({message_name_camel_cased});\n"
+                output_str += f"    let modifiedData = addxpath(cloneDeep(originalData));\n"
             else:
                 dependent_msg_name = self.root_message.proto.name
                 dependent_msg_name_snake_cased = convert_camel_case_to_specific_case(dependent_msg_name)
@@ -982,9 +956,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }\n\n"
         else:
             output_str += f"    let collections = schemaCollections[props.name];\n"
-            if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type:
-                output_str += f"    let rows = getTableRows(collections, " \
-                              f"{message_name_camel_cased}, modified{message_name});\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += f"    let rows = getTableRows(collections, {message_name_camel_cased}, " \
+                              f"modified{message_name});\n"
+            elif layout_type == JsxFileGenPlugin.repeated_root_type:
+                output_str += f"    let rows = getTableRows(collections, originalData, modifiedData);\n"
             else:
                 root_message_name = self.root_message.proto.name
                 root_message_name_camel_cased = root_message_name[0].lower() + root_message_name[1:]
@@ -1072,13 +1048,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }\n\n"
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type or \
                 layout_type == JsxFileGenPlugin.repeated_non_root_type:
-            output_str += "    const onChangeMode = () => {\n"
-            output_str += "        setMode(Modes.EDIT_MODE);\n"
-            output_str += "    }\n\n"
-            output_str += "    const onReload = () => {\n"
             if layout_type == JsxFileGenPlugin.repeated_root_type:
+                output_str += "    const onReload = () => {\n"
                 output_str += f"        dispatch(getAll{message_name}());\n"
             else:
+                output_str += "    const onChangeMode = () => {\n"
+                output_str += "        setMode(Modes.EDIT_MODE);\n"
+                output_str += "    }\n\n"
+                output_str += "    const onReload = () => {\n"
                 output_str += f"        if (selected{message_name}Id) "+"{\n"
                 output_str += f"            let updatedData = addxpath(cloneDeep({message_name_camel_cased}));\n"
                 output_str += f"            dispatch(setModified{message_name}(updatedData));\n"
@@ -1247,6 +1224,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        setOpenConfirmSavePopup(false);\n"
                 output_str += "    }\n"
             elif layout_type == JsxFileGenPlugin.repeated_root_type:
+                output_str += "    const onChangeMode = () => { }\n\n"
                 output_str += "    const onUpdate = () => { }\n\n"
                 output_str += "    const onSave = () => { }\n\n"
                 output_str += "    const onUserChange = () => { }\n\n"
@@ -1274,7 +1252,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        setSearchValue('');\n"
             output_str += "    }\n\n"
         else:
-            if layout_type == JsxFileGenPlugin.repeated_root_type or layout_type == JsxFileGenPlugin.repeated_non_root_type:
+            if layout_type == JsxFileGenPlugin.repeated_root_type:
                 output_str += "    const onClosePopup = () => { }\n\n"
             else:
                 output_str += "\n"
@@ -1282,7 +1260,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if layout_type != JsxFileGenPlugin.non_root_type:
                     output_str += "        setChanges({ [xpath]: value });\n"
                     output_str += f"        if ({message_name_camel_cased}[DB_ID]) "+"{\n"
-                    output_str += f"            onSave(null, true);\n"
+                    output_str += f"            onSave(null);\n"
                     output_str += "        }\n"
                     output_str += "    }\n\n"
                 else:

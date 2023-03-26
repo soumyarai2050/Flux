@@ -41,7 +41,7 @@ class TradingLinkBase:
 
     @classmethod
     @abstractmethod
-    def place_new_order(cls, px: float, qty: int, side: Side, sec_id: str, system_sec_id: str,
+    def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
                         account: str, exchange: str | None = None, text: List[str] | None = None) -> bool:
         """derived to implement connector to underlying link provider, return True if place order is successful"""
         return False

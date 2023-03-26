@@ -4,6 +4,8 @@
     justify-content: flex-start;
     background-color: cadetblue;
     flex-wrap: wrap;
+    max-height: 100px;
+    overflow: auto;
 }
 
 .item {

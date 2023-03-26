@@ -44,7 +44,7 @@ const Layout = (props) => {
         className: 'layout',
         rowHeight: 25,
         margin: { lg: [8, 8], md: [5, 5] },
-        preventCollision: true,
+        preventCollision: false,
         allowOverlap: false,
         autoSize: false,
         isBounded: false,

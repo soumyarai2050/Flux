@@ -1,4 +1,6 @@
+import inspect
 import os
+import sys
 import time
 from pathlib import PurePath
 from threading import Thread
@@ -12,7 +14,7 @@ from Flux.CodeGenProjects.addressbook.app.trading_data_manager import TradingDat
 from Flux.CodeGenProjects.addressbook.app.strat_cache import *
 from Flux.CodeGenProjects.addressbook.app.trading_link import get_trading_link, TradingLinkBase, config_dict
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import \
-    get_consumable_participation_qty_http, create_alert
+    get_consumable_participation_qty_http, create_alert, get_pair_strat_key, get_portfolio_limits
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import *
 
 
@@ -28,11 +30,12 @@ class StratExecutor:
     """ 1 instance = 1 thread = 1 pair strat"""
 
     def __init__(self, trading_data_manager: TradingDataManager, strat_cache: StratCache):
+        self.pair_strat_id: str | None = None
         self.is_test_run: bool = config_dict.get("is_test_run")
+
         self.trading_data_manager: TradingDataManager = trading_data_manager
         self.strat_cache: StratCache = strat_cache
-        self.trading_account = "trading-account"
-        self.exchange = "exchange"
+        self.leg1_fx: float | None = None
 
         self._portfolio_status_update_date_time: DateTime | None = None
         self._strat_brief_update_date_time: DateTime | None = None
@@ -89,15 +92,29 @@ class StratExecutor:
         symbol_overviews: List[SymbolOverviewBaseModel] = \
             self.trading_link.market_data_service_web_client.get_all_symbol_overview_client()
         if symbol_overviews:
-            for symbol_overview in symbol_overviews:
-                self.strat_cache.set_symbol_overview(symbol_overview)
+            for symbol_overview_ in symbol_overviews:
+                self.trading_data_manager.handle_symbol_overview_ws(symbol_overview_)
+            self.get_leg1_fx()  # internally looks up the updated fx symbol overview form above and updates it
 
     def update_tobs_from_http(self):
-        tobs: List[TopOfBookBaseModel] = \
+        tobs: List[TopOfBookBaseModel] | None = \
             self.trading_link.market_data_service_web_client.get_all_top_of_book_client()
         if tobs:
             for tob in tobs:
-                self.strat_cache.set_top_of_book(tob)
+                self.trading_data_manager.handle_top_of_book_ws()
+            # if we need fx TOB: self.strat_cache needs to collect reference here (like we do in symbol_overview)
+
+    def update_strat_brief_from_http(self):
+        strat_briefs: List[StratBriefBaseModel] | None = \
+            self.trading_link.strat_manager_service_web_client.get_all_strat_brief_client()
+        if strat_briefs:
+            for strat_brief in strat_briefs:
+                self.strat_cache.set_strat_brief(strat_brief)
+
+    def update_portfolio_limits_from_http(self):
+        portfolio_limits: PortfolioLimitsBaseModel | None = get_portfolio_limits()
+        if portfolio_limits:
+            self.trading_data_manager.trading_cache.set_portfolio_limits(portfolio_limits)
 
     def get_market_depths(self, symbol: str, side: Side) -> List[MarketDepthBaseModel]:
         market_depths = self.trading_link.market_data_service_web_client.get_market_depth_from_index_client(symbol)
@@ -187,8 +204,13 @@ class StratExecutor:
         return False
 
     def place_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
-                        order_limits: OrderLimitsBaseModel, px: float, qty,
-                        side: Side, trading_symbol: str, system_symbol: str, account: str, exchange: str) -> bool:
+                        order_limits: OrderLimitsBaseModel, px: float, usd_px: float, qty: int,
+                        side: Side, system_symbol: str) -> bool:
+        trading_symbol, account, exchange = self.strat_cache.get_metadata(system_symbol)
+        if trading_symbol is None or account is None or exchange is None:
+            logging.error(f"unable to send order, couldn't find metadata for: symbol {system_symbol}, meta-data:"
+                          f" trading_symbol: {trading_symbol}, account: {account}, exch: {exchange}")
+            return False
         # block new order if any prior unack order exist
         if self.check_unack(system_symbol):
             error_msg: str = f"past order on symbol {system_symbol} is in unack state, dropping order with " \
@@ -196,7 +218,7 @@ class StratExecutor:
             logging.error(error_msg)
             return False
 
-        if self.check_new_order(top_of_book, strat_brief, order_limits, px, qty, side, system_symbol, account,
+        if self.check_new_order(top_of_book, strat_brief, order_limits, px, usd_px, qty, side, system_symbol, account,
                                 exchange):
             # set unack for subsequent orders this symbol to be blocked until this order goes through
             self.set_unack(system_symbol, True)
@@ -209,8 +231,8 @@ class StratExecutor:
         else:
             return False
 
-    def check_strat_limits(self, strat_brief: StratBriefBaseModel, px: float, qty: int, side: Side,
-                           order_notional: float, system_symbol: str):
+    def check_strat_limits(self, strat_brief: StratBriefBaseModel, px: float, usd_px: float, qty: int, side: Side,
+                           order_usd_notional: float, system_symbol: str):
         # max_open_orders_per_side check
         check_passed = True
         symbol_overview: SymbolOverviewBaseModel | None = None
@@ -234,10 +256,10 @@ class StratExecutor:
                 check_passed = False
 
             # covers: max cb notional, max open cb notional & max net filled notional (validate)
-            if order_notional > strat_brief.pair_sell_side_trading_brief.consumable_notional:
+            if order_usd_notional > strat_brief.pair_sell_side_trading_brief.consumable_notional:
                 logging.error(f"blocked generated SELL order, breaches available consumable notional, expected less "
                               f"than: {strat_brief.pair_sell_side_trading_brief.consumable_notional}, order needs: "
-                              f"{order_notional} - the check covers: max cb notional, max open cb notional, "
+                              f"{order_usd_notional} - the check covers: max cb notional, max open cb notional, "
                               f"max net filled notional, ")
                 check_passed = False
 
@@ -270,10 +292,10 @@ class StratExecutor:
                 logging.error(f"blocked generated BUY order, not enough consumable_open_orders: "
                               f"{strat_brief.pair_buy_side_trading_brief.consumable_open_orders} ")
                 check_passed = False
-            if order_notional > strat_brief.pair_buy_side_trading_brief.consumable_notional:
+            if order_usd_notional > strat_brief.pair_buy_side_trading_brief.consumable_notional:
                 logging.error(f"blocked generated BUY order, breaches available consumable notional, expected less "
                               f"than: {strat_brief.pair_buy_side_trading_brief.consumable_notional}, order needs: "
-                              f"{order_notional} ")
+                              f"{order_usd_notional} ")
                 check_passed = False
             # limit up - TODO : Important : Upgrade this to support trading at Limit Up within the limit Up limit
             if px > symbol_overview.limit_up_px:
@@ -362,7 +384,7 @@ class StratExecutor:
             max_px_by_deviation: float = top_of_book.last_trade.px + (
                     top_of_book.last_trade.px / 100 * order_limits.max_px_deviation)
             max_px_by_basis_point: float = aggressive_quote.px + (aggressive_quote.px / 100 * (
-                        order_limits.max_basis_points / 100))
+                    order_limits.max_basis_points / 100))
             return min(max_px_by_basis_point, max_px_by_deviation, px_by_max_level)
 
         else:
@@ -378,19 +400,19 @@ class StratExecutor:
             return max(min_px_by_deviation, min_px_by_basis_point, px_by_max_level)
 
     def check_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
-                        order_limits: OrderLimitsBaseModel, px: float,
+                        order_limits: OrderLimitsBaseModel, px: float, usd_px: float,
                         qty: int, side: Side, system_symbol: str, account: str, exchange: str) -> bool:
         pair_strat_tuple = self.strat_cache.get_pair_strat()
         checks_passed: bool = True
 
-        order_notional = px * qty
-        if order_limits.min_order_notional > order_notional:
+        order_usd_notional = usd_px * qty
+        if order_limits.min_order_notional > order_usd_notional:
             logging.warning(f"blocked order opportunity < min_order_notional limit: "
-                            f"{order_notional} < {order_limits.min_order_notional}")
+                            f"{order_usd_notional} < {order_limits.min_order_notional}")
             checks_passed = False
-        if order_limits.max_order_notional < order_notional:
+        if order_limits.max_order_notional < order_usd_notional:
             logging.error(f"blocked generated order, breaches max_order_notional limit, expected less than: "
-                          f"{order_limits.max_order_notional}, found: {order_notional} ")
+                          f"{order_limits.max_order_notional}, found: {order_usd_notional} ")
             checks_passed = False
         if order_limits.max_order_qty < qty:
             logging.error(f"blocked generated order, breaches max_order_qty limit, expected less than: "
@@ -414,7 +436,7 @@ class StratExecutor:
                           f"{self.strat_cache}")
             checks_passed = False
 
-        if not self.check_strat_limits(strat_brief, px, qty, side, order_notional, system_symbol):
+        if not self.check_strat_limits(strat_brief, px, usd_px, qty, side, order_usd_notional, system_symbol):
             checks_passed = False  # true only if no prior check failed
 
         if pair_strat_tuple:
@@ -437,10 +459,38 @@ class StratExecutor:
 
         return checks_passed
 
+    def retry_init_strat_cache(self):
+        while True:
+            done = True  # done is left unchanged (True) implies all required data checks succeeded
+            try:
+                if not self.pair_strat_id:
+                    self.pair_strat_id = get_pair_strat_key(self.strat_cache.get_pair_strat_())
+                    done = False
+                if not self.strat_cache.symbol_overviews:
+                    self.update_symbol_overviews_from_http()
+                    done = False
+                if not self.strat_cache.get_top_of_books():
+                    self.update_tobs_from_http()
+                    done = False
+                if not self.leg1_fx:
+                    self.update_symbol_overviews_from_http()
+                    done = False
+                if not self.strat_cache.get_strat_brief():
+                    self.update_strat_brief_from_http()
+                    done = False
+                if not self.trading_data_manager.trading_cache.get_portfolio_limits():
+                    self.update_portfolio_limits_from_http()
+                    done = False
+                if done:
+                    return
+            except Exception as e:
+                logging.error(f"strat retry-init failed! unable to proceed with strat: {self.pair_strat_id}, retrying!"
+                              f";;;exception: {e}, strat_cache: {self.strat_cache}")
+
     def run(self):
-        self.update_symbol_overviews_from_http()
-        self.update_tobs_from_http()
         ret_val: int = -5000
+        self.retry_init_strat_cache()
+
         while 1:
             try:
                 ret_val = self.internal_run()
@@ -449,11 +499,14 @@ class StratExecutor:
             finally:
                 if ret_val != 0:
                     logging.error(f"Error: Run returned, code: {ret_val} - sending again")
+                elif ret_val == 1:
+                    logging.info(f"explicit strat shutdown requested for: {self.pair_strat_id}, going down")
+                    break
                 else:
                     pair_strat, _ = self.strat_cache.get_pair_strat()
                     pair_strat_id: str = f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}_" \
                                          f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}_{pair_strat.id}"
-                    alert_brief: str = f"graceful shut down processing for strat: {pair_strat_id}"
+                    alert_brief: str = f"graceful shut down processing for strat: {self.pair_strat_id}"
                     alert_details: str = f"strat details: {self.strat_cache.get_pair_strat()}"
                     alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
                     if pair_strat.strat_status.strat_state != StratState.StratState_DONE:
@@ -462,12 +515,18 @@ class StratExecutor:
                         pair_strat_basemodel.strat_status.strat_state = StratState.StratState_DONE
                         pair_strat_basemodel.strat_status.strat_alerts = [alert]
                         self.trading_link.strat_manager_service_web_client.patch_pair_strat_client(pair_strat_basemodel)
-                        logging.debug(f"Pair Strat with id: {pair_strat_id} Marked Done")
+                        logging.debug(f"Pair Strat with id: {self.pair_strat_id} Marked Done")
                         ret_val = 0
                     else:
-                        logging.error(f"unexpected - Pair Strat with id {pair_strat_id} was already Marked Done")
+                        logging.error(f"unexpected - Pair Strat with id {self.pair_strat_id} was already Marked Done")
                         ret_val = -4000  # helps find the error location
                     break
+
+    def get_usd_px(self, px: float):
+        """
+        assumes single currency strat - may extend to accept symbol and send revised px according to underlying currency
+        """
+        return px / self.leg1_fx
 
     def _check_tob_n_place_non_systematic_order(self, new_order: NewOrderBaseModel, pair_strat: PairStratBaseModel,
                                                 strat_brief: StratBriefBaseModel, order_limits: OrderLimitsBaseModel,
@@ -489,11 +548,17 @@ class StratExecutor:
             logging.error(f"unable to send new_order: no matching leg in this strat: {new_order};;;"
                           f"strat: {self.strat_cache}, pair_strat: {pair_strat}")
             return False
-        order_placed: bool = self.place_new_order(trade_tob, strat_brief, order_limits, new_order.px, new_order.qty,
-                                                  new_order.side, trading_symbol=new_order.security.sec_id,
-                                                  system_symbol=new_order.security.sec_id,
-                                                  account=self.trading_account, exchange=self.exchange)
+
+        usd_px = self.get_usd_px(new_order.px)
+        order_placed: bool = self.place_new_order(trade_tob, strat_brief, order_limits, new_order.px, usd_px,
+                                                  new_order.qty, new_order.side,
+                                                  system_symbol=new_order.security.sec_id)
         return order_placed
+
+    def get_leg1_leg2_ratio(self, leg1_px: float, leg2_px: float):
+        if math.isclose(leg2_px, 0):
+            return 0
+        return leg1_px / leg2_px
 
     def _check_tob_and_place_order(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
                                    order_limits: OrderLimitsBaseModel, top_of_books: List[TopOfBookBaseModel]) -> bool:
@@ -510,10 +575,10 @@ class StratExecutor:
                 # process primary leg
                 if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:  # execute aggressive buy
                     if not (leg1_tob.ask_quote.qty == 0 or math.isclose(leg1_tob.ask_quote.px, 0)):
+                        ask_usd_px: float = self.get_usd_px(leg1_tob.ask_quote.px)
                         order_placed = self.place_new_order(leg1_tob, strat_brief, order_limits, leg1_tob.ask_quote.px,
-                                                            leg1_tob.ask_quote.qty,
-                                                            Side.BUY, self.strat_cache.leg1_trading_symbol,
-                                                            leg1_tob.symbol, self.trading_account, self.exchange)
+                                                            ask_usd_px, leg1_tob.ask_quote.qty,
+                                                            Side.BUY, leg1_tob.symbol)
                         if order_placed:
                             posted_leg1_notional = leg1_tob.ask_quote.px * leg1_tob.ask_quote.qty
                     else:
@@ -523,10 +588,10 @@ class StratExecutor:
                         return False
                 else:  # execute aggressive sell
                     if not (leg1_tob.bid_quote.qty == 0 or math.isclose(leg1_tob.bid_quote.px, 0)):
+                        bid_usd_px: float = self.get_usd_px(leg1_tob.bid_quote.px)
                         order_placed = self.place_new_order(leg1_tob, strat_brief, order_limits, leg1_tob.bid_quote.px,
-                                                            leg1_tob.bid_quote.qty,
-                                                            Side.SELL, self.strat_cache.leg1_trading_symbol,
-                                                            leg1_tob.symbol, self.trading_account, self.exchange)
+                                                            bid_usd_px, leg1_tob.bid_quote.qty,
+                                                            Side.SELL, leg1_tob.symbol)
                         if order_placed:
                             posted_leg1_notional = leg1_tob.bid_quote.px * leg1_tob.bid_quote.qty
                     else:
@@ -539,11 +604,10 @@ class StratExecutor:
                 # process secondary leg
                 if pair_strat.pair_strat_params.strat_leg2.side == Side.BUY:  # execute aggressive buy
                     if not (leg2_tob.ask_quote.qty == 0 or math.isclose(leg2_tob.ask_quote.px, 0)):
+                        ask_usd_px: float = self.get_usd_px(leg1_tob.ask_quote.px)
                         order_placed = self.place_new_order(leg2_tob, strat_brief, order_limits, leg2_tob.ask_quote.px,
-                                                            leg2_tob.ask_quote.qty, Side.BUY,
-                                                            trading_symbol=self.strat_cache.leg2_trading_symbol,
-                                                            system_symbol=leg2_tob.symbol,
-                                                            account=self.trading_account, exchange=self.exchange)
+                                                            ask_usd_px, leg2_tob.ask_quote.qty, Side.BUY,
+                                                            leg2_tob.symbol)
                         if order_placed:
                             posted_leg2_notional = leg2_tob.ask_quote.px * leg2_tob.ask_quote.qty
                     else:
@@ -553,11 +617,10 @@ class StratExecutor:
                         return False
                 else:  # execute aggressive sell
                     if not (leg2_tob.bid_quote.qty == 0 or math.isclose(leg2_tob.bid_quote.px, 0)):
+                        bid_usd_px: float = self.get_usd_px(leg1_tob.bid_quote.px)
                         order_placed = self.place_new_order(leg2_tob, strat_brief, order_limits, leg2_tob.bid_quote.px,
-                                                            leg2_tob.bid_quote.qty, Side.SELL,
-                                                            trading_symbol=self.strat_cache.leg2_trading_symbol,
-                                                            system_symbol=leg2_tob.symbol,
-                                                            account=self.trading_account, exchange=self.exchange)
+                                                            bid_usd_px, leg2_tob.bid_quote.qty, Side.SELL,
+                                                            leg2_tob.symbol)
                         if order_placed:
                             posted_leg2_notional = leg2_tob.bid_quote.px * leg2_tob.bid_quote.qty
                     else:
@@ -612,28 +675,62 @@ class StratExecutor:
             if buy_top_of_book.bid_quote.last_update_date_time == \
                     self._top_of_books_update_date_time:
                 if buy_top_of_book.bid_quote.px == 110:
-                    order_id = self.place_new_order(buy_top_of_book, strat_brief, order_limits, 100, 90, Side.BUY,
-                                                    buy_top_of_book.symbol, buy_top_of_book.symbol,
-                                                    self.trading_account, "Exch1")
+                    px = 100
+                    usd_px: float = self.get_usd_px(px)
+                    order_placed = self.place_new_order(buy_top_of_book, strat_brief, order_limits, px, usd_px, 90,
+                                                    Side.BUY, buy_top_of_book.symbol)
         elif sell_top_of_book is not None:
             if sell_top_of_book.ask_quote.last_update_date_time == \
                     self._top_of_books_update_date_time:
                 if sell_top_of_book.ask_quote.px == 120:
-                    order_id = self.place_new_order(sell_top_of_book, strat_brief, order_limits, 110, 70, Side.SELL,
-                                                    sell_top_of_book.symbol, sell_top_of_book.symbol,
-                                                    self.trading_account, "Exch1")
+                    px = 110
+                    usd_px: float = self.get_usd_px(px)
+                    order_placed = self.place_new_order(sell_top_of_book, strat_brief, order_limits, px, usd_px, 70,
+                                                        Side.SELL, sell_top_of_book.symbol)
         else:
             err_str_ = "TOB updates could not find any updated buy or sell tob"
             logging.error(err_str_)
             raise Exception(err_str_)
         return True
 
+    def get_leg1_fx(self):
+        if self.leg1_fx:
+            return self.leg1_fx
+        else:
+            if not self.strat_cache.leg1_fx_symbol_overview:
+                self.strat_cache.leg1_fx_symbol_overview = \
+                    StratCache.fx_symbol_overview_dict[self.strat_cache.leg1_fx_symbol]
+            if self.strat_cache.leg1_fx_symbol_overview and self.strat_cache.leg1_fx_symbol_overview.closing_px and \
+                    (not math.isclose(self.strat_cache.leg1_fx_symbol_overview.closing_px, 0)):
+                self.leg1_fx = self.strat_cache.leg1_fx_symbol_overview.closing_px
+                return self.leg1_fx
+            else:
+                return None
+
+    def process_cxl_request(self):
+        cancel_orders_and_date_tuple = self.strat_cache.get_cancel_orders(self._cancel_orders_update_date_time)
+        if cancel_orders_and_date_tuple is not None:
+            cancel_orders, self._cancel_orders_update_date_time = cancel_orders_and_date_tuple
+            if cancel_orders is not None:
+                final_slice = len(cancel_orders)
+                unprocessed_cancel_orders: List[CancelOrderBaseModel] = \
+                    cancel_orders[self._cancel_orders_processed_slice:final_slice]
+                self._cancel_orders_processed_slice = final_slice
+                for cancel_order in unprocessed_cancel_orders:
+                    self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side,
+                                                      cancel_order.security.sec_id)
+                if unprocessed_cancel_orders:
+                    return True
+        # all else return false - no cancel_order to process
+        return False
+
     def internal_run(self):
         while 1:
             self.strat_limit = None
             try:
                 if self.strat_cache.stopped:
-                    break
+                    self.strat_cache.set_pair_strat(None)
+                    return 1  # indicates explicit shutdown requested from server
                 self.strat_cache.notify_semaphore.acquire()
 
                 # 1. check if portfolio status has updated since we last checked
@@ -661,20 +758,7 @@ class StratExecutor:
                     return -1
 
                 # 3. check if any cxl order is requested and send out
-                cancel_orders_and_date_tuple = self.strat_cache.get_cancel_orders(self._cancel_orders_update_date_time)
-                if cancel_orders_and_date_tuple is not None:
-                    cancel_orders, self._cancel_orders_update_date_time = cancel_orders_and_date_tuple
-                    if cancel_orders is not None:
-                        final_slice = len(cancel_orders)
-                        unprocessed_cancel_orders: List[CancelOrderBaseModel] = \
-                            cancel_orders[self._cancel_orders_processed_slice:final_slice]
-                        self._cancel_orders_processed_slice = final_slice
-                        for cancel_order in unprocessed_cancel_orders:
-                            self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side,
-                                                              cancel_order.security.sec_id)
-                        if unprocessed_cancel_orders:
-                            continue
-                # else no cancel_order to process
+                self.process_cxl_request()
 
                 strat_brief: StratBriefBaseModel | None = None
                 # strat doesn't need to check if strat_brief is updated or not
@@ -688,7 +772,8 @@ class StratExecutor:
                         logging.error(f"strat_brief not found for strat-cache: [ {self.strat_cache} ], can't proceed")
                         continue  # go next run - we don't stop processing for one faulty strat_cache
                 else:
-                    logging.error(f"strat_brief_tuple not found for strat-cache: [ {self.strat_cache} ], can't proceed")
+                    logging.error(f"can't proceed! strat_brief_tuple not found for strat-cache: "
+                                  f"{self.strat_cache.get_key()};;;strat_cache: [ {self.strat_cache} ], ")
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
                 order_limits: OrderLimitsBaseModel | None = None
@@ -737,7 +822,12 @@ class StratExecutor:
                     logging.error(f"unexpected top_of_book_and_date_tuple is None for strat: {self.strat_cache}")
                     continue  # go next run - we don't stop processing for one faulty tob update
 
-                # 5. If any manual new_order requested: apply risk checks (maybe no strat param checks?) & send out
+                # 5. ensure leg1_fx is present - otherwise don't proceed - retry later
+                if not self.get_leg1_fx():
+                    logging.error(f"USD fx rate not found for strat, unable to proceed, fx symbol: "
+                                  f"{self.strat_cache.leg1_fx_symbol}, we'll retry in next attempt")
+
+                # 6. If any manual new_order requested: apply risk checks (maybe no strat param checks?) & send out
                 new_orders_and_date_tuple = self.strat_cache.get_new_orders(self._new_orders_update_date_time)
                 if new_orders_and_date_tuple is not None:
                     new_orders, self._new_orders_update_date_time = new_orders_and_date_tuple
@@ -752,8 +842,9 @@ class StratExecutor:
                                                                              order_limits, top_of_books)
                                 continue
                             else:
-                                # reject the order citing kill switch in force
-                                logging.error("Portfolio_status kill switch's state is True, so ignored "
+                                # kill switch in force - drop the order
+                                logging.error(f"Portfolio_status kill switch's is enabled, dropping non-systematic "
+                                              f"new-order request;;;new order: {new_order} "
                                               "non-systematic new order call")
                                 continue
                 # else no new_order to process, ignore and move to next step
@@ -768,7 +859,8 @@ class StratExecutor:
                     self._check_tob_and_place_order_test(pair_strat, strat_brief, order_limits, top_of_books)
                 continue  # all good - go next run
             except Exception as e:
-                logging.error(f"Run returned with exception - sending again, exception: {e}")
+                logging.error(f"Run returned with exception: {e};;;inspect.trace()[-1][3]: {inspect.trace()[-1][3]} "
+                              f"sys.exc_info: {str(sys.exc_info())}")
                 return -1
         # we are outside while 1 (strat processing loop) - graceful shut down this strat processing
         return 0

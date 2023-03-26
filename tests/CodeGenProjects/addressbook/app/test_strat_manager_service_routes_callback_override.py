@@ -1319,6 +1319,18 @@ def get_pair_strat_from_symbol(symbol: str):
                 pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id == symbol:
             return pair_strat_obj
 
+
+def get_order_snapshot_from_order_id(order_id) -> OrderSnapshotBaseModel | None:
+    order_snapshot_list = strat_manager_service_web_client.get_all_order_snapshot_client()
+    expected_order_snapshot: OrderSnapshotBaseModel | None = None
+    for order_snapshot in order_snapshot_list:
+        if order_snapshot.order_brief.order_id == order_id:
+            expected_order_snapshot = order_snapshot
+            break
+    assert expected_order_snapshot is not None
+    return expected_order_snapshot
+
+
 def test_clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_):
     # cleaning all collections
     clean_mongo_collections(mongo_server="mongodb://localhost:27017", database_name="addressbook_test",
@@ -1553,8 +1565,6 @@ def test_simulated_partial_fills(buy_sell_symbol_list, pair_strat_, expected_str
                                  last_trade_fixture_list, market_depth_basemodel_list,
                                  top_of_book_list_, buy_order_, sell_order_,
                                  total_loop_counts_per_side, residual_wait_sec):
-    fil_percent: int | None = TradingLinkBase.config_dict.get("fill_percent") \
-        if TradingLinkBase.config_dict is not None else None
     partial_filled_qty: int | None = None
     unfilled_amount: int | None = None
 
@@ -1604,17 +1614,7 @@ def test_simulated_partial_fills(buy_sell_symbol_list, pair_strat_, expected_str
         assert unfilled_amount * total_loop_counts_per_side == pair_strat_obj.strat_status.total_cxl_sell_qty
 
 
-def test_rej_orders(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
-                    expected_start_status_, symbol_overview_obj_list,
-                    last_trade_fixture_list, market_depth_basemodel_list,
-                    top_of_book_list_, buy_order_, sell_order_,
-                    total_loop_counts_per_side, residual_wait_sec):
-    # if simulate_new_to_reject_orders is True then test case fill check orders with OE_NEW and OE_REJ combination
-    simulate_new_to_reject_orders: bool | None = \
-        TradingLinkBase.config_dict.get("simulate_new_to_reject_orders") if TradingLinkBase.config_dict is not None else None
-    # if simulate_new_to_reject_orders is True then test case fill check orders with OE_ACK and OE_REJ combination
-    simulate_ack_to_reject_orders: bool | None = \
-        TradingLinkBase.config_dict.get("simulate_ack_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+def config_rej_counts():
     continues_buy_count: int | None = \
         TradingLinkBase.config_dict.get("continues_buy_count") if TradingLinkBase.config_dict is not None else None
     continues_buy_rej_count: int | None = \
@@ -1628,6 +1628,39 @@ def test_rej_orders(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
     assert continues_buy_rej_count is not None
     assert continues_sell_count is not None
     assert continues_sell_rej_count is not None
+    return continues_buy_count, continues_buy_rej_count, continues_sell_count, continues_sell_rej_count
+
+
+def verify_rej_orders(simulate_ack_to_reject_orders: bool, last_id: int | None,
+                      check_order_event: OrderEventType, symbol: str) -> int:
+    # internally checks order_journal is not None else raises assert exception internally
+    latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, symbol)
+    if last_id is None:
+        last_id = latest_order_journal.id
+    else:
+        assert last_id != latest_order_journal.id, f"No new order_journal received for event " \
+                                                   f"{check_order_event} sell_symbol"
+        last_id = latest_order_journal.id
+
+    if simulate_ack_to_reject_orders:
+        if check_order_event != OrderEventType.OE_REJ:
+            # internally checks fills_journal is not None else raises assert exception internally
+            latest_fill_journal = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id)
+    return last_id
+
+
+def test_rej_orders(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                    expected_start_status_, symbol_overview_obj_list,
+                    last_trade_fixture_list, market_depth_basemodel_list,
+                    top_of_book_list_, buy_order_, sell_order_,
+                    total_loop_counts_per_side, residual_wait_sec):
+    # if simulate_new_to_reject_orders is True then test case fill check orders with OE_NEW and OE_REJ combination
+    simulate_new_to_reject_orders: bool | None = \
+        TradingLinkBase.config_dict.get("simulate_new_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+    # if simulate_new_to_reject_orders is True then test case fill check orders with OE_ACK and OE_REJ combination
+    simulate_ack_to_reject_orders: bool | None = \
+        TradingLinkBase.config_dict.get("simulate_ack_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+    continues_buy_count, continues_buy_rej_count, continues_sell_count, continues_sell_rej_count = config_rej_counts()
 
     buy_order_counts = 0
     buy_rej_counts = 0
@@ -1659,19 +1692,8 @@ def test_rej_orders(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                     buy_rej_counts = 0
                     time.sleep(10)
 
-            # internally checks order_journal is not None else raises assert exception internally
-            latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, buy_symbol)
-            if last_id is None:
-                last_id = latest_order_journal.id
-            else:
-                assert last_id != latest_order_journal.id, f"No new order_journal received for event " \
-                                                           f"{check_order_event} buy_symbol"
-                last_id = latest_order_journal.id
-
-            if simulate_ack_to_reject_orders:
-                if check_order_event != OrderEventType.OE_REJ:
-                    # internally checks fills_journal is not None else raises assert exception internally
-                    latest_fill_journal = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id)
+            # internally contains assert checks
+            last_id = verify_rej_orders(simulate_ack_to_reject_orders, last_id, check_order_event, buy_symbol)
 
         # sell fills check
         last_id = None
@@ -1693,19 +1715,91 @@ def test_rej_orders(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                     sell_rej_counts = 0
                     time.sleep(10)
 
-            # internally checks order_journal is not None else raises assert exception internally
-            latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, sell_symbol)
-            if last_id is None:
-                last_id = latest_order_journal.id
-            else:
-                assert last_id != latest_order_journal.id, f"No new order_journal received for event " \
-                                                           f"{check_order_event} sell_symbol"
-                last_id = latest_order_journal.id
+            # internally contains assert checks
+            last_id = verify_rej_orders(simulate_ack_to_reject_orders, last_id, check_order_event, sell_symbol)
 
-            if simulate_ack_to_reject_orders:
-                if check_order_event != OrderEventType.OE_REJ:
-                    # internally checks fills_journal is not None else raises assert exception internally
-                    latest_fill_journal = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id)
+
+def verify_cxl_rej(last_id: int | None, check_order_event: OrderEventType, symbol: str) -> int:
+    # internally checks order_journal is not None else raises assert exception internally
+    latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, symbol)
+    if last_id is None:
+        last_id = latest_order_journal.id
+    else:
+        assert last_id != latest_order_journal.id, f"No new order_journal received for event " \
+                                                   f"{check_order_event} sell_symbol"
+        last_id = latest_order_journal.id
+
+    if check_order_event == OrderEventType.OE_CXL_REJ:
+        order_snapshot = get_order_snapshot_from_order_id(latest_order_journal.order.order_id)
+        if order_snapshot.order_brief.qty > order_snapshot.filled_qty:
+            assert order_snapshot.order_status == OrderStatusType.OE_ACKED
+        elif order_snapshot.order_brief.qty < order_snapshot.filled_qty:
+            assert order_snapshot.order_status == OrderStatusType.OE_OVER_FILLED
+        else:
+            assert order_snapshot.order_status == OrderStatusType.OE_FILLED
+
+    return last_id
+
+
+def test_cxl_rej(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                 expected_start_status_, symbol_overview_obj_list,
+                 last_trade_fixture_list, market_depth_basemodel_list,
+                 top_of_book_list_, buy_order_, sell_order_,
+                 total_loop_counts_per_side, residual_wait_sec):
+    simulate_cxl_rej_orders: bool | None = \
+        TradingLinkBase.config_dict.get("simulate_cxl_rej_orders") if TradingLinkBase.config_dict is not None else None
+    assert simulate_cxl_rej_orders
+    continues_buy_count, continues_buy_rej_count, continues_sell_count, continues_sell_rej_count = config_rej_counts()
+
+    buy_order_counts = 0
+    buy_cxl_rej_counts = 0
+    sell_order_counts = 0
+    sell_cxl_rej_counts = 0
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list)
+        # buy fills check
+        last_id = None
+        for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
+            time.sleep(10)  # delay for order to get placed and trigger cxl
+
+            if buy_order_counts < continues_buy_count:
+                check_order_event = OrderEventType.OE_CXL_ACK
+                buy_order_counts += 1
+            else:
+                if buy_cxl_rej_counts < continues_buy_rej_count:
+                    check_order_event = OrderEventType.OE_CXL_REJ
+                    buy_cxl_rej_counts += 1
+                else:
+                    check_order_event = OrderEventType.OE_CXL_ACK
+                    buy_order_counts = 1
+                    buy_cxl_rej_counts = 0
+
+            # internally contains assert statements
+            last_id = verify_cxl_rej(last_id, check_order_event, buy_symbol)
+
+        # sell fills check
+        last_id = None
+        for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_sell_top_of_book(sell_symbol)
+            time.sleep(10)  # delay for order to get placed
+
+            if sell_order_counts < continues_sell_count:
+                check_order_event = OrderEventType.OE_CXL_ACK
+                sell_order_counts += 1
+            else:
+                if sell_cxl_rej_counts < continues_sell_rej_count:
+                    check_order_event = OrderEventType.OE_CXL_REJ
+                    sell_cxl_rej_counts += 1
+                else:
+                    check_order_event = OrderEventType.OE_CXL_ACK
+                    sell_order_counts = 1
+                    sell_cxl_rej_counts = 0
+
+            # internally contains assert statements
+            last_id = verify_cxl_rej(last_id, check_order_event, sell_symbol)
 
 
 def test_drop_test_environment():

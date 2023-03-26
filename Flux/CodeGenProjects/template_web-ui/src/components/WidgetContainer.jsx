@@ -1,4 +1,4 @@
-import React, { Fragment, useState, useCallback } from 'react';
+import React, { Fragment, useRef } from 'react';
 import { Typography, Box } from '@mui/material';
 import { Save, Cached, Edit, AccountTree, TableView } from '@mui/icons-material';
 import { Icon } from './Icon';
@@ -8,15 +8,7 @@ import CommonKeyWidget from './CommonKeyWidget';
 import classes from './WidgetContainer.module.css';
 
 const WidgetContainer = (props) => {
-    const [commonkeyHeight, setCommonkeyHeight] = useState(0);
-
-    const commonkey = useCallback(node => {
-        if (node !== null) {
-            setCommonkeyHeight(node.offsetHeight);
-        } else {
-            setCommonkeyHeight(0);
-        }
-    }, [])
+    const commonkeyRef = useRef(null);
 
     let modeMenu = '';
     if (props.onSave && props.mode === Modes.EDIT_MODE) {
@@ -38,6 +30,11 @@ const WidgetContainer = (props) => {
         return true;
     }) : [];
 
+    let height = 0;
+    if(commonkeyRef.current !== null) {
+        height = commonkeyRef.current.offsetHeight;
+    }
+
     return (
         <Fragment>
             <Typography variant='h6'>
@@ -53,8 +50,8 @@ const WidgetContainer = (props) => {
                     </div>
                 </div>
             </Typography>
-            {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkey} commonkeys={commonkeys} />}
-            <Box style={{ height: `calc(100% - 40px - ${commonkeyHeight}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
+            {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkeyRef} commonkeys={commonkeys} />}
+            <Box style={{ height: `calc(100% - 40px - ${height}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
                 {props.children}
             </Box>
         </Fragment >

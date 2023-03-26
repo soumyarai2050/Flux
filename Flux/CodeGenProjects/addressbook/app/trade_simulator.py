@@ -15,6 +15,7 @@ class TradeSimulator(TradingLinkBase):
     simulate_reverse_path: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_reverse_path") if TradingLinkBase.config_dict is not None else None
     simulate_new_to_reject_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_new_to_reject_orders") if TradingLinkBase.config_dict is not None else None
     simulate_ack_to_reject_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_ack_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+    simulate_cxl_rej_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_cxl_rej_orders") if TradingLinkBase.config_dict is not None else None
     fill_percent: ClassVar[int | None] = TradingLinkBase.config_dict.get("fill_percent") if TradingLinkBase.config_dict is not None else None
     continues_buy_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_buy_count") if TradingLinkBase.config_dict is not None else None
     continues_buy_rej_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_buy_rej_count") if TradingLinkBase.config_dict is not None else None
@@ -63,18 +64,21 @@ class TradeSimulator(TradingLinkBase):
         order_journal = OrderJournalBaseModel(order=order_brief,
                                               order_event_date_time=create_date_time,
                                               order_event=OrderEventType.OE_REJ)
+        msg = f"SIM:Order REJ for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
+              f"and side {order_journal.order.side}"
+        add_to_texts(order_brief, msg)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
 
     @classmethod
-    def place_new_order(cls, px: float, qty: int, side: Side, sec_id: str, system_sec_id: str,
+    def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
                         account: str, exchange: str | None = None, text: List[str] | None = None):
         create_date_time = DateTime.utcnow()
-        order_id: str = f"{sec_id}-{create_date_time}"
-        security = Security(sec_id=sec_id)
+        order_id: str = f"{trading_sec_id}-{create_date_time}"
+        security = Security(sec_id=system_sec_id)  # use system_sec_id to create system's internal order brief / journal
 
         order_brief = OrderBrief(order_id=order_id, security=security, side=side, px=px, qty=qty,
                                  underlying_account=account)
-        msg = f"SIM: Ordering {sec_id}, qty {qty} and px {px}"
+        msg = f"SIM: Ordering {trading_sec_id}/{system_sec_id}, qty {qty} and px {px}"
         add_to_texts(order_brief, msg)
 
         order_journal = OrderJournalBaseModel(order=order_brief,
@@ -85,7 +89,7 @@ class TradeSimulator(TradingLinkBase):
             if cls.simulate_new_to_reject_orders and cls.check_do_reject(side):
                 cls.process_order_reject(order_brief)
             else:
-                cls.process_order_ack(order_id, px, qty, side, sec_id, account)
+                cls.process_order_ack(order_id, px, qty, side, system_sec_id, account)
         return True  # indicates order send success (send false otherwise)
 
     @classmethod
@@ -128,6 +132,26 @@ class TradeSimulator(TradingLinkBase):
         TradeSimulator.strat_manager_service_web_client.create_fills_journal_client(fill_journal)
 
     @classmethod
+    def process_cxl_rej(cls, order_brief: OrderBrief):
+        order_journal = OrderJournalBaseModel(order=order_brief,
+                                              order_event_date_time=DateTime.utcnow(),
+                                              order_event=OrderEventType.OE_CXL_REJ)
+        msg = f"SIM:Cancel REJ for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
+              f"and side {order_journal.order.side}"
+        add_to_texts(order_brief, msg)
+        TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
+
+    @classmethod
+    def process_cxl_ack(cls, order_brief: OrderBrief):
+        order_journal = OrderJournalBaseModel(order=order_brief,
+                                              order_event_date_time=DateTime.utcnow(),
+                                              order_event=OrderEventType.OE_CXL_ACK)
+        msg = f"SIM:Cancel ACK for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
+              f"and side {order_journal.order.side}"
+        add_to_texts(order_brief, msg)
+        TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
+
+    @classmethod
     def place_cxl_order(cls, order_id: str, side: Side | None = None, sec_id: str | None = None,
                         underlying_account: str | None = "trading-account"):
         """
@@ -137,13 +161,18 @@ class TradeSimulator(TradingLinkBase):
         # query order
         order_brief = OrderBrief(order_id=order_id, security=security, side=side,
                                  underlying_account=underlying_account)
-        msg = f"SIM:Cancel Ack {sec_id}, order_id {order_id} and side {side}"
+        msg = f"SIM:Cancel Request for {sec_id}, order_id {order_id} and side {side}"
         add_to_texts(order_brief, msg)
         # simulate cancel ack
         order_journal = OrderJournalBaseModel(order=order_brief,
                                               order_event_date_time=DateTime.utcnow(),
-                                              order_event=OrderEventType.OE_CXL_ACK)
+                                              order_event=OrderEventType.OE_CXL)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
+
+        if cls.simulate_cxl_rej_orders and cls.check_do_reject(side):
+            cls.process_cxl_rej(order_brief)
+        else:
+            cls.process_cxl_ack(order_brief)
 
     @classmethod
     def trigger_kill_switch(cls):

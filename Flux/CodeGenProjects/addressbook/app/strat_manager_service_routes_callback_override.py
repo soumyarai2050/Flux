@@ -2,7 +2,7 @@
 import copy
 import logging
 import time
-from typing import List, Type, Tuple, Dict, FrozenSet, Set
+from typing import List, Type, Tuple, Dict, FrozenSet, Set, Final
 import threading
 from pathlib import PurePath
 from datetime import date
@@ -27,7 +27,7 @@ from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import is_s
     create_alert, update_strat_alert_by_sec_and_side_async, get_new_strat_limits, \
     get_single_exact_match_ongoing_strat_from_symbol_n_side, get_portfolio_limits, is_ongoing_pair_strat, \
     create_portfolio_limits, get_order_limits, create_order_limits, except_n_log_alert, \
-    get_consumable_participation_qty
+    get_consumable_participation_qty, get_order_journal_key, get_order_snapshot_key, get_symbol_side_snapshot_key
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
 
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
@@ -39,10 +39,16 @@ market_data_service_web_client = MarketDataServiceWebClient(host, 8040)
 
 
 class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallback):
-
     def __init__(self):
+        self.service_up: bool = False
         self.service_ready: bool = False
         self.static_data: SecurityRecordManager | None = None
+		
+        # restricted variables: don't overuse this will be extended to multi-currency support
+        self.usd_fx_symbol: Final[str] = "USD|SGD"
+        self.fx_symbol_overview_dict: Dict[str, SymbolOverviewBaseModel | None] = {self.usd_fx_symbol, None}
+        self.usd_fx = None
+
         # dict of pair_strat_id and their activated tickers from today
         self.active_ticker_pair_strat_id_dict_lock: threading.Lock = threading.Lock()
         self.pair_strat_id_n_today_activated_tickers_dict_file_name: str = f'pair_strat_id_n_today_activated_' \
@@ -72,19 +78,30 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         return
 
     def _app_launch_pre_thread_func(self):
+        """
+        sleep wait till engine is up, then create portfolio limits if required
+        TODO LAZY: we should invoke self._apply_checks_n_alert() on all active pair strats upon startup/re-start
+        """
+
         error_prefix = "_app_launch_pre_thread_func: "
         static_data_service_state: ServiceState = ServiceState(
             error_prefix=error_prefix + "static_data_service failed, exception: ")
         service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
+        md_service_state: ServiceState = ServiceState(
+            error_prefix=error_prefix + "md_service failed, exception: ")
         should_sleep: bool = False
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            if not self.service_ready:
+            # validate essential services are up, if so, set service ready state to true
+            # static data and md service are considered essential
+            if self.service_up and static_data_service_state.ready and md_service_state.ready:
+                self.service_ready = True
+            if not self.service_up:
                 try:
                     if is_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
                         self._check_and_create_order_and_portfolio_limits()
-                        self.service_ready = True
+                        self.service_up = True
                     else:
                         should_sleep = True
                         service_up_no_error_retry_count -= 1
@@ -102,6 +119,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     logging.error("periodic open order check failed, "
                                   "periodic order state checks will not be honored and retried in next periodic cycle"
                                   f";;;exception: {e}", exc_info=True)
+                # service loop: manage all sub-services within their private try-catch to allow high level service to
+                # remain partially operational even if some sub-service is not available for any reason
                 if not static_data_service_state.ready:
                     try:
                         self.static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
@@ -118,6 +137,33 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     except Exception as e:
                         static_data_service_state.handle_exception(e)
                         static_data_service_state.ready = False  # forces re-init in next iteration
+
+                if not md_service_state.ready:
+                    try:
+                        self.update_fx_symbol_overview_dict_from_http()
+                        if len(StratManagerServiceRoutesCallbackOverride.fx_symbol_overview_dict) > 0:
+                            self.update_fx_symbol_overview_dict_from_http()
+                            md_service_state.ready = True
+                    except Exception as e:
+                        md_service_state.handle_exception(e)
+                        md_service_state.ready = False  # forces re-try in next iteration
+
+    def update_fx_symbol_overview_dict_from_http(self):
+        symbol_overviews: List[SymbolOverviewBaseModel] = \
+            market_data_service_web_client.get_all_symbol_overview_client()
+        if symbol_overviews:
+            for symbol_overview_ in symbol_overviews:
+                if symbol_overview_.symbol in self.fx_symbol_overview_dict:
+                    # fx_symbol_overview_dict is pre initialized with supported fx pair symbols and None objects
+                    self.fx_symbol_overview_dict[symbol_overview_.symbol] = symbol_overview_
+                    self.usd_fx = symbol_overview_.closing_px
+
+    def get_usd_px(self, px: float, system_symbol: str):
+        """
+        assumes single currency strat for now - may extend to accept symbol and send revised px according to
+        underlying trading currency
+        """
+        return px / self.usd_fx
 
     def app_launch_pre(self):
         app_launch_pre_thread = threading.Thread(target=self._app_launch_pre_thread_func, daemon=True)
@@ -199,9 +245,13 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             if order_snapshot_obj.order_status in expected_status_list:
                 return order_snapshot_obj
             else:
-                err_str_ = f"order_journal - {order_journal_obj} received to update status of " \
-                           f"order_snapshot - {order_snapshot_obj}, but order_snapshot " \
-                           f"doesn't contain any order_status of list {expected_status_list}"
+                ord_journal_key: str = get_order_journal_key(order_journal_obj)
+                ord_snapshot_key: str = get_order_snapshot_key(order_snapshot_obj)
+                err_str_ = f"_check_state_and_get_order_snapshot_obj: order_journal: {ord_journal_key} received " \
+                           f"with event: {order_journal_obj.order_event}, to update status of " \
+                           f"order_snapshot - {ord_snapshot_key}, with status: {order_snapshot_obj.order_status}, " \
+                           f"but order_snapshot doesn't contain any of expected statuses: {expected_status_list};;;" \
+                           f"order_journal: {order_journal_obj}, order_snapshot_obj: {order_snapshot_obj}"
                 await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
                                                                order_journal_obj.order.side, err_str_)
         # else not required: error occurred in _get_order_snapshot_from_order_journal_order_id,
@@ -380,7 +430,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
                     underlying_partial_update_order_snapshot_http
                 order_snapshot_obj = \
-                    await self._check_state_and_get_order_snapshot_obj(order_journal_obj, [OrderStatusType.OE_ACKED])
+                    await self._check_state_and_get_order_snapshot_obj(order_journal_obj, [OrderStatusType.OE_UNACK,
+                                                                                           OrderStatusType.OE_ACKED])
                 if order_snapshot_obj is not None:
                     await underlying_partial_update_order_snapshot_http(
                         OrderSnapshotOptional(_id=order_snapshot_obj.id,
@@ -434,9 +485,40 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 order_snapshot_obj = await self._check_state_and_get_order_snapshot_obj(
                     order_journal_obj, [OrderStatusType.OE_CXL_UNACK])
                 if order_snapshot_obj is not None:
-                    if order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty > 0:
-                        order_status = OrderStatusType.OE_ACKED
-                    elif order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty > 0:
+                    if order_snapshot_obj.order_brief.qty > order_snapshot_obj.filled_qty:
+                        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+                            underlying_read_order_journal_http
+                        from Flux.CodeGenProjects.addressbook.app.aggregate import \
+                            get_last_3_order_journals_from_order_id
+                        last_3_order_journals_from_order_id = \
+                            await underlying_read_order_journal_http(
+                                get_last_3_order_journals_from_order_id(order_journal_obj.order.order_id))
+                        if last_3_order_journals_from_order_id:
+                            if last_3_order_journals_from_order_id[0].order_event == OrderEventType.OE_CXL_REJ:
+                                if last_3_order_journals_from_order_id[-1].order_event == OrderEventType.OE_NEW:
+                                    order_status = OrderStatusType.OE_UNACK
+                                elif last_3_order_journals_from_order_id[-1].order_event == OrderEventType.OE_ACK:
+                                    order_status = OrderStatusType.OE_ACKED
+                                else:
+                                    err_str_ = "3rd order journal from order_journal of status OE_CXL_REJ, must be" \
+                                               "of status OE_ACK and OE_UNACK, received last 3 order_journals " \
+                                               f"{last_3_order_journals_from_order_id}"
+                                    await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
+                                                                                   order_journal_obj.order.side, err_str_)
+                                    return None
+                            else:
+                                err_str_ = "Recent order journal must be of status OE_CXL_REJ, " \
+                                           f"received last 3 order_journals {last_3_order_journals_from_order_id}"
+                                await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
+                                                                               order_journal_obj.order.side, err_str_)
+                                return None
+                        else:
+                            err_str_ = f"Received empty list while fetching last 3 order_journals for " \
+                                       f"order_id {order_journal_obj.order.order_id}"
+                            await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
+                                                                           order_journal_obj.order.side, err_str_)
+                            return None
+                    elif order_snapshot_obj.order_brief.qty < order_snapshot_obj.filled_qty:
                         order_status = OrderStatusType.OE_OVER_FILLED
                     else:
                         order_status = OrderStatusType.OE_FILLED
@@ -524,7 +606,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                 order_snapshot.cxled_qty * order_snapshot.order_brief.px
                             updated_strat_status_obj.avg_cxl_buy_px = \
                                 (
-                                            updated_strat_status_obj.total_cxl_buy_notional / updated_strat_status_obj.total_cxl_buy_qty) \
+                                    updated_strat_status_obj.total_cxl_buy_notional / updated_strat_status_obj.total_cxl_buy_qty) \
                                     if updated_strat_status_obj.total_cxl_buy_qty != 0 else 0
                             updated_strat_status_obj.total_cxl_exposure = \
                                 updated_strat_status_obj.total_cxl_buy_notional - updated_strat_status_obj.total_cxl_sell_notional
@@ -856,7 +938,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             raise HTTPException(status_code=503, detail="create_order_journal_pre not ready - service is not "
                                                         "initialized yet")
         # Updating notional field in fills journal
-        fills_journal_obj.fill_notional = fills_journal_obj.fill_px * fills_journal_obj.fill_qty
+        fills_journal_obj.fill_notional = \
+            self.get_usd_px(fills_journal_obj.fill_px, fills_journal_obj.fill_symbol) * fills_journal_obj.fill_qty
 
     async def create_fills_journal_post(self, fills_journal_obj: FillsJournal):
         with OrderSnapshot.reentrant_lock:
@@ -1198,7 +1281,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                f"{symbol_side_snapshots} for security {security} and side {side}"
                     await update_strat_alert_by_sec_and_side_async(security.sec_id, side, err_str_)
                     return
-                # else not required: good if no symbol_side_snapshot exists already
+                # else not required: good if no symbol_side_snapshot exists already (we create new)
 
                 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
                     underlying_create_symbol_side_snapshot_http
@@ -1212,13 +1295,12 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                                               total_cxled_notional=0,
                                                               last_update_date_time=DateTime.utcnow(),
                                                               order_create_count=0)
-                created_symbol_side_snapshot = \
+                created_symbol_side_snapshot: SymbolSideSnapshot = \
                     await underlying_create_symbol_side_snapshot_http(symbol_side_snapshot_obj)
-                logging.debug(
-                    f"Created SymbolSideSnapshot {created_symbol_side_snapshot} for security {security} and "
-                    f"side {side} in pre call of pair_strat {pair_strat_obj}")
-            # else not required: Avoiding creation if symbol_side_snapshot is received as None, that signifies that
-            # _get_symbol_side_snapshot_from_symbol_side internally has some error which must have been added to alert
+                logging.debug(f"Created SymbolSideSnapshot with key: {get_symbol_side_snapshot_key()};;;"
+                              f"new SymbolSideSnapshot: {created_symbol_side_snapshot}")
+            else:
+                logging.error("unexpected: None symbol_side_snapshots received - this is likely a bug")
 
     async def _update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat,
                                      updated_pair_strat_obj: PairStrat) -> bool | None:
@@ -1308,7 +1390,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     market_data_service_web_client.patch_symbol_overview_client(updated_symbol_overview)
                 else:
                     err_str_ = f"symbol_overview must be one per symbol received {symbol_overview_obj_list} " \
-                              f"for symbol {symbol}"
+                               f"for symbol {symbol}"
                     logging.error(err_str_)
             # else not required: avoiding force publish if no symbol_overview exists
 
@@ -1430,7 +1512,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             if pair_strat_obj is not None:
                 open_qty = (symbol_side_snapshot.total_qty -
                             (symbol_side_snapshot.total_filled_qty + symbol_side_snapshot.total_cxled_qty))
-                open_notional = open_qty * order_snapshot.order_brief.px
+                open_notional = open_qty * self.get_usd_px(order_snapshot.order_brief.px,
+                                                           order_snapshot.order_brief.security.sec_id)
                 consumable_notional = \
                     pair_strat_obj.strat_limits.max_cb_notional - symbol_side_snapshot.total_fill_notional - \
                     open_notional
@@ -1740,10 +1823,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         # removing and updating relative models
                         await self._delete_strat_relative_models(pair_strat)
 
-                        empty_strat_status = StratStatus(strat_state=StratState.StratState_READY)
+                        strat_status = StratStatus(strat_state=StratState.StratState_READY)
                         updated_pair_strat = PairStratOptional(_id=pair_strat.id,
                                                                pair_strat_params=pair_strat.pair_strat_params,
-                                                               strat_status=empty_strat_status)
+                                                               strat_status=strat_status)
                         await underlying_update_pair_strat_http(updated_pair_strat)
 
                 # else: deleted not unloaded - nothing to do , DB will remove entry

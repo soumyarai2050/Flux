@@ -310,6 +310,25 @@ def create_order_limits():
     strat_manager_service_web_client_internal.create_order_limits_client(ord_limit_obj)
 
 
+def get_pair_strat_key(pair_strat: PairStrat | PairStratBaseModel | PairStratOptional):
+    return f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}-" \
+           f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}-{pair_strat.id}"
+
+
+def get_order_journal_key(order_journal: OrderJournal | OrderJournalBaseModel | OrderJournalOptional):
+    return f"{order_journal.order.security.sec_id}-{order_journal.order.side}" \
+           f"{order_journal.order.order_id}"
+
+
+def get_order_snapshot_key(order_snapshot: OrderSnapshot | OrderSnapshotBaseModel | OrderSnapshotOptional):
+    return f"{order_snapshot.order_brief.security.sec_id}-{order_snapshot.order_brief.side}" \
+           f"{order_snapshot.order_brief.order_id}-{order_snapshot.order_status}"
+
+
+def get_symbol_side_snapshot_key(symbol_side_snapshot: SymbolSideSnapshot | SymbolSideSnapshotBaseModel | SymbolSideSnapshotOptional):
+    return f"{symbol_side_snapshot.security.sec_id}-{symbol_side_snapshot.side}"
+
+
 def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:
     cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_min_orders=5)
     market_trade_volume_participation: MarketTradeVolumeParticipation = \

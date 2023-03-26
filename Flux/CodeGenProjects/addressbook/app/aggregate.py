@@ -340,6 +340,22 @@ def get_open_order_snapshots_for_symbol(symbol: str):
         }]}
 
 
+def get_last_3_order_journals_from_order_id(order_id: str):
+    return {"aggregate": [
+        {
+            "$match": {
+                "order.order_id": order_id
+            },
+        },
+        {
+            "$sort": {"_id": -1},
+        },
+        {
+            "$limit": 3
+        }
+    ]}
+
+
 if __name__ == '__main__':
     with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
     print(with_symbol_agg_query)

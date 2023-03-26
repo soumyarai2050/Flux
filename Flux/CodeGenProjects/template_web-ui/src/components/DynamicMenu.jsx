@@ -17,6 +17,7 @@ import classes from './DynamicMenu.module.css';
 const DynamicMenu = (props) => {
     const state = useSelector(state => state);
     const [showFilter, setShowFilter] = useState(false);
+    const [filter, setFilter] = useState(props.filter ? props.filter : {});
 
     const onClick = (e, action, xpath, value) => {
         if (action === 'flux_toggle') {
@@ -35,27 +36,24 @@ const DynamicMenu = (props) => {
     }
 
     const onTextChange = (e, key, value) => {
-        if (props.onFilterChange) {
-            let updatedFilter = {
-                ...props.filter,
-                [key]: value
-            }
-            props.onFilterChange(updatedFilter);
-        }
+        setFilter({
+            ...filter,
+            [key]: value
+        })
     }
 
     const onApplyFilter = () => {
         onFilterToggle();
-        if (props.onApplyFilter) {
-            props.onApplyFilter();
+        if (props.onFilterChange) {
+            props.onFilterChange(filter);
         }
     }
 
     const onClearFilter = () => {
         onFilterToggle();
-        if (props.onClearFilter) {
+        if (props.onFilterChange) {
+            setFilter({});
             props.onFilterChange({});
-            props.onClearFilter();
         }
     }
 
@@ -222,7 +220,7 @@ const DynamicMenu = (props) => {
                                         id={collection.key}
                                         name={collection.key}
                                         size='small'
-                                        value={props.filter[collection.xpath] ? props.filter[collection.xpath] : ""}
+                                        value={filter[collection.xpath] ? filter[collection.xpath] : ""}
                                         onChange={(e) => onTextChange(e, collection.xpath, e.target.value)}
                                         variant='outlined'
                                         placeholder="Comma separated values"
