@@ -1,13 +1,13 @@
 # Before running this test case, keep in mind to put DB_NAME env var to
 # - "market_data_test_fixture" for market_data_project
 # - "addressbook_test" for pair_strat_project
+
 import pytest
 import time
 import copy
 from threading import Thread
+from pathlib import PurePath
 
-from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import get_new_order_limits, \
-    get_new_portfolio_limits
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
@@ -17,11 +17,13 @@ from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from FluxPythonUtils.scripts.utility_functions import drop_mongo_collections, clean_mongo_collections
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase
+from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations
 
 strat_manager_service_web_client: StratManagerServiceWebClient = StratManagerServiceWebClient()
 market_data_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient()
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
-
+PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
+config_file_path: PurePath = PROJECT_DATA_DIR / "config.yaml"
 
 def position_fixture():
     position_json = {
@@ -97,14 +99,45 @@ def place_fill(fills_journal_obj: FillsJournalBaseModel):
     return stored_fills_journal_obj
 
 
+def get_buy_order_related_values():
+    single_buy_order_px = 100
+    single_buy_order_qty = 90
+    single_buy_filled_px = 90
+    single_buy_filled_qty = 50
+    single_buy_unfilled_qty = single_buy_order_qty - single_buy_filled_qty
+    return single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+        single_buy_unfilled_qty
+
+
+def get_sell_order_related_values():
+    single_sell_order_px = 110
+    single_sell_order_qty = 70
+    single_sell_filled_px = 120
+    single_sell_filled_qty = 30
+    single_sell_unfilled_qty = single_sell_order_qty - single_sell_filled_qty
+    return single_sell_order_px, single_sell_order_qty, single_sell_filled_px, single_sell_filled_qty, \
+        single_sell_unfilled_qty
+
+
+def get_both_leg_last_trade_px():
+    current_leg_last_trade_px = 116
+    other_leg_last_trade_px = 116
+    return current_leg_last_trade_px, other_leg_last_trade_px
+
+
 def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot_obj: OrderSnapshotBaseModel,
                                         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                         expected_strat_limits: StratLimits,
                                         expected_strat_brief_obj: StratBriefBaseModel,
                                         date_time_for_cmp: DateTime):
+    single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+        single_buy_unfilled_qty = get_buy_order_related_values()
+    current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
+    max_participation_rate = 40
+
     open_qty = expected_symbol_side_snapshot.total_qty - expected_symbol_side_snapshot.total_filled_qty - \
                expected_symbol_side_snapshot.total_cxled_qty
-    open_notional = open_qty * expected_order_snapshot_obj.order_brief.px
+    open_notional = open_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px)
     expected_strat_brief_obj.pair_buy_side_trading_brief.open_qty = open_qty
     expected_strat_brief_obj.pair_buy_side_trading_brief.open_notional = open_notional
     expected_strat_brief_obj.pair_buy_side_trading_brief.all_bkr_cxlled_qty = \
@@ -129,11 +162,12 @@ def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot
            expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_strat_limits.cancel_rate.max_cancel_rate) - \
         expected_symbol_side_snapshot.total_cxled_qty
     expected_strat_brief_obj.pair_buy_side_trading_brief.indicative_consumable_participation_qty = \
-        (30 * 40) - expected_strat_brief_obj.pair_buy_side_trading_brief.participation_period_order_qty_sum
-    expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty = 40 * (loop_count - 1)
+        (30 * max_participation_rate) - expected_strat_brief_obj.pair_buy_side_trading_brief.participation_period_order_qty_sum
+    expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty = single_buy_unfilled_qty * (loop_count - 1)
     expected_strat_brief_obj.pair_buy_side_trading_brief.indicative_consumable_residual = \
         expected_strat_limits.residual_restriction.max_residual - \
-        ((expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * 116) - (0 * 116))
+        ((expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * current_leg_last_trade_px) -
+         (0 * other_leg_last_trade_px))
     expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = date_time_for_cmp
 
 
@@ -143,9 +177,14 @@ def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
                                          expected_strat_limits: StratLimits,
                                          expected_strat_brief_obj: StratBriefBaseModel,
                                          date_time_for_cmp: DateTime):
+    single_sell_order_px, single_sell_order_qty, single_sell_filled_px, single_sell_filled_qty, \
+        single_sell_unfilled_qty = get_sell_order_related_values()
+    current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
+    max_participation_rate = 40
+
     open_qty = expected_symbol_side_snapshot.total_qty - expected_symbol_side_snapshot.total_filled_qty - \
                expected_symbol_side_snapshot.total_cxled_qty
-    open_notional = open_qty * expected_order_snapshot_obj.order_brief.px
+    open_notional = open_qty * get_px_in_usd(expected_order_snapshot_obj.order_brief.px)
     expected_strat_brief_obj.pair_sell_side_trading_brief.open_qty = open_qty
     expected_strat_brief_obj.pair_sell_side_trading_brief.open_notional = open_notional
     expected_strat_brief_obj.pair_sell_side_trading_brief.all_bkr_cxlled_qty = \
@@ -169,11 +208,12 @@ def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
            expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_strat_limits.cancel_rate.max_cancel_rate) - \
         expected_symbol_side_snapshot.total_cxled_qty
     expected_strat_brief_obj.pair_sell_side_trading_brief.indicative_consumable_participation_qty = \
-        (30 * 40) - expected_strat_brief_obj.pair_sell_side_trading_brief.participation_period_order_qty_sum
-    expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty = 40 * (loop_count - 1)
+        (30 * max_participation_rate) - expected_strat_brief_obj.pair_sell_side_trading_brief.participation_period_order_qty_sum
+    expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty = single_sell_unfilled_qty * (loop_count - 1)
     expected_strat_brief_obj.pair_sell_side_trading_brief.indicative_consumable_residual = \
         expected_strat_limits.residual_restriction.max_residual - \
-        ((expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116) - ((40 * total_loop_count) * 116))
+        ((expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * current_leg_last_trade_px) -
+         ((40 * total_loop_count) * other_leg_last_trade_px))
     expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = date_time_for_cmp
 
 
@@ -194,11 +234,15 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
 
     assert buy_placed_order_journal in order_journal_obj_list
 
+    single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+        single_buy_unfilled_qty = get_buy_order_related_values()
+    current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
+
     # Checking order_snapshot
     expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = 100
-    expected_order_snapshot_obj.order_brief.qty = 90
-    expected_order_snapshot_obj.order_brief.order_notional = 9000
+    expected_order_snapshot_obj.order_brief.px = single_buy_order_px
+    expected_order_snapshot_obj.order_brief.qty = single_buy_order_qty
+    expected_order_snapshot_obj.order_brief.order_notional = single_buy_order_qty*get_px_in_usd(single_buy_order_px)
     expected_order_snapshot_obj.order_status = "OE_UNACK"
     expected_order_snapshot_obj.last_update_date_time = buy_placed_order_journal.order_event_date_time
     expected_order_snapshot_obj.create_date_time = buy_placed_order_journal.order_event_date_time
@@ -217,19 +261,19 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
                              f"{order_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.avg_px = 100
-    expected_symbol_side_snapshot.total_qty = 90 * loop_count
+    expected_symbol_side_snapshot.avg_px = single_buy_order_px
+    expected_symbol_side_snapshot.total_qty = single_buy_order_qty * loop_count
     expected_symbol_side_snapshot.last_update_date_time = buy_placed_order_journal.order_event_date_time
     expected_symbol_side_snapshot.order_create_count = loop_count
     if loop_count > 1:
-        expected_symbol_side_snapshot.total_filled_qty = 50 * (loop_count - 1)
-        expected_symbol_side_snapshot.total_fill_notional = 4500 * (loop_count - 1)
-        expected_symbol_side_snapshot.total_cxled_qty = 40 * (loop_count - 1)
-        expected_symbol_side_snapshot.total_cxled_notional = 4000 * (loop_count - 1)
-        expected_symbol_side_snapshot.avg_fill_px = 90
-        expected_symbol_side_snapshot.last_update_fill_qty = 50
-        expected_symbol_side_snapshot.last_update_fill_px = 90
-        expected_symbol_side_snapshot.avg_cxled_px = 100
+        expected_symbol_side_snapshot.total_filled_qty = single_buy_filled_qty * (loop_count - 1)
+        expected_symbol_side_snapshot.total_fill_notional = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * (loop_count - 1)
+        expected_symbol_side_snapshot.total_cxled_qty = single_buy_unfilled_qty * (loop_count - 1)
+        expected_symbol_side_snapshot.total_cxled_notional = get_px_in_usd(single_buy_order_px) * (loop_count - 1) * single_buy_unfilled_qty
+        expected_symbol_side_snapshot.avg_fill_px = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * (loop_count - 1))/(single_buy_filled_qty * (loop_count - 1))
+        expected_symbol_side_snapshot.last_update_fill_qty = single_buy_filled_qty
+        expected_symbol_side_snapshot.last_update_fill_px = single_buy_filled_px
+        expected_symbol_side_snapshot.avg_cxled_px = (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1))/(single_buy_unfilled_qty * (loop_count - 1))
 
     symbol_side_snapshot_list = strat_manager_service_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -256,25 +300,25 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
     expected_pair_strat.last_active_date_time = None
     expected_pair_strat.frequency = None
     expected_pair_strat.strat_limits = expected_strat_limits
-    expected_strat_status.total_buy_qty = 90 * loop_count
-    expected_strat_status.total_order_qty = 90 * loop_count
-    expected_strat_status.total_open_buy_qty = 90
-    expected_strat_status.avg_open_buy_px = 100
-    expected_strat_status.total_open_buy_notional = 9000
-    expected_strat_status.total_open_exposure = 9000
+    expected_strat_status.total_buy_qty = single_buy_order_qty * loop_count
+    expected_strat_status.total_order_qty = single_buy_order_qty * loop_count
+    expected_strat_status.total_open_buy_qty = single_buy_order_qty
+    expected_strat_status.avg_open_buy_px = (single_buy_order_qty*get_px_in_usd(single_buy_order_px))/single_buy_order_qty
+    expected_strat_status.total_open_buy_notional = single_buy_order_qty*get_px_in_usd(single_buy_order_px)
+    expected_strat_status.total_open_exposure = single_buy_order_qty*get_px_in_usd(single_buy_order_px)
     expected_strat_status.residual = Residual(security=expected_pair_strat.pair_strat_params.strat_leg2.sec,
                                               residual_notional=0)
     if loop_count > 1:
-        expected_strat_status.avg_fill_buy_px = 90
-        expected_strat_status.total_fill_buy_qty = 50 * (loop_count - 1)
-        expected_strat_status.total_fill_buy_notional = 4500 * (loop_count - 1)
-        expected_strat_status.total_fill_exposure = 4500 * (loop_count - 1)
-        expected_strat_status.avg_cxl_buy_px = 100
-        expected_strat_status.total_cxl_buy_qty = 40 * (loop_count - 1)
-        expected_strat_status.total_cxl_buy_notional = 4000 * (loop_count - 1)
-        expected_strat_status.total_cxl_exposure = 4000 * (loop_count - 1)
-        residual_notional = abs((expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * 116) - \
-                                (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116))
+        expected_strat_status.avg_fill_buy_px = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px * (loop_count - 1)))/(single_buy_filled_qty * (loop_count - 1))
+        expected_strat_status.total_fill_buy_qty = single_buy_filled_qty * (loop_count - 1)
+        expected_strat_status.total_fill_buy_notional = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * (loop_count - 1)
+        expected_strat_status.total_fill_exposure = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * (loop_count - 1)
+        expected_strat_status.avg_cxl_buy_px = (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1))/(single_buy_unfilled_qty * (loop_count - 1))
+        expected_strat_status.total_cxl_buy_qty = single_buy_unfilled_qty * (loop_count - 1)
+        expected_strat_status.total_cxl_buy_notional = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1)
+        expected_strat_status.total_cxl_exposure = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1)
+        residual_notional = abs((expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(current_leg_last_trade_px)) - \
+                                (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(other_leg_last_trade_px)))
         expected_strat_status.residual = Residual(security=expected_pair_strat.pair_strat_params.strat_leg1.sec,
                                                   residual_notional=residual_notional)
 
@@ -320,12 +364,15 @@ def placed_buy_order_ack_receive(loop_count: int, expected_order_id: str, buy_or
 
     assert expected_order_journal in order_journal_obj_list
 
+    single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+        single_buy_unfilled_qty = get_buy_order_related_values()
+
     # Checking order_snapshot
     expected_order_snapshot_obj.order_status = "OE_ACKED"
     expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = 100
-    expected_order_snapshot_obj.order_brief.qty = 90
-    expected_order_snapshot_obj.order_brief.order_notional = 9000
+    expected_order_snapshot_obj.order_brief.px = single_buy_order_px
+    expected_order_snapshot_obj.order_brief.qty = single_buy_order_qty
+    expected_order_snapshot_obj.order_brief.order_notional = single_buy_order_qty*get_px_in_usd(single_buy_order_px)
     expected_order_snapshot_obj.last_update_date_time = expected_order_journal.order_event_date_time
     expected_order_snapshot_obj.create_date_time = buy_order_placed_date_time
 
@@ -354,16 +401,20 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
     fill_journal_obj_list = strat_manager_service_web_client.get_all_fills_journal_client()
     assert buy_fill_journal in fill_journal_obj_list
 
+    single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+        single_buy_unfilled_qty = get_buy_order_related_values()
+    current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
+
     # Checking order_snapshot
     expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = 100
-    expected_order_snapshot_obj.order_brief.qty = 90
-    expected_order_snapshot_obj.order_brief.order_notional = 9000
-    expected_order_snapshot_obj.filled_qty = 50
-    expected_order_snapshot_obj.avg_fill_px = 90
-    expected_order_snapshot_obj.fill_notional = 4500
-    expected_order_snapshot_obj.last_update_fill_qty = 50
-    expected_order_snapshot_obj.last_update_fill_px = 90
+    expected_order_snapshot_obj.order_brief.px = single_buy_order_px
+    expected_order_snapshot_obj.order_brief.qty = single_buy_order_qty
+    expected_order_snapshot_obj.order_brief.order_notional = single_buy_order_qty*get_px_in_usd(single_buy_order_px)
+    expected_order_snapshot_obj.filled_qty = single_buy_filled_qty
+    expected_order_snapshot_obj.avg_fill_px = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px))/single_buy_filled_qty
+    expected_order_snapshot_obj.fill_notional = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px)
+    expected_order_snapshot_obj.last_update_fill_qty = single_buy_filled_qty
+    expected_order_snapshot_obj.last_update_fill_px = single_buy_filled_px
     expected_order_snapshot_obj.last_update_date_time = buy_fill_journal.fill_date_time
     expected_order_snapshot_obj.create_date_time = buy_order_placed_date_time
     expected_order_snapshot_obj.order_status = "OE_ACKED"
@@ -375,19 +426,22 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
     assert expected_order_snapshot_obj in order_snapshot_list
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.avg_px = 100
-    expected_symbol_side_snapshot.total_qty = 90 * loop_count
+    expected_symbol_side_snapshot.avg_px = single_buy_order_px
+    expected_symbol_side_snapshot.total_qty = single_buy_order_qty * loop_count
     expected_symbol_side_snapshot.last_update_date_time = buy_fill_journal.fill_date_time
     expected_symbol_side_snapshot.order_create_count = 1 * loop_count
-    expected_symbol_side_snapshot.total_filled_qty = 50 * loop_count
-    expected_symbol_side_snapshot.avg_fill_px = 90
-    expected_symbol_side_snapshot.total_fill_notional = 4500 * loop_count
-    expected_symbol_side_snapshot.last_update_fill_qty = 50
-    expected_symbol_side_snapshot.last_update_fill_px = 90
+    expected_symbol_side_snapshot.total_filled_qty = single_buy_filled_qty * loop_count
+    expected_symbol_side_snapshot.avg_fill_px = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * loop_count)/(single_buy_filled_qty * loop_count)
+    expected_symbol_side_snapshot.total_fill_notional = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * loop_count
+    expected_symbol_side_snapshot.last_update_fill_qty = single_buy_filled_qty
+    expected_symbol_side_snapshot.last_update_fill_px = single_buy_filled_px
     if loop_count > 1:
-        expected_symbol_side_snapshot.total_cxled_qty = 40 * (loop_count - 1)
-        expected_symbol_side_snapshot.total_cxled_notional = 4000 * (loop_count - 1)
-        expected_symbol_side_snapshot.avg_cxled_px = 100
+        expected_symbol_side_snapshot.total_cxled_qty = single_buy_unfilled_qty * (loop_count - 1)
+        expected_symbol_side_snapshot.total_cxled_notional = \
+            single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1)
+        expected_symbol_side_snapshot.avg_cxled_px = \
+            (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1))/(single_buy_unfilled_qty *
+                                                                                             (loop_count - 1))
 
     symbol_side_snapshot_list = strat_manager_service_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -412,25 +466,25 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
     expected_pair_strat.last_active_date_time = None
     expected_pair_strat.frequency = None
     expected_pair_strat.strat_limits = expected_strat_limits
-    expected_strat_status.total_buy_qty = 90 * loop_count
-    expected_strat_status.total_order_qty = 90 * loop_count
-    expected_strat_status.total_open_buy_qty = 40
-    expected_strat_status.avg_open_buy_px = 100
-    expected_strat_status.total_open_buy_notional = 4000
-    expected_strat_status.total_open_exposure = 4000
-    expected_strat_status.total_fill_buy_qty = 50 * loop_count
-    expected_strat_status.avg_fill_buy_px = 90
-    expected_strat_status.total_fill_buy_notional = 4500 * loop_count
-    expected_strat_status.total_fill_exposure = 4500 * loop_count
+    expected_strat_status.total_buy_qty = single_buy_order_qty * loop_count
+    expected_strat_status.total_order_qty = single_buy_order_qty * loop_count
+    expected_strat_status.total_open_buy_qty = single_buy_unfilled_qty
+    expected_strat_status.avg_open_buy_px = (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px))/single_buy_unfilled_qty
+    expected_strat_status.total_open_buy_notional = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px)
+    expected_strat_status.total_open_exposure = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px)
+    expected_strat_status.total_fill_buy_qty = single_buy_filled_qty * loop_count
+    expected_strat_status.avg_fill_buy_px = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * loop_count)/(single_buy_filled_qty * loop_count)
+    expected_strat_status.total_fill_buy_notional = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * loop_count
+    expected_strat_status.total_fill_exposure = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * loop_count
     expected_strat_status.residual = Residual(security=expected_pair_strat.pair_strat_params.strat_leg2.sec,
                                               residual_notional=0)
     if loop_count > 1:
-        expected_strat_status.avg_cxl_buy_px = 100
-        expected_strat_status.total_cxl_buy_qty = 40 * (loop_count - 1)
-        expected_strat_status.total_cxl_buy_notional = 4000 * (loop_count - 1)
-        expected_strat_status.total_cxl_exposure = 4000 * (loop_count - 1)
-        residual_notional = abs((expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * 116) - \
-                                (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116))
+        expected_strat_status.avg_cxl_buy_px = (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1))/(single_buy_unfilled_qty * (loop_count - 1))
+        expected_strat_status.total_cxl_buy_qty = single_buy_unfilled_qty * (loop_count - 1)
+        expected_strat_status.total_cxl_buy_notional = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1)
+        expected_strat_status.total_cxl_exposure = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * (loop_count - 1)
+        residual_notional = abs((expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(current_leg_last_trade_px)) - \
+                                (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(other_leg_last_trade_px)))
         expected_strat_status.residual = Residual(security=expected_pair_strat.pair_strat_params.strat_leg1.sec,
                                                   residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
@@ -477,11 +531,17 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
 
     assert sell_placed_order_journal in order_journal_obj_list
 
+    single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+        single_buy_unfilled_qty = get_buy_order_related_values()
+    single_sell_order_px, single_sell_order_qty, single_sell_filled_px, single_sell_filled_qty, \
+        single_sell_unfilled_qty = get_sell_order_related_values()
+    current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
+
     # Checking order_snapshot
     expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = 110
-    expected_order_snapshot_obj.order_brief.qty = 70
-    expected_order_snapshot_obj.order_brief.order_notional = 7700
+    expected_order_snapshot_obj.order_brief.px = single_sell_order_px
+    expected_order_snapshot_obj.order_brief.qty = single_sell_order_qty
+    expected_order_snapshot_obj.order_brief.order_notional = single_sell_order_qty*get_px_in_usd(single_sell_order_px)
     expected_order_snapshot_obj.order_status = "OE_UNACK"
     expected_order_snapshot_obj.last_update_date_time = sell_placed_order_journal.order_event_date_time
     expected_order_snapshot_obj.create_date_time = sell_placed_order_journal.order_event_date_time
@@ -494,19 +554,19 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
     assert expected_order_snapshot_obj in order_snapshot_list
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.avg_px = 110
-    expected_symbol_side_snapshot.total_qty = 70 * loop_count
+    expected_symbol_side_snapshot.avg_px = single_sell_order_px
+    expected_symbol_side_snapshot.total_qty = single_sell_order_qty * loop_count
     expected_symbol_side_snapshot.last_update_date_time = sell_placed_order_journal.order_event_date_time
     expected_symbol_side_snapshot.order_create_count = loop_count
     if loop_count > 1:
-        expected_symbol_side_snapshot.total_filled_qty = 30 * (loop_count - 1)
-        expected_symbol_side_snapshot.total_fill_notional = 3600 * (loop_count - 1)
-        expected_symbol_side_snapshot.total_cxled_qty = 40 * (loop_count - 1)
-        expected_symbol_side_snapshot.total_cxled_notional = 4400 * (loop_count - 1)
-        expected_symbol_side_snapshot.avg_fill_px = 120
-        expected_symbol_side_snapshot.last_update_fill_qty = 30
-        expected_symbol_side_snapshot.last_update_fill_px = 120
-        expected_symbol_side_snapshot.avg_cxled_px = 110
+        expected_symbol_side_snapshot.total_filled_qty = single_sell_filled_qty * (loop_count - 1)
+        expected_symbol_side_snapshot.total_fill_notional = single_sell_filled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1)
+        expected_symbol_side_snapshot.total_cxled_qty = single_sell_unfilled_qty * (loop_count - 1)
+        expected_symbol_side_snapshot.total_cxled_notional = single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1)
+        expected_symbol_side_snapshot.avg_fill_px = (single_sell_filled_qty*get_px_in_usd(single_sell_filled_px) * (loop_count - 1))/(single_sell_filled_qty * (loop_count - 1))
+        expected_symbol_side_snapshot.last_update_fill_qty = single_sell_filled_qty
+        expected_symbol_side_snapshot.last_update_fill_px = single_sell_filled_px
+        expected_symbol_side_snapshot.avg_cxled_px = (single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1))/(single_sell_unfilled_qty * (loop_count - 1))
 
     symbol_side_snapshot_list = strat_manager_service_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -537,37 +597,37 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
     expected_pair_strat.last_active_date_time = None
     expected_pair_strat.frequency = None
     expected_pair_strat.strat_limits = expected_strat_limits
-    expected_strat_status.total_buy_qty = 90 * total_loop_count
-    expected_strat_status.total_sell_qty = 70 * loop_count
-    expected_strat_status.total_order_qty = (90 * total_loop_count) + (70 * loop_count)
-    expected_strat_status.total_open_sell_qty = 70
-    expected_strat_status.avg_open_sell_px = 110
-    expected_strat_status.total_open_sell_notional = 7700
-    expected_strat_status.total_open_exposure = -7700
-    expected_strat_status.avg_fill_buy_px = 90
-    expected_strat_status.total_fill_buy_qty = 50 * total_loop_count
-    expected_strat_status.total_fill_buy_notional = 4500 * total_loop_count
-    expected_strat_status.total_fill_exposure = 4500 * total_loop_count
-    expected_strat_status.avg_cxl_buy_px = 100
-    expected_strat_status.total_cxl_buy_qty = 40 * total_loop_count
-    expected_strat_status.total_cxl_buy_notional = 4000 * total_loop_count
-    expected_strat_status.total_cxl_exposure = 4000 * total_loop_count
-    residual_notional = abs(((40 * total_loop_count) * 116) -
-                            (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116))
-    if ((40 * total_loop_count) * 116) > (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116):
+    expected_strat_status.total_buy_qty = single_buy_order_qty * total_loop_count
+    expected_strat_status.total_sell_qty = single_sell_order_qty * loop_count
+    expected_strat_status.total_order_qty = (single_buy_order_qty * total_loop_count) + (single_sell_order_qty * loop_count)
+    expected_strat_status.total_open_sell_qty = single_sell_order_qty
+    expected_strat_status.avg_open_sell_px = (single_sell_order_qty*get_px_in_usd(single_sell_order_px))/single_sell_order_qty
+    expected_strat_status.total_open_sell_notional = single_sell_order_qty*get_px_in_usd(single_sell_order_px)
+    expected_strat_status.total_open_exposure = -single_sell_order_qty*get_px_in_usd(single_sell_order_px)
+    expected_strat_status.avg_fill_buy_px = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * total_loop_count)/(single_buy_filled_qty * total_loop_count)
+    expected_strat_status.total_fill_buy_qty = single_buy_filled_qty * total_loop_count
+    expected_strat_status.total_fill_buy_notional = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * total_loop_count
+    expected_strat_status.total_fill_exposure = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * total_loop_count
+    expected_strat_status.avg_cxl_buy_px = (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * total_loop_count)/(single_buy_unfilled_qty * total_loop_count)
+    expected_strat_status.total_cxl_buy_qty = single_buy_unfilled_qty * total_loop_count
+    expected_strat_status.total_cxl_buy_notional = single_buy_filled_qty*get_px_in_usd(single_buy_order_px) * total_loop_count
+    expected_strat_status.total_cxl_exposure = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * total_loop_count
+    residual_notional = abs(((single_buy_unfilled_qty * total_loop_count) * get_px_in_usd(current_leg_last_trade_px)) -
+                            (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(other_leg_last_trade_px)))
+    if ((single_buy_unfilled_qty * total_loop_count) * current_leg_last_trade_px) > (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * other_leg_last_trade_px):
         residual_security = strat_brief.pair_buy_side_trading_brief.security
     else:
         residual_security = strat_brief.pair_sell_side_trading_brief.security
     expected_strat_status.residual = Residual(security=residual_security, residual_notional=residual_notional)
     if loop_count > 1:
-        expected_strat_status.avg_fill_sell_px = 120
-        expected_strat_status.total_fill_sell_qty = 30 * (loop_count - 1)
-        expected_strat_status.total_fill_sell_notional = 3600 * (loop_count - 1)
-        expected_strat_status.total_fill_exposure = (4500 * total_loop_count) - (3600 * (loop_count - 1))
-        expected_strat_status.avg_cxl_sell_px = 110
-        expected_strat_status.total_cxl_sell_qty = 40 * (loop_count - 1)
-        expected_strat_status.total_cxl_sell_notional = 4400 * (loop_count - 1)
-        expected_strat_status.total_cxl_exposure = (4000 * total_loop_count) - (4400 * (loop_count - 1))
+        expected_strat_status.avg_fill_sell_px = (single_sell_filled_qty*get_px_in_usd(single_sell_filled_px) * (loop_count - 1))/(single_sell_filled_qty * (loop_count - 1))
+        expected_strat_status.total_fill_sell_qty = single_sell_filled_qty * (loop_count - 1)
+        expected_strat_status.total_fill_sell_notional = single_sell_filled_qty * get_px_in_usd(single_sell_filled_px) * (loop_count - 1)
+        expected_strat_status.total_fill_exposure = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * total_loop_count) - (single_sell_filled_qty*get_px_in_usd(single_sell_filled_px) * (loop_count - 1))
+        expected_strat_status.avg_cxl_sell_px = (single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1))/(single_sell_unfilled_qty * (loop_count - 1))
+        expected_strat_status.total_cxl_sell_qty = single_sell_unfilled_qty * (loop_count - 1)
+        expected_strat_status.total_cxl_sell_notional = single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1)
+        expected_strat_status.total_cxl_exposure = (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * total_loop_count) - (single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1))
 
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
@@ -613,12 +673,15 @@ def placed_sell_order_ack_receive(loop_count: int, expected_order_id: str, sell_
 
     assert expected_order_journal in order_journal_obj_list
 
+    single_sell_order_px, single_sell_order_qty, single_sell_filled_px, single_sell_filled_qty, \
+        single_sell_unfilled_qty = get_sell_order_related_values()
+
     # Checking order_snapshot
     expected_order_snapshot_obj.order_status = "OE_ACKED"
     expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = 110
-    expected_order_snapshot_obj.order_brief.qty = 70
-    expected_order_snapshot_obj.order_brief.order_notional = 7700
+    expected_order_snapshot_obj.order_brief.px = single_sell_order_px
+    expected_order_snapshot_obj.order_brief.qty = single_sell_order_qty
+    expected_order_snapshot_obj.order_brief.order_notional = single_sell_order_qty*get_px_in_usd(single_sell_order_px)
     expected_order_snapshot_obj.last_update_date_time = expected_order_journal.order_event_date_time
     expected_order_snapshot_obj.create_date_time = sell_order_placed_date_time
 
@@ -643,16 +706,22 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     fill_journal_obj_list = strat_manager_service_web_client.get_all_fills_journal_client()
     assert sell_fill_journal in fill_journal_obj_list
 
+    single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+        single_buy_unfilled_qty = get_buy_order_related_values()
+    single_sell_order_px, single_sell_order_qty, single_sell_filled_px, single_sell_filled_qty, \
+        single_sell_unfilled_qty = get_sell_order_related_values()
+    current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
+
     # Checking order_snapshot
     expected_order_snapshot_obj.order_brief.order_id = expected_order_id
-    expected_order_snapshot_obj.order_brief.px = 110
-    expected_order_snapshot_obj.order_brief.qty = 70
-    expected_order_snapshot_obj.order_brief.order_notional = 7700
-    expected_order_snapshot_obj.filled_qty = 30
-    expected_order_snapshot_obj.avg_fill_px = 120
-    expected_order_snapshot_obj.fill_notional = 3600
-    expected_order_snapshot_obj.last_update_fill_qty = 30
-    expected_order_snapshot_obj.last_update_fill_px = 120
+    expected_order_snapshot_obj.order_brief.px = single_sell_order_px
+    expected_order_snapshot_obj.order_brief.qty = single_sell_order_qty
+    expected_order_snapshot_obj.order_brief.order_notional = single_sell_order_qty*get_px_in_usd(single_sell_order_px)
+    expected_order_snapshot_obj.filled_qty = single_sell_filled_qty
+    expected_order_snapshot_obj.avg_fill_px = (single_sell_filled_qty*get_px_in_usd(single_sell_filled_px))/single_sell_filled_qty
+    expected_order_snapshot_obj.fill_notional = single_sell_filled_qty*get_px_in_usd(single_sell_filled_px)
+    expected_order_snapshot_obj.last_update_fill_qty = single_sell_filled_qty
+    expected_order_snapshot_obj.last_update_fill_px = single_sell_filled_px
     expected_order_snapshot_obj.last_update_date_time = sell_fill_journal.fill_date_time
     expected_order_snapshot_obj.create_date_time = sell_order_placed_date_time
     expected_order_snapshot_obj.order_status = "OE_ACKED"
@@ -664,19 +733,19 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     assert expected_order_snapshot_obj in order_snapshot_list
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.avg_px = 110
-    expected_symbol_side_snapshot.total_qty = 70 * loop_count
+    expected_symbol_side_snapshot.avg_px = single_sell_order_px
+    expected_symbol_side_snapshot.total_qty = single_sell_order_qty * loop_count
     expected_symbol_side_snapshot.last_update_date_time = expected_order_snapshot_obj.last_update_date_time
     expected_symbol_side_snapshot.order_create_count = 1 * loop_count
-    expected_symbol_side_snapshot.total_filled_qty = 30 * loop_count
-    expected_symbol_side_snapshot.avg_fill_px = 120
-    expected_symbol_side_snapshot.total_fill_notional = 3600 * loop_count
-    expected_symbol_side_snapshot.last_update_fill_qty = 30
-    expected_symbol_side_snapshot.last_update_fill_px = 120
+    expected_symbol_side_snapshot.total_filled_qty = single_sell_filled_qty * loop_count
+    expected_symbol_side_snapshot.avg_fill_px = (single_sell_filled_qty*get_px_in_usd(single_sell_filled_px) * loop_count)/(single_sell_filled_qty * loop_count)
+    expected_symbol_side_snapshot.total_fill_notional = single_sell_filled_qty*get_px_in_usd(single_sell_filled_px) * loop_count
+    expected_symbol_side_snapshot.last_update_fill_qty = single_sell_filled_qty
+    expected_symbol_side_snapshot.last_update_fill_px = single_sell_filled_px
     if loop_count > 1:
-        expected_symbol_side_snapshot.total_cxled_qty = 40 * (loop_count - 1)
-        expected_symbol_side_snapshot.total_cxled_notional = 4400 * (loop_count - 1)
-        expected_symbol_side_snapshot.avg_cxled_px = 110
+        expected_symbol_side_snapshot.total_cxled_qty = single_sell_unfilled_qty * (loop_count - 1)
+        expected_symbol_side_snapshot.total_cxled_notional = single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1)
+        expected_symbol_side_snapshot.avg_cxled_px = (single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1))/(single_sell_unfilled_qty * (loop_count - 1))
 
     symbol_side_snapshot_list = strat_manager_service_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -688,36 +757,39 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     expected_pair_strat.last_active_date_time = None
     expected_pair_strat.frequency = None
     expected_pair_strat.strat_limits = expected_strat_limits
-    expected_strat_status.total_buy_qty = 90 * total_loop_count
-    expected_strat_status.total_sell_qty = 70 * loop_count
-    expected_strat_status.total_order_qty = (90 * total_loop_count) + (70 * loop_count)
-    expected_strat_status.avg_open_sell_px = 110
-    expected_strat_status.total_open_sell_qty = 40
-    expected_strat_status.total_open_sell_notional = 4400
-    expected_strat_status.total_open_exposure = -4400
-    expected_strat_status.total_fill_buy_qty = 50 * total_loop_count
-    expected_strat_status.total_fill_sell_qty = 30 * loop_count
-    expected_strat_status.avg_fill_buy_px = 90
-    expected_strat_status.avg_fill_sell_px = 120
-    expected_strat_status.total_fill_buy_notional = 4500 * total_loop_count
-    expected_strat_status.total_fill_sell_notional = 3600 * loop_count
-    expected_strat_status.total_fill_exposure = (4500 * total_loop_count) - (3600 * loop_count)
-    expected_strat_status.avg_cxl_buy_px = 100
-    expected_strat_status.total_cxl_buy_qty = 40 * total_loop_count
-    expected_strat_status.total_cxl_buy_notional = 4000 * total_loop_count
-    expected_strat_status.total_cxl_exposure = 4000 * total_loop_count
+    expected_strat_status.total_buy_qty = single_buy_order_qty * total_loop_count
+    expected_strat_status.total_sell_qty = single_sell_order_qty * loop_count
+    expected_strat_status.total_order_qty = (single_buy_order_qty * total_loop_count) + (single_sell_order_qty * loop_count)
+    expected_strat_status.avg_open_sell_px = single_sell_unfilled_qty * get_px_in_usd(single_sell_order_px) / single_sell_unfilled_qty
+    expected_strat_status.total_open_sell_qty = single_sell_unfilled_qty
+    expected_strat_status.total_open_sell_notional = single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px)
+    expected_strat_status.total_open_exposure = -single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px)
+    expected_strat_status.total_fill_buy_qty = single_buy_filled_qty * total_loop_count
+    expected_strat_status.total_fill_sell_qty = single_sell_filled_qty * loop_count
+    expected_strat_status.avg_fill_buy_px = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * total_loop_count)/(single_buy_filled_qty * total_loop_count)
+    expected_strat_status.avg_fill_sell_px = (single_sell_filled_qty*get_px_in_usd(single_sell_filled_px) * loop_count)/(single_sell_filled_qty * loop_count)
+    expected_strat_status.total_fill_buy_notional = single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * total_loop_count
+    expected_strat_status.total_fill_sell_notional = single_sell_filled_qty*get_px_in_usd(single_sell_filled_px) * loop_count
+    expected_strat_status.total_fill_exposure = (single_buy_filled_qty*get_px_in_usd(single_buy_filled_px) * total_loop_count) - \
+                                                (single_sell_filled_qty*get_px_in_usd(single_sell_filled_px) * loop_count)
+    expected_strat_status.avg_cxl_buy_px = (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * total_loop_count)/(single_buy_unfilled_qty * total_loop_count)
+    expected_strat_status.total_cxl_buy_qty = single_buy_unfilled_qty * total_loop_count
+    expected_strat_status.total_cxl_buy_notional = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * total_loop_count
+    expected_strat_status.total_cxl_exposure = single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * total_loop_count
+    current_leg_last_trade_px = 116
+    other_leg_last_trade_px = 116
     residual_notional = abs(
-        ((40 * total_loop_count) * 116) - (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116))
-    if ((40 * total_loop_count) * 116) > (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * 116):
+        ((40 * total_loop_count) * get_px_in_usd(current_leg_last_trade_px)) - (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(current_leg_last_trade_px)))
+    if ((40 * total_loop_count) * get_px_in_usd(other_leg_last_trade_px)) > (expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(other_leg_last_trade_px)):
         residual_security = expected_strat_brief_obj.pair_buy_side_trading_brief.security
     else:
         residual_security = expected_strat_brief_obj.pair_sell_side_trading_brief.security
     expected_strat_status.residual = Residual(security=residual_security, residual_notional=residual_notional)
     if loop_count > 1:
-        expected_strat_status.avg_cxl_sell_px = 110
-        expected_strat_status.total_cxl_sell_qty = 40 * (loop_count - 1)
-        expected_strat_status.total_cxl_sell_notional = 4400 * (loop_count - 1)
-        expected_strat_status.total_cxl_exposure = (4000 * total_loop_count) - (4400 * (loop_count - 1))
+        expected_strat_status.avg_cxl_sell_px = (single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1))/(single_sell_unfilled_qty * (loop_count - 1))
+        expected_strat_status.total_cxl_sell_qty = single_sell_unfilled_qty * (loop_count - 1)
+        expected_strat_status.total_cxl_sell_notional = single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1)
+        expected_strat_status.total_cxl_exposure = (single_buy_unfilled_qty*get_px_in_usd(single_buy_order_px) * total_loop_count) - (single_sell_unfilled_qty*get_px_in_usd(single_sell_order_px) * (loop_count - 1))
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
             expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
@@ -976,7 +1048,6 @@ def run_symbol_overview(buy_symbol: str, sell_symbol: str,
             symbol_overview_obj.symbol = sell_symbol
         symbol_overview_obj.id = None
         created_symbol_overview = market_data_web_client.create_symbol_overview_client(symbol_overview_obj)
-
         symbol_overview_obj.id = created_symbol_overview.id
         assert created_symbol_overview == symbol_overview_obj, f"Created symbol_overview {symbol_overview_obj} not " \
                                                                f"equals to expected symbol_overview " \
@@ -1035,13 +1106,13 @@ def create_n_verify_portfolio_status(portfolio_status_obj: PortfolioStatusBaseMo
 def verify_portfolio_status(total_loop_count: int, symbol_pair_count: int,
                             expected_portfolio_status: PortfolioStatusBaseModel):
     # expected portfolio_status
-    expected_portfolio_status.overall_sell_notional = ((7700 * total_loop_count) + (300 * total_loop_count) - (
-            4400 * total_loop_count)) * symbol_pair_count
-    expected_portfolio_status.overall_sell_fill_notional = (3600 * total_loop_count) * symbol_pair_count
+    expected_portfolio_status.overall_sell_notional = get_px_in_usd(((7700 * total_loop_count) + (300 * total_loop_count) - (
+            4400 * total_loop_count))) * symbol_pair_count
+    expected_portfolio_status.overall_sell_fill_notional = get_px_in_usd((3600 * total_loop_count) * symbol_pair_count)
     # computes from last buy test execution
     expected_portfolio_status.overall_buy_notional = \
-        ((9000 * total_loop_count) - (500 * total_loop_count) - (4000 * total_loop_count)) * symbol_pair_count
-    expected_portfolio_status.overall_buy_fill_notional = (4500 * total_loop_count) * symbol_pair_count
+        get_px_in_usd(((9000 * total_loop_count) - (500 * total_loop_count) - (4000 * total_loop_count)) * symbol_pair_count)
+    expected_portfolio_status.overall_buy_fill_notional = get_px_in_usd((4500 * total_loop_count) * symbol_pair_count)
     expected_portfolio_status.current_period_available_buy_order_count = 4
     expected_portfolio_status.current_period_available_sell_order_count = 4
 
@@ -1119,6 +1190,23 @@ def create_pre_order_test_requirements(buy_symbol: str, sell_symbol: str, pair_s
     # Adding strat in strat_collection
     create_if_not_exists_and_validate_strat_collection(active_pair_strat)
     print(f"Added to strat_collection, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+
+def fx_symbol_overview_obj() -> SymbolOverviewBaseModel:
+    return SymbolOverviewBaseModel(**{
+        "symbol": "USD|SGD",
+        "limit_up_px": 150,
+        "limit_dn_px": 50,
+        "conv_px": 90,
+        "closing_px": 0.5,
+        "open_px": 0.5,
+        "last_update_date_time": "2023-03-12T13:11:22.329Z",
+        "force_publish": False
+    })
+
+
+def get_px_in_usd(px: float):
+    return px / fx_symbol_overview_obj().closing_px
 
 
 def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: int, symbol_pair_counter: int,
@@ -1331,11 +1419,27 @@ def get_order_snapshot_from_order_id(order_id) -> OrderSnapshotBaseModel | None:
     return expected_order_snapshot
 
 
+def create_fx_symbol_overview():
+    symbol_overview = fx_symbol_overview_obj()
+    created_symbol_overview = market_data_web_client.create_symbol_overview_client(symbol_overview)
+    symbol_overview.id = created_symbol_overview.id
+    assert created_symbol_overview == symbol_overview
+
+
 def test_clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_):
+    if os.path.isfile(str(config_file_path)):
+        test_config = load_yaml_configurations(str(config_file_path))
+        ps_db_name = \
+            fetched_ps_db_name if (fetched_ps_db_name := test_config.get("ps_db_name")) is not None else "addressbook"
+        md_db_name = \
+            fetched_md_db_name if (fetched_md_db_name := test_config.get("md_db_name")) is not None else "market_data"
+    else:
+        ps_db_name = "addressbook"
+        md_db_name = "market_data"
     # cleaning all collections
-    clean_mongo_collections(mongo_server="mongodb://localhost:27017", database_name="addressbook_test",
+    clean_mongo_collections(mongo_server="mongodb://localhost:27017", database_name=ps_db_name,
                             ignore_collections=["UILayout"])
-    clean_mongo_collections(mongo_server="mongodb://localhost:27017", database_name="market_data_test_fixture",
+    clean_mongo_collections(mongo_server="mongodb://localhost:27017", database_name=md_db_name,
                             ignore_collections=["UILayout"])
 
     # setting limits
@@ -1344,10 +1448,13 @@ def test_clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_
     # creating portfolio_status
     create_n_verify_portfolio_status(copy.deepcopy(expected_portfolio_status_))
 
+    # creating symbol_override for fx
+    create_fx_symbol_overview()
+
 
 @pytest.fixture(scope="session")
 def total_loop_counts_per_side():
-    total_loop_counts_per_side = 5
+    total_loop_counts_per_side = 3
     yield total_loop_counts_per_side
 
 

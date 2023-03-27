@@ -440,7 +440,7 @@ class StratCache:
     strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
     order_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
     # fx_symbol_overview_dict must be preloaded with supported fx pairs for system to work
-    fx_symbol_overview_dict: Dict[str, SymbolOverviewBaseModel | None] = {"USD|SGD", None}
+    fx_symbol_overview_dict: Dict[str, SymbolOverviewBaseModel | None] = {"USD|SGD": None}
 
     def __init__(self):
         self.re_ent_lock: RLock = RLock()
@@ -487,7 +487,7 @@ class StratCache:
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
     def get_key(self):
-        return f"{get_pair_strat_key(self._pair_strat)}"
+        return f"{get_pair_strat_key(self._pair_strat)}-{self.stopped}"
 
     def __str__(self):
         return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.leg1_trading_symbol},  " \

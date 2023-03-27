@@ -20,6 +20,7 @@ class TradingDataManager:
         market_data_base_url: str = f"ws://{host}:8040/market_data"
         cpp_ws_url: str = f"ws://{host}:8083/"
         self.trading_cache: TradingCache = TradingCache()
+
         self.top_of_book_ws_cont = WSReader(f"{market_data_base_url}/get-all-top_of_book-ws", TopOfBookBaseModel,
                                             TopOfBookBaseModelList, self.handle_top_of_book_ws)
 
@@ -161,7 +162,7 @@ class TradingDataManager:
                 # remove if this pair strat is in our cache - it's no more ongoing
                 with strat_cache.re_ent_lock:
                     # demon thread will tear down itself if strat_cache.stopped is True, it will also invoke
-                    # set_pair_strat(NOne) on cache enabling future reactivation, stops any processing until then
+                    # set_pair_strat(None) on cache, enabling future reactivation + stops any processing until then
                     strat_cache.stopped = True
                     if key_leg_1 in self.strat_thread_dict:
                         self.strat_thread_dict.pop(key_leg_1)
@@ -284,7 +285,7 @@ class TradingDataManager:
                 logging.error(f"error: new_order_ key: {key}matched strat_cache with None pair_strat ;;;new_order_: "
                               f"{new_order_}, strat_cache: {strat_cache}")
             # else not required - strat does not need this update notification
-            logging.debug(f"Updated new_order cache for key: {key} ;;; new_order_: {new_order_}")
+            logging.debug(f"Updated new_order cache for key: {key};;;new_order_: {new_order_}")
         else:
             logging.error(f"error: no ongoing pair strat matches this new_order_ key: {key};;;new_order_: "
                           f"{new_order_}, strat_cache: {strat_cache}")

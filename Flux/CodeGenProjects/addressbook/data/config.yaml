@@ -5,8 +5,8 @@ simulate_reverse_path: False
 #fill_percent: 100
 
 # to simulate rej functionality
-#simulate_new_to_reject_orders: False   # to simulate out orders with new and reject order_event
-#simulate_ack_to_reject_orders: False   # to simulate out orders with ack and reject order_event
+#simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+#simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
 
 # to simulate cxl-rej functionality
 #simulate_cxl_rej_orders: False

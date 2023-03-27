@@ -421,7 +421,7 @@ def buy_order_(pair_securities_with_sides_):
             "px": 100,
             "qty": 90,
             "order_notional": 0,
-            "underlying_account": "trading-account",
+            "underlying_account": "trading_account",
             "text": [
               "test_string"
             ]
@@ -441,7 +441,7 @@ def expected_buy_order_snapshot_(pair_securities_with_sides_):
             "px": 0,
             "qty": 0,
             "order_notional": 0,
-            "underlying_account": "trading-account",
+            "underlying_account": "trading_account",
             "text": []
         },
         "filled_qty": 0,
@@ -465,7 +465,7 @@ def buy_fill_journal_():
         "fill_px": 90,
         "fill_qty": 50,
         "fill_notional": 0,
-        "underlying_account": "trading-account",
+        "underlying_account": "trading_account",
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F1"
     })
@@ -492,7 +492,7 @@ def sell_order_(pair_securities_with_sides_):
             "px": 110,
             "qty": 70,
             "order_notional": 0,
-            "underlying_account": "trading-account",
+            "underlying_account": "trading_account",
             "text": [
               "test_string"
             ]
@@ -512,7 +512,7 @@ def expected_sell_order_snapshot_(pair_securities_with_sides_):
             "px": 0,
             "qty": 0,
             "order_notional": 0,
-            "underlying_account": "trading-account",
+            "underlying_account": "trading_account",
             "text": []
         },
         "filled_qty": 0,
@@ -536,7 +536,7 @@ def sell_fill_journal_():
         "fill_px": 120,
         "fill_qty": 30,
         "fill_notional": 0,
-        "underlying_account": "trading-account",
+        "underlying_account": "trading_account",
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F2"
     })
