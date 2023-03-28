@@ -22,9 +22,9 @@ import classes from './TableWidget.module.css';
 const TableWidget = (props) => {
 
     const [rowTrees, setRowTrees] = useState([]);
-    const [rows, setRows] = useState([]);
-    const [headCells, setHeadCells] = useState([]);
-    const [commonkeys, setCommonkeys] = useState([]);
+    const [rows, setRows] = useState(props.rows);
+    const [headCells, setHeadCells] = useState(props.tableColumns);
+    const [commonkeys, setCommonkeys] = useState(props.commonKeyCollections);
     const [selectedRow, setSelectedRow] = useState();
     const [selectedRows, setSelectedRows] = useState([]);
     const [data, setData] = useState(props.data);
@@ -44,7 +44,7 @@ const TableWidget = (props) => {
         setRows(props.rows);
         setHeadCells(props.tableColumns);
         setCommonkeys(props.commonKeyCollections);
-    }, [props.data]);
+    }, [props.data, props.tableColumns]);
 
     useEffect(() => {
         let trees = generateRowTrees(cloneDeep(data), props.collections, props.xpath);
@@ -57,7 +57,7 @@ const TableWidget = (props) => {
     }, [rows, headCells, props.mode, hide])
 
     function getFilteredCells() {
-        let updatedCells = headCells;
+        let updatedCells = cloneDeep(headCells);
         if (hide) {
             updatedCells = updatedCells.filter(cell => !cell.hide);
         }
@@ -179,11 +179,37 @@ const TableWidget = (props) => {
     }
 
     const onSettingsItemChange = (e, key) => {
-        if (!e.target.checked) {
+        let hide = !e.target.checked;
+        if (hide) {
             setSelectAll(false);
         }
-        let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: !e.target.checked } : cell)
+        let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: hide } : cell)
         setHeadCells(updatedHeadCells);
+        let collection = props.collections.filter(c => c.tableTitle === key)[0];
+        let enableOverride = cloneDeep(props.enableOverride);
+        let disableOverride = cloneDeep(props.disableOverride);
+        if (hide) {
+            if (collection.hide !== hide) {
+                if (!enableOverride.includes(key)) {
+                    enableOverride.push(key);
+                }
+            }
+            let index = disableOverride.indexOf(key);
+            if (index !== -1) {
+                disableOverride.splice(index, 1);
+            }
+        } else {
+            if (collection.hide !== undefined && collection.hide !== hide) {
+                if (!disableOverride.includes(key)) {
+                    disableOverride.push(key);
+                }
+            }
+            let index = enableOverride.indexOf(key);
+            if (index !== -1) {
+                enableOverride.splice(index, 1);
+            }
+        }
+        props.onOverrideChange(props.headerProps.name, enableOverride, disableOverride);
     }
 
     const onSettingsOpen = () => {

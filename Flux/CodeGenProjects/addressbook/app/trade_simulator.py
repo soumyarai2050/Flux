@@ -125,8 +125,8 @@ class TradeSimulator(TradingLinkBase):
         # simulate fill
         if cls.fill_percent:
             qty = cls.get_partial_allowed_fill_qty(qty)
-        fill_journal = FillsJournalBaseModel(order_id=order_id, fill_px=px, fill_qty=qty,
-                                             underlying_account=underlying_account,
+        fill_journal = FillsJournalBaseModel(order_id=order_id, fill_px=px, fill_qty=qty, fill_symbol=sec_id,
+                                             fill_side=side, underlying_account=underlying_account,
                                              fill_date_time=DateTime.utcnow(),
                                              fill_id=f"F{order_id[1:]}")
         TradeSimulator.strat_manager_service_web_client.create_fills_journal_client(fill_journal)

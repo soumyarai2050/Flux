@@ -287,6 +287,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    xpath={currentSchemaXpath}\n"
         output_str += "                    onUserChange={onUserChange}\n"
         output_str += "                    onButtonToggle={onButtonToggle}\n"
+        output_str += "                    enableOverride={props.enableOverride}\n"
+        output_str += "                    disableOverride={props.disableOverride}\n"
+        output_str += "                    onOverrideChange={props.onOverrideChange}\n"
         output_str += "                />\n"
         output_str += "            ) : props.layout === Layouts.TREE_LAYOUT ? (\n"
         output_str += "                <TreeWidget\n"
@@ -966,7 +969,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 root_message_name_camel_cased = root_message_name[0].lower() + root_message_name[1:]
                 output_str += f"    let rows = getTableRows(collections, {root_message_name_camel_cased}, " \
                               f"modified{root_message_name}, currentSchemaXpath);\n"
-            output_str += f"    let tableColumns = getTableColumns(collections, mode);\n"
+            output_str += f"    let tableColumns = getTableColumns(collections, mode, props.enableOverride, " \
+                          f"props.disableOverride);\n"
             output_str += f"    let commonKeyCollections = getCommonKeyCollections(rows, tableColumns);\n\n"
 
         if layout_type != JsxFileGenPlugin.abbreviated_type:
@@ -1260,7 +1264,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if layout_type != JsxFileGenPlugin.non_root_type:
                     output_str += "        setChanges({ [xpath]: value });\n"
                     output_str += f"        if ({message_name_camel_cased}[DB_ID]) "+"{\n"
-                    output_str += f"            onSave(null);\n"
+                    output_str += f"            onSave(null, true);\n"
                     output_str += "        }\n"
                     output_str += "    }\n\n"
                 else:

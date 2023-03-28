@@ -110,6 +110,11 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += f'            name="{message_name_case_styled}"\n'
             output_str += "            layout={"+f"getLayoutById('{message_name_case_styled}').layout"+"}\n"
             output_str += "            onChangeLayout={onWidgetLayoutChange}\n"
+            output_str += "            enableOverride={getLayoutById('"+f"{message_name_case_styled}"+"')." \
+                          "enable_override}\n"
+            output_str += "            disableOverride={getLayoutById('"+f"{message_name_case_styled}"+"')." \
+                          "disable_override}\n"
+            output_str += '            onOverrideChange={onWidgetOverrideChange}\n'
             output_str += f'        />\n'
             output_str += f'    </Paper>\n'
             output_str += '}\n'

@@ -459,12 +459,14 @@ def expected_buy_order_snapshot_(pair_securities_with_sides_):
 
 
 @pytest.fixture()
-def buy_fill_journal_():
+def buy_fill_journal_(pair_securities_with_sides_):
     yield FillsJournalBaseModel(**{
         "order_id": "O1",
         "fill_px": 90,
         "fill_qty": 50,
         "fill_notional": 0,
+        "fill_symbol": pair_securities_with_sides_["security1"]["sec_id"],
+        "fill_side": pair_securities_with_sides_["side1"],
         "underlying_account": "trading_account",
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F1"
@@ -530,12 +532,14 @@ def expected_sell_order_snapshot_(pair_securities_with_sides_):
 
 
 @pytest.fixture()
-def sell_fill_journal_():
+def sell_fill_journal_(pair_securities_with_sides_):
     yield FillsJournalBaseModel(**{
         "order_id": "O2",
         "fill_px": 120,
         "fill_qty": 30,
         "fill_notional": 0,
+        "fill_symbol": pair_securities_with_sides_["security2"]["sec_id"],
+        "fill_side": pair_securities_with_sides_["side2"],
         "underlying_account": "trading_account",
         "fill_date_time": DateTime.utcnow(),
         "fill_id": "F2"

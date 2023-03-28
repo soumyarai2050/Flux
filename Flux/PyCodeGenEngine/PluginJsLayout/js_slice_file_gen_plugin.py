@@ -120,8 +120,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import { addxpath, clearxpath, getErrorDetails } from '../utils';\n"
             if dependent_message_name is not None:
                 output_str += "import { setModified"+f"{dependent_message_name}, " \
-                                                     f""+"update"+f"{dependent_message_name}"+" } from './" + \
-                              f"{capitalized_to_camel_case(dependent_message_name)}Slice';\n"
+                              f""+"update"+f"{dependent_message_name}"+" } from " \
+                              f"'./{capitalized_to_camel_case(dependent_message_name)}Slice';\n"
             output_str += "\n"
 
         return output_str
@@ -179,7 +179,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_message_name = self.dependent_to_abbreviated_message_relation_dict[message_name]
                 dependent_message_name_camel_cased = capitalized_to_camel_case(dependent_message_name)
                 output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/" \
-                             f"create', (payload, "+"{ dispatch, getState }) => " + "{\n"
+                             f"create', (payload, "+"{ dispatch, getState, rejectWithValue }) => " + "{\n"
                 output_str += "    let { data, abbreviated, loadedKeyName } = payload;\n"
                 output_str += "    abbreviated = abbreviated.substring(0, abbreviated.indexOf('$'));\n"
                 output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + \
@@ -195,7 +195,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "            _.get(updatedData, loadedKeyName).push(newStratKey);\n"
                 output_str += f"            dispatch(update{dependent_message_name}("+"updatedData));\n"
                 output_str += "            return res.data;\n"
-                output_str += "        });\n"
+                output_str += "        })\n"
+                output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
                 output_str += "})\n\n"
                 return output_str
         return ""

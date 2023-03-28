@@ -55,6 +55,8 @@ message WidgetUIData{
   optional bool is_repeated = 7 [default = false];
   optional string alert_bubble_source = 8;
   optional string alert_bubble_color = 9;
+  repeated string enable_override = 10;
+  repeated string disable_override = 11;
 }
 
 message UIButton{

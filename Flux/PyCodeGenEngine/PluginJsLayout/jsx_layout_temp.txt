@@ -108,17 +108,18 @@ const Layout = (props) => {
     }
 
     const onSave = () => {
+        let layout;
         if (uiLayoutArray.filter(l => l.profile_id === profileId).length > 0) {
-            let layout = uiLayoutArray.filter(l => l.profile_id === profileId)[0];
+            layout = uiLayoutArray.filter(l => l.profile_id === profileId)[0];
             layout = cloneDeep(layout);
             layout.widget_ui_data = layouts;
             dispatch(updateUILayout(layout));
         } else {
-            let layout = { profile_id: profileId, widget_ui_data: layouts }
+            layout = { profile_id: profileId, widget_ui_data: layouts }
             dispatch(createUILayout(layout));
         }
         setOpenSaveLayout(false);
-        setProfileId(uiLayout.profile_id ? uiLayout.profile_id : '');
+        setProfileId(layout.profile_id ? layout.profile_id : '');
     }
 
     const onLoad = () => {
@@ -143,7 +144,7 @@ const Layout = (props) => {
     const onLayoutChange = (updatedLayouts) => {
         updatedLayouts = updatedLayouts.map(l => {
             let layout = layouts.filter(widgetLayout => widgetLayout.i === l.i)[0];
-            return { i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, layout: layout.layout }
+            return { i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, layout: layout.layout, enable_override: layout.enable_override, disable_override: layout.disable_override }
         })
         setLayouts(updatedLayouts);
     }
@@ -173,6 +174,7 @@ const Layout = (props) => {
         setLayouts(defaultLayouts);
         sessionStorage.removeItem(COOKIE_NAME);
         setProfileId('');
+        dispatch(setUILayout({}));
         setOpenLoadLayout(false);
         let updatedShow = cloneDeep(show);
         Object.keys(updatedShow).map(key => {
@@ -193,7 +195,7 @@ const Layout = (props) => {
         }
         let xMax = Math.max(...layouts.map(widgetLayout => widgetLayout.x + widgetLayout.w));
         let yMax = Math.max(...layouts.map(widgetLayout => widgetLayout.y + widgetLayout.h));
-        return layout ? layout : { i: id, x: xMax, y: yMax, w: defaultLayout.w, h: defaultLayout.h, layout: defaultLayout.layout };
+        return layout ? layout : { i: id, x: xMax, y: yMax, w: defaultLayout.w, h: defaultLayout.h, layout: defaultLayout.layout, enable_override: defaultLayout.enable_override, disable_override: defaultLayout.disable_override };
     }
 
     const onWidgetLayoutChange = (name, layoutType) => {
@@ -201,6 +203,18 @@ const Layout = (props) => {
         let updatedLayouts = updatedData.map(widgetLayout => {
             if (widgetLayout.i === name) {
                 widgetLayout.layout = layoutType;
+            }
+            return widgetLayout
+        });
+        setLayouts(updatedLayouts);
+    }
+
+    const onWidgetOverrideChange = (name, enableOverride, disableOverride) => {
+        let updatedData = cloneDeep(layouts);
+        let updatedLayouts = updatedData.map(widgetLayout => {
+            if (widgetLayout.i === name) {
+                widgetLayout.enable_override = enableOverride;
+                widgetLayout.disable_override = disableOverride;
             }
             return widgetLayout
         });

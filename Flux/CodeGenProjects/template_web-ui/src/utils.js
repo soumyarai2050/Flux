@@ -1186,21 +1186,32 @@ export function hasxpath(data, xpath) {
     return false;
 }
 
-export function getTableColumns(collections, mode) {
-    let columns = collections.map(collection => Object.assign({}, collection)).filter(collection => {
-        if (collection.serverPopulate && mode === Modes.EDIT_MODE) {
+export function getTableColumns(collections, mode, enableOverride = [], disableOverride = []) {
+    let columns = collections
+        .map(collection => Object.assign({}, collection))
+        .map(collection => {
+            if (enableOverride.includes(collection.tableTitle)) {
+                collection.hide = true;
+            }
+            if (disableOverride.includes(collection.tableTitle)) {
+                collection.hide = false;
+            }
+            return collection;
+        })
+        .filter(collection => {
+            if (collection.serverPopulate && mode === Modes.EDIT_MODE) {
+                return false;
+            } else if (primitiveDataTypes.includes(collection.type)) {
+                return true;
+            } else if (collection.abbreviated && collection.abbreviated === "JSON") {
+                return true;
+            } else if (collection.type === 'button' && !collection.rootLevel) {
+                return true;
+            } else if (collection.type === 'progressBar') {
+                return true;
+            }
             return false;
-        } else if (primitiveDataTypes.includes(collection.type)) {
-            return true;
-        } else if (collection.abbreviated && collection.abbreviated === "JSON") {
-            return true;
-        } else if (collection.type === 'button' && !collection.rootLevel) {
-            return true;
-        } else if (collection.type === 'progressBar') {
-            return true;
-        }
-        return false;
-    })
+        })
     return columns;
 }
 

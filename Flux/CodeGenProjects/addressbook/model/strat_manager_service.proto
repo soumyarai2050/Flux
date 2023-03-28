@@ -170,7 +170,7 @@ message OrderSnapshot{
   optional int64 cxled_qty = 8;
   optional float avg_cxled_px = 9;
   optional float cxled_notional = 10;
-  optional int64 create_date_time = 11 [(FluxFldValIsDateTime) = true];
+  optional int64 create_date_time = 11 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
   optional int64 last_update_date_time = 12 [(FluxFldValIsDateTime) = true];
   optional OrderStatusType order_status = 13 ;
   optional int64 last_n_sec_total_qty = 14 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec order qty
@@ -244,9 +244,10 @@ message FillsJournal{
   optional int64 fill_qty = 4;
   optional float fill_notional = 5;
   optional string fill_symbol = 6;
-  required string underlying_account = 7;
-  optional int64 fill_date_time = 8 [(FluxFldValIsDateTime) = true];
-  required string fill_id = 9;
+  optional Side fill_side = 7;
+  required string underlying_account = 8;
+  optional int64 fill_date_time = 9 [(FluxFldValIsDateTime) = true];
+  required string fill_id = 10;
 }
 
 //Widget - 6

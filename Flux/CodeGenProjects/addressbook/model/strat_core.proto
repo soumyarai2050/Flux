@@ -193,11 +193,12 @@ message Alert{
     pressed_value_as_text: "true"
   }];
   required Severity severity = 3 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
-  required string alert_brief = 4 [(FluxFldSizeMax) = 32];
+  optional int32 alert_count = 4 ;
+  required string alert_brief = 5 [(FluxFldSizeMax) = 32];
   // must prefix strat:<strat-name> for strat alerts
-  optional string alert_details = 5 [(FluxFldAbbreviated) = "JSON"];
+  optional string alert_details = 6 [(FluxFldAbbreviated) = "JSON"];
   // populated only if this alert is for one or more orders
-  repeated OrderBrief impacted_order = 6;
+  repeated OrderBrief impacted_order = 7;
 }
 
 message Residual{

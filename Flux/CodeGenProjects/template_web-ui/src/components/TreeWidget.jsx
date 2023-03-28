@@ -228,7 +228,7 @@ TreeWidget.propTypes = {
     originalData: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     mode: PropTypes.string.isRequired,
     onUpdate: PropTypes.func.isRequired,
-    error: PropTypes.string,
+    error: PropTypes.object,
     onResetError: PropTypes.func
 }
 

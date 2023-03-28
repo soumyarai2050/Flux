@@ -101,7 +101,7 @@ class StratExecutor:
             self.trading_link.market_data_service_web_client.get_all_top_of_book_client()  # Never returns None
         if tobs:
             for tob in tobs:
-                self.trading_data_manager.handle_top_of_book_ws()
+                self.trading_data_manager.handle_top_of_book_ws(tob)
             # if we need fx TOB: self.strat_cache needs to collect reference here (like we do in symbol_overview)
 
     def update_strat_brief_from_http(self):
@@ -691,7 +691,7 @@ class StratExecutor:
             err_str_ = "TOB updates could not find any updated buy or sell tob"
             logging.error(err_str_)
             raise Exception(err_str_)
-        return True
+        return order_placed
 
     def get_leg1_fx(self):
         if self.leg1_fx:
@@ -760,7 +760,8 @@ class StratExecutor:
                     return -1
 
                 # 3. check if any cxl order is requested and send out
-                self.process_cxl_request()
+                if self.process_cxl_request():
+                    continue
 
                 strat_brief: StratBriefBaseModel | None = None
                 # strat doesn't need to check if strat_brief is updated or not

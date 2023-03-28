@@ -316,7 +316,7 @@ class StratCache:
     def get_top_of_books(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
         if date_time is None or date_time < self._top_of_books_update_date_time:
             with self.re_ent_lock:
-                if self._top_of_books is not None:
+                if self._top_of_books[0] is not None and self._top_of_books[1] is not None:
                     _top_of_books_update_date_time = copy.deepcopy(self._top_of_books_update_date_time)
                     _top_of_books = copy.deepcopy(self._top_of_books)
                     return _top_of_books, _top_of_books_update_date_time

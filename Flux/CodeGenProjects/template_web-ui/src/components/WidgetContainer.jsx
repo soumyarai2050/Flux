@@ -51,7 +51,7 @@ const WidgetContainer = (props) => {
                 </div>
             </Typography>
             {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkeyRef} commonkeys={commonkeys} />}
-            <Box style={{ height: `calc(100% - 40px - ${height}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
+            <Box style={{ height: `calc(100% - 42px - ${height}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
                 {props.children}
             </Box>
         </Fragment >

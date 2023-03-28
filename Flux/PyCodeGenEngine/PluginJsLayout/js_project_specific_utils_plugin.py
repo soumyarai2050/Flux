@@ -53,7 +53,8 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
                                             f'y: {widget_ui_data_options_value["y"].strip()}, ' \
                                             f'w: {widget_ui_data_options_value["w"].strip()}, ' \
                                             f'h: {widget_ui_data_options_value["h"].strip()}, ' \
-                                            f'layout: "{widget_ui_data_options_value["layout"].strip()}"'+'},\n'
+                                            f'layout: "{widget_ui_data_options_value["layout"].strip()}", ' \
+                                            f'enable_override: [], disable_override: [] ' + '},\n'
         output_str += "    ]\n"
         output_str += "    return layout;\n"
         output_str += "}\n\n"

@@ -168,6 +168,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         """
         return px / self.usd_fx
 
+    def get_local_notional(self, px: float, system_symbol: str):
+        return px * self.usd_fx
+
     def app_launch_pre(self):
         app_launch_pre_thread = threading.Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
@@ -322,7 +325,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     updated_symbol_side_snapshot_obj.total_cxled_qty = symbol_side_snapshot_obj.total_cxled_qty + order_snapshot_obj.cxled_qty
                     updated_symbol_side_snapshot_obj.total_cxled_notional = symbol_side_snapshot_obj.total_cxled_notional + order_snapshot_obj.cxled_notional
                     updated_symbol_side_snapshot_obj.avg_cxled_px = (
-                            updated_symbol_side_snapshot_obj.total_cxled_notional / updated_symbol_side_snapshot_obj.total_cxled_qty) if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0
+                            self.get_local_notional(updated_symbol_side_snapshot_obj.total_cxled_notional,
+                                                    symbol_side_snapshot_obj.security.sec_id) /
+                            updated_symbol_side_snapshot_obj.total_cxled_qty) \
+                        if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0
                     updated_symbol_side_snapshot_obj.last_update_date_time = order_journal_obj.order_event_date_time
                 case other_:
                     err_str_ = f"Unsupported StratEventType for symbol_side_snapshot update {other_}"
@@ -359,7 +365,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             updated_symbol_side_snapshot_obj.total_fill_notional = \
                 symbol_side_snapshot_obj.total_fill_notional + fills_journal.fill_notional
             updated_symbol_side_snapshot_obj.avg_fill_px = \
-                updated_symbol_side_snapshot_obj.total_fill_notional / updated_symbol_side_snapshot_obj.total_filled_qty
+                self.get_local_notional(updated_symbol_side_snapshot_obj.total_fill_notional,
+                                        symbol_side_snapshot_obj.security.sec_id) / \
+                updated_symbol_side_snapshot_obj.total_filled_qty
             updated_symbol_side_snapshot_obj.last_update_fill_px = fills_journal.fill_px
             updated_symbol_side_snapshot_obj.last_update_fill_qty = fills_journal.fill_qty
             updated_symbol_side_snapshot_obj.last_update_date_time = fills_journal.fill_date_time
@@ -460,7 +468,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     cxled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
                     cxled_notional = cxled_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
                                                                  order_snapshot_obj.order_brief.security.sec_id)
-                    avg_cxled_px = (cxled_notional / cxled_qty) if cxled_qty != 0 else 0
+                    avg_cxled_px = \
+                        (self.get_local_notional(cxled_notional, order_snapshot_obj.order_brief.security.sec_id) /
+                         cxled_qty) if cxled_qty != 0 else 0
                     order_snapshot_obj = await underlying_partial_update_order_snapshot_http(
                         OrderSnapshotOptional(_id=order_snapshot_obj.id,
                                               order_brief=order_brief_obj,
@@ -548,7 +558,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     cxled_notional = \
                         order_snapshot_obj.cxled_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
                                                                        order_snapshot_obj.order_brief.security.sec_id)
-                    avg_cxled_px = (cxled_notional / cxled_qty) if cxled_qty != 0 else 0
+                    avg_cxled_px = \
+                        (self.get_local_notional(cxled_notional, order_snapshot_obj.order_brief.security.sec_id) /
+                         cxled_qty) if cxled_qty != 0 else 0
                     order_snapshot_obj = await underlying_partial_update_order_snapshot_http(
                         OrderSnapshotOptional(
                             _id=order_snapshot_obj.id,
@@ -617,10 +629,13 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                                                            order_snapshot.order_brief.security.sec_id)
                             updated_strat_status_obj.avg_cxl_buy_px = \
                                 (
-                                    updated_strat_status_obj.total_cxl_buy_notional / updated_strat_status_obj.total_cxl_buy_qty) \
+                                    self.get_local_notional(updated_strat_status_obj.total_cxl_buy_notional,
+                                                            order_journal_obj.order.security.sec_id) /
+                                    updated_strat_status_obj.total_cxl_buy_qty) \
                                     if updated_strat_status_obj.total_cxl_buy_qty != 0 else 0
                             updated_strat_status_obj.total_cxl_exposure = \
-                                updated_strat_status_obj.total_cxl_buy_notional - updated_strat_status_obj.total_cxl_sell_notional
+                                updated_strat_status_obj.total_cxl_buy_notional - \
+                                updated_strat_status_obj.total_cxl_sell_notional
                         case other_:
                             err_str_ = f"Unsupported Order Event type {other_}"
                             await update_strat_alert_by_sec_and_side_async(order_journal_obj.order.security.sec_id,
@@ -630,7 +645,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         updated_strat_status_obj.avg_open_buy_px = 0
                     else:
                         updated_strat_status_obj.avg_open_buy_px = \
-                            updated_strat_status_obj.total_open_buy_notional / updated_strat_status_obj.total_open_buy_qty
+                            self.get_local_notional(updated_strat_status_obj.total_open_buy_notional,
+                                                    order_journal_obj.order.security.sec_id) / \
+                            updated_strat_status_obj.total_open_buy_qty
                 case Side.SELL:
                     match order_journal_obj.order_event:
                         case OrderEventType.OE_NEW:
@@ -651,8 +668,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                 order_snapshot.cxled_qty * self.get_usd_px(order_snapshot.order_brief.px,
                                                                            order_snapshot.order_brief.security.sec_id)
                             updated_strat_status_obj.avg_cxl_sell_px = \
-                                (updated_strat_status_obj.total_cxl_sell_notional /
-                                 updated_strat_status_obj.total_cxl_sell_qty) \
+                                self.get_local_notional(updated_strat_status_obj.total_cxl_sell_notional,
+                                                        order_journal_obj.order.security.sec_id) / \
+                                updated_strat_status_obj.total_cxl_sell_qty \
                                     if updated_strat_status_obj.total_cxl_sell_qty != 0 else 0
                             updated_strat_status_obj.total_cxl_exposure = \
                                 updated_strat_status_obj.total_cxl_buy_notional - \
@@ -666,7 +684,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         updated_strat_status_obj.avg_open_sell_px = 0
                     else:
                         updated_strat_status_obj.avg_open_sell_px = \
-                            updated_strat_status_obj.total_open_sell_notional / \
+                            self.get_local_notional(updated_strat_status_obj.total_open_sell_notional,
+                                                    order_journal_obj.order.security.sec_id) / \
                             updated_strat_status_obj.total_open_sell_qty
                 case other_:
                     err_str_ = f"Unsupported Side Type {other_} received in order journal {order_journal_obj} " \
@@ -676,8 +695,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     return
             updated_strat_status_obj.total_order_qty = \
                 updated_strat_status_obj.total_buy_qty + updated_strat_status_obj.total_sell_qty
-            updated_strat_status_obj.total_open_exposure = \
-                updated_strat_status_obj.total_open_buy_notional - updated_strat_status_obj.total_open_sell_notional
+            updated_strat_status_obj.total_open_exposure = updated_strat_status_obj.total_open_buy_notional - \
+                                                           updated_strat_status_obj.total_open_sell_notional
             if updated_strat_status_obj.total_fill_buy_notional < updated_strat_status_obj.total_fill_sell_notional:
                 updated_strat_status_obj.balance_notional = \
                     strat_limits.max_cb_notional - updated_strat_status_obj.total_fill_buy_notional
@@ -805,16 +824,20 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
                                                                                   order_snapshot_obj.order_brief.security.sec_id)
                     if updated_strat_status_obj.total_open_buy_qty == 0:
-                        updated_strat_status_obj.avg_open_sell_px = 0
+                        updated_strat_status_obj.avg_open_buy_px = 0
                     else:
                         updated_strat_status_obj.avg_open_buy_px = \
-                            updated_strat_status_obj.total_open_buy_notional / updated_strat_status_obj.total_open_buy_qty
+                            self.get_local_notional(updated_strat_status_obj.total_open_buy_notional,
+                                                    order_snapshot_obj.order_brief.security.sec_id) / \
+                            updated_strat_status_obj.total_open_buy_qty
                     updated_strat_status_obj.total_fill_buy_qty += order_snapshot_obj.last_update_fill_qty
                     updated_strat_status_obj.total_fill_buy_notional += \
                         order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.last_update_fill_px,
                                                                                   order_snapshot_obj.order_brief.security.sec_id)
                     updated_strat_status_obj.avg_fill_buy_px = \
-                        updated_strat_status_obj.total_fill_buy_notional / updated_strat_status_obj.total_fill_buy_qty
+                        self.get_local_notional(updated_strat_status_obj.total_fill_buy_notional,
+                                                order_snapshot_obj.order_brief.security.sec_id) / \
+                        updated_strat_status_obj.total_fill_buy_qty
                 case Side.SELL:
                     updated_strat_status_obj.total_open_sell_qty -= order_snapshot_obj.last_update_fill_qty
                     updated_strat_status_obj.total_open_sell_notional -= \
@@ -824,23 +847,27 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         updated_strat_status_obj.avg_open_sell_px = 0
                     else:
                         updated_strat_status_obj.avg_open_sell_px = \
-                            updated_strat_status_obj.total_open_sell_notional / updated_strat_status_obj.total_open_sell_qty
+                            self.get_local_notional(updated_strat_status_obj.total_open_sell_notional,
+                                                    order_snapshot_obj.order_brief.security.sec_id) / \
+                            updated_strat_status_obj.total_open_sell_qty
                     updated_strat_status_obj.total_fill_sell_qty += order_snapshot_obj.last_update_fill_qty
                     updated_strat_status_obj.total_fill_sell_notional += \
                         order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.last_update_fill_px,
                                                                                   order_snapshot_obj.order_brief.security.sec_id)
                     updated_strat_status_obj.avg_fill_sell_px = \
-                        updated_strat_status_obj.total_fill_sell_notional / updated_strat_status_obj.total_fill_sell_qty
+                        self.get_local_notional(updated_strat_status_obj.total_fill_sell_notional,
+                                                order_snapshot_obj.order_brief.security.sec_id) / \
+                        updated_strat_status_obj.total_fill_sell_qty
                 case other_:
                     err_str_ = f"Unsupported Side Type {other_} received in order snapshot {order_snapshot_obj} " \
                                f"while updating strat_status"
                     await update_strat_alert_by_sec_and_side_async(order_snapshot_obj.order_brief.security.sec_id,
                                                                    order_snapshot_obj.order_brief.side, err_str_)
                     return
-            updated_strat_status_obj.total_open_exposure = \
-                updated_strat_status_obj.total_open_buy_notional - updated_strat_status_obj.total_open_sell_notional
-            updated_strat_status_obj.total_fill_exposure = \
-                updated_strat_status_obj.total_fill_buy_notional - updated_strat_status_obj.total_fill_sell_notional
+            updated_strat_status_obj.total_open_exposure = updated_strat_status_obj.total_open_buy_notional - \
+                                                           updated_strat_status_obj.total_open_sell_notional
+            updated_strat_status_obj.total_fill_exposure = updated_strat_status_obj.total_fill_buy_notional - \
+                                                           updated_strat_status_obj.total_fill_sell_notional
             if updated_strat_status_obj.total_fill_buy_notional < updated_strat_status_obj.total_fill_sell_notional:
                 updated_strat_status_obj.balance_notional = \
                     strat_limits.max_cb_notional - updated_strat_status_obj.total_fill_buy_notional
@@ -1039,7 +1066,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                     updated_fill_notional = last_filled_notional + fills_journal_obj.fill_notional
                 else:
                     updated_fill_notional = fills_journal_obj.fill_notional
-                updated_avg_fill_px = updated_fill_notional / updated_filled_qty
+                updated_avg_fill_px = \
+                    self.get_local_notional(updated_fill_notional, fills_journal_obj.fill_symbol) / updated_filled_qty
                 last_update_fill_qty = fills_journal_obj.fill_qty
                 last_update_fill_px = fills_journal_obj.fill_px
 
