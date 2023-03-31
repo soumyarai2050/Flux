@@ -145,7 +145,8 @@ def except_n_log_alert(severity: Severity = Severity.Severity_ERROR):
 def create_alert(alert_brief: str, alert_details: str | None = None, impacted_order: List[OrderBrief] | None = None,
                  severity: Severity = Severity.Severity_ERROR) -> Alert:
     kwargs = {}
-    kwargs.update(severity=severity, alert_brief=alert_brief, dismiss=False)
+    kwargs.update(severity=severity, alert_brief=alert_brief, dismiss=False, last_update_date_time=DateTime.utcnow(),
+                  alert_count=1)
     if alert_details is not None:
         kwargs.update(alert_details=alert_details)
     if impacted_order is not None:
@@ -352,12 +353,11 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
 
 
 def get_consumable_participation_qty(
-        last_n_sec_trade_qty_and_order_qty_sum_obj_list: List[ExecutorCheckSnapshot],
+        executor_check_snapshot_obj_list: List[ExecutorCheckSnapshot],
         max_participation_rate: float) -> int:
-    last_n_sec_trade_qty_and_order_qty_sum_obj = last_n_sec_trade_qty_and_order_qty_sum_obj_list[0]
-    participation_period_order_qty_sum = last_n_sec_trade_qty_and_order_qty_sum_obj.last_n_sec_order_qty
-    participation_period_last_trade_qty_sum = \
-        last_n_sec_trade_qty_and_order_qty_sum_obj.last_n_sec_trade_qty
+    executor_check_snapshot_obj = executor_check_snapshot_obj_list[0]
+    participation_period_order_qty_sum = executor_check_snapshot_obj.last_n_sec_order_qty
+    participation_period_last_trade_qty_sum = executor_check_snapshot_obj.last_n_sec_trade_qty
 
     return int(((participation_period_last_trade_qty_sum / 100) *
                 max_participation_rate) - participation_period_order_qty_sum)

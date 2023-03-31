@@ -179,7 +179,7 @@ message LastTrade {
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
   required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
-  required int64 time = 2 [(FluxFldValIsDateTime) = true];
+  required int64 time = 2 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
   required float px = 3;
   required int64 qty = 4;
   optional float premium = 5;

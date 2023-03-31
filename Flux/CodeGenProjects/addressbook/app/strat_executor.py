@@ -86,7 +86,7 @@ class StratExecutor:
             self.trading_link.market_data_service_web_client.get_all_market_depth_client()
         if market_depths:
             for market_depth in market_depths:
-                self.strat_cache.set_market_depth(market_depth)
+                self.trading_data_manager.handle_market_depth_ws(market_depth)
 
     def update_symbol_overviews_from_http(self):
         symbol_overviews: List[SymbolOverviewBaseModel] = \
@@ -109,7 +109,7 @@ class StratExecutor:
             self.trading_link.strat_manager_service_web_client.get_all_strat_brief_client()
         if strat_briefs:
             for strat_brief in strat_briefs:
-                self.strat_cache.set_strat_brief(strat_brief)
+                self.trading_data_manager.handle_strat_brief_ws(strat_brief)
 
     def update_portfolio_limits_from_http(self):
         portfolio_limits: PortfolioLimitsBaseModel | None = get_portfolio_limits()
@@ -285,8 +285,9 @@ class StratExecutor:
                                   f"applied")
                     return False
             else:
-                logging.error(f"blocked generated BUY order, symbol_overview_tuple missing: limit down check can't be "
-                              f"applied")
+                logging.error(f"blocked generated BUY order, symbol_overview_tuple missing for symbol "
+                              f"{strat_brief.pair_buy_side_trading_brief.security.sec_id}"
+                              f": limit down check can't be applied")
                 return False
 
             if strat_brief.pair_buy_side_trading_brief.consumable_open_orders < 0:
@@ -462,6 +463,7 @@ class StratExecutor:
 
     def retry_init_strat_cache(self):
         while True:
+            time.sleep(1)  # retry every one sec (sleep first on purpose for other strat specific updates to apply)
             done = True  # done is left unchanged (True) implies all required data checks succeeded
             try:
                 if not self.pair_strat_id:
@@ -490,8 +492,9 @@ class StratExecutor:
 
     def run(self):
         ret_val: int = -5000
+		logging.info(f"strat init started for: {self.pair_strat_id}")
         self.retry_init_strat_cache()
-
+        logging.info(f"strat init done for: {self.pair_strat_id}, firing up internal run")
         while 1:
             try:
                 ret_val = self.internal_run()
@@ -643,6 +646,20 @@ class StratExecutor:
         sell_symbol_prefix = "EQT_Sec"
         order_placed: bool = False
 
+        top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(self._top_of_books_update_date_time)
+
+        top_of_books: List[TopOfBookBaseModel] = []
+        if top_of_book_and_date_tuple is not None:
+            top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
+            if top_of_books is not None and len(top_of_books) == 2:
+                if top_of_books[0] is not None and top_of_books[1] is not None:
+                    pass
+                else:
+                    logging.error(f"strats need both sides of TOB to be present, found  0 or 1 - triggering "
+                                  f"force update;;;tob found: {top_of_books[0]}, {top_of_books[1]}")
+                    self.update_tobs_from_http()
+                    return False
+
         latest_update_date_time: DateTime | None = None
         for top_of_book in top_of_books:
             if latest_update_date_time is None:
@@ -689,8 +706,7 @@ class StratExecutor:
                                                         Side.SELL, sell_top_of_book.symbol)
         else:
             err_str_ = "TOB updates could not find any updated buy or sell tob"
-            logging.error(err_str_)
-            raise Exception(err_str_)
+            logging.debug(err_str_)
         return order_placed
 
     def get_leg1_fx(self):
@@ -804,7 +820,7 @@ class StratExecutor:
 
                 if top_of_book_and_date_tuple is not None:
                     top_of_books: List[TopOfBookBaseModel]
-                    top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
+                    top_of_books, _ = top_of_book_and_date_tuple
                     if top_of_books is not None and len(top_of_books) == 2:
                         if top_of_books[0] is not None and top_of_books[1] is not None:
                             pass

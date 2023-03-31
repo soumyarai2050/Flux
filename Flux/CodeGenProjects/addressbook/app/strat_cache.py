@@ -158,6 +158,10 @@ class StratCache:
     def get_key_from_top_of_book(top_of_book: TopOfBookBaseModel) -> Tuple[str, str]:
         return (top_of_book.symbol + "_BID"), (top_of_book.symbol + "_ASK")
 
+    @staticmethod
+    def get_key_from_market_depth(market_depth_: MarketDepthBaseModel) -> Tuple[str, str]:
+        return (market_depth_.symbol + "_BID"), (market_depth_.symbol + "_ASK")
+
     def get_pair_strat(self, date_time: DateTime | None = None) -> Tuple[PairStratBaseModel, DateTime] | None:
         if date_time is None or date_time < self._pair_strat_update_date_time:
             if self._pair_strat is not None:

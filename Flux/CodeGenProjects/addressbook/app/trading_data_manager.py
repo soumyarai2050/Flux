@@ -23,6 +23,9 @@ class TradingDataManager:
 
         self.top_of_book_ws_cont = WSReader(f"{market_data_base_url}/get-all-top_of_book-ws", TopOfBookBaseModel,
                                             TopOfBookBaseModelList, self.handle_top_of_book_ws)
+        # TODO IMPORTANT Enable this when we add formal ws support for market depth
+        # self.market_depth_ws_cont = WSReader(f"{market_data_base_url}/get-all-market_depth-ws", MarketDepthBaseModel,
+        #                                     MarketDepthBaseModelList, self.handle_market_depth_ws)
 
         self.symbol_overview_ws_cont = WSReader(f"{market_data_base_url}/get-all-symbol_overview-ws",
                                                 SymbolOverviewBaseModel,
@@ -346,4 +349,30 @@ class TradingDataManager:
             logging.debug(f"no matching strat: for TOB keys: {key1}, {key2};;;TOB: {top_of_book_}")
 
     def handle_market_depth_ws(self, market_depth_: MarketDepthBaseModel):
-        print(market_depth_)
+        if market_depth_.symbol in StratCache.fx_symbol_overview_dict:
+            # if we need fx Market Depth: StratCache needs to collect reference here (like we do in symbol_overview)
+            return  # No use-case for fx MarketDepth at this time
+        key1, key2 = StratCache.get_key_from_market_depth(market_depth_)
+        strat_cache1: StratCache = StratCache.get(key1)
+        strat_cache2: StratCache = StratCache.get(key2)
+        updated: bool = False
+        if strat_cache1 is not None:
+            with strat_cache1.re_ent_lock:
+                strat_cache1.set_market_depth(market_depth_)
+            # TODO IMPORTANT Enable this when we add formal ws support for market depth
+            # if self.market_depth_ws_cont.notify:
+            #     strat_cache1.notify_semaphore.release()
+            updated = True
+            # else not required - strat does not need this update notification
+        if strat_cache2 is not None:
+            with strat_cache2.re_ent_lock:
+                strat_cache2.set_market_depth(market_depth_)\
+            # TODO IMPORTANT Enable this when we add formal ws support for market depth
+            # if self.market_depth_ws_cont.notify:
+            #     strat_cache2.notify_semaphore.release()
+            updated = True
+            # else not required - strat does not need this update notification
+        if updated:
+            logging.debug(f"Updated market_depth cache for keys: {key1}, {key2};;;market_depth: {market_depth_}")
+        else:
+            logging.debug(f"no matching strat: for market_depth keys: {key1}, {key2};;;market_depth_: {market_depth_}")

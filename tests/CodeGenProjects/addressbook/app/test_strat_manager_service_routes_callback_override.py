@@ -133,7 +133,7 @@ def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot
     single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
         single_buy_unfilled_qty = get_buy_order_related_values()
     current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
-    max_participation_rate = 40
+    max_participation_rate = expected_strat_limits.market_trade_volume_participation.max_participation_rate
 
     open_qty = expected_symbol_side_snapshot.total_qty - expected_symbol_side_snapshot.total_filled_qty - \
                expected_symbol_side_snapshot.total_cxled_qty
@@ -155,14 +155,14 @@ def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_concentration = \
         (total_security_size / 100 * expected_strat_limits.max_concentration) - (
                 open_qty + expected_symbol_side_snapshot.total_filled_qty)
-    # currently assuming applicable_period_seconds = 0
-    expected_strat_brief_obj.pair_buy_side_trading_brief.participation_period_order_qty_sum = expected_symbol_side_snapshot.total_qty
+    # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
+    expected_strat_brief_obj.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_cxl_qty = \
         (((open_qty + expected_symbol_side_snapshot.total_filled_qty +
            expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_strat_limits.cancel_rate.max_cancel_rate) - \
         expected_symbol_side_snapshot.total_cxled_qty
-    expected_strat_brief_obj.pair_buy_side_trading_brief.indicative_consumable_participation_qty = \
-        (30 * max_participation_rate) - expected_strat_brief_obj.pair_buy_side_trading_brief.participation_period_order_qty_sum
+    # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
+    expected_strat_brief_obj.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
     expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty = single_buy_unfilled_qty * (loop_count - 1)
     expected_strat_brief_obj.pair_buy_side_trading_brief.indicative_consumable_residual = \
         expected_strat_limits.residual_restriction.max_residual - \
@@ -180,7 +180,7 @@ def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
     single_sell_order_px, single_sell_order_qty, single_sell_filled_px, single_sell_filled_qty, \
         single_sell_unfilled_qty = get_sell_order_related_values()
     current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
-    max_participation_rate = 40
+    max_participation_rate = expected_strat_limits.market_trade_volume_participation.max_participation_rate
 
     open_qty = expected_symbol_side_snapshot.total_qty - expected_symbol_side_snapshot.total_filled_qty - \
                expected_symbol_side_snapshot.total_cxled_qty
@@ -202,13 +202,14 @@ def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_concentration = \
         (total_security_size / 100 * expected_strat_limits.max_concentration) - (
                 open_qty + expected_symbol_side_snapshot.total_filled_qty)
-    expected_strat_brief_obj.pair_sell_side_trading_brief.participation_period_order_qty_sum = expected_symbol_side_snapshot.total_qty
+    # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
+    expected_strat_brief_obj.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_cxl_qty = \
         (((open_qty + expected_symbol_side_snapshot.total_filled_qty +
            expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_strat_limits.cancel_rate.max_cancel_rate) - \
         expected_symbol_side_snapshot.total_cxled_qty
-    expected_strat_brief_obj.pair_sell_side_trading_brief.indicative_consumable_participation_qty = \
-        (30 * max_participation_rate) - expected_strat_brief_obj.pair_sell_side_trading_brief.participation_period_order_qty_sum
+    # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
+    expected_strat_brief_obj.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
     expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty = single_sell_unfilled_qty * (loop_count - 1)
     expected_strat_brief_obj.pair_sell_side_trading_brief.indicative_consumable_residual = \
         expected_strat_limits.residual_restriction.max_residual - \
@@ -291,6 +292,8 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
         strat_brief.id = None
+        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
         # Since sell side of strat_brief is not updated till sell cycle
         strat_brief.pair_sell_side_trading_brief = expected_strat_brief_obj.pair_sell_side_trading_brief
     assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find expected strat_brief {expected_strat_brief_obj} in " \
@@ -458,6 +461,8 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
         strat_brief.id = None
+        strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
         # Since sell side of strat_brief is not updated till sell cycle
         strat_brief.pair_sell_side_trading_brief = expected_strat_brief_obj.pair_sell_side_trading_brief
     assert expected_strat_brief_obj in strat_brief_list
@@ -586,6 +591,8 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
         strat_brief.id = None
         # Since buy side of strat_brief is already checked
         strat_brief.pair_buy_side_trading_brief = expected_strat_brief_obj.pair_buy_side_trading_brief
+        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
     for strat_brief in strat_brief_list:
         if strat_brief.pair_sell_side_trading_brief == expected_strat_brief_obj.pair_sell_side_trading_brief:
             assert True
@@ -818,6 +825,8 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
         strat_brief.id = None
         # Since buy side of strat_brief is already checked
         strat_brief.pair_buy_side_trading_brief = expected_strat_brief_obj.pair_buy_side_trading_brief
+        strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
+        strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
     for strat_brief in strat_brief_list:
         if strat_brief.pair_sell_side_trading_brief == expected_strat_brief_obj.pair_sell_side_trading_brief:
             assert True
@@ -1226,6 +1235,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
 
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
+    order_id = None
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Loop started")
         expected_buy_order_snapshot = copy.deepcopy(expected_buy_order_snapshot_)
@@ -1269,7 +1279,12 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol)
         create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        order_id = placed_order_journal.order.order_id
+        if order_id is None:
+            order_id = placed_order_journal.order.order_id
+        else:
+            assert order_id != placed_order_journal.order.order_id, "Couldn't find new buy order"
+            order_id = placed_order_journal.order.order_id
+
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
 
         # Checking placed order computations
@@ -1278,7 +1293,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
                                         expected_buy_symbol_side_snapshot, expected_pair_strat,
                                         expected_strat_limits_, expected_strat_status,
                                         expected_strat_brief_obj, expected_portfolio_status)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order")
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order of order_id {order_id}")
 
         TradeSimulator.process_order_ack(order_id, current_itr_expected_buy_order_journal_.order.px,
                                          current_itr_expected_buy_order_journal_.order.qty,
@@ -1292,7 +1307,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         # Checking Ack response on placed order
         placed_buy_order_ack_receive(loop_count, order_id, create_buy_order_date_time,
                                      placed_order_journal_obj_ack_response, expected_buy_order_snapshot)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order ACK")
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order ACK of order_id {order_id}")
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
         TradeSimulator.process_fill(order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
@@ -1307,11 +1322,16 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
                                                 expected_pair_strat,
                                                 expected_strat_limits_, expected_strat_status,
                                                 expected_strat_brief_obj, expected_portfolio_status)
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order FILL")
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order FILL of order_id {order_id}")
 
         # Sleeping to let the order get cxlled
         time.sleep(residual_test_wait)
 
+    # running last trade once more before sell side
+    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
+    print(f"LastTrade created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+    order_id = None
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
         expected_sell_order_snapshot = copy.deepcopy(expected_sell_order_snapshot_)
@@ -1355,7 +1375,11 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
 
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol)
         create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        order_id = placed_order_journal.order.order_id
+        if order_id is None:
+            order_id = placed_order_journal.order.order_id
+        else:
+            assert order_id != placed_order_journal.order.order_id, "Couldn't find new buy order"
+            order_id = placed_order_journal.order.order_id
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
 
         # Checking placed order computations
@@ -1364,7 +1388,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
                                          expected_sell_symbol_side_snapshot, expected_pair_strat,
                                          expected_strat_limits_, expected_strat_status,
                                          expected_strat_brief_obj, expected_portfolio_status)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order of order_id {order_id}")
 
         TradeSimulator.process_order_ack(order_id, current_itr_expected_sell_order_journal_.order.px,
                                          current_itr_expected_sell_order_journal_.order.qty,
@@ -1379,7 +1403,8 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         placed_sell_order_ack_receive(loop_count, order_id, create_sell_order_date_time,
                                       total_loop_count, placed_order_journal_obj_ack_response,
                                       expected_sell_order_snapshot)
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed order ACK")
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
+              f"Checked sell placed order ACK of order_id {order_id}")
 
         sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
         TradeSimulator.process_fill(order_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
@@ -1398,10 +1423,6 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
 
         # Sleeping to let the order get cxlled
         time.sleep(residual_test_wait)
-
-    # resetting non-triggerable tob for next pair test (if present)
-    run_buy_top_of_book(0, buy_symbol, sell_symbol, top_of_book_list_, True)
-    run_sell_top_of_book(sell_symbol, True)
 
 
 def get_pair_strat_from_symbol(symbol: str):
@@ -1458,7 +1479,7 @@ def test_clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_
 
 @pytest.fixture(scope="session")
 def total_loop_counts_per_side():
-    total_loop_counts_per_side = 3
+    total_loop_counts_per_side = 10
     yield total_loop_counts_per_side
 
 
@@ -1466,7 +1487,10 @@ def total_loop_counts_per_side():
 def buy_sell_symbol_list():
     yield [
         ("CB_Sec_1", "EQT_Sec_1"),
-        ("CB_Sec_2", "EQT_Sec_2")
+        ("CB_Sec_2", "EQT_Sec_2"),
+        ("CB_Sec_3", "EQT_Sec_3"),
+        ("CB_Sec_4", "EQT_Sec_4"),
+        ("CB_Sec_5", "EQT_Sec_5")
     ]
 
 
@@ -1925,3 +1949,41 @@ def test_clear_test_environment():
                             ignore_collections=["UILayout"])
     clean_mongo_collections(mongo_server="mongodb://localhost:27017", database_name="market_data_test_fixture",
                             ignore_collections=["UILayout"])
+
+
+def test_alert_handling_for_pair_strat(pair_strat_, expected_strat_limits_, expected_start_status_, sample_alert):
+    # creating strat
+    buy_symbol = "CB_Sec_1"
+    sell_symbol = "EQT_Sec_1"
+    active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, pair_strat_,
+                                                expected_strat_limits_, expected_start_status_)
+
+    # check to add alert
+    alert = copy.deepcopy(sample_alert)
+    update_pair_strat = \
+        PairStratBaseModel(_id=active_pair_strat.id,
+                           strat_status=StratStatusOptional(strat_alerts=[alert]))
+    updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+    assert updated_pair_strat.strat_status.strat_alerts == [alert]
+
+    # check to add more impacted orders and update alert
+    alert.alert_brief = "Updated alert"
+    alert.impacted_order[0].order_id = "O2"
+    alert.impacted_order[0].security.sec_id = sell_symbol
+    update_pair_strat = \
+        PairStratBaseModel(_id=active_pair_strat.id,
+                           strat_status=StratStatusOptional(strat_alerts=[alert]))
+    updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+
+    expected_alert = copy.deepcopy(sample_alert)
+    expected_alert.impacted_order.extend(alert.impacted_order)
+    expected_alert.alert_brief = alert.alert_brief
+    assert updated_pair_strat.strat_status.strat_alerts == [expected_alert]
+
+    # Deleting alert
+    delete_intended_alert = AlertOptional(_id=alert.id)
+    update_pair_strat = \
+        PairStratBaseModel(_id=active_pair_strat.id,
+                           strat_status=StratStatusOptional(strat_alerts=[delete_intended_alert]))
+    updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+    assert updated_pair_strat.strat_status.strat_alerts == []

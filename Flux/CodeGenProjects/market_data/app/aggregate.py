@@ -91,10 +91,23 @@ def get_max_market_depth_obj(symbol: str, side: str):
 def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
     return {"aggregate": [
         {
+            "$match": {
+                "$and": [
+                    {
+                        "symbol": symbol
+                    },
+                    {"$expr": {
+                        "$gte": [
+                            "$time",
+                            {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
+                        ]
+                    }}
+                ]
+            }
+        },
+        {
+            # add match for time to reduce
             "$setWindowFields": {
-                "partitionBy": {
-                    "symbol": f"$symbol"
-                },
                 "sortBy": {
                     "time": 1.0
                 },
@@ -110,11 +123,6 @@ def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
                         }
                     }
                 }
-            }
-        },
-        {
-            "$match": {
-                "symbol": symbol
             }
         }
     ]}

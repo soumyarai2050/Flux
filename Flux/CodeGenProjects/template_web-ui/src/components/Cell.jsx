@@ -49,6 +49,12 @@ const Cell = (props) => {
         setOpen(false);
     }, [])
 
+    const onKeyDown = useCallback((e) => {
+        if (e.keyCode == 13) {
+            onFocusOut();
+        }
+    }, [])
+    
     let type = DataTypes.STRING;
     let enumValues = [];
 
@@ -60,7 +66,7 @@ const Cell = (props) => {
     if (mode === Modes.EDIT_MODE && active && !disabled) {
         if (collection.autocomplete) {
             return (
-                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Autocomplete
                         sx={{ minWidth: 160 }}
                         className={classes.text_field}
@@ -87,7 +93,7 @@ const Cell = (props) => {
             )
         } else if (type === DataTypes.ENUM) {
             return (
-                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Select
                         className={classes.select}
                         size='small'
@@ -109,7 +115,7 @@ const Cell = (props) => {
             )
         } else if (type === DataTypes.BOOLEAN) {
             return (
-                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Checkbox
                         className={classes.checkbox}
                         defaultValue={false}
@@ -146,7 +152,7 @@ const Cell = (props) => {
             }
 
             return (
-                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <NumericFormat
                         className={classes.text_field}
                         size='small'
@@ -171,7 +177,7 @@ const Cell = (props) => {
         } else if (type === DataTypes.DATE_TIME) {
             let value = currentValue ? new Date(currentValue) : null;
             return (
-                <TableCell className={classes.cell} align='center' size='small' onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DateTimePicker
                             className={classes.text_field}
@@ -192,7 +198,7 @@ const Cell = (props) => {
         } else if (type === DataTypes.STRING && !collection.abbreviated) {
             let value = currentValue ? currentValue : '';
             return (
-                <TableCell className={classes.cell} align='center' size='small' onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <TextField
                         className={classes.text_field}
                         size='small'

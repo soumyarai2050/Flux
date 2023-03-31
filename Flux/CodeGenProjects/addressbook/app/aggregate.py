@@ -356,6 +356,45 @@ def get_last_3_order_journals_from_order_id(order_id: str):
     ]}
 
 
+def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: str):
+    return {"aggregate": [
+        {
+            '$match': {
+                '$and': [
+                    {
+                        'fill_symbol': symbol
+                    }, {
+                        'fill_side': side
+                    }
+                ]
+            }
+        },
+        {
+            '$setWindowFields': {
+                'partitionBy': {
+                    'underlying_account': '$underlying_account'
+                },
+                'sortBy': {
+                    'fill_date_time': 1.0
+                },
+                'output': {
+                    'underlying_account_cumulative_fill_qty': {
+                        '$sum': '$fill_qty',
+                        'window': {
+                            'documents': [
+                                'unbounded', 'current'
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "$sort": {"fill_date_time": -1},
+        }
+    ]}
+
+
 if __name__ == '__main__':
     with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
     print(with_symbol_agg_query)

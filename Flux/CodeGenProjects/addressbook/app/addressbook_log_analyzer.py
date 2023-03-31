@@ -4,6 +4,8 @@ import os
 import time
 from pathlib import PurePath
 from typing import List, Optional
+from pendulum import DateTime
+import re
 
 # Project imports
 from FluxPythonUtils.scripts.utility_functions import configure_logger
@@ -15,7 +17,7 @@ from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client
     StratManagerServiceWebClient
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import Alert, \
     PortfolioStatusBaseModel
-
+from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import create_alert
 
 host, port = get_host_port_from_env()
 debug_mode: bool = False if (debug_env := os.getenv("DEBUG")) is None or len(debug_env) == 0 or debug_env == "0" \
@@ -24,6 +26,7 @@ debug_mode: bool = False if (debug_env := os.getenv("DEBUG")) is None or len(deb
 
 class AddressbookLogAnalyzer(LogAnalyzer):
     def __init__(self, log_files: Optional[List[str]]):
+        logging.info(f"starting log analyzer. monitoring log_files: {log_files}")
         self.strat_manager_service_web_client = StratManagerServiceWebClient(host=host, port=port)
         super().__init__(log_files, debug_mode=debug_mode)
 
@@ -33,14 +36,53 @@ class AddressbookLogAnalyzer(LogAnalyzer):
         created: bool = False
         while not created:
             try:
-                portfolio_status_base_model: PortfolioStatusBaseModel = PortfolioStatusBaseModel(_id=1)
-                alert_obj: Alert = Alert(_id=Alert.next_id(), dismiss=False, severity=severity, alert_brief=alert_brief,
-                                         alert_details=alert_details, impacted_order=None)
-                portfolio_status_base_model.portfolio_alerts = [alert_obj]
-                self.strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_base_model)
-                created = True
+                portfolio_status_list: List[
+                    PortfolioStatusBaseModel] = self.strat_manager_service_web_client.get_all_portfolio_status_client()
+                logging.debug(f"portfolio_status_list count: {len(portfolio_status_list)}")
+                alert_obj: Alert | None = None
+                if not alert_details:
+                    alert_details = None
+                if 0 == len(portfolio_status_list):
+                    raise Exception("no portfolio status obj found. Waiting for portfolio status obj to be created")
+                elif 1 == len(portfolio_status_list):
+                    portfolio_status: PortfolioStatusBaseModel = \
+                        self.strat_manager_service_web_client.get_portfolio_status_client(1)
+                    if portfolio_status.portfolio_alerts is not None:
+                        for portfolio_alert in portfolio_status.portfolio_alerts:
+                            stored_alert_brief = portfolio_alert.alert_brief
+                            stored_alert_brief = stored_alert_brief.split(":", 3)[-1].strip()
+                            stored_alert_brief = re.sub(f'0x[a-f0-9]*', '', stored_alert_brief)
+
+                            stored_alert_details = portfolio_alert.alert_details
+                            if stored_alert_details is not None:
+                                stored_alert_details = re.sub(f'0x[a-f0-9]*', '', stored_alert_details)
+
+                            cleaned_alert_brief = alert_brief.split(":", 3)[-1].strip()
+                            cleaned_alert_brief = re.sub(f'0x[a-f0-9]*', '', cleaned_alert_brief)
+                            cleaned_alert_details = alert_details
+                            if alert_details is not None:
+                                cleaned_alert_details = re.sub(f'0x[a-f0-9]*', '', cleaned_alert_details)
+
+                            if cleaned_alert_brief == stored_alert_brief and \
+                                    cleaned_alert_details == stored_alert_details and \
+                                    severity == portfolio_alert.severity:
+                                alert_obj = portfolio_alert
+                                alert_obj.last_update_date_time = DateTime.utcnow()
+                                alert_obj.alert_count += 1
+                                break
+                            # else not required
+                    if alert_obj is None:
+                        alert_obj = create_alert(alert_brief=alert_brief, alert_details=alert_details,
+                                                 severity=severity)
+                    portfolio_status.portfolio_alerts = [alert_obj]
+                    self.strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status)
+                    created = True
+                else:
+                    raise Exception("multiple portfolio status entries not supported at this time! "
+                                    "use swagger UI to delete redundant entries from DB and retry - "
+                                    f"this blocks all alert form reaching UI!!")
             except Exception as e:
-                logging.error(f"_send_alerts failed;;; exception: {e}", exc_info=True)
+                logging.error(f"_send_alerts failed;;;exception: {e}")
                 time.sleep(30)
 
 

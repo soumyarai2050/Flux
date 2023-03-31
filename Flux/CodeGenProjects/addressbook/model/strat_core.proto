@@ -197,8 +197,9 @@ message Alert{
   required string alert_brief = 5 [(FluxFldSizeMax) = 32];
   // must prefix strat:<strat-name> for strat alerts
   optional string alert_details = 6 [(FluxFldAbbreviated) = "JSON"];
+  optional int64 last_update_date_time = 7 [(FluxFldValIsDateTime) = true];
   // populated only if this alert is for one or more orders
-  repeated OrderBrief impacted_order = 7;
+  repeated OrderBrief impacted_order = 8;
 }
 
 message Residual{

@@ -461,7 +461,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 if order_snapshot_obj is not None:
                     order_brief_obj = OrderBrief(**order_snapshot_obj.order_brief.dict())
                     if order_journal_obj.order.text:
-                        order_brief_obj.text.extend(order_journal_obj.order.text)
+                        if order_brief_obj.text:
+                            order_brief_obj.text.extend(order_journal_obj.order.text)
+                        else:
+                            order_brief_obj.text = order_journal_obj.order.text
                     # else not required: If no text is present in order_journal then updating
                     # order snapshot with same obj
 
@@ -749,7 +752,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
             if strat_brief_.pair_sell_side_trading_brief.all_bkr_cxlled_qty > 0:
                 if (consumable_cxl_qty := strat_brief_.pair_sell_side_trading_brief.consumable_cxl_qty) <= 0:
-                    err_str_: str = f"Consumable qty can't be <= 0, currently is {consumable_cxl_qty} " \
+                    err_str_: str = f"Consumable cxl qty can't be <= 0, currently is {consumable_cxl_qty} " \
                                     f"for symbol {strat_brief_.pair_buy_side_trading_brief.security.sec_id} and " \
                                     f"side {Side.BUY}"
                     alert_brief: str = err_str_
@@ -1426,14 +1429,48 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                                         "initialized yet")
 
         updated_pair_strat_obj.frequency = stored_pair_strat_obj.frequency + 1
-        updated_pydantic_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_pair_strat_obj.dict()),
-                                                         updated_pair_strat_obj.dict(exclude_unset=True,
-                                                                                     exclude_none=True))
-        updated_pair_strat_obj = PairStrat(**updated_pydantic_obj_dict)
 
+        # After use of below compare_n_patch_dict we are also having one more compare_n_patch_dict call in
+        # generic_patch_http causing below issues (or may be more which not got debugged yet):
+        # 1. When there is intended delete required for alerts, alerts get removed in below compare_n_patch_dict
+        #    function's output but when again compared in compare_n_patch_dict call in generic_patch_http, since
+        #    update_dict for that call will not have intended delete alerts but stored_dict will still have all
+        #    alerts, delete intended alerts get ignored
+        # 2. If we need to add impacted_order in any alert then since we are calling compare_n_patch_dict 2 times,
+        #    impacted_order objects get duplicated
+        # To handle these before returning making state of alerts same as it would have been before going
+        # to be passed in compare_n_patch_dict call in generic_patch_http
+        delete_intended_alerts = []
+        strat_status: Dict = updated_pair_strat_obj.dict(exclude_none=True).get("strat_status")
+        strat_alerts = None
+        if strat_status is not None:
+            strat_alerts = strat_status.get("strat_alerts")
+            if strat_alerts is not None:
+                for alert in strat_alerts:
+                    if alert.get("id") is not None and len(alert) == 1:
+                        # if only id is present
+                        delete_intended_alerts.append(alert)
+
+        updated_pydantic_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_pair_strat_obj.dict()),
+                                                         updated_pair_strat_obj.dict(exclude_none=True))
+        updated_pair_strat_obj = PairStratOptional(**updated_pydantic_obj_dict)
+
+        alerts_before_underlying_pre_update = updated_pair_strat_obj.strat_status.strat_alerts
         await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
+        alerts_after_underlying_pre_update = updated_pair_strat_obj.strat_status.strat_alerts
+
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
         logging.debug(f"further updated by _update_pair_strat_pre: {updated_pair_strat_obj}")
+
+        # making state of alerts same as it would have been before going
+        # to be passed in compare_n_patch_dict call in generic_patch_http
+        if strat_alerts is not None:
+            # getting alerts updated from _update_pair_strat_pre call
+            for added_alert in alerts_after_underlying_pre_update:
+                if added_alert not in alerts_before_underlying_pre_update:
+                    strat_alerts += added_alert
+            updated_pair_strat_obj.strat_status.strat_alerts = strat_alerts
+
         return updated_pair_strat_obj
 
     async def _force_publish_symbol_overview_for_ready_to_active_strat(self, pair_strat: PairStrat) -> None:
@@ -1934,13 +1971,41 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
         return updated_strat_collection_obj
 
-    async def get_executor_check_snapshot_query_pre(self, executor_check_snapshot_class_type: Type[
-        ExecutorCheckSnapshot], symbol: str, side: Side, last_n_sec: int):
+    async def get_symbol_side_underlying_account_cumulative_fill_qty_query_pre(
+            self, fills_journal_class_type: Type[FillsJournal], symbol: str, side: str):
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            underlying_read_fills_journal_http
+        from Flux.CodeGenProjects.addressbook.app.aggregate import \
+            get_symbol_side_underlying_account_cumulative_fill_qty
+        return await underlying_read_fills_journal_http(
+            get_symbol_side_underlying_account_cumulative_fill_qty(symbol, side))
+
+    async def get_underlying_account_cumulative_fill_qty_query_pre(
+            self, underlying_account_cum_fill_qty_class_type: Type[UnderlyingAccountCumFillQty],
+            symbol: str, side: str):
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            get_symbol_side_underlying_account_cumulative_fill_qty_query_http
+        fill_journal_obj_list = await get_symbol_side_underlying_account_cumulative_fill_qty_query_http(symbol, side)
+
+        underlying_accounts: Set[str] = set()
+        underlying_accounts_cum_fill_qty_obj: UnderlyingAccountCumFillQty = UnderlyingAccountCumFillQty(
+            underlying_account_n_cumulative_fill_qty=[]
+        )
+        for fill_journal_obj in fill_journal_obj_list:
+            if (underlying_acc := fill_journal_obj.underlying_account) not in underlying_accounts:
+                underlying_accounts.add(underlying_acc)
+                underlying_accounts_cum_fill_qty_obj.underlying_account_n_cumulative_fill_qty.append(
+                    UnderlyingAccountNCumFillQty(underlying_account=underlying_acc,
+                                                 cumulative_qty=fill_journal_obj.underlying_account_cumulative_fill_qty)
+                )
+        return [underlying_accounts_cum_fill_qty_obj]
+
+    async def get_last_n_sec_order_qty(self, symbol: str, side: Side, last_n_sec: int) -> int | None:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_order_snapshot_http
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_order_total_sum_of_last_n_sec
 
-        last_n_sec_order_qty: int
+        last_n_sec_order_qty: int | None = None
         if last_n_sec == 0:
             symbol_side_snapshots = await self._get_symbol_side_snapshot_from_symbol_side(symbol, side)
             if symbol_side_snapshots is not None:
@@ -1954,7 +2019,6 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             else:
                 err_str_ = f"Found multiple symbol_side snapshot for symbol {symbol} and side {side}, must be only one"
                 logging.exception(err_str_)
-                raise Exception(err_str_)
         else:
             agg_objs = \
                 await underlying_read_order_snapshot_http(get_order_total_sum_of_last_n_sec(symbol, last_n_sec))
@@ -1966,15 +2030,23 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 err_str_ = "received empty list of aggregated objects from aggregation on OrderSnapshot to " \
                            f"get last {last_n_sec} sec total order sum"
                 logging.debug(err_str_)
+        return last_n_sec_order_qty
 
+    async def get_last_n_sec_trade_qty(self, symbol: str) -> int | None:
         pair_strat = await self._get_ongoing_pair_strat_from_symbol(symbol)
-        last_n_sec_trade_qty: int
+        last_n_sec_trade_qty: int | None = None
         applicable_period_seconds = \
             pair_strat.strat_limits.market_trade_volume_participation.applicable_period_seconds
-        last_n_sec_market_trade_vol_obj = market_data_service_web_client.get_last_n_sec_total_qty_query_client(
-            [symbol, applicable_period_seconds])[0]
-        last_n_sec_trade_qty = last_n_sec_market_trade_vol_obj.last_n_sec_trade_vol
+        last_n_sec_market_trade_vol_obj_list = \
+            market_data_service_web_client.get_last_n_sec_total_qty_query_client([symbol, applicable_period_seconds])
+        if last_n_sec_market_trade_vol_obj_list:
+            last_n_sec_trade_qty = last_n_sec_market_trade_vol_obj_list[0].last_n_sec_trade_vol
+        else:
+            logging.error(f"could not receive any last_n_sec_market_trade_vol_obj to get last_n_sec_trade_qty "
+                          f"for {symbol}")
+        return last_n_sec_trade_qty
 
+    async def get_rolling_new_order_count(self, symbol: str) -> int | None:
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
             underlying_read_portfolio_limits_by_id_http, underlying_get_last_n_sec_orders_by_event_query_http
         portfolio_limits_obj = await underlying_read_portfolio_limits_by_id_http(1)
@@ -1990,12 +2062,39 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             rolling_new_order_count = order_counts_updated_order_journals[-1].current_period_order_count
         else:
             rolling_new_order_count = 0
+        return rolling_new_order_count
 
-        executor_check_snapshot = \
-            ExecutorCheckSnapshot(last_n_sec_trade_qty=last_n_sec_trade_qty,
-                                  last_n_sec_order_qty=last_n_sec_order_qty,
-                                  rolling_new_order_count=rolling_new_order_count)
-        return [executor_check_snapshot]
+    async def get_list_of_underlying_account_n_cumulative_fill_qty(self, symbol: str, side: Side):
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            get_underlying_account_cumulative_fill_qty_query_http
+        underlying_account_cum_fill_qty_obj_list = \
+            await get_underlying_account_cumulative_fill_qty_query_http(symbol, side)
+        return underlying_account_cum_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty
+
+    async def get_executor_check_snapshot_query_pre(self, executor_check_snapshot_class_type: Type[
+        ExecutorCheckSnapshot], symbol: str, side: Side, last_n_sec: int):
+
+        last_n_sec_order_qty = await self.get_last_n_sec_order_qty(symbol, side, last_n_sec)
+
+        last_n_sec_trade_qty = await self.get_last_n_sec_trade_qty(symbol)
+
+        rolling_new_order_count = await self.get_rolling_new_order_count(symbol)
+
+        if last_n_sec_order_qty is not None and \
+                last_n_sec_trade_qty is not None and \
+                rolling_new_order_count is not None:
+
+            executor_check_snapshot = \
+                ExecutorCheckSnapshot(last_n_sec_trade_qty=last_n_sec_trade_qty,
+                                      last_n_sec_order_qty=last_n_sec_order_qty,
+                                      rolling_new_order_count=rolling_new_order_count)
+            return [executor_check_snapshot]
+        else:
+            logging.error(f"Received last_n_sec_order_qty - {last_n_sec_order_qty}, "
+                          f"last_n_sec_trade_qty - {last_n_sec_trade_qty}, "
+                          f"rolling_new_order_count - {rolling_new_order_count} and "
+                          last_n_sec - {last_n_sec}")
+            return []
 
     async def get_open_order_count_query_pre(self, open_order_count_class_type: Type[OpenOrderCount], symbol: str):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
