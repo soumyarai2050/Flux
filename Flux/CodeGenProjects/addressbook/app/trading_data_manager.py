@@ -12,12 +12,14 @@ from Flux.CodeGenProjects.addressbook.app.trading_link import TradingLinkBase, g
 trading_link: TradingLinkBase = get_trading_link()
 
 host, port = get_host_port_from_env()
+market_data_int_port: int = 8040 if (port_env := (os.getenv("MARKET_DATA_PORT"))) is None or len(port_env) == 0 else \
+    int(port_env)
 
 
 class TradingDataManager:
     def __init__(self, executor_trigger_method: Callable):
         trading_base_url: str = f"ws://{host}:{port}/addressbook"
-        market_data_base_url: str = f"ws://{host}:8040/market_data"
+        market_data_base_url: str = f"ws://{host}:{market_data_int_port}/market_data"
         cpp_ws_url: str = f"ws://{host}:8083/"
         self.trading_cache: TradingCache = TradingCache()
 
@@ -366,13 +368,13 @@ class TradingDataManager:
             # else not required - strat does not need this update notification
         if strat_cache2 is not None:
             with strat_cache2.re_ent_lock:
-                strat_cache2.set_market_depth(market_depth_)\
+                strat_cache2.set_market_depth(market_depth_)
             # TODO IMPORTANT Enable this when we add formal ws support for market depth
             # if self.market_depth_ws_cont.notify:
-            #     strat_cache2.notify_semaphore.release()
+            #    strat_cache2.notify_semaphore.release()
             updated = True
             # else not required - strat does not need this update notification
         if updated:
             logging.debug(f"Updated market_depth cache for keys: {key1}, {key2};;;market_depth: {market_depth_}")
         else:
-            logging.debug(f"no matching strat: for market_depth keys: {key1}, {key2};;;market_depth_: {market_depth_}")
+            logging.debug(f"no matching strat: for market_depth keys: {key1}, {key2};;;market_depth: {market_depth_}")

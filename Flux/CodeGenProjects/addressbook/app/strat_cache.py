@@ -47,10 +47,58 @@ class MarketDepthsCont:
 
 
 class StratCache:
+    strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
     add_to_strat_cache_rlock: RLock = RLock()
+    order_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
+    # fx_symbol_overview_dict must be preloaded with supported fx pairs for system to work
+    fx_symbol_overview_dict: Dict[str, SymbolOverviewBaseModel | None] = {"USD|SGD": None}
+
+    def __init__(self):
+        self.re_ent_lock: RLock = RLock()
+        self.notify_semaphore = Semaphore()
+        self.stopped = True  # used by consumer thread to stop processing
+        self.leg1_trading_symbol: str | None = None
+        self.leg2_trading_symbol: str | None = None
+        self.unack_leg1: bool = False
+        self.unack_leg2: bool = False
+
+        # all fx always against usd - these are reused across strats
+        self.leg1_fx_symbol: str = "USD|SGD"  # get this from static data based on leg1 symbol
+        self.leg1_fx_tob: TopOfBookBaseModel | None = None
+        self.leg1_fx_symbol_overview: SymbolOverviewBaseModel | None = None
+
+        self._cancel_orders: List[CancelOrderBaseModel] | None = None
+        self._cancel_orders_update_date_time: DateTime = DateTime.utcnow()
+
+        self._new_orders: List[NewOrderBaseModel] | None = None
+        self._new_orders_update_date_time: DateTime = DateTime.utcnow()
+
+        self._pair_strat: PairStratBaseModel | None = None
+        self._pair_strat_update_date_time: DateTime = DateTime.utcnow()
+
+        self._strat_brief: StratBriefBaseModel | None = None
+        self._strat_brief_update_date_time: DateTime = DateTime.utcnow()
+
+        self._order_snapshots: List[OrderSnapshotBaseModel] | None = None
+        self._order_snapshots_update_date_time: DateTime = DateTime.utcnow()
+
+        self._order_journals: List[OrderJournalBaseModel] | None = None
+        self._order_journals_update_date_time: DateTime = DateTime.utcnow()
+
+        self._fills_journals: List[FillsJournalBaseModel] | None = None
+        self._fills_journals_update_date_time: DateTime = DateTime.utcnow()
+
+        self.symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]  # pre-create space for 2 legs
+        self.symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
+
+        self._top_of_books: List[TopOfBookBaseModel | None] = [None, None]  # pre-create space for 2 legs
+        self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
+
+        self._market_depths_conts: List[MarketDepthsCont] | None = None
+        self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
     @staticmethod
-    def get_key_from_order_snapshot(order_snapshot: OrderSnapshotBaseModel):
+    def get_key_from_order_snapshot(order_snapshot: OrderSnapshotBaseModel) -> str | None:
         key: str | None = None
         if order_snapshot.order_brief.security.sec_id is not None and \
                 order_snapshot.order_brief.side == Side.BUY:
@@ -62,7 +110,7 @@ class StratCache:
         return key
 
     @staticmethod
-    def get_key_from_cancel_order(cancel_order: CancelOrderBaseModel):
+    def get_key_from_cancel_order(cancel_order: CancelOrderBaseModel) -> str | None:
         key: str | None = None
         if cancel_order.security.sec_id is not None and \
                 cancel_order.side == Side.BUY:
@@ -74,7 +122,7 @@ class StratCache:
         return key
 
     @staticmethod
-    def get_key_from_new_order(new_order: NewOrderBaseModel):
+    def get_key_from_new_order(new_order: NewOrderBaseModel) -> str | None:
         key: str | None = None
         if new_order.security.sec_id is not None and \
                 new_order.side == Side.BUY:
@@ -86,7 +134,7 @@ class StratCache:
         return key
 
     @staticmethod
-    def get_key_from_order_journal(order_journal: OrderJournalBaseModel):
+    def get_key_from_order_journal(order_journal: OrderJournalBaseModel) -> str | None:
         key: str | None = None
         if order_journal.order.security.sec_id is not None and \
                 order_journal.order.side == Side.BUY:
@@ -98,7 +146,7 @@ class StratCache:
         return key
 
     @staticmethod
-    def get_key_n_symbol_from_fill_journal(fill_journal: FillsJournalBaseModel):
+    def get_key_n_symbol_from_fill_journal(fill_journal: FillsJournalBaseModel) -> Tuple[str | None, str]:
         key: str | None = None
         symbol: str
         symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict.get(fill_journal.order_id)
@@ -115,7 +163,7 @@ class StratCache:
         return key, symbol
 
     @staticmethod
-    def get_key_from_strat_brief(strat_brief: StratBriefBaseModel):
+    def get_key_from_strat_brief(strat_brief: StratBriefBaseModel) -> Tuple[str | None, str | None]:
         key1: str | None = None
         if strat_brief.pair_buy_side_trading_brief.security.sec_id is not None:
             key1 = strat_brief.pair_buy_side_trading_brief.security.sec_id + "_BID"
@@ -131,7 +179,7 @@ class StratCache:
         return key1, key2
 
     @staticmethod
-    def get_key_from_pair_strat(pair_strat: PairStratBaseModel):
+    def get_key_from_pair_strat(pair_strat: PairStratBaseModel) -> Tuple[str | None, str | None]:
         key1: str | None = None
         if pair_strat.pair_strat_params.strat_leg1.sec.sec_id is not None:
             if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
@@ -151,8 +199,12 @@ class StratCache:
         return key1, key2
 
     @staticmethod
-    def get_key_from_symbol_overview(symbol_overview_: SymbolOverviewBaseModel):
-        return (symbol_overview_.symbol + "_BID"), (symbol_overview_.symbol + "_ASK")
+    def get_key_from_symbol_overview(symbol_overview_: SymbolOverviewBaseModel) -> Tuple[str, str] | None:
+        if symbol_overview_ and symbol_overview_.symbol:
+            return (symbol_overview_.symbol + "_BID"), (symbol_overview_.symbol + "_ASK")
+        else:
+            logging.error(f"get_key_from_symbol_overview invoked with invalid symbol_overview: {symbol_overview_}")
+            return None
 
     @staticmethod
     def get_key_from_top_of_book(top_of_book: TopOfBookBaseModel) -> Tuple[str, str]:
@@ -174,7 +226,7 @@ class StratCache:
     def get_pair_strat_(self) -> PairStratBaseModel | None:
         return self._pair_strat
 
-    def get_metadata(self, system_symbol: str):
+    def get_metadata(self, system_symbol: str) -> Tuple[str, str, str]:
         """function to check system symbol's corresponding trading_symbol, account, exchange (maybe fx in future ?)"""
         trading_symbol: str = system_symbol
         account = "trading_account"
@@ -440,55 +492,6 @@ class StratCache:
 
     def has_unack_leg2(self) -> bool:
         return self.unack_leg2
-
-    strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
-    order_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
-    # fx_symbol_overview_dict must be preloaded with supported fx pairs for system to work
-    fx_symbol_overview_dict: Dict[str, SymbolOverviewBaseModel | None] = {"USD|SGD": None}
-
-    def __init__(self):
-        self.re_ent_lock: RLock = RLock()
-        self.notify_semaphore = Semaphore()
-        self.stopped = True  # used by consumer thread to stop processing
-        self.leg1_trading_symbol: str | None = None
-        self.leg2_trading_symbol: str | None = None
-        self.unack_leg1: bool = False
-        self.unack_leg2: bool = False
-
-        # all fx always against usd - these are reused across strats
-        self.leg1_fx_symbol: str = "USD|SGD"  # get this from static data based on leg1 symbol
-        self.leg1_fx_tob: TopOfBookBaseModel | None = None
-        self.leg1_fx_symbol_overview: SymbolOverviewBaseModel | None = None
-
-        self._cancel_orders: List[CancelOrderBaseModel] | None = None
-        self._cancel_orders_update_date_time: DateTime = DateTime.utcnow()
-
-        self._new_orders: List[NewOrderBaseModel] | None = None
-        self._new_orders_update_date_time: DateTime = DateTime.utcnow()
-
-        self._pair_strat: PairStratBaseModel | None = None
-        self._pair_strat_update_date_time: DateTime = DateTime.utcnow()
-
-        self._strat_brief: StratBriefBaseModel | None = None
-        self._strat_brief_update_date_time: DateTime = DateTime.utcnow()
-
-        self._order_snapshots: List[OrderSnapshotBaseModel] | None = None
-        self._order_snapshots_update_date_time: DateTime = DateTime.utcnow()
-
-        self._order_journals: List[OrderJournalBaseModel] | None = None
-        self._order_journals_update_date_time: DateTime = DateTime.utcnow()
-
-        self._fills_journals: List[FillsJournalBaseModel] | None = None
-        self._fills_journals_update_date_time: DateTime = DateTime.utcnow()
-
-        self.symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]  # pre-create space for 2 legs
-        self.symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
-
-        self._top_of_books: List[TopOfBookBaseModel | None] = [None, None]  # pre-create space for 2 legs
-        self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
-
-        self._market_depths_conts: List[MarketDepthsCont] | None = None
-        self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
     def get_key(self):
         return f"{get_pair_strat_key(self._pair_strat)}-{self.stopped}"

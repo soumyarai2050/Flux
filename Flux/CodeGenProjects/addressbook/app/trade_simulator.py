@@ -72,6 +72,11 @@ class TradeSimulator(TradingLinkBase):
     @classmethod
     def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
                         account: str, exchange: str | None = None, text: List[str] | None = None):
+        """
+        when invoked form log analyzer - all params are passed as strings
+        pydantic default conversion handles conversion - any util functions called should be called with
+        explicit type convertors or pydantic object converted values
+        """
         create_date_time = DateTime.utcnow()
         order_id: str = f"{trading_sec_id}-{create_date_time}"
         security = Security(sec_id=system_sec_id)  # use system_sec_id to create system's internal order brief / journal
@@ -86,10 +91,11 @@ class TradeSimulator(TradingLinkBase):
                                               order_event=OrderEventType.OE_NEW)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
         if cls.simulate_reverse_path:
-            if cls.simulate_new_to_reject_orders and cls.check_do_reject(side):
+            if cls.simulate_new_to_reject_orders and cls.check_do_reject(order_brief.side):
                 cls.process_order_reject(order_brief)
             else:
-                cls.process_order_ack(order_id, px, qty, side, system_sec_id, account)
+                cls.process_order_ack(order_id, order_brief.px, order_brief.qty, order_brief.side, system_sec_id,
+                                      account)
         return True  # indicates order send success (send false otherwise)
 
     @classmethod
@@ -152,16 +158,19 @@ class TradeSimulator(TradingLinkBase):
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
 
     @classmethod
-    def place_cxl_order(cls, order_id: str, side: Side | None = None, sec_id: str | None = None,
-                        underlying_account: str | None = "trading-account"):
+    def place_cxl_order(cls, order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
+                        system_sec_id: str | None = None, underlying_account: str | None = "trading-account"):
         """
-        cls.simulate_reverse_path or not - always simulate cancel order's Ack
+        cls.simulate_reverse_path or not - always simulate cancel order's Ack/Rejects (unless configured for unack)
+        when invoked form log analyzer - all params are passed as strings
+        pydantic default conversion handles conversion - any util functions called should be called with
+        explicit type convertors or pydantic object converted values
         """
-        security = Security(sec_id=sec_id)
+        security = Security(sec_id=system_sec_id)
         # query order
         order_brief = OrderBrief(order_id=order_id, security=security, side=side,
                                  underlying_account=underlying_account)
-        msg = f"SIM:Cancel Request for {sec_id}, order_id {order_id} and side {side}"
+        msg = f"SIM:Cancel Request for {trading_sec_id}/{system_sec_id}, order_id {order_id} and side {side}"
         add_to_texts(order_brief, msg)
         # simulate cancel ack
         order_journal = OrderJournalBaseModel(order=order_brief,
@@ -169,13 +178,13 @@ class TradeSimulator(TradingLinkBase):
                                               order_event=OrderEventType.OE_CXL)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
 
-        if cls.simulate_cxl_rej_orders and cls.check_do_reject(side):
+        if cls.simulate_cxl_rej_orders and cls.check_do_reject(order_brief.side):
             cls.process_cxl_rej(order_brief)
         else:
             cls.process_cxl_ack(order_brief)
 
     @classmethod
-    def trigger_kill_switch(cls):
+    def trigger_kill_switch(cls) -> bool:
         portfolio_status_id = 1
         portfolio_status = \
             TradeSimulator.strat_manager_service_web_client.get_portfolio_status_client(portfolio_status_id)
@@ -185,11 +194,13 @@ class TradeSimulator(TradingLinkBase):
             portfolio_status_basemodel.kill_switch = True
             TradeSimulator.strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_basemodel)
             logging.debug("Portfolio_status - Kill Switch turned to True")
+            return True
         else:
             logging.error("Portfolio_status - Kill Switch is already True")
+            return False
 
     @classmethod
-    def revoke_kill_switch_n_resume_trading(cls):
+    def revoke_kill_switch_n_resume_trading(cls) -> bool:
         portfolio_status_id = 1
         portfolio_status = \
             TradeSimulator.strat_manager_service_web_client.get_portfolio_status_client(portfolio_status_id)
@@ -199,5 +210,7 @@ class TradeSimulator(TradingLinkBase):
             portfolio_status_basemodel.kill_switch = False
             TradeSimulator.strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_basemodel)
             logging.debug("Portfolio_status - Kill Switch turned to False")
+            return True
         else:
             logging.error("Portfolio_status - Kill Switch is already False")
+            return False

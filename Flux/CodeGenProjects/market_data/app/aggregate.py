@@ -89,20 +89,21 @@ def get_max_market_depth_obj(symbol: str, side: str):
 
 
 def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
+    # Model - LastTrade
     return {"aggregate": [
         {
             "$match": {
-                "$and": [
-                    {
-                        "symbol": symbol
-                    },
-                    {"$expr": {
-                        "$gte": [
-                            "$time",
-                            {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
-                        ]
-                    }}
-                ]
+                "$expr": {
+                    "$gte": [
+                        "$time",
+                        {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
+                    ]
+                }
+            }
+        },
+        {
+            "$match": {
+                "symbol": symbol
             }
         },
         {
@@ -124,6 +125,13 @@ def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
                     }
                 }
             }
+        },
+        # Sorting in descending order since limit only takes first n objects
+        {
+            "$sort": {"time": -1}
+        },
+        {
+            "$limit": 1
         }
     ]}
 

@@ -23,19 +23,31 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         super().__init__(base_dir_path)
         self.default_id_field_type: str = "PydanticObjectId"
 
+    def is_field_indexed_option_enabled(self, field: protogen.Field) -> bool:
+        if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
+            if field.enum is not None:
+                err_str_ = f"Not supported: Enum type fields cannot be indexed, field {field.proto.name} of message " \
+                           f"{field.parent.proto.name} has index option eneabled"
+                logging.error(err_str_)
+                raise Exception(err_str_)
+            else:
+                return True
+        else:
+            return False
+
     def _handle_field_cardinality(self, field: protogen.Field) -> str:
         field_type = self.proto_to_py_datatype(field)
 
         match field.cardinality.name.lower():
             case "optional":
-                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
+                if self.is_field_indexed_option_enabled(field):
                     output_str = f"{field.proto.name}: Indexed({field_type}) | None"
                 elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
                     output_str = f"{field.proto.name}: Link[{field_type}] | None"
                 else:
                     output_str = f"{field.proto.name}: {field_type} | None"
             case "repeated":
-                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
+                if self.is_field_indexed_option_enabled(field):
                     if BeanieModelPlugin.flux_fld_is_required in str(field.proto.options):
                         output_str = f"{field.proto.name}: Indexed(List[{field_type}])"
                     else:
@@ -51,7 +63,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                     else:
                         output_str = f"{field.proto.name}: List[{field_type}] | None"
             case "required":
-                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_index):
+                if self.is_field_indexed_option_enabled(field):
                     output_str = f"{field.proto.name}: Indexed({field_type})"
                 elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
                     output_str = f"{field.proto.name}: Link[{field_type}]"

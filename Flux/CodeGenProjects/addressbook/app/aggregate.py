@@ -136,7 +136,18 @@ def get_symbol_side_snapshot_from_symbol_side(security_id: str, side: str):
 
 
 def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
+    # Model - OrderSnapshot
     return {"aggregate": [
+        {
+            "$match": {
+                "$expr": {
+                    "$gte": [
+                        "$create_date_time",
+                        {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": n}}
+                    ]
+                }
+            }
+        },
         {
             "$match": {
                 "order_brief.security.sec_id": symbol
@@ -145,7 +156,7 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
         {
             "$setWindowFields": {
                 "sortBy": {
-                    "last_update_date_time": 1.0
+                    "create_date_time": 1.0
                 },
                 "output": {
                     "last_n_sec_total_qty": {
@@ -160,22 +171,47 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
                     }
                 }
             }
+        },
+        # Sorting in descending order since limit only takes first n objects
+        {
+            "$sort": {"create_date_time": -1}
+        },
+        {
+            "$limit": 1
         }
     ]}
 
 
 # careful with special chars on regex match !!
-def get_order_of_matching_suffix_order_id_filter(order_id_suffix: str):
+def get_order_of_matching_suffix_order_id_filter(order_id_suffix: str, sort: int = 0, limit: int = 0):
+    """
+    Note: careful with special chars on regex match !!
+    :param order_id_suffix:
+    :param sort: 0: no sort, 1 or -1: passed as is to sort param of aggregation, any other number treated as 0 (no sort)
+    :param limit: val <= 0: no limit, else number passed as is to aggregate limit parameter
+    :return:formatted mongo aggregate query
+    """
     regex_order_id_suffix: str = f".*{order_id_suffix}$"
-    return {"aggregate": [{
+    agg_pipeline = {"aggregate": [{
         "$match": {
             "order.order_id": {"$regex": regex_order_id_suffix}
         }
     }
     ]}
+    if sort == -1 or sort == 1:
+        sort_expr = {
+            "$sort": {"_id": sort},
+        }
+        agg_pipeline["aggregate"].append(sort_expr)
+    if limit > 0:
+        limit_expr = {
+            "$limit": limit
+        }
+        agg_pipeline["aggregate"].append(limit_expr)
+    return agg_pipeline
 
 
-def get_cancel_order_by_order_id_filter(order_id: str):
+def get_order_by_order_id_filter(order_id: str):
     return {"aggregate": [
         {
             "$match": {
@@ -196,10 +232,31 @@ def get_open_order_snapshots_by_order_status(order_status: str):
 
 
 def get_last_n_sec_orders_by_event(symbol: str | None, last_n_sec: int, order_event: str):
+    # Model - order journal
+    # Below match aggregation stages are based on max filtering first (stage that filters most gets precedence)
+    # since this aggregate is used to count
+    # Note: if you change sequence of match stages, don't forget to change hardcoded index number below to add
+    # symbol based match aggregation layer
     agg_query = {"aggregate": [
+        {
+            "$match": {
+                "$expr": {
+                    "$gte": [
+                        "$order_event_date_time",
+                        {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
+                    ]
+                }
+            }
+        },
         {
             "$match": {},
         },
+        {
+            "$match": {
+                "order_event": order_event
+            }
+        },
+
         {
             "$setWindowFields": {
                 "sortBy": {
@@ -218,22 +275,20 @@ def get_last_n_sec_orders_by_event(symbol: str | None, last_n_sec: int, order_ev
                     }
                 }
             }
+        },
+        # Sorting in descending order since limit only takes first n objects
+        {
+            "$sort": {"order_event_date_time": -1}
+        },
+        {
+            "$limit": 1
         }
     ]}
     if symbol is not None:
         match_agg = {
-            "$and": [
-                {
-                    "order.security.sec_id": symbol
-                },
-                {
-                    "order_event": order_event
-                }
-            ]
+            "order.security.sec_id": symbol
         }
-    else:
-        match_agg = {"order_event": order_event}
-    agg_query["aggregate"][0]["$match"] = match_agg
+        agg_query["aggregate"][1]["$match"] = match_agg
     return agg_query
 
 
@@ -305,6 +360,7 @@ def get_limited_strat_alerts_obj(limit: int):
 
 
 def get_limited_objs(limit: int):
+    # used in limit model option
     if limit > 0:
         return [
             {
@@ -317,7 +373,7 @@ def get_limited_objs(limit: int):
                 "$sort": {"_id": -1},
             },
             {
-                "$limit": -limit
+                "$limit": -limit    # limit becomes positive (limit agg always accepts +ive argument)
             }
         ]
     else:
@@ -340,7 +396,7 @@ def get_open_order_snapshots_for_symbol(symbol: str):
         }]}
 
 
-def get_last_3_order_journals_from_order_id(order_id: str):
+def get_last_n_order_journals_from_order_id(order_id: str, journal_count: int):
     return {"aggregate": [
         {
             "$match": {
@@ -351,7 +407,7 @@ def get_last_3_order_journals_from_order_id(order_id: str):
             "$sort": {"_id": -1},
         },
         {
-            "$limit": 3
+            "$limit": journal_count
         }
     ]}
 
@@ -363,7 +419,8 @@ def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: st
                 '$and': [
                     {
                         'fill_symbol': symbol
-                    }, {
+                    },
+                    {
                         'fill_side': side
                     }
                 ]

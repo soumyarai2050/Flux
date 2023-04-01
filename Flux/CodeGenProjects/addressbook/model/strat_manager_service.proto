@@ -129,7 +129,7 @@ message OrderJournal{
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional OrderBrief order = 2;
-  optional int64 order_event_date_time = 3 [(FluxFldValIsDateTime) = true];
+  optional int64 order_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
   optional OrderEventType order_event = 4;
   optional int32 current_period_order_count = 8 [ (FluxFldHelp) = "total new order count within order_rate(s) applicable_period_seconds"];
 }
@@ -384,8 +384,6 @@ message PortfolioStatus{
   optional float overall_buy_fill_notional = 6;
   // Executed
   optional float overall_sell_fill_notional = 7;
-  optional int32 current_period_available_buy_order_count = 8 [ (FluxFldHelp) = "order_rate(s) max_order_count - new order(s) order journal current_period_order_count"];
-  optional int32 current_period_available_sell_order_count = 9 [ (FluxFldHelp) = "order_rate(s) max_order_count - new order(s) order journal current_period_order_count"];
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly

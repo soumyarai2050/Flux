@@ -1094,7 +1094,8 @@ def wait_for_get_new_order_placed_from_tob(wait_stop_px: int | float, symbol_to_
 
         loop_counter += 1
         if loop_counter == loop_limit:
-            assert False, f"Could not find any update after {last_update_date_time} in tob_list {tob_obj_list}"
+            assert False, f"Could not find any update after {last_update_date_time} in tob_list {tob_obj_list}, " \
+                          f"symbol - {symbol_to_check} and wait_stop_px - {wait_stop_px}"
 
 
 def set_n_verify_limits(expected_order_limits_obj, expected_portfolio_limits_obj):
@@ -1133,7 +1134,8 @@ def verify_portfolio_status(total_loop_count: int, symbol_pair_count: int,
 
 
 def get_latest_order_journal_with_status_and_symbol(expected_order_event, expected_symbol,
-                                                    expect_no_order: bool | None = None):
+                                                    expect_no_order: bool | None = None, 
+                                                    last_order_id: str | None = None):
     placed_order_journal = None
 
     stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
@@ -1149,6 +1151,11 @@ def get_latest_order_journal_with_status_and_symbol(expected_order_event, expect
     else:
         assert placed_order_journal is not None, f"Can't find any order_journal with symbol {expected_symbol} " \
                                                  f"order_event {expected_order_event}"
+
+    if last_order_id is not None:
+        # to check if fetched order_journal's id is not same as last_order_id (if provided)
+        assert last_order_id != placed_order_journal.order.order_id, "Couldn't find new buy order"
+    
     return placed_order_journal
 
 
@@ -1277,14 +1284,9 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
             time.sleep(2)
 
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               buy_symbol)
+                                                                               buy_symbol, last_order_id=order_id)
+        order_id = placed_order_journal.order.order_id
         create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        if order_id is None:
-            order_id = placed_order_journal.order.order_id
-        else:
-            assert order_id != placed_order_journal.order.order_id, "Couldn't find new buy order"
-            order_id = placed_order_journal.order.order_id
-
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
 
         # Checking placed order computations
@@ -1373,13 +1375,10 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol)
+        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                               sell_symbol, last_order_id=order_id)
         create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
-        if order_id is None:
-            order_id = placed_order_journal.order.order_id
-        else:
-            assert order_id != placed_order_journal.order.order_id, "Couldn't find new buy order"
-            order_id = placed_order_journal.order.order_id
+        order_id = placed_order_journal.order.order_id
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
 
         # Checking placed order computations
@@ -1709,16 +1708,18 @@ def test_simulated_partial_fills(buy_sell_symbol_list, pair_strat_, expected_str
                                            market_depth_basemodel_list)
 
         # buy fills check
+        order_id = None
         for loop_count in range(1, total_loop_counts_per_side+1):
             run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
             time.sleep(2)   # delay for order to get placed
 
             new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                                buy_symbol)
+                                                                                buy_symbol, last_order_id=order_id)
+            order_id = new_order_journal.order.order_id
             partial_filled_qty = TradeSimulator.get_partial_allowed_fill_qty(new_order_journal.order.qty)
             unfilled_amount = new_order_journal.order.qty - partial_filled_qty
 
-            latest_fill_journal = get_latest_fill_journal_from_order_id(new_order_journal.order.order_id)
+            latest_fill_journal = get_latest_fill_journal_from_order_id(order_id)
             assert latest_fill_journal.fill_qty == partial_filled_qty
 
             # wait to get unfilled order qty cancelled
@@ -1729,16 +1730,18 @@ def test_simulated_partial_fills(buy_sell_symbol_list, pair_strat_, expected_str
         assert unfilled_amount * total_loop_counts_per_side == pair_strat_obj.strat_status.total_cxl_buy_qty
 
         # sell fills check
+        order_id = None
         for loop_count in range(1, total_loop_counts_per_side+1):
             run_sell_top_of_book(sell_symbol)
             time.sleep(2)   # delay for order to get placed
 
             new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                                sell_symbol)
+                                                                                sell_symbol, last_order_id=order_id)
+            order_id = new_order_journal.order.order_id
             partial_filled_qty = TradeSimulator.get_partial_allowed_fill_qty(new_order_journal.order.qty)
             unfilled_amount = new_order_journal.order.qty - partial_filled_qty
 
-            latest_fill_journal = get_latest_fill_journal_from_order_id(new_order_journal.order.order_id)
+            latest_fill_journal = get_latest_fill_journal_from_order_id(order_id)
             assert latest_fill_journal.fill_qty == partial_filled_qty
 
             # wait to get unfilled order qty cancelled
@@ -1987,3 +1990,86 @@ def test_alert_handling_for_pair_strat(pair_strat_, expected_strat_limits_, expe
                            strat_status=StratStatusOptional(strat_alerts=[delete_intended_alert]))
     updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
     assert updated_pair_strat.strat_status.strat_alerts == []
+
+
+def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, top_of_book_list_: List[Dict],
+                                             tob_last_update_date_time_tracker: DateTime | None,
+                                             order_id: str | None, underlying_account_prefix: str, side: Side):
+    loop_count = 1
+    if side == Side.BUY:
+        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
+        symbol = buy_symbol
+        wait_stop_px = 110
+    else:
+        run_sell_top_of_book(sell_symbol)
+        symbol = sell_symbol
+        wait_stop_px = 120
+
+    # Waiting for tob to trigger place order
+    tob_last_update_date_time_tracker = \
+        wait_for_get_new_order_placed_from_tob(wait_stop_px, symbol, tob_last_update_date_time_tracker, side)
+
+    placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                           symbol, last_order_id=order_id)
+    order_id = placed_order_journal.order.order_id
+
+    TradeSimulator.process_order_ack(order_id, placed_order_journal.order.px,
+                                     placed_order_journal.order.qty,
+                                     placed_order_journal.order.side,
+                                     placed_order_journal.order.security.sec_id,
+                                     placed_order_journal.order.underlying_account)
+    fills_count = 6
+    fill_px = 100
+    fill_qty = 5
+    for loop_count in range(fills_count):
+        if loop_count+1 <= (fills_count / 2):
+            underlying_account = f"{underlying_account_prefix}_1"
+        else:
+            underlying_account = f"{underlying_account_prefix}_2"
+        TradeSimulator.process_fill(order_id, fill_px, fill_qty,
+                                    placed_order_journal.order.side,
+                                    placed_order_journal.order.security.sec_id, underlying_account)
+    return tob_last_update_date_time_tracker, order_id
+
+
+def test_underlying_account_cumulative_fill_qty_query(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                                                      expected_start_status_, symbol_overview_obj_list, 
+                                                      last_trade_fixture_list, market_depth_basemodel_list, 
+                                                      top_of_book_list_):
+    underlying_account_prefix: str = "Acc"
+    buy_tob_last_update_date_time_tracker: DateTime | None = None
+    sell_tob_last_update_date_time_tracker: DateTime | None = None
+    buy_order_id = None
+    sell_order_id = None
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list)
+
+        # buy handling
+        buy_tob_last_update_date_time_tracker, buy_order_id = \
+            create_fills_for_underlying_account_test(buy_symbol, sell_symbol, top_of_book_list_,
+                                                     buy_tob_last_update_date_time_tracker, buy_order_id,
+                                                     underlying_account_prefix, Side.BUY)
+
+        # sell handling
+        sell_tob_last_update_date_time_tracker, sell_order_id = \
+            create_fills_for_underlying_account_test(buy_symbol, sell_symbol, top_of_book_list_,
+                                                     sell_tob_last_update_date_time_tracker, sell_order_id,
+                                                     underlying_account_prefix, Side.SELL)
+
+        for symbol, side in [(buy_symbol, "BUY"), (sell_symbol, "SELL")]:
+            underlying_account_cumulative_fill_qty_obj_list = \
+                strat_manager_service_web_client.get_underlying_account_cumulative_fill_qty_query_client([symbol,
+                                                                                                          side])
+            assert len(underlying_account_cumulative_fill_qty_obj_list) == 1
+            assert len(underlying_account_cumulative_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty) == 2
+
+            underlying_account_counts = 2
+            for loop_count in range(underlying_account_counts):
+                underlying_account_n_cum_fill_qty_obj = \
+                    underlying_account_cumulative_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty[loop_count]
+                assert underlying_account_n_cum_fill_qty_obj.underlying_account == \
+                       f"{underlying_account_prefix}_{underlying_account_counts-loop_count}"
+                assert underlying_account_n_cum_fill_qty_obj.cumulative_qty == 15
+

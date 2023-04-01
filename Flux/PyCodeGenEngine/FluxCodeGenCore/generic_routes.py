@@ -93,7 +93,7 @@ async def generic_put_http(pydantic_class_type, stored_pydantic_obj, pydantic_ob
 async def generic_patch_http(pydantic_class_type, stored_pydantic_obj, pydantic_obj_updated,
                              filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None, has_links: bool = False):
     updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(),
-                                                     pydantic_obj_updated.dict(exclude_unset=True, exclude_none=True))
+                                                     pydantic_obj_updated.dict(exclude_none=True))
     return await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
                                          pydantic_obj_updated, updated_pydantic_obj_dict, filter_agg_pipeline,
                                          update_agg_pipeline, has_links)
