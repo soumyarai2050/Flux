@@ -1,1 +1,2 @@
 mongo_server: "mongodb://localhost:27017"
+#log_mongo_uri: True

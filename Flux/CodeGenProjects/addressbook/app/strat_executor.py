@@ -182,7 +182,7 @@ class StratExecutor:
         self.internal_reject_count += 1
         internal_reject_order_id: str = str(self.internal_reject_count * -1) + str(DateTime.utcnow())
         self.trading_link.internal_order_state_update(OrderEventType.OE_REJ, internal_reject_order_id, new_order.side,
-                                                      new_order.security.sec_id, None, reject_msg)
+                                                      None, new_order.security.sec_id, None, reject_msg)
 
     def set_unack(self, symbol: str, unack_state: bool):
         if self.strat_cache.leg1_trading_symbol == symbol:
@@ -747,8 +747,9 @@ class StratExecutor:
                     cancel_orders[self._cancel_orders_processed_slice:final_slice]
                 self._cancel_orders_processed_slice = final_slice
                 for cancel_order in unprocessed_cancel_orders:
-                    self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side, None,
-                                                      cancel_order.security.sec_id, underlying_account="NA")
+                    if not cancel_order.cxl_confirmed:
+                        self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side, None,
+                                                          cancel_order.security.sec_id, underlying_account="NA")
                 if unprocessed_cancel_orders:
                     return True
         # all else return false - no cancel_order to process

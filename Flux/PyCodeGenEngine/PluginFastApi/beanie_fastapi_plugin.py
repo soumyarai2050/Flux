@@ -89,9 +89,10 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += '    config_dict = load_yaml_configurations(str(config_file_path))\n'
         output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := ' \
                       'config_dict.get("mongo_server")) is None else mongo_env\n'
-        output_str += '    logging.debug(f"mongo_server: {mongo_server}")\n'
+        output_str += '    if config_dict.get("log_mongo_uri", True):\n'
+        output_str += '        logging.debug(f"mongo_server: {mongo_server}")\n'
         output_str += f'    if (db_name := os.getenv("DB_NAME")) is not None:\n'
-        output_str += f'        mongo_server += "/" + db_name\n'
+        output_str += '        mongo_server += f"/{db_name}?authSource=admin"\n'
         output_str += f'        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server, tz_aware=True)\n'
         output_str += f'        db = client.get_default_database()\n'
         output_str += f'    else:\n'
@@ -114,7 +115,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
 
         output_str += f"from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
-        output_str += f'from {model_file_path} import *\n'
+        output_str += f'from {model_file_path} import *\n\n\n'
         output_str += self.handle_init_db()
 
         return output_str

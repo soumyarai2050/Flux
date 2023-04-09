@@ -384,6 +384,7 @@ message PortfolioStatus{
   optional float overall_buy_fill_notional = 6;
   // Executed
   optional float overall_sell_fill_notional = 7;
+  optional int64 alert_update_counts = 8;
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
@@ -414,6 +415,9 @@ message PairStrat{
     required PairStratParams pair_strat_params = 4;
     optional StratStatus strat_status = 5 [(FluxFldUIUpdateOnly) = true];
     optional StratLimits strat_limits = 6 [(FluxFldUIUpdateOnly) = true];
+    optional int64 pair_strat_params_update_counts = 7 [(FluxFldHide) = "True"];
+    optional int64 strat_status_update_counts = 8 [(FluxFldHide) = "True"];
+    optional int64 strat_limits_update_counts = 9 [(FluxFldHide) = "True"];
 }
 
 // Widget - 1
@@ -553,12 +557,14 @@ message CancelOrder{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string order_id = 2;
   required Security security = 3;
   required Side side = 4;
+  optional bool cxl_confirmed = 5;
 }
 
 message CommandRequest{

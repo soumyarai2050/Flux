@@ -237,7 +237,7 @@ def expected_strat_limits_():
       },
       "residual_restriction": {
         "max_residual": 100_000,
-        "residual_mark_seconds": 4
+        "residual_mark_seconds": 10
       },
       "eligible_brokers": []
     })
@@ -265,9 +265,9 @@ def expected_portfolio_limits_():
 @pytest.fixture()
 def pair_strat_(pair_securities_with_sides_):
     yield PairStratBaseModel(**{
-      "last_active_date_time": "2023-02-13T20:30:31.165Z",
-      "frequency": 1,
-      "pair_strat_params": {
+        "last_active_date_time": "2023-02-13T20:30:31.165Z",
+        "frequency": 1,
+        "pair_strat_params": {
         "strat_leg1": {
           "exch_id": "EXCH1",
           "sec": pair_securities_with_sides_["security1"],
@@ -281,7 +281,10 @@ def pair_strat_(pair_securities_with_sides_):
         "exch_response_max_seconds": 5,
         "common_premium": 40,
         "hedge_ratio": 5
-      }
+        },
+        "pair_strat_params_update_counts": 0,
+        "strat_status_update_counts": 0,
+        "strat_limits_update_counts": 0
     })
 
 
@@ -400,12 +403,14 @@ def expected_symbol_side_snapshot_():
 @pytest.fixture()
 def expected_portfolio_status_():
     yield PortfolioStatusBaseModel(**{
+        "_id": 1,
         "kill_switch": False,
         "portfolio_alerts": [],
         "overall_buy_notional": 0,
         "overall_sell_notional": 0,
         "overall_buy_fill_notional": 0,
-        "overall_sell_fill_notional": 0
+        "overall_sell_fill_notional": 0,
+        "alert_update_counts":0
     })
 
 

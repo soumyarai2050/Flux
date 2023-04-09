@@ -24,7 +24,7 @@ def generic_http_post_client(url: str, pydantic_obj, pydantic_type):
     if pydantic_obj is not None:
         # create don't need to delete any field: model default should handle that,
         # so: exclude_unset=True, exclude_none=True
-        json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+        json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_none=True)
 
     # When used for queries like get last date query, as there is no pydantic obj in case of query
     else:
@@ -63,7 +63,7 @@ def generic_http_patch_client(url: str, pydantic_obj, pydantic_type):
     # When used for routes
     if pydantic_obj is not None:
         # When used for routes
-        json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+        json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_none=True)
     else:
         # When used for queries like get last date query, as there is no pydantic obj in case of query
         json_data = None

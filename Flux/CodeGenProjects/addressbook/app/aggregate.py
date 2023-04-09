@@ -1,3 +1,7 @@
+import os
+os.environ["DBType"] = "beanie"
+from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
+
 cum_price_size_aggregate_json = {"aggregate": [
     {
         "$setWindowFields": {
@@ -292,71 +296,46 @@ def get_last_n_sec_orders_by_event(symbol: str | None, last_n_sec: int, order_ev
     return agg_query
 
 
+def get_pydantic_model_to_dict_for_limit_agg(pydentic_obj_dict: Dict):
+    for key, value in pydentic_obj_dict.items():
+        if isinstance(value, dict):
+            get_pydantic_model_to_dict_for_limit_agg(value)
+        else:
+            pydentic_obj_dict[key] = 1
+
+
 def get_limited_portfolio_alerts_obj(limit: int):
+    portfolio_status_obj = PortfolioStatusBaseModel().dict()
+    get_pydantic_model_to_dict_for_limit_agg(portfolio_status_obj)
+
+    portfolio_status_obj["portfolio_alerts"] = {
+                    "$reverseArray": {"$slice": ["$portfolio_alerts", limit]},
+                }
+
     return [
         {
-            "$project": {
-                "kill_switch": 1,
-                "portfolio_alerts": {
-                    "$reverseArray": {"$slice": ["$portfolio_alerts", limit]},
-                },
-                "overall_buy_notional": 1,
-                "overall_sell_notional": 1,
-                "overall_buy_fill_notional": 1,
-                "overall_sell_fill_notional": 1,
-                "current_period_available_buy_order_count": 1,
-                "current_period_available_sell_order_count": 1,
-                "id": 1
-            }
+            "$project": portfolio_status_obj
         }
     ]
 
 
 def get_limited_strat_alerts_obj(limit: int):
-    return [
-        {
-            "$project": {
-                "last_active_date_time": 1,
-                "frequency": 1,
-                "pair_strat_params": 1,
-                "strat_status": {
-                    "strat_state": 1,
-                    "total_buy_qty": 1,
-                    "total_sell_qty": 1,
-                    "total_order_qty": 1,
-                    "total_open_buy_qty": 1,
-                    "total_open_sell_qty": 1,
-                    "avg_open_buy_px": 1,
-                    "avg_open_sell_px": 1,
-                    "total_open_buy_notional": 1,
-                    "total_open_sell_notional": 1,
-                    "total_open_exposure": 1,
-                    "total_fill_buy_qty": 1,
-                    "total_fill_sell_qty": 1,
-                    "avg_fill_buy_px": 1,
-                    "avg_fill_sell_px": 1,
-                    "total_fill_buy_notional": 1,
-                    "total_fill_sell_notional": 1,
-                    "total_fill_exposure": 1,
-                    "total_cxl_buy_qty": 1,
-                    "total_cxl_sell_qty": 1,
-                    "avg_cxl_buy_px": 1,
-                    "avg_cxl_sell_px": 1,
-                    "total_cxl_buy_notional": 1,
-                    "total_cxl_sell_notional": 1,
-                    "total_cxl_exposure": 1,
-                    "average_premium": 1,
-                    "residual": 1,
-                    "balance_notional": 1,
-                    "strat_alerts": {
+    pair_strat_dict = PairStratBaseModel().dict()
+    get_pydantic_model_to_dict_for_limit_agg(pair_strat_dict)
+
+    strat_status_dict = StratStatusOptional().dict()
+    get_pydantic_model_to_dict_for_limit_agg(strat_status_dict)
+    pair_strat_dict["strat_status"] = strat_status_dict
+
+    pair_strat_dict["strat_status"]["strat_alerts"] = {
                         "$reverseArray": {"$slice": ["$strat_status.strat_alerts", -limit]},
                     }
-                },
-                "strat_limits": 1,
-                "id": 1
-            }
+    return_agg = [
+        {
+            "$project": pair_strat_dict
         }
     ]
+    return return_agg
 
 
 def get_limited_objs(limit: int):
@@ -453,7 +432,9 @@ def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: st
 
 
 if __name__ == '__main__':
-    with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
-    print(with_symbol_agg_query)
-    without_symbol_agg_query = get_last_n_sec_orders_by_event(None, 5, "OE_NEW")
-    print(without_symbol_agg_query)
+    # with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
+    # print(with_symbol_agg_query)
+    # without_symbol_agg_query = get_last_n_sec_orders_by_event(None, 5, "OE_NEW")
+    # print(without_symbol_agg_query)
+
+    print(get_limited_portfolio_alerts_obj(5))

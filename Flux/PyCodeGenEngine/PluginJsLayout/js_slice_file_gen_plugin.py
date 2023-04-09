@@ -88,42 +88,45 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 self.independent_message_list.append(message)
 
     def handle_import_output(self, message: protogen.Message) -> str:
-        output_str = "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
+        output_str = "/* redux and third-party library imports */\n"
+        output_str += "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
         output_str += "import axios from 'axios';\n"
+        output_str += "import _, { cloneDeep } from 'lodash';\n"
+        output_str += "/* project constants */\n"
+        output_str += "import { DB_ID, API_ROOT_URL, Modes } from '../constants';\n"
+        output_str += "/* common util imports */\n"
         if not self.current_message_is_dependent:
-            if message.proto.name in self.repeated_layout_msg_name_list:
-                output_str += "import _ from 'lodash';\n"
-                output_str += "import { API_ROOT_URL } from '../constants';\n"
-            else:
-                output_str += "import _, { cloneDeep } from 'lodash';\n"
-                output_str += "import { API_ROOT_URL, DB_ID } from '../constants';\n"
             if message.proto.name not in self.dependent_to_abbreviated_message_relation_dict.values():
                 if message.proto.name in self.repeated_layout_msg_name_list:
                     # Repeated case
-                    output_str += "import { getErrorDetails, applyWebSocketUpdate } from '../utils';\n"
+                    output_str += "import { getErrorDetails, applyWebSocketUpdate } from '../utils';\n\n"
                 else:
                     # Independent case
-                    output_str += "import { addxpath, clearxpath, getErrorDetails, getObjectWithLeastId } from '../utils';\n"
+                    output_str += "import {\n"
+                    output_str += "    addxpath, clearxpath, getErrorDetails, applyGetAllWebsocketUpdate, " \
+                                  "getObjectWithLeastId,\n"
+                    output_str += "    compareObjects, generateRowTrees\n"
+                    output_str += "} from '../utils';\n\n"
             else:
                 # abbreviated case
-                output_str += "import { addxpath, clearxpath, generateObjectFromSchema, " \
-                              "getObjectWithLeastId, getErrorDetails } from " \
-                              "'../utils';\n"
-            output_str += "\n"
+                output_str += "import {\n"
+                output_str += "    addxpath, clearxpath, getErrorDetails, getObjectWithLeastId, " \
+                              "applyGetAllWebsocketUpdate,\n"
+                output_str += "    generateObjectFromSchema\n"
+                output_str += "} from '../utils';\n\n"
         else:
-            output_str += "import _, { cloneDeep } from 'lodash';\n"
             dependent_message_name: str | None = None
             message_name = message.proto.name
             if message_name in self.dependent_to_abbreviated_message_relation_dict:
                 dependent_message_name = self.dependent_to_abbreviated_message_relation_dict[message_name]
-            output_str += "import { API_ROOT_URL, DB_ID, Modes, NEW_ITEM_ID } from '../constants';\n"
-            output_str += "import { addxpath, clearxpath, getErrorDetails } from '../utils';\n"
+            output_str += "import {\n"
+            output_str += "    addxpath, clearxpath, getErrorDetails, applyGetAllWebsocketUpdate,\n"
+            output_str += "    compareObjects, generateRowTrees\n"
+            output_str += "} from '../utils';\n"
             if dependent_message_name is not None:
-                output_str += "import { setModified"+f"{dependent_message_name}, " \
-                              f""+"update"+f"{dependent_message_name}"+" } from " \
-                              f"'./{capitalized_to_camel_case(dependent_message_name)}Slice';\n"
-            output_str += "\n"
-
+                output_str += "/* dependent actions imports */\n"
+                output_str += "import { update" + f"{dependent_message_name}" + " } from " \
+                              f"'./{capitalized_to_camel_case(dependent_message_name)}Slice';\n\n"
         return output_str
 
     def handle_get_all_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
@@ -321,6 +324,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str = self.handle_import_output(message)
         message_name = message.proto.name
         message_name_camel_cased = capitalized_to_camel_case(message_name)
+        output_str += "/* initial redux state */\n"
         output_str += f"const initialState = " + "{\n"
         if message_name not in self.repeated_layout_msg_name_list:
             output_str += f"    {message_name_camel_cased}Array: [],\n"
@@ -329,18 +333,15 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"    selected{message_name}Id: null,\n"
         else:
             output_str += f"    {message_name_camel_cased}: " + "[],\n"
+        output_str += "    loading: false,\n"
+        output_str += "    error: null,\n"
+        output_str += "    userChanges: {},\n"
+        output_str += "    discardedChanges: {},\n"
+        output_str += "    openWsPopup: false,\n"
         if self.current_message_is_dependent:
-            output_str += "    loading: false,\n"
-            output_str += "    error: null,\n"
             output_str += "    mode: Modes.READ_MODE,\n"
             output_str += "    createMode: false,\n"
-            output_str += "    changes: {},\n"
-            output_str += "    userChanges: {},\n"
-            output_str += "    discardedChanges: {},\n"
             output_str += "    openConfirmSavePopup: false\n"
-        else:
-            output_str += "    loading: true,\n"
-            output_str += "    error: null\n"
         output_str += "}\n\n"
         output_str += self.handle_get_all_export_out_str(message_name, message_name_camel_cased)
         if message_name not in self.repeated_layout_msg_name_list:
@@ -355,9 +356,128 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        set{message_name}Array: (state, action) => "+"{\n"
             output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
             output_str += "        },\n"
+            if not self.current_message_is_dependent:
+                output_str += f"        set{message_name}ArrayWs: (state, action) => " + "{\n"
+                output_str += f"            const dict = action.payload;\n"
+                output_str += f"            let updatedArray = state.{message_name_camel_cased}Array;\n"
+                output_str += "            _.values(dict).forEach(v => {\n"
+                output_str += "                updatedArray = applyGetAllWebsocketUpdate(updatedArray, v);\n"
+                output_str += "            })\n"
+                output_str += f"            state.{message_name_camel_cased}Array = updatedArray;\n"
+                output_str += "            let isDeleted = false;\n"
+                output_str += f"            if (state.selected{message_name}Id) " + "{\n"
+                output_str += "                isDeleted = true;\n"
+                output_str += f"                state.{message_name_camel_cased}Array.forEach(o => " + "{\n"
+                output_str += f"                    if (_.get(o, DB_ID) === state.selected{message_name}Id) " + "{\n"
+                output_str += "                        isDeleted = false;\n"
+                output_str += "                    }\n"
+                output_str += "                })\n"
+                output_str += "            }\n"
+                output_str += "            if (isDeleted) {\n"
+                output_str += f"                state.selected{message_name}Id = initialState.selected{message_name}Id;\n"
+                output_str += f"                state.{message_name_camel_cased} = " \
+                              f"initialState.{message_name_camel_cased};\n"
+                output_str += "            }\n"
+                output_str += "        },\n"
+            else:
+                output_str += f"        set{message_name}ArrayWs: (state, action) => " + "{\n"
+                output_str += "            const { dict, mode, collections } = action.payload;\n"
+                output_str += f"            let updatedArray = state.{message_name_camel_cased}Array;\n"
+                output_str += "            _.entries(dict).map(([k, v]) => {\n"
+                output_str += "                k *= 1;\n"
+                output_str += "                let updatedObj = v;\n"
+                output_str += "                updatedArray = applyGetAllWebsocketUpdate(updatedArray, updatedObj);\n"
+                output_str += f"                state.{message_name_camel_cased}Array = updatedArray;\n"
+                output_str += f"                if (k === state.selected{message_name}Id) " + "{\n"
+                output_str += "                    let diff = compareObjects(updatedObj, " \
+                              f"state.modified{message_name}, state.modified{message_name});\n"
+                output_str += "                    if (_.keys(updatedObj).length === 1) {\n"
+                output_str += f"                        state.selected{message_name}Id = " \
+                              f"initialState.selected{message_name}Id;\n"
+                output_str += f"                        state.{message_name_camel_cased} = " \
+                              f"initialState.{message_name_camel_cased};\n"
+                output_str += "                    } else {\n"
+                output_str += f"                        state.{message_name_camel_cased} = updatedObj;\n"
+                output_str += "                    }\n"
+                output_str += "                    let trees = generateRowTrees(cloneDeep(updatedObj), collections);\n"
+                output_str += "                    let modifiedTrees = generateRowTrees(cloneDeep(" \
+                              f"state.modified{message_name}), collections);\n"
+                output_str += "                    if (trees.length !== modifiedTrees.length) {\n"
+                output_str += "                        if (mode === Modes.EDIT_MODE) {\n"
+                output_str += "                            state.openWsPopup = true;\n"
+                output_str += "                        } else {\n"
+                output_str += "                            let modifiedObj = addxpath(cloneDeep(updatedObj));\n"
+                output_str += f"                            state.modified{message_name} = modifiedObj;\n"
+                output_str += "                        }\n"
+                output_str += "                    } else {\n"
+                output_str += "                        _.keys(state.userChanges).map(xpath => {\n"
+                output_str += "                            if (diff.includes(xpath) && ! diff.includes(DB_ID)) {\n"
+                output_str += "                                state.discardedChanges[xpath] = " \
+                              "state.userChanges[xpath];\n"
+                output_str += "                                delete state.userChanges[xpath];\n"
+                output_str += "                                state.openWsPopup = true;\n"
+                output_str += "                            }\n"
+                output_str += "                            return;\n"
+                output_str += "                        })\n"
+                output_str += "                    }\n"
+                output_str += "                }\n"
+                output_str += "                return;\n"
+                output_str += "            })\n"
+                output_str += "        },\n"
+
             output_str += f"        set{message_name}: (state, action) => " + "{\n"
             output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
             output_str += "        },\n"
+
+            if not self.current_message_is_dependent and message_name not in self.dependent_to_abbreviated_message_relation_dict.values():
+                output_str += f"        set{message_name}Ws: (state, action) => " + "{\n"
+                output_str += "            const { dict, mode, collections } = action.payload;\n"
+                output_str += f"            let updatedObj = dict[state.selected{message_name}Id];\n"
+                output_str += f"            let diff = compareObjects(updatedObj, state.modified{message_name}, " \
+                              f"state.modified{message_name});\n"
+                output_str += "            if (_.keys(updatedObj).length === 1) {\n"
+                output_str += f"                state.selected{message_name}Id = " \
+                              f"initialState.selected{message_name}Id;\n"
+                output_str += f"                state.{message_name_camel_cased} = " \
+                              f"initialState.{message_name_camel_cased};\n"
+                output_str += "            } else {\n"
+                output_str += f"                state.{message_name_camel_cased} = updatedObj;\n"
+                output_str += "            }\n"
+                output_str += "            let trees = generateRowTrees(cloneDeep(updatedObj), collections);\n"
+                output_str += f"            let modifiedTrees = generateRowTrees(cloneDeep(" \
+                              f"state.modified{message_name}), collections);\n"
+                output_str += "            if (trees.length !== modifiedTrees.length) {\n"
+                output_str += "                if (mode === Modes.EDIT_MODE) {\n"
+                output_str += "                    state.openWsPopup = true;\n"
+                output_str += "                } else {\n"
+                output_str += "                    let modifiedObj = addxpath(cloneDeep(updatedObj));\n"
+                output_str += f"                    state.modified{message_name} = modifiedObj;\n"
+                output_str += "                 }\n"
+                output_str += "            } else {\n"
+                output_str += "                _.keys(state.userChanges).map(xpath => {\n"
+                output_str += "                    if (diff.includes(xpath)) {\n"
+                output_str += "                        state.discardedChanges[xpath] = state.userChanges[xpath];\n"
+                output_str += "                        delete state.userChanges[xpath];\n"
+                output_str += "                        state.openWsPopup = true;\n"
+                output_str += "                    }\n"
+                output_str += "                    return;\n"
+                output_str += "                })\n"
+                output_str += "            }\n"
+                output_str += "        },\n"
+            elif message_name in self.dependent_to_abbreviated_message_relation_dict.values():
+                output_str += f"        set{message_name}Ws: (state, action) => " + "{\n"
+                output_str += "            const { dict } = action.payload;\n"
+                output_str += f"            let updatedObj = dict[state.selected{message_name}Id];\n"
+                output_str += "            if (_.keys(updatedObj).length === 1) {\n"
+                output_str += f"                state.selected{message_name}Id = " \
+                              f"initialState.selected{message_name}Id;\n"
+                output_str += f"                state.{message_name_camel_cased} = " \
+                              f"initialState.{message_name_camel_cased};\n"
+                output_str += "            } else {\n"
+                output_str += f"                state.{message_name_camel_cased} = updatedObj;\n"
+                output_str += "            }\n"
+                output_str += "        },\n"
+
             output_str += f"        reset{message_name}: (state) => " + "{\n"
             output_str += f"            state.{message_name_camel_cased} = initialState.{message_name_camel_cased};\n"
             output_str += "        },\n"
@@ -381,29 +501,28 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"            state.{message_name_camel_cased} = updated{message_name};\n"
             output_str += "        },\n"
         output_str += "        resetError: (state) => {\n"
-        if not self.current_message_is_dependent:
-            output_str += "            state.error = initialState.error;\n"
-        else:
-            output_str += "            state.error = null;\n"
-            output_str += "        },\n"
+        output_str += "            state.error = initialState.error;\n"
+        output_str += "        },\n"
+        output_str += "        setUserChanges: (state, action) => {\n"
+        output_str += "            state.userChanges = action.payload;\n"
+        output_str += "        },\n"
+        output_str += "        setDiscardedChanges: (state, action) => {\n"
+        output_str += "            state.discardedChanges = action.payload;\n"
+        output_str += "        },\n"
+        output_str += "        setOpenWsPopup: (state, action) => {\n"
+        output_str += "            state.openWsPopup = action.payload;\n"
+        output_str += "        },\n"
+        if self.current_message_is_dependent:
             output_str += "        setMode: (state, action) => {\n"
             output_str += "            state.mode = action.payload;\n"
             output_str += "        },\n"
             output_str += "        setCreateMode: (state, action) => {\n"
             output_str += "            state.createMode = action.payload;\n"
             output_str += "        },\n"
-            output_str += "        setUserChanges: (state, action) => {\n"
-            output_str += "            state.userChanges = action.payload;\n"
-            output_str += "        },\n"
-            output_str += "        setDiscardedChanges: (state, action) => {\n"
-            output_str += "            state.discardedChanges = action.payload;\n"
-            output_str += "        },\n"
             output_str += "        setOpenConfirmSavePopup: (state, action) => {\n"
             output_str += "            state.openConfirmSavePopup = action.payload;\n"
             output_str += "        },\n"
-            output_str += "        setChanges: (state, action) => {\n"
-            output_str += "            state.changes = action.payload;\n"
-        output_str += "        }\n"
+        # output_str += "        }\n"
         output_str += "    },\n"
         output_str += "    extraReducers: {\n"
         output_str += self.handle_get_all_out_str(message_name, message_name_camel_cased)
@@ -415,20 +534,23 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "})\n\n"
         output_str += f"export default {message_name_camel_cased}Slice.reducer;\n\n"
         if message_name not in self.repeated_layout_msg_name_list:
-            output_str += "export const { " + f"set{message_name}Array, set{message_name}, reset{message_name}, " \
-                                              f"setModified{message_name}, setSelected{message_name}Id, " \
-                                              f"resetSelected{message_name}Id, resetError"
+            output_str += "export const {\n"
+            output_str += f"    set{message_name}Array, set{message_name}ArrayWs, set{message_name}, "
+            if not self.current_message_is_dependent:
+                output_str += f"set{message_name}Ws,"
+            output_str += "\n"
+            output_str += f"    reset{message_name}, setModified{message_name}, setSelected{message_name}Id, " \
+                          f"resetSelected{message_name}Id, resetError,\n"
+            output_str += "    setUserChanges, setDiscardedChanges, setOpenWsPopup"
+            if self.current_message_is_dependent:
+                output_str += ", setMode, setCreateMode,  setOpenConfirmSavePopup"
+            output_str += "\n"
+            output_str += "} = " + f"{message_name_camel_cased}Slice.actions;\n"
         else:
             output_str += "export const { " + f"set{message_name}Ws, resetError"
-        if message.proto.name == self.__ui_layout_msg_name:
             output_str += " }" + f" = {message_name_camel_cased}Slice.actions;\n"
-        else:
-            if not self.current_message_is_dependent:
-                output_str += " }" + f" = {message_name_camel_cased}Slice.actions;\n"
-            else:
-                output_str += f", setMode, setCreateMode" + \
-                              ", setUserChanges, setDiscardedChanges, setOpenConfirmSavePopup, setChanges }" + \
-                              f" = {message_name_camel_cased}Slice.actions;\n"
+        # if message.proto.name == self.__ui_layout_msg_name:
+
         return output_str
 
     def handle_jsx_file_convert(self, file: protogen.File) -> Dict[str, str]:

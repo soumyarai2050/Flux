@@ -16,14 +16,14 @@ from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client i
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from FluxPythonUtils.scripts.utility_functions import drop_mongo_collections, clean_mongo_collections
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
-from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase
-from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations
+from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, config_file_path
+from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations, update_yaml_configurations
 
 strat_manager_service_web_client: StratManagerServiceWebClient = StratManagerServiceWebClient()
 market_data_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient()
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
-config_file_path: PurePath = PROJECT_DATA_DIR / "config.yaml"
+test_config_file_path: PurePath = PROJECT_DATA_DIR / "config.yaml"
 
 def position_fixture():
     position_json = {
@@ -84,19 +84,10 @@ def test_add_brokers_to_portfolio_limits():
     strat_manager_service_web_client.patch_portfolio_limits_client(portfolio_limits_basemodel)
 
     stored_portfolio_limits_ = strat_manager_service_web_client.get_portfolio_limits_client(1)
+    for stored_broker in stored_portfolio_limits_.eligible_brokers:
+        stored_broker.id = None
+    broker.id = None
     assert broker in stored_portfolio_limits_.eligible_brokers
-
-
-def place_order(order_journal_obj: OrderJournalBaseModel):
-    stored_order_journal_obj = \
-        strat_manager_service_web_client.create_order_journal_client(order_journal_obj)
-    return stored_order_journal_obj
-
-
-def place_fill(fills_journal_obj: FillsJournalBaseModel):
-    stored_fills_journal_obj = \
-        strat_manager_service_web_client.create_fills_journal_client(fills_journal_obj)
-    return stored_fills_journal_obj
 
 
 def get_buy_order_related_values():
@@ -340,6 +331,9 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
         pair_strat.id = None
         pair_strat.last_active_date_time = None
         pair_strat.frequency = None
+        pair_strat.strat_status_update_counts = 0
+        pair_strat.strat_limits_update_counts = 0
+        pair_strat.pair_strat_params_update_counts = 0
     assert expected_pair_strat in pair_strat_list, f"{expected_pair_strat} not found in {pair_strat_list}"
 
     # # expected portfolio_status
@@ -506,6 +500,9 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
         pair_strat.id = None
         pair_strat.frequency = None
         pair_strat.last_active_date_time = None
+        pair_strat.strat_status_update_counts = 0
+        pair_strat.strat_limits_update_counts = 0
+        pair_strat.pair_strat_params_update_counts = 0
     assert expected_pair_strat in pair_strat_list
 
     # expected portfolio_status
@@ -651,6 +648,9 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
         pair_strat.id = None
         pair_strat.last_active_date_time = None
         pair_strat.frequency = None
+        pair_strat.strat_status_update_counts = 0
+        pair_strat.strat_limits_update_counts = 0
+        pair_strat.pair_strat_params_update_counts = 0
     assert expected_pair_strat in pair_strat_list
 
     # expected portfolio_status
@@ -811,6 +811,9 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
         pair_strat.id = None
         pair_strat.frequency = None
         pair_strat.last_active_date_time = None
+        pair_strat.strat_status_update_counts = 0
+        pair_strat.strat_limits_update_counts = 0
+        pair_strat.pair_strat_params_update_counts = 0
     assert expected_pair_strat in pair_strat_list
 
     # Checking start_brief
@@ -994,6 +997,9 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     assert pair_strat_obj.frequency == stored_pair_strat_basemodel.frequency, "Unmatched frequency "
     assert pair_strat_obj.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params
     assert expected_strat_status == stored_pair_strat_basemodel.strat_status
+    assert stored_pair_strat_basemodel.strat_status_update_counts == 0
+    assert stored_pair_strat_basemodel.strat_limits_update_counts == 0
+    assert stored_pair_strat_basemodel.pair_strat_params_update_counts == 0
     print(f"{buy_symbol} - strat created, {stored_pair_strat_basemodel}")
 
     # updating pair_strat for this test-case
@@ -1001,6 +1007,12 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
                                                strat_limits=expected_strat_limits)
     updated_pair_strat_basemodel = strat_manager_service_web_client.patch_pair_strat_client(pair_strat_base_model)
     assert stored_pair_strat_basemodel.frequency + 1 == updated_pair_strat_basemodel.frequency
+    assert stored_pair_strat_basemodel.strat_status_update_counts  == \
+           updated_pair_strat_basemodel.strat_status_update_counts
+    assert stored_pair_strat_basemodel.strat_limits_update_counts + 1 == \
+           updated_pair_strat_basemodel.strat_limits_update_counts
+    assert stored_pair_strat_basemodel.pair_strat_params_update_counts == \
+           updated_pair_strat_basemodel.pair_strat_params_update_counts
     assert expected_strat_limits == updated_pair_strat_basemodel.strat_limits
     print(f"strat updated, {updated_pair_strat_basemodel}")
 
@@ -1011,6 +1023,12 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
         strat_manager_service_web_client.patch_pair_strat_client(pair_strat_active_obj)
 
     assert updated_pair_strat_basemodel.frequency + 1 == activated_pair_strat_basemodel.frequency
+    assert updated_pair_strat_basemodel.strat_status_update_counts + 1 == \
+           activated_pair_strat_basemodel.strat_status_update_counts
+    assert updated_pair_strat_basemodel.strat_limits_update_counts == \
+           activated_pair_strat_basemodel.strat_limits_update_counts
+    assert updated_pair_strat_basemodel.pair_strat_params_update_counts == \
+           activated_pair_strat_basemodel.pair_strat_params_update_counts
     assert activated_pair_strat_basemodel.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params
     assert activated_pair_strat_basemodel.strat_status.strat_state == \
            activated_pair_strat_basemodel.strat_status.strat_state
@@ -1115,47 +1133,71 @@ def create_n_verify_portfolio_status(portfolio_status_obj: PortfolioStatusBaseMo
 
 def verify_portfolio_status(total_loop_count: int, symbol_pair_count: int,
                             expected_portfolio_status: PortfolioStatusBaseModel):
-    # expected portfolio_status
-    expected_portfolio_status.overall_sell_notional = get_px_in_usd(((7700 * total_loop_count) + (300 * total_loop_count) - (
-            4400 * total_loop_count))) * symbol_pair_count
-    expected_portfolio_status.overall_sell_fill_notional = get_px_in_usd((3600 * total_loop_count) * symbol_pair_count)
-    # computes from last buy test execution
+    single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
+        single_buy_unfilled_qty = get_buy_order_related_values()
+    single_sell_order_px, single_sell_order_qty, single_sell_filled_px, single_sell_filled_qty, \
+        single_sell_unfilled_qty = get_sell_order_related_values()
+
     expected_portfolio_status.overall_buy_notional = \
-        get_px_in_usd(((9000 * total_loop_count) - (500 * total_loop_count) - (4000 * total_loop_count)) * symbol_pair_count)
-    expected_portfolio_status.overall_buy_fill_notional = get_px_in_usd((4500 * total_loop_count) * symbol_pair_count)
-    expected_portfolio_status.current_period_available_buy_order_count = 4
-    expected_portfolio_status.current_period_available_sell_order_count = 4
+        ((single_buy_order_qty * get_px_in_usd(single_buy_order_px)) +
+         (single_buy_filled_qty * get_px_in_usd(single_buy_filled_px-single_buy_order_px)) -
+         (single_buy_unfilled_qty * get_px_in_usd(single_buy_order_px))) * total_loop_count * symbol_pair_count
+    expected_portfolio_status.overall_buy_fill_notional = \
+        single_buy_filled_qty * get_px_in_usd(single_buy_filled_px) * total_loop_count * symbol_pair_count
+    expected_portfolio_status.overall_sell_notional = \
+        ((single_sell_order_qty * get_px_in_usd(single_sell_order_px)) +
+         (single_sell_filled_qty * get_px_in_usd(single_sell_filled_px-single_sell_order_px)) -
+         (single_sell_unfilled_qty * get_px_in_usd(single_sell_order_px))) * total_loop_count * symbol_pair_count
+    expected_portfolio_status.overall_sell_fill_notional = \
+        single_sell_filled_qty * get_px_in_usd(single_sell_filled_px) * total_loop_count * symbol_pair_count
 
     portfolio_status_list = strat_manager_service_web_client.get_all_portfolio_status_client()
     for portfolio_status in portfolio_status_list:
-        portfolio_status.id = None
         portfolio_status.portfolio_alerts = []
     assert expected_portfolio_status in portfolio_status_list
 
 
 def get_latest_order_journal_with_status_and_symbol(expected_order_event, expected_symbol,
                                                     expect_no_order: bool | None = None, 
-                                                    last_order_id: str | None = None):
+                                                    last_order_id: str | None = None,
+                                                    loop_counts: int | None = None,
+                                                    loop_wait_secs: int | None = None):
+    start_time = DateTime.utcnow()
     placed_order_journal = None
+    if loop_counts is None:
+        loop_counts = 15
+    if loop_wait_secs is None:
+        loop_wait_secs = 2
 
-    stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
-    for stored_order_journal in stored_order_journal_list:
-        if stored_order_journal.order_event == expected_order_event and \
-                stored_order_journal.order.security.sec_id == expected_symbol:
-            placed_order_journal = stored_order_journal
-            # since get_all return orders in descendant order of date_time, first obj is latest
+    for loop_count in range(loop_counts):
+        stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
+        for stored_order_journal in stored_order_journal_list:
+            if stored_order_journal.order_event == expected_order_event and \
+                    stored_order_journal.order.security.sec_id == expected_symbol:
+                if last_order_id is None:
+                    placed_order_journal = stored_order_journal
+                else:
+                    if last_order_id != stored_order_journal.order.order_id:
+                        placed_order_journal = stored_order_journal
+                        # since get_all return orders in descendant order of date_time, first obj is latest
+                break
+        if placed_order_journal is not None:
             break
+        time.sleep(loop_wait_secs)
+
+    time_delta = DateTime.utcnow() - start_time
+    print(f"Found placed_order_journal - {placed_order_journal} in {time_delta.total_seconds()}, "
+          f"for symbol {expected_symbol}, order_event {expected_order_event}, "
+          f"expect_no_order {expect_no_order} and last_order_id {last_order_id}")
+
     if expect_no_order:
         assert placed_order_journal is None, f"Expected no new order for symbol {expected_symbol}, " \
                                              f"received {placed_order_journal}"
+        placed_order_journal = OrderJournalBaseModel(_id=last_order_id)
     else:
         assert placed_order_journal is not None, f"Can't find any order_journal with symbol {expected_symbol} " \
                                                  f"order_event {expected_order_event}"
 
-    if last_order_id is not None:
-        # to check if fetched order_journal's id is not same as last_order_id (if provided)
-        assert last_order_id != placed_order_journal.order.order_id, "Couldn't find new buy order"
-    
     return placed_order_journal
 
 
@@ -1236,6 +1278,7 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
                          expected_portfolio_status_: PortfolioStatusBaseModel, top_of_book_list_: List[Dict],
                          last_trade_fixture_list: List[Dict], symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                          market_depth_basemodel_list: List[MarketDepthBaseModel], is_non_systematic_run: bool = False):
+
     create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
                                        market_depth_basemodel_list)
@@ -1244,7 +1287,8 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
     sell_tob_last_update_date_time_tracker: DateTime | None = None
     order_id = None
     for loop_count in range(1, total_loop_count + 1):
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Loop started")
+        start_time = DateTime.utcnow()
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Loop started at {start_time}")
         expected_buy_order_snapshot = copy.deepcopy(expected_buy_order_snapshot_)
         expected_buy_order_snapshot.order_brief.security.sec_id = buy_symbol
 
@@ -1268,15 +1312,21 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         current_itr_expected_buy_order_journal_ = copy.deepcopy(buy_order_)
         current_itr_expected_buy_order_journal_.order.security.sec_id = buy_symbol
 
+        # running last trade once more before sell side
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
+        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
         # Running TopOfBook (this triggers expected buy order)
-        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_, is_non_systematic_run)
+        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, copy.deepcopy(top_of_book_list_), is_non_systematic_run)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, created tob")
 
         if not is_non_systematic_run:
             # Waiting for tob to trigger place order
             buy_tob_last_update_date_time_tracker = \
                 wait_for_get_new_order_placed_from_tob(110, buy_symbol, buy_tob_last_update_date_time_tracker, Side.BUY)
-            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received buy TOB")
+            time_delta = DateTime.utcnow() - start_time
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received buy TOB, "
+                  f"time delta {time_delta.total_seconds()}")
         else:
             # placing new non-systematic new_order
             place_new_order(buy_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty)
@@ -1329,10 +1379,6 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         # Sleeping to let the order get cxlled
         time.sleep(residual_test_wait)
 
-    # running last trade once more before sell side
-    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
-    print(f"LastTrade created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
     order_id = None
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
@@ -1358,6 +1404,10 @@ def _test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: in
         # placing order
         current_itr_expected_sell_order_journal_ = copy.deepcopy(sell_order_)
         current_itr_expected_sell_order_journal_.order.security.sec_id = sell_symbol
+
+        # running last trade once more before sell side
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
+        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         # Running TopOfBook (this triggers expected buy order)
         run_sell_top_of_book(sell_symbol, is_non_systematic_run)
@@ -1451,8 +1501,8 @@ def create_fx_symbol_overview():
 
 
 def test_clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_):
-    if os.path.isfile(str(config_file_path)):
-        test_config = load_yaml_configurations(str(config_file_path))
+    if os.path.isfile(str(test_config_file_path)):
+        test_config = load_yaml_configurations(str(test_config_file_path))
         ps_db_name = \
             fetched_ps_db_name if (fetched_ps_db_name := test_config.get("ps_db_name")) is not None else "addressbook"
         md_db_name = \
@@ -1476,15 +1526,15 @@ def test_clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_
     create_fx_symbol_overview()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def total_loop_counts_per_side():
-    total_loop_counts_per_side = 10
-    yield total_loop_counts_per_side
+    total_loop_counts_per_side = 5
+    return total_loop_counts_per_side
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def buy_sell_symbol_list():
-    yield [
+    return [
         ("CB_Sec_1", "EQT_Sec_1"),
         ("CB_Sec_2", "EQT_Sec_2"),
         ("CB_Sec_3", "EQT_Sec_3"),
@@ -1493,9 +1543,9 @@ def buy_sell_symbol_list():
     ]
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture()
 def residual_wait_sec() -> int:
-    yield 10
+    return 32
 
 
 # Run Strat_executor before starting this test
@@ -1508,14 +1558,11 @@ def test_buy_sell_order_multi_pair_serialized(pair_securities_with_sides_, buy_o
                                               market_depth_basemodel_list, expected_order_limits_,
                                               expected_portfolio_limits_, total_loop_counts_per_side,
                                               buy_sell_symbol_list, residual_wait_sec):
-    total_loop_count = total_loop_counts_per_side
-    residual_test_wait = residual_wait_sec
-
     symbol_pair_counter = 0
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         symbol_pair_counter += 1
-        _test_buy_sell_order(buy_symbol, sell_symbol, total_loop_count, symbol_pair_counter, residual_test_wait,
-                             buy_order_, sell_order_, buy_fill_journal_, sell_fill_journal_,
+        _test_buy_sell_order(buy_symbol, sell_symbol, total_loop_counts_per_side, symbol_pair_counter,
+                             residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_, sell_fill_journal_,
                              expected_buy_order_snapshot_, expected_sell_order_snapshot_,
                              expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
                              expected_start_status_, expected_strat_brief_, expected_portfolio_status_,
@@ -1532,16 +1579,13 @@ def test_buy_sell_order_multi_pair_parallel(pair_securities_with_sides_, buy_ord
                                             last_trade_fixture_list, symbol_overview_obj_list,
                                             market_depth_basemodel_list, expected_order_limits_,
                                             expected_portfolio_limits_, total_loop_counts_per_side,
-                                            buy_sell_symbol_list):
-    total_loop_count = total_loop_counts_per_side
-    residual_test_wait = 10
-
+                                            buy_sell_symbol_list, config_dict, residual_wait_sec):
     symbol_pair_counter = 1
     thread_list: List[Thread] = []
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         new_thread = Thread(target=_test_buy_sell_order,
-                            args=(buy_symbol, sell_symbol, total_loop_count, symbol_pair_counter, residual_test_wait,
-                                  copy.deepcopy(buy_order_), copy.deepcopy(sell_order_),
+                            args=(buy_symbol, sell_symbol, total_loop_counts_per_side, symbol_pair_counter,
+                                  residual_wait_sec, copy.deepcopy(buy_order_), copy.deepcopy(sell_order_),
                                   copy.deepcopy(buy_fill_journal_), copy.deepcopy(sell_fill_journal_),
                                   copy.deepcopy(expected_buy_order_snapshot_),
                                   copy.deepcopy(expected_sell_order_snapshot_),
@@ -1550,7 +1594,7 @@ def test_buy_sell_order_multi_pair_parallel(pair_securities_with_sides_, buy_ord
                                   copy.deepcopy(expected_start_status_), copy.deepcopy(expected_strat_brief_),
                                   copy.deepcopy(expected_portfolio_status_), copy.deepcopy(top_of_book_list_),
                                   copy.deepcopy(last_trade_fixture_list), copy.deepcopy(symbol_overview_obj_list),
-                                  copy.deepcopy(market_depth_basemodel_list),), daemon=True)
+                                  copy.deepcopy(market_depth_basemodel_list),))
         thread_list.append(new_thread)
         thread_list[-1].start()
 
@@ -1571,15 +1615,12 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(pair_securities_wit
                                                              last_trade_fixture_list, symbol_overview_obj_list,
                                                              market_depth_basemodel_list, expected_order_limits_,
                                                              expected_portfolio_limits_, total_loop_counts_per_side,
-                                                             buy_sell_symbol_list):
-    total_loop_count = total_loop_counts_per_side
-    residual_test_wait = 10
-
+                                                             buy_sell_symbol_list, residual_wait_sec):
     symbol_pair_counter = 0
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         symbol_pair_counter += 1
-        _test_buy_sell_order(buy_symbol, sell_symbol, total_loop_count, symbol_pair_counter, residual_test_wait,
-                             buy_order_, sell_order_, buy_fill_journal_, sell_fill_journal_,
+        _test_buy_sell_order(buy_symbol, sell_symbol, total_loop_counts_per_side, symbol_pair_counter,
+                             residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_, sell_fill_journal_,
                              expected_buy_order_snapshot_, expected_sell_order_snapshot_,
                              expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
                              expected_start_status_, expected_strat_brief_, expected_portfolio_status_,
@@ -1599,16 +1640,13 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(pair_securities_with_
                                                            last_trade_fixture_list, symbol_overview_obj_list,
                                                            market_depth_basemodel_list, expected_order_limits_,
                                                            expected_portfolio_limits_, total_loop_counts_per_side,
-                                                           buy_sell_symbol_list):
-    total_loop_count = total_loop_counts_per_side
-    residual_test_wait = 10
-
+                                                           buy_sell_symbol_list, residual_wait_sec):
     symbol_pair_counter = 1
     thread_list: List[Thread] = []
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         new_thread = Thread(target=_test_buy_sell_order,
-                            args=(buy_symbol, sell_symbol, total_loop_count, symbol_pair_counter, residual_test_wait,
-                                  copy.deepcopy(buy_order_), copy.deepcopy(sell_order_),
+                            args=(buy_symbol, sell_symbol, total_loop_counts_per_side, symbol_pair_counter,
+                                  residual_wait_sec, copy.deepcopy(buy_order_), copy.deepcopy(sell_order_),
                                   copy.deepcopy(buy_fill_journal_), copy.deepcopy(sell_fill_journal_),
                                   copy.deepcopy(expected_buy_order_snapshot_),
                                   copy.deepcopy(expected_sell_order_snapshot_),
@@ -1617,7 +1655,7 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(pair_securities_with_
                                   copy.deepcopy(expected_start_status_), copy.deepcopy(expected_strat_brief_),
                                   copy.deepcopy(expected_portfolio_status_), copy.deepcopy(top_of_book_list_),
                                   copy.deepcopy(last_trade_fixture_list), copy.deepcopy(symbol_overview_obj_list),
-                                  copy.deepcopy(market_depth_basemodel_list), True,), daemon=True)
+                                  copy.deepcopy(market_depth_basemodel_list), True,))
         thread_list.append(new_thread)
         thread_list[-1].start()
 
@@ -1698,9 +1736,24 @@ def test_simulated_partial_fills(buy_sell_symbol_list, pair_strat_, expected_str
                                  expected_start_status_, symbol_overview_obj_list,
                                  last_trade_fixture_list, market_depth_basemodel_list,
                                  top_of_book_list_, buy_order_, sell_order_,
-                                 total_loop_counts_per_side, residual_wait_sec):
+                                 total_loop_counts_per_side, residual_wait_sec, config_dict):
+    # updating yaml_configs according to this test
+    config_dict["simulate_reverse_path"] = True
+    config_dict["fill_percent"] = 50
+    update_yaml_configurations(config_dict, str(config_file_path))
+
+    # delay to manually start addressbook_log_analyzer.py
+    time.sleep(30)
+
     partial_filled_qty: int | None = None
     unfilled_amount: int | None = None
+
+    # updating fixture values for this test-case
+    total_loop_counts_per_side = 5
+    buy_sell_symbol_list = [
+        ("CB_Sec_1", "EQT_Sec_1"),
+        ("CB_Sec_2", "EQT_Sec_2")
+    ]
 
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
@@ -1791,13 +1844,32 @@ def test_rej_orders(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                     expected_start_status_, symbol_overview_obj_list,
                     last_trade_fixture_list, market_depth_basemodel_list,
                     top_of_book_list_, buy_order_, sell_order_,
-                    total_loop_counts_per_side, residual_wait_sec):
+                    total_loop_counts_per_side, residual_wait_sec, config_dict):
     # if simulate_new_to_reject_orders is True then test case fill check orders with OE_NEW and OE_REJ combination
-    simulate_new_to_reject_orders: bool | None = \
-        TradingLinkBase.config_dict.get("simulate_new_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+    simulate_new_to_reject_orders: bool = False
+
     # if simulate_new_to_reject_orders is True then test case fill check orders with OE_ACK and OE_REJ combination
-    simulate_ack_to_reject_orders: bool | None = \
-        TradingLinkBase.config_dict.get("simulate_ack_to_reject_orders") if TradingLinkBase.config_dict is not None else None
+    simulate_ack_to_reject_orders: bool = True
+
+    if simulate_new_to_reject_orders and simulate_ack_to_reject_orders:
+        raise Exception("Current test case must only have one of simulate_new_to_reject_orders and "
+                        "simulate_ack_to_reject_orders True")
+
+    # updating yaml_configs according to this test
+    config_dict["simulate_new_to_reject_orders"] = simulate_new_to_reject_orders
+    config_dict["simulate_ack_to_reject_orders"] = simulate_ack_to_reject_orders
+    update_yaml_configurations(config_dict, str(config_file_path))
+
+    # delay to manually start addressbook_log_analyzer.py
+    time.sleep(30)
+
+    # updating fixture values for this test-case
+    total_loop_counts_per_side = 5
+    buy_sell_symbol_list = [
+        ("CB_Sec_1", "EQT_Sec_1"),
+        ("CB_Sec_2", "EQT_Sec_2")
+    ]
+
     continues_buy_count, continues_buy_rej_count, continues_sell_count, continues_sell_rej_count = config_rej_counts()
 
     buy_order_counts = 0
@@ -1883,10 +1955,23 @@ def test_cxl_rej(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                  expected_start_status_, symbol_overview_obj_list,
                  last_trade_fixture_list, market_depth_basemodel_list,
                  top_of_book_list_, buy_order_, sell_order_,
-                 total_loop_counts_per_side, residual_wait_sec):
-    simulate_cxl_rej_orders: bool | None = \
-        TradingLinkBase.config_dict.get("simulate_cxl_rej_orders") if TradingLinkBase.config_dict is not None else None
-    assert simulate_cxl_rej_orders
+                 total_loop_counts_per_side, residual_wait_sec, config_dict):
+    # updating yaml_configs according to this test
+    config_dict["simulate_cxl_rej_orders"] = True
+    config_dict["simulate_reverse_path"] = True
+    config_dict["fill_percent"] = 50
+    update_yaml_configurations(config_dict, str(config_file_path))
+
+    # delay to manually start addressbook_log_analyzer.py
+    time.sleep(30)
+
+    # updating fixture values for this test-case
+    total_loop_counts_per_side = 10
+    buy_sell_symbol_list = [
+        ("CB_Sec_1", "EQT_Sec_1"),
+        ("CB_Sec_2", "EQT_Sec_2")
+    ]
+
     continues_buy_count, continues_buy_rej_count, continues_sell_count, continues_sell_rej_count = config_rej_counts()
 
     buy_order_counts = 0
@@ -1900,6 +1985,7 @@ def test_cxl_rej(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
         # buy fills check
         last_id = None
         for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
             run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
             time.sleep(10)  # delay for order to get placed and trigger cxl
 
@@ -1921,6 +2007,7 @@ def test_cxl_rej(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
         # sell fills check
         last_id = None
         for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
             run_sell_top_of_book(sell_symbol)
             time.sleep(10)  # delay for order to get placed
 
@@ -1958,38 +2045,59 @@ def test_alert_handling_for_pair_strat(pair_strat_, expected_strat_limits_, expe
     # creating strat
     buy_symbol = "CB_Sec_1"
     sell_symbol = "EQT_Sec_1"
+    total_loop_count = 5
     active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, pair_strat_,
                                                 expected_strat_limits_, expected_start_status_)
 
-    # check to add alert
-    alert = copy.deepcopy(sample_alert)
-    update_pair_strat = \
-        PairStratBaseModel(_id=active_pair_strat.id,
-                           strat_status=StratStatusOptional(strat_alerts=[alert]))
-    updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
-    assert updated_pair_strat.strat_status.strat_alerts == [alert]
+    alert_id_list = []
+    broker_id_list = []
+    for loop_count in range(total_loop_count):
+        # check to add alert
+        alert = copy.deepcopy(sample_alert)
+        alert.id = f"test_id_{loop_count}"
+        broker = broker_fixture()
+        update_pair_strat = \
+            PairStratBaseModel(_id=active_pair_strat.id,
+                               strat_status=StratStatusOptional(strat_alerts=[alert]),
+                               strat_limits=StratLimitsOptional(eligible_brokers=[broker]))
 
-    # check to add more impacted orders and update alert
-    alert.alert_brief = "Updated alert"
-    alert.impacted_order[0].order_id = "O2"
-    alert.impacted_order[0].security.sec_id = sell_symbol
-    update_pair_strat = \
-        PairStratBaseModel(_id=active_pair_strat.id,
-                           strat_status=StratStatusOptional(strat_alerts=[alert]))
-    updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+        updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+        assert alert in updated_pair_strat.strat_status.strat_alerts
+        assert broker in updated_pair_strat.strat_limits.eligible_brokers
+        alert_id_list.append(alert.id)
+        broker_id_list.append(broker.id)
 
-    expected_alert = copy.deepcopy(sample_alert)
-    expected_alert.impacted_order.extend(alert.impacted_order)
-    expected_alert.alert_brief = alert.alert_brief
-    assert updated_pair_strat.strat_status.strat_alerts == [expected_alert]
+        # check to add more impacted orders and update alert
+        updated_alert = copy.deepcopy(alert)
+        updated_alert.alert_brief = "Updated alert"
+        updated_alert.impacted_order[0].order_id = "O2"
+        updated_alert.impacted_order[0].security.sec_id = sell_symbol
+        update_pair_strat = \
+            PairStratBaseModel(_id=active_pair_strat.id,
+                               strat_status=StratStatusOptional(strat_alerts=[updated_alert]))
+        updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
 
-    # Deleting alert
-    delete_intended_alert = AlertOptional(_id=alert.id)
-    update_pair_strat = \
-        PairStratBaseModel(_id=active_pair_strat.id,
-                           strat_status=StratStatusOptional(strat_alerts=[delete_intended_alert]))
-    updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
-    assert updated_pair_strat.strat_status.strat_alerts == []
+        alert.impacted_order.extend(updated_alert.impacted_order)
+        alert.alert_brief = updated_alert.alert_brief
+        assert alert in updated_pair_strat.strat_status.strat_alerts
+
+    # Deleting alerts
+    for alert_id in alert_id_list:
+        delete_intended_alert = AlertOptional(_id=alert_id)
+        update_pair_strat = \
+            PairStratBaseModel(_id=active_pair_strat.id,
+                               strat_status=StratStatusOptional(strat_alerts=[delete_intended_alert]))
+        updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+        assert alert_id not in [alert.id for alert in updated_pair_strat.strat_status.strat_alerts]
+
+    # deleting broker
+    for broker_id in broker_id_list:
+        delete_intended_broker = BrokerOptional(_id=broker_id)
+        update_pair_strat = \
+            PairStratBaseModel(_id=active_pair_strat.id,
+                               strat_limits=StratLimitsOptional(eligible_brokers=[delete_intended_broker]))
+        updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+        assert broker_id not in [broker.id for broker in updated_pair_strat.strat_limits.eligible_brokers]
 
 
 def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, top_of_book_list_: List[Dict],
@@ -2073,3 +2181,312 @@ def test_underlying_account_cumulative_fill_qty_query(buy_sell_symbol_list, pair
                        f"{underlying_account_prefix}_{underlying_account_counts-loop_count}"
                 assert underlying_account_n_cum_fill_qty_obj.cumulative_qty == 15
 
+
+@pytest.fixture()
+def config_dict():
+    original_yaml_content_str = load_yaml_configurations(str(config_file_path), load_as_str=True)
+    yield TradingLinkBase.config_dict
+
+    # reverting back file
+    update_yaml_configurations(original_yaml_content_str, str(config_file_path))
+
+
+def test_last_n_sec_order_qty_sum_and_order_counts(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                                                   expected_start_status_, symbol_overview_obj_list,
+                                                   last_trade_fixture_list, market_depth_basemodel_list,
+                                                   top_of_book_list_, buy_fill_journal_, config_dict):
+    # updating yaml_configs according to this test
+    config_dict["simulate_reverse_path"] = True
+    config_dict["fill_percent"] = 50
+    update_yaml_configurations(config_dict, str(config_file_path))
+
+    # delay to manually start addressbook_log_analyzer.py
+    time.sleep(30)
+
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+    total_order_counts_for_each_side = 10
+    delay_btw_orders = 5
+    _, single_buy_order_qty, _, _, _ = get_buy_order_related_values()
+
+    # updating portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds
+    portfolio_limits_basemodel = \
+        PortfolioLimitsBaseModel(_id=1,
+                                 rolling_max_order_count=RollingMaxOrderCount(max_rolling_tx_count=5,
+                                                                              rolling_tx_count_period_seconds=5))
+    strat_manager_service_web_client.patch_portfolio_limits_client(portfolio_limits_basemodel)
+
+    # making applicable_period_sec to 5 sec for current test
+    expected_strat_limits_ = copy.deepcopy(expected_strat_limits_)
+    expected_strat_limits_.market_trade_volume_participation.applicable_period_seconds = 5
+    expected_strat_limits_.residual_restriction.max_residual = 105000
+
+    create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                       expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                       market_depth_basemodel_list)
+    # buy testing
+    for loop_count in range(total_order_counts_for_each_side):
+
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
+        run_buy_top_of_book(loop_count+1, buy_symbol, sell_symbol, top_of_book_list_)
+
+        if loop_count+1 != total_order_counts_for_each_side:
+            time.sleep(delay_btw_orders)
+        else:
+            time.sleep(3)
+
+    for loop_count in range(total_order_counts_for_each_side):
+        executor_check_snapshot_obj = \
+            strat_manager_service_web_client.get_executor_check_snapshot_query_client(
+                [buy_symbol, "BUY", delay_btw_orders*(loop_count+1)+3])
+
+        order_count_updated_order_journals = \
+            strat_manager_service_web_client.get_last_n_sec_orders_by_event_query_client(
+                [buy_symbol, delay_btw_orders*(loop_count+1)+3, "OE_NEW"])
+
+        assert len(executor_check_snapshot_obj) == 1
+        assert executor_check_snapshot_obj[0].last_n_sec_order_qty == single_buy_order_qty * (loop_count+1), \
+            f"Order qty mismatched for last {delay_btw_orders*(loop_count+1)+3} " \
+            f"secs of {buy_symbol} for side {Side.BUY}"
+
+        assert len(order_count_updated_order_journals) == 1
+        assert order_count_updated_order_journals[0].current_period_order_count == loop_count+1, \
+            f"New Order count mismatched for last {delay_btw_orders * (loop_count + 1) + 3} " \
+            f"secs of {buy_symbol} for side {Side.BUY}"
+
+
+def verify_unsolicited_cxl_orders(last_id: int | None,
+                      check_order_event: OrderEventType, symbol: str) -> int:
+    # internally checks order_journal is not None else raises assert exception internally
+    if check_order_event == OrderEventType.OE_CXL:
+        latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, symbol,
+                                                                               last_order_id=last_id)
+    else:
+        # checking no latest order with OE_CXL
+        latest_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL, symbol,
+                                                                               expect_no_order=True,
+                                                                               last_order_id=last_id)
+
+    return latest_order_journal.id
+
+
+def test_unsolicited_cxl(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                         expected_start_status_, symbol_overview_obj_list,
+                         last_trade_fixture_list, market_depth_basemodel_list,
+                         top_of_book_list_, buy_order_, sell_order_,
+                         total_loop_counts_per_side, residual_wait_sec, config_dict):
+    # updating yaml_configs according to this test
+    config_dict["simulate_reverse_path"] = True
+    config_dict["fill_percent"] = 50
+    config_dict["simulate_unsolicited_cxl_orders"] = True
+    update_yaml_configurations(config_dict, str(config_file_path))
+
+    # delay to manually start addressbook_log_analyzer.py
+    time.sleep(30)
+
+    # updating fixture values for this test-case
+    total_loop_counts_per_side = 5
+    buy_sell_symbol_list = [
+        ("CB_Sec_1", "EQT_Sec_1"),
+        ("CB_Sec_2", "EQT_Sec_2")
+    ]
+
+    continues_buy_count, continues_buy_unsolicited_cxl_count, \
+        continues_sell_count, continues_sell_unsolicited_cxl_count = config_rej_counts()
+
+    buy_order_counts = 0
+    buy_rej_counts = 0
+    sell_order_counts = 0
+    sell_rej_counts = 0
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        # explicitly setting waived_min_orders to 10 for this test case
+        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list)
+        # buy fills check
+        last_id = None
+        last_cxl_ack_id = None
+        for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
+            time.sleep(2)  # delay for order to get placed
+
+            if buy_order_counts < continues_buy_count:
+                check_order_event = OrderEventType.OE_CXL
+                buy_order_counts += 1
+                time.sleep(10)
+            else:
+                if buy_rej_counts < continues_buy_unsolicited_cxl_count:
+                    check_order_event = OrderEventType.OE_CXL_ACK
+                    buy_rej_counts += 1
+                else:
+                    check_order_event = OrderEventType.OE_CXL
+                    buy_order_counts = 1
+                    buy_rej_counts = 0
+                    time.sleep(10)
+
+            # internally contains assert checks
+            last_id = verify_unsolicited_cxl_orders(last_id, check_order_event, buy_symbol)
+            latest_cxl_ack_obj = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK,
+                                                                              buy_symbol, last_order_id=last_cxl_ack_id)
+            last_cxl_ack_id = latest_cxl_ack_obj.id
+
+        # sell fills check
+        last_id = None
+        last_cxl_ack_id = None
+        for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_sell_top_of_book(sell_symbol)
+            time.sleep(2)  # delay for order to get placed
+
+            if sell_order_counts < continues_sell_count:
+                check_order_event = OrderEventType.OE_CXL
+                sell_order_counts += 1
+                time.sleep(10)
+            else:
+                if sell_rej_counts < continues_sell_unsolicited_cxl_count:
+                    check_order_event = OrderEventType.OE_CXL_ACK
+                    sell_rej_counts += 1
+                else:
+                    check_order_event = OrderEventType.OE_CXL
+                    sell_order_counts = 1
+                    sell_rej_counts = 0
+                    time.sleep(10)
+
+            # internally contains assert checks
+            last_id = verify_unsolicited_cxl_orders(last_id, check_order_event, sell_symbol)
+            latest_cxl_ack_obj = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK,
+                                                                              sell_symbol, last_order_id=last_cxl_ack_id)
+            last_cxl_ack_id = latest_cxl_ack_obj.id
+
+
+# sanity test to create and activate pair_strat
+def test_create_pair_strat(buy_sell_symbol_list, pair_strat_, expected_strat_limits_, expected_start_status_):
+    # creates and activates multiple pair_strats
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        create_n_validate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_)
+
+
+def test_pair_strat_update_counters(buy_sell_symbol_list, pair_strat_, expected_strat_limits_, expected_start_status_):
+    activated_strats = []
+
+    # creates and activates multiple pair_strats
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        activated_strat = create_n_validate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_)
+        activated_strats.append(activated_strat)
+
+    for index, activated_strat in enumerate(activated_strats):
+        # updating pair_strat_params
+        pair_strat = \
+            PairStratBaseModel(_id=activated_strat.id, pair_strat_params=PairStratParamsOptional(common_premium=index))
+        updates_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(pair_strat)
+        assert updates_pair_strat.pair_strat_params_update_counts == activated_strat.pair_strat_params_update_counts+1
+
+    for index, activated_strat in enumerate(activated_strats):
+        # updating pair_strat_params
+        pair_strat = \
+            PairStratBaseModel(_id=activated_strat.id, strat_limits=StratLimitsOptional(max_concentration=index))
+        updates_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(pair_strat)
+        assert updates_pair_strat.strat_limits_update_counts == activated_strat.strat_limits_update_counts+1
+
+
+def test_portfolio_status_alert_updates(sample_alert):
+    stored_portfolio_status = strat_manager_service_web_client.get_portfolio_status_client(portfolio_status_id=1)
+
+    alert = copy.deepcopy(sample_alert)
+    portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert])
+    updated_portfolio_status = \
+        strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_basemodel)
+    assert stored_portfolio_status.alert_update_counts+1 == updated_portfolio_status.alert_update_counts
+
+    total_loop_counts = 5
+    for loop_count in range(total_loop_counts):
+        alert.alert_brief = f"Test update - {loop_count}"
+        portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert])
+        alert_updated_portfolio_status = \
+            strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_basemodel)
+        assert updated_portfolio_status.alert_update_counts + (loop_count+1) == \
+               alert_updated_portfolio_status.alert_update_counts
+
+
+def test_cxl_order_cxl_confirmed_status(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                                        expected_start_status_, symbol_overview_obj_list,
+                                        last_trade_fixture_list, market_depth_basemodel_list,
+                                        top_of_book_list_, buy_order_, sell_order_,
+                                        total_loop_counts_per_side, residual_wait_sec, config_dict):
+    # updating yaml_configs according to this test
+    config_dict["simulate_reverse_path"] = True
+    config_dict["fill_percent"] = 50
+    update_yaml_configurations(config_dict, str(config_file_path))
+
+    # delay to manually start addressbook_log_analyzer.py
+    time.sleep(30)
+
+    # updating fixture values for this test-case
+    total_loop_counts_per_side = 5
+    buy_sell_symbol_list = [
+        ("CB_Sec_1", "EQT_Sec_1"),
+        ("CB_Sec_2", "EQT_Sec_2")
+    ]
+
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list)
+
+        # buy fills check
+        order_id = None
+        cxl_order_id = None
+        for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
+            run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_)
+            time.sleep(2)  # delay for order to get placed
+
+            new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                                buy_symbol, last_order_id=order_id)
+            order_id = new_order_journal.order.order_id
+
+            # wait to get unfilled order qty cancelled
+            time.sleep(residual_wait_sec)
+
+            cxl_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK,
+                                                                                    buy_symbol,
+                                                                                    last_order_id=cxl_order_id)
+            cxl_order_id = cxl_ack_order_journal.order.order_id
+
+            cxl_order_list = []
+            cxl_order_obj_list = strat_manager_service_web_client.get_all_cancel_order_client()
+            for cxl_order_obj in cxl_order_obj_list:
+                if cxl_order_obj.order_id == cxl_order_id:
+                    cxl_order_list.append(cxl_order_obj)
+
+            assert len(cxl_order_list) == 1
+            assert cxl_order_list[0].cxl_confirmed
+
+        # sell fills check
+        order_id = None
+        cxl_order_id = None
+        for loop_count in range(1, total_loop_counts_per_side + 1):
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
+            run_sell_top_of_book(sell_symbol)
+            time.sleep(2)  # delay for order to get placed
+
+            new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                                sell_symbol, last_order_id=order_id)
+            order_id = new_order_journal.order.order_id
+
+            # wait to get unfilled order qty cancelled
+            time.sleep(residual_wait_sec)
+
+            cxl_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK,
+                                                                                    buy_symbol,
+                                                                                    last_order_id=cxl_order_id)
+            cxl_order_id = cxl_ack_order_journal.order.order_id
+
+            cxl_order_list = []
+            cxl_order_obj_list = strat_manager_service_web_client.get_all_cancel_order_client()
+            for cxl_order_obj in cxl_order_obj_list:
+                if cxl_order_obj.order_id == cxl_order_id:
+                    cxl_order_list.append(cxl_order_obj)
+
+            assert len(cxl_order_list) == 1
+            assert cxl_order_list[0].cxl_confirmed

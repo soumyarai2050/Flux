@@ -1,8 +1,11 @@
 mongo_server: "mongodb://localhost:27017"
-min_refresh_interval: 5
+min_refresh_interval: 15
 is_test_run: True
 simulate_reverse_path: False
 #fill_percent: 100
+#log_mongo_uri: True
+# to run log analyzer in simulator mode
+#simulate_log_analyzer: True
 
 # to simulate rej functionality
 #simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
@@ -10,6 +13,9 @@ simulate_reverse_path: False
 
 # to simulate cxl-rej functionality
 #simulate_cxl_rej_orders: False
+
+# to simulate unsolicited cxl functionality
+#simulate_unsolicited_cxl_orders: False
 
 # counts to be used in rej and cxl_rej simulations
 #continues_buy_count: 3

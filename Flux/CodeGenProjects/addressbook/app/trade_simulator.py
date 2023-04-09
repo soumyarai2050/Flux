@@ -16,6 +16,7 @@ class TradeSimulator(TradingLinkBase):
     simulate_new_to_reject_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_new_to_reject_orders") if TradingLinkBase.config_dict is not None else None
     simulate_ack_to_reject_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_ack_to_reject_orders") if TradingLinkBase.config_dict is not None else None
     simulate_cxl_rej_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_cxl_rej_orders") if TradingLinkBase.config_dict is not None else None
+    simulate_unsolicited_cxl_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_unsolicited_cxl_orders") if TradingLinkBase.config_dict is not None else None
     fill_percent: ClassVar[int | None] = TradingLinkBase.config_dict.get("fill_percent") if TradingLinkBase.config_dict is not None else None
     continues_buy_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_buy_count") if TradingLinkBase.config_dict is not None else None
     continues_buy_rej_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_buy_rej_count") if TradingLinkBase.config_dict is not None else None
@@ -116,6 +117,8 @@ class TradeSimulator(TradingLinkBase):
         if cls.simulate_reverse_path:
             if cls.simulate_ack_to_reject_orders and cls.check_do_reject(side):
                 cls.process_order_reject(order_brief_obj)
+            elif cls.simulate_unsolicited_cxl_orders and cls.check_do_reject(side):
+                cls.process_cxl_ack(order_brief_obj)
             else:
                 cls.process_fill(order_id, px, qty, side, sec_id, underlying_account)
 

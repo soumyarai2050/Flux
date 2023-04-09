@@ -1,14 +1,12 @@
 # system imports
 import copy
-import logging
 import time
-from typing import List, Type, Tuple, Dict, FrozenSet, Set, Final
+from typing import Type, Set, Final
 import threading
 from pathlib import PurePath
 from datetime import date
 
 # third-party package imports
-from pendulum import DateTime, local_timezone
 from fastapi import HTTPException
 
 # project imports
@@ -399,6 +397,40 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if symbol_side_snapshot_obj.security.sec_type is None:
             symbol_side_snapshot_obj.security.sec_type = SecurityType.TICKER
 
+    async def update_cxl_order_for_order_cxl_ack(self,
+                                                 order_snapshot: OrderSnapshot) -> CancelOrder | None:
+        from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+            underlying_read_cancel_order_http, underlying_partial_update_cancel_order_http
+        from Flux.CodeGenProjects.addressbook.app.aggregate import get_order_by_order_id_filter
+
+        cxl_order_list: List[CancelOrder] | None = await underlying_read_cancel_order_http(
+            get_order_by_order_id_filter(order_snapshot.order_brief.order_id))
+
+        if len(cxl_order_list) == 1:
+            # if cxl-confirmed field is already True
+            if cxl_order_list[0].cxl_confirmed:
+                err_str_ = f"received cxl_order obj for order_id {order_snapshot.order_brief.order_id} already having " \
+                           f"cxl_confirmed field True while updating cxl_order in between order_snapshot update"
+                await update_strat_alert_by_sec_and_side_async(order_snapshot.order_brief.security.sec_id,
+                                                               order_snapshot.order_brief.side,
+                                                               alert_brief=err_str_)
+                return None
+        else:
+            if len(cxl_order_list) > 1:
+                err_str_ = f"There must be only one cancel_order obj per order_id, " \
+                           f"received {cxl_order_list} for order_id {order_snapshot.order_brief.order_id}"
+            else:
+                err_str_ = f"Can't find any cancel_order object for order_id " \
+                           f"{order_snapshot.order_brief.order_id}"
+                logging.error(err_str_)
+            await update_strat_alert_by_sec_and_side_async(order_snapshot.order_brief.security.sec_id,
+                                                           order_snapshot.order_brief.side,
+                                                           alert_brief=err_str_)
+            return None
+        updated_cxl_order = CancelOrderOptional(_id=cxl_order_list[0].id, cxl_confirmed=True)
+        confirm_marked_cxl_oder = await underlying_partial_update_cancel_order_http(updated_cxl_order)
+        return confirm_marked_cxl_oder
+
     async def _update_order_snapshot_from_order_journal(self, order_journal_obj: OrderJournal):
         match order_journal_obj.order_event:
             case OrderEventType.OE_NEW:
@@ -491,6 +523,12 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                               avg_cxled_px=avg_cxled_px,
                                               last_update_date_time=order_journal_obj.order_event_date_time,
                                               order_status=OrderStatusType.OE_DOD))
+
+                    # updating cancel_order object for this id
+                    cxl_marked_cxl_order = await self.update_cxl_order_for_order_cxl_ack(order_snapshot)
+                    if cxl_marked_cxl_order is None:
+                        return None
+
                     symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_order_journal(
                         order_journal_obj, order_snapshot)
                     if symbol_side_snapshot is not None:
@@ -925,7 +963,6 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         portfolio_status_obj.overall_buy_notional += \
                             self.get_usd_px(order_journal_obj.order.px, order_journal_obj.order.security.sec_id) * \
                             order_journal_obj.order.qty
-
                     case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
                         total_buy_unfilled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
                         portfolio_status_obj.overall_buy_notional -= \
@@ -939,7 +976,6 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         portfolio_status_obj.overall_sell_notional += \
                             self.get_usd_px(order_journal_obj.order.px, order_journal_obj.order.security.sec_id) * \
                             order_journal_obj.order.qty
-
                     case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
                         total_sell_unfilled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
                         portfolio_status_obj.overall_sell_notional -= \
@@ -954,9 +990,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         updated_portfolio_status = PortfolioStatusOptional(
             _id=portfolio_status_obj.id,
             overall_buy_notional=portfolio_status_obj.overall_buy_notional,
-            overall_sell_notional=portfolio_status_obj.overall_sell_notional,
-            current_period_available_buy_order_count=portfolio_status_obj.current_period_available_buy_order_count,
-            current_period_available_sell_order_count=portfolio_status_obj.current_period_available_sell_order_count
+            overall_sell_notional=portfolio_status_obj.overall_sell_notional
         )
         await underlying_partial_update_portfolio_status_http(updated_portfolio_status)
 
@@ -986,7 +1020,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 portfolio_status_obj.overall_buy_notional += \
                     (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.last_update_fill_px,
                                                                                order_snapshot_obj.order_brief.security.sec_id)) - \
-                    (order_snapshot_obj.last_update_fill_qty * order_snapshot_obj.order_brief.px)
+                    (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                                                               order_snapshot_obj.order_brief.security.sec_id))
                 if portfolio_status_obj.overall_buy_fill_notional is None:
                     portfolio_status_obj.overall_buy_fill_notional = 0
                 portfolio_status_obj.overall_buy_fill_notional += \
@@ -1206,11 +1241,14 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         else:
             logging.warning(f"No filtered_portfolio_limits found for pair-strat: {pair_strat_obj}")
         pair_strat_obj.frequency = 1
+        pair_strat_obj.pair_strat_params_update_counts = 0
+        pair_strat_obj.strat_limits_update_counts = 0
+        pair_strat_obj.strat_status_update_counts = 0
         pair_strat_obj.last_active_date_time = DateTime.utcnow()
 
     async def _create_strat_brief_for_ready_to_active_pair_strat(self, pair_strat_obj: PairStrat):
         from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
-            underlying_read_strat_brief_http, underlying_delete_strat_brief_http
+            underlying_read_strat_brief_http
         from Flux.CodeGenProjects.addressbook.app.aggregate import get_strat_brief_from_symbol
         symbol = pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
         side = pair_strat_obj.pair_strat_params.strat_leg1.side
@@ -1391,6 +1429,19 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if updated_pair_strat_obj.frequency is None:
             updated_pair_strat_obj.frequency = 0
         updated_pair_strat_obj.frequency += 1
+
+        if updated_pair_strat_obj.strat_status_update_counts is None:
+            updated_pair_strat_obj.strat_status_update_counts = 0
+        updated_pair_strat_obj.strat_status_update_counts += 1
+
+        if updated_pair_strat_obj.pair_strat_params_update_counts is None:
+            updated_pair_strat_obj.pair_strat_params_update_counts = 0
+        updated_pair_strat_obj.pair_strat_params_update_counts += 1
+
+        if updated_pair_strat_obj.strat_limits_update_counts is None:
+            updated_pair_strat_obj.strat_limits_update_counts = 0
+        updated_pair_strat_obj.strat_limits_update_counts += 1
+
         await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
         logging.debug(f"further updated by _update_pair_strat_pre: {updated_pair_strat_obj}")
@@ -1404,6 +1455,22 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
         updated_pair_strat_obj.frequency = stored_pair_strat_obj.frequency + 1
 
+        if updated_pair_strat_obj.strat_status is not None:
+            if stored_pair_strat_obj.strat_status_update_counts is None:
+                updated_pair_strat_obj.strat_status_update_counts = 0
+            updated_pair_strat_obj.strat_status_update_counts = stored_pair_strat_obj.strat_status_update_counts + 1
+
+        if updated_pair_strat_obj.pair_strat_params is not None:
+            if stored_pair_strat_obj.pair_strat_params_update_counts is None:
+                updated_pair_strat_obj.pair_strat_params_update_counts = 0
+            updated_pair_strat_obj.pair_strat_params_update_counts = \
+                stored_pair_strat_obj.pair_strat_params_update_counts + 1
+
+        if updated_pair_strat_obj.strat_limits is not None:
+            if stored_pair_strat_obj.strat_limits_update_counts is None:
+                updated_pair_strat_obj.strat_limits_update_counts = 0
+            updated_pair_strat_obj.strat_limits_update_counts = stored_pair_strat_obj.strat_limits_update_counts + 1
+
         # After use of below compare_n_patch_dict we are also having one more compare_n_patch_dict call in
         # generic_patch_http causing below issues (or may be more which not got debugged yet):
         # 1. When there is intended delete required for alerts, alerts get removed in below compare_n_patch_dict
@@ -1414,16 +1481,16 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         #    impacted_order objects get duplicated
         # To handle these before returning making state of alerts same as it would have been before going
         # to be passed in compare_n_patch_dict call in generic_patch_http
-        delete_intended_alerts = []
-        strat_status: Dict = updated_pair_strat_obj.dict(exclude_none=True).get("strat_status")
-        strat_alerts = None
-        if strat_status is not None:
-            strat_alerts = strat_status.get("strat_alerts")
-            if strat_alerts is not None:
-                for alert in strat_alerts:
-                    if alert.get("id") is not None and len(alert) == 1:
-                        # if only id is present
-                        delete_intended_alerts.append(alert)
+        # same goes for strat_limits.eligible_brokers
+        original_strat_alerts = []
+        original_eligible_brokers = []
+        if updated_pair_strat_obj.strat_status is not None:
+            if updated_pair_strat_obj.strat_status.strat_alerts is not None:
+                original_strat_alerts = copy.deepcopy(updated_pair_strat_obj.strat_status.strat_alerts)
+
+        if updated_pair_strat_obj.strat_limits is not None:
+            if updated_pair_strat_obj.strat_limits.eligible_brokers is not None:
+                original_eligible_brokers = copy.deepcopy(updated_pair_strat_obj.strat_limits.eligible_brokers)
 
         updated_pydantic_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_pair_strat_obj.dict()),
                                                          updated_pair_strat_obj.dict(exclude_none=True))
@@ -1436,24 +1503,48 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
         logging.debug(f"further updated by _update_pair_strat_pre: {updated_pair_strat_obj}")
 
-        # making state of alerts same as it would have been before going
-        # to be passed in compare_n_patch_dict call in generic_patch_http
-        if strat_alerts is not None:
+        # retrieving newly added alerts by _update_pair_strat_pre call
+        new_alerts = []
+        for alert_id, alert in id_to_alerts_dict_after_underlying_pre_update.items():
             # getting alerts updated from _update_pair_strat_pre call
-            for alert_id, alert in id_to_alerts_dict_after_underlying_pre_update:
-                if alert_id not in id_to_alerts_dict_before_underlying_pre_update:
-                    strat_alerts += alert
-                else:
-                    if alert != id_to_alerts_dict_before_underlying_pre_update[alert_id]:
-                        err_str_ = "Modifying alerts in _update_pair_strat_pre call not supported: " \
-                                  f"original alert - {id_to_alerts_dict_before_underlying_pre_update[alert_id]}, " \
-                                  f"modified alert - {alert}"
-                        logging.error(err_str_)
-                        raise Exception(err_str_)
-                    # else not required: ignore alert if not modified in _update_pair_strat_pre call
-            updated_pair_strat_obj.strat_status.strat_alerts = strat_alerts
+            if alert_id not in id_to_alerts_dict_before_underlying_pre_update:
+                new_alerts.append(alert)
+            else:
+                if alert != id_to_alerts_dict_before_underlying_pre_update[alert_id]:
+                    err_str_ = "Modifying alerts in _update_pair_strat_pre call not supported: " \
+                              f"original alert - {id_to_alerts_dict_before_underlying_pre_update[alert_id]}, " \
+                              f"modified alert - {alert}"
+                    logging.error(err_str_)
+                    raise Exception(err_str_)
+                # else not required: ignore alert if not modified in _update_pair_strat_pre call
+
+        # making state of alerts and eligible brokers same as it would have been before going
+        # to be passed in compare_n_patch_dict call in generic_patch_http
+        updated_pair_strat_obj.strat_status.strat_alerts = original_strat_alerts
+        updated_pair_strat_obj.strat_status.strat_alerts.extend(new_alerts)
+        updated_pair_strat_obj.strat_limits.eligible_brokers = original_eligible_brokers
 
         return updated_pair_strat_obj
+
+    async def create_portfolio_status_pre(self, portfolio_status_obj: PortfolioStatus):
+        portfolio_status_obj.alert_update_counts = 0
+
+    async def update_portfolio_status_pre(self, stored_portfolio_status_obj: PortfolioStatus,
+                                          updated_portfolio_status_obj: PortfolioStatus):
+        if stored_portfolio_status_obj.alert_update_counts is None:
+            updated_portfolio_status_obj.alert_update_counts = 1
+        else:
+            updated_portfolio_status_obj.alert_update_counts = stored_portfolio_status_obj.alert_update_counts + 1
+        return updated_portfolio_status_obj
+
+    async def partial_update_portfolio_status_pre(self, stored_portfolio_status_obj: PortfolioStatus,
+                                                  updated_portfolio_status_obj: PortfolioStatusOptional):
+        if updated_portfolio_status_obj.portfolio_alerts:
+            if stored_portfolio_status_obj.alert_update_counts is None:
+                updated_portfolio_status_obj.alert_update_counts = 1
+            else:
+                updated_portfolio_status_obj.alert_update_counts = stored_portfolio_status_obj.alert_update_counts + 1
+        return updated_portfolio_status_obj
 
     async def _force_publish_symbol_overview_for_ready_to_active_strat(self, pair_strat: PairStrat) -> None:
         symbols_list = [pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
@@ -1704,10 +1795,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 portfolio_status: PortfolioStatusOptional = PortfolioStatusOptional(id=1,
                                                                                     kill_switch=True)
                 await underlying_partial_update_portfolio_status_http(portfolio_status)
-        else:
-            err_str_ = "Must receive only limited one object by get_last_n_sec_orders_by_event_query, " \
-                       f"received {order_counts_updated_order_journals}"
-            logging.error(err_str_)
+        elif len(order_counts_updated_order_journals) != 0:
+            err_str_ = "Must receive only one object from get_last_n_sec_orders_by_event_query, " \
+                       f"received: {order_counts_updated_order_journals}"
+        # else not required - no rejects found - no action
 
         # 3. No one expects anything useful to be returned - just return empty list
         return []
@@ -1724,7 +1815,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                                pair_strat_obj.strat_limits.residual_restriction.residual_mark_seconds):
                 cancel_order: CancelOrder = CancelOrder(order_id=order_snapshot.order_brief.order_id,
                                                         security=order_snapshot.order_brief.security,
-                                                        side=order_snapshot.order_brief.side)
+                                                        side=order_snapshot.order_brief.side,
+                                                        cxl_confirmed=False)
                 # trigger cancel if it does not already exist for this order id, otherwise log for alert
                 from Flux.CodeGenProjects.addressbook.app.aggregate import get_order_by_order_id_filter
                 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
@@ -1734,9 +1826,14 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 if not cxl_order_list:
                     await underlying_create_cancel_order_http(cancel_order)
                 else:
-                    logging.error(f"cxl_expired_open_orders failed: Prior cxl request found in DB for this order-id: "
-                                  f"{cancel_order.order_id}, use swagger to delete this order-id form DB to trigger "
-                                  f"cxl request again;;;order_snapshot: {order_snapshot}")
+                    if len(cxl_order_list) == 1:
+                        if not cxl_order_list[0].cxl_confirmed:
+                            logging.error(f"cxl_expired_open_orders failed: Prior cxl request found in DB for this "
+                                          f"order-id: {cancel_order.order_id}, use swagger to delete this order-id "
+                                          f"from DB to trigger cxl request again;;;order_snapshot: {order_snapshot}")
+                    else:
+                        logging.error(f"There must be only one cancel_order obj per order_id, "
+                                      f"received {cxl_order_list} for order_id {order_snapshot.order_brief.order_id}")
             # else not required: If pair_strat_obj is None or If time-delta is still less than
             # residual_mark_seconds then avoiding cancellation of order
 
@@ -1891,7 +1988,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         strat_status = StratStatus(strat_state=StratState.StratState_READY)
                         updated_pair_strat = PairStratOptional(_id=pair_strat.id,
                                                                pair_strat_params=pair_strat.pair_strat_params,
-                                                               strat_status=strat_status)
+                                                               strat_status=strat_status,
+                                                               pair_strat_params_update_counts=0,
+                                                               strat_status_update_counts=0,
+                                                               strat_limits_update_counts=0)
                         await underlying_update_pair_strat_http(updated_pair_strat)
 
                 # else: deleted not unloaded - nothing to do , DB will remove entry
@@ -2029,7 +2129,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if len(order_counts_updated_order_journals) == 1:
             rolling_new_order_count = order_counts_updated_order_journals[-1].current_period_order_count
         elif len(order_counts_updated_order_journals) > 1:
-            err_str_ = "Must receive only limited one object by get_last_n_sec_orders_by_event_query, " \
+            err_str_ = "Must receive only one object by get_last_n_sec_orders_by_event_query, " \
                        f"received {order_counts_updated_order_journals}"
             logging.error(err_str_)
             return None

@@ -153,65 +153,65 @@ def create_alert(alert_brief: str, alert_details: str | None = None, impacted_or
         kwargs.update(impacted_order=impacted_order)
     return Alert(**kwargs)
 
-
-def update_portfolio_status(overall_buy_notional: float | None, overall_sell_notional: float | None,
-                            portfolio_alerts: List[Alert] | None = None):
-    """
-    this function is generally invoked in extreme cases - best to not throw any further exceptions from here
-    otherwise the program will terminate - log critical error and continue
-    """
-    try:
-        kwargs = {}
-        act = False
-        if overall_buy_notional is not None:
-            kwargs.update(overall_buy_notional=overall_buy_notional)
-            act = True
-        if overall_sell_notional is not None:
-            kwargs.update(overall_sell_notional=overall_sell_notional)
-            act = True
-        if portfolio_alerts is not None:
-            act = True
-        if act:
-            with update_portfolio_status_lock:
-                portfolio_status_list: List[
-                    PortfolioStatusBaseModel] = strat_manager_service_web_client_internal.get_all_portfolio_status_client()
-                logging.debug(f"portfolio_status_list count: {len(portfolio_status_list)}")
-                if 0 == len(portfolio_status_list):  # no portfolio status set yet - create one
-                    kwargs.update(kill_switch=False)
-                    kwargs.update(portfolio_alerts=portfolio_alerts)
-                    portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(**kwargs)
-                    portfolio_status: PortfolioStatusBaseModel = \
-                        strat_manager_service_web_client_internal.create_portfolio_status_client(portfolio_status)
-                    logging.debug(f"created: portfolio_status: {portfolio_status}")
-                elif 1 == len(portfolio_status_list):
-                    # TODO: we may need to copy non-updated fields form original model
-                    # (we should just update original model with new data (patch) and send)
-                    kwargs.update(kill_switch=portfolio_status_list[0].kill_switch)
-                    kwargs.update(_id=portfolio_status_list[0].id)
-                    if 'overall_buy_notional' not in kwargs:
-                        kwargs.update(overall_buy_notional=portfolio_status_list[0].overall_buy_notional)
-                    if 'overall_sell_notional' not in kwargs:
-                        kwargs.update(overall_sell_notional=portfolio_status_list[0].overall_sell_notional)
-                    if portfolio_status_list[0].portfolio_alerts is not None \
-                            and len(portfolio_status_list[0].portfolio_alerts) > 0:
-                        # TODO LAZY : maybe deep copy instead
-                        if portfolio_alerts is not None:
-                            portfolio_alerts += portfolio_status_list[0].portfolio_alerts
-                        else:
-                            portfolio_alerts = portfolio_status_list[0].portfolio_alerts
-                    kwargs.update(portfolio_alerts=portfolio_alerts)
-                    portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(**kwargs)
-                    strat_manager_service_web_client_internal.put_portfolio_status_client(portfolio_status)
-                else:
-                    logging.critical(
-                        "multiple portfolio limits entries not supported at this time! "
-                        "use swagger UI to delete redundant entries from DB and retry - "
-                        f"this blocks all alert form reaching UI!! alert being processed: {portfolio_alerts}")
-        # else not action required - no action to take - ignore and continue
-    except Exception as e:
-        logging.critical(
-            f"something serious is wrong: update_portfolio_status is throwing an exception!;;; exception: {e}",
-            exc_info=True)
+#
+# def update_portfolio_status(overall_buy_notional: float | None, overall_sell_notional: float | None,
+#                             portfolio_alerts: List[Alert] | None = None):
+#     """
+#     this function is generally invoked in extreme cases - best to not throw any further exceptions from here
+#     otherwise the program will terminate - log critical error and continue
+#     """
+#     try:
+#         kwargs = {}
+#         act = False
+#         if overall_buy_notional is not None:
+#             kwargs.update(overall_buy_notional=overall_buy_notional)
+#             act = True
+#         if overall_sell_notional is not None:
+#             kwargs.update(overall_sell_notional=overall_sell_notional)
+#             act = True
+#         if portfolio_alerts is not None:
+#             act = True
+#         if act:
+#             with update_portfolio_status_lock:
+#                 portfolio_status_list: List[
+#                     PortfolioStatusBaseModel] = strat_manager_service_web_client_internal.get_all_portfolio_status_client()
+#                 logging.debug(f"portfolio_status_list count: {len(portfolio_status_list)}")
+#                 if 0 == len(portfolio_status_list):  # no portfolio status set yet - create one
+#                     kwargs.update(kill_switch=False)
+#                     kwargs.update(portfolio_alerts=portfolio_alerts)
+#                     portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(**kwargs)
+#                     portfolio_status: PortfolioStatusBaseModel = \
+#                         strat_manager_service_web_client_internal.create_portfolio_status_client(portfolio_status)
+#                     logging.debug(f"created: portfolio_status: {portfolio_status}")
+#                 elif 1 == len(portfolio_status_list):
+#                     # TODO: we may need to copy non-updated fields form original model
+#                     # (we should just update original model with new data (patch) and send)
+#                     kwargs.update(kill_switch=portfolio_status_list[0].kill_switch)
+#                     kwargs.update(_id=portfolio_status_list[0].id)
+#                     if 'overall_buy_notional' not in kwargs:
+#                         kwargs.update(overall_buy_notional=portfolio_status_list[0].overall_buy_notional)
+#                     if 'overall_sell_notional' not in kwargs:
+#                         kwargs.update(overall_sell_notional=portfolio_status_list[0].overall_sell_notional)
+#                     if portfolio_status_list[0].portfolio_alerts is not None \
+#                             and len(portfolio_status_list[0].portfolio_alerts) > 0:
+#                         # TODO LAZY : maybe deep copy instead
+#                         if portfolio_alerts is not None:
+#                             portfolio_alerts += portfolio_status_list[0].portfolio_alerts
+#                         else:
+#                             portfolio_alerts = portfolio_status_list[0].portfolio_alerts
+#                     kwargs.update(portfolio_alerts=portfolio_alerts)
+#                     portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(**kwargs)
+#                     strat_manager_service_web_client_internal.put_portfolio_status_client(portfolio_status)
+#                 else:
+#                     logging.critical(
+#                         "multiple portfolio limits entries not supported at this time! "
+#                         "use swagger UI to delete redundant entries from DB and retry - "
+#                         f"this blocks all alert form reaching UI!! alert being processed: {portfolio_alerts}")
+#         # else not action required - no action to take - ignore and continue
+#     except Exception as e:
+#         logging.critical(
+#             f"something serious is wrong: update_portfolio_status is throwing an exception!;;; exception: {e}",
+#             exc_info=True)
 
 
 def is_service_up(ignore_error: bool = False):

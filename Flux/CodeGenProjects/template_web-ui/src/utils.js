@@ -1397,6 +1397,16 @@ export function getErrorDetails(error) {
     }
 }
 
+export function createObjectFromDict(obj, dict = {}) {
+    let objArray = [];
+    _.entries(dict).map(([k, v]) => {
+        let updatedObj = createObjectFromXpathDict(obj, k, v);
+        objArray.push(updatedObj);
+        return;
+    })
+    return _.merge(...objArray);
+}
+
 export function createObjectFromXpathDict(obj, xpath, value) {
     let o = { [DB_ID]: obj[DB_ID] };
     let currentObj = o;
@@ -1452,5 +1462,29 @@ export function applyWebSocketUpdate(arr, obj, uiLimit) {
             }
         }
     }
+    return updatedArr;
+}
+
+export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
+    let updatedArr = arr.filter(o => o[DB_ID] !== obj[DB_ID]);
+    // if obj is not deleted object
+    if (Object.keys(obj) !== 1) {
+        let index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);
+        // if index is not equal to -1, it is updated obj. If updated, replace the obj at the index
+        if (index !== -1) {
+            updatedArr.splice(index, 0, obj);
+        } else {
+            updatedArr.push(obj);
+        }
+    }
+    return updatedArr;
+}
+
+export function applyFilter(arr, filter) {
+    let updatedArr = cloneDeep(arr);
+    Object.keys(filter).forEach(key => {
+        let values = filter[key].split(",").map(val => val.trim()).filter(val => val !== "");
+        updatedArr = updatedArr.filter(data => values.includes(_.get(data, key)));
+    })
     return updatedArr;
 }
