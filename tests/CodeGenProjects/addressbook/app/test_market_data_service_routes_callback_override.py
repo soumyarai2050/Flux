@@ -14,19 +14,19 @@ market_data_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient(
 
 
 def test_last_trade_total_qty_sum(last_trade_fixture_list):
-    total_loop_counts = 20
+    max_loop_count = 20
     sec_gap_btw_trades = 5
 
-    for loop_count in range(total_loop_counts):
+    for loop_count in range(max_loop_count):
         for last_trade_obj in last_trade_fixture_list:
             last_trade_obj = LastTradeBaseModel(**last_trade_obj)
             last_trade_obj.time = DateTime.utcnow()
             market_data_web_client.create_last_trade_client(last_trade_obj)
 
-        if loop_count != (total_loop_counts-1):
+        if loop_count != (max_loop_count-1):
             time.sleep(sec_gap_btw_trades)
 
-    for loop_count in range(total_loop_counts):
+    for loop_count in range(max_loop_count):
         for last_trade_obj in last_trade_fixture_list:
             last_trade_obj = LastTradeBaseModel(**last_trade_obj)
             last_n_sec_market_trade_vol = \

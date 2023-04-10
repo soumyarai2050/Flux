@@ -8,7 +8,7 @@ import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
-    getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue
+    getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt
 } from '../utils';
 import { DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
@@ -54,7 +54,7 @@ const Cell = (props) => {
             onFocusOut();
         }
     }, [])
-    
+
     let type = DataTypes.STRING;
     let enumValues = [];
 
@@ -149,6 +149,10 @@ const Cell = (props) => {
                         endAdornment: <InputAdornment position="end">%</InputAdornment>
                     }
                 }
+            }
+
+            if (collection.displayType === DataTypes.INTEGER) {
+                value = floatToInt(value);
             }
 
             return (
@@ -368,7 +372,11 @@ const Cell = (props) => {
     }
 
 
-    let value = currentValue !== undefined && currentValue !== null ? currentValue.toLocaleString() : '';
+    let value = currentValue !== undefined && currentValue !== null ? currentValue : '';
+    if (collection.displayType === DataTypes.INTEGER && typeof (value) === DataTypes.NUMBER) {
+        value = floatToInt(value);
+    }
+    value = value.toLocaleString();
     let numberSuffix = ""
     if (collection.numberFormat) {
         if (collection.numberFormat === "%") {
@@ -377,17 +385,21 @@ const Cell = (props) => {
     }
 
     if (mode === Modes.EDIT_MODE && dataModified) {
-        let originalValue = previousValue !== undefined && previousValue !== null ? previousValue.toLocaleString() : '';
+        let originalValue = previousValue !== undefined && previousValue !== null ? previousValue : '';
+        if (collection.displayType === DataTypes.INTEGER && typeof (originalValue) === DataTypes.NUMBER) {
+            originalValue = floatToInt(originalValue);
+        }
+        originalValue = originalValue.toLocaleString();
         return (
             <TableCell className={`${classes.cell} ${tableCellColorClass} ${disabledClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                <span className={classes.previous}>{originalValue}{numberSuffix}</span>
-                <span className={classes.modified}>{value}{numberSuffix}</span>
+                {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
+                {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
             </TableCell>
         )
     } else {
         return (
             <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                <span>{value}{numberSuffix}</span>
+                {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
             </TableCell>
         )
     }

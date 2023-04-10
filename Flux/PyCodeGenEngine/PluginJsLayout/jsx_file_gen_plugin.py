@@ -537,8 +537,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"            dispatch(setSelected{message_name}Id(object[DB_ID]));\n"
             output_str += "        }\n"
             output_str += "    }" + f", [{message_name_camel_cased}Array])\n\n"
-
-        if layout_type == JsxFileGenPlugin.root_type:
             output_str += "    useEffect(() => {\n"
             output_str += "        /* on new update on original object from websocket/server, " \
                           "update the modified object\n"
@@ -546,12 +544,29 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           "pending changes if any\n"
             output_str += "        */\n"
             output_str += f"        let modifiedObj = addxpath(cloneDeep({message_name_camel_cased}));\n"
-            output_str += "        _.keys(userChanges).map(xpath => {\n"
-            output_str += "            _.set(modifiedObj, xpath, userChanges[xpath]);\n"
-            output_str += "            return;\n"
-            output_str += "        })\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += "        _.keys(userChanges).map(xpath => {\n"
+                output_str += "            _.set(modifiedObj, xpath, userChanges[xpath]);\n"
+                output_str += "            return;\n"
+                output_str += "        })\n"
             output_str += f"        dispatch(setModified{message_name}(modifiedObj));\n"
+            if layout_type == JsxFileGenPlugin.abbreviated_type:
+                dependent_message = self.abbreviated_dependent_message_name
+                dependent_message_camel_cased = dependent_message[0].lower() + dependent_message[1:]
+                output_str += f"        let loadedKeys = _.get({message_name_camel_cased}, loadedKeyName);\n"
+                output_str += "        if (loadedKeys) {\n"
+                output_str += "            let loadedIds = loadedKeys.map(key => getIdFromAbbreviatedKey(abbreviated, " \
+                              "key));\n"
+                output_str += f"            let updatedArray = {dependent_message_camel_cased}Array.filter(strat => " \
+                              "loadedIds.includes(strat[DB_ID]));\n"
+                output_str += f"            dispatch(set{dependent_message}Array(updatedArray));\n"
+                output_str += "            if (loadedKeys.length > 0) {\n"
+                output_str += "                let id = getIdFromAbbreviatedKey(abbreviated, loadedKeys[0]);\n"
+                output_str += f"                dispatch(setSelected{dependent_message}Id(id));\n"
+                output_str += "            }\n"
+                output_str += "        }\n"
             output_str += "    }" + f", [{message_name_camel_cased}])\n\n"
+
         elif layout_type == JsxFileGenPlugin.non_root_type:
             output_str += "    const applyUserChanges = (updatedData) => {\n"
             output_str += "        _.keys(userChanges).map(xpath => {\n"
@@ -580,31 +595,21 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        }\n"
             output_str += "    }" + f", [createMode, {root_message_name_camel_cased}Array, " \
                                     f"selected{root_message_name}Id])\n\n"
-        elif layout_type == JsxFileGenPlugin.abbreviated_type:
-            dependent_message = self.abbreviated_dependent_message_name
-            dependent_message_camel_cased = dependent_message[0].lower() + dependent_message[1:]
+
+        if layout_type == JsxFileGenPlugin.abbreviated_type:
             output_str += "    useEffect(() => {\n"
-            output_str += "        /* on new update on original object from websocket/server, update the " \
-                          "modified object\n"
-            output_str += "         * from original object by adding xpath and applying any local " \
-                          "pending changes if any\n"
-            output_str += "        */\n"
-            output_str += f"        let modifiedObj = addxpath(cloneDeep({message_name_camel_cased}));\n"
-            output_str += f"        dispatch(setModified{message_name}(modifiedObj));\n"
-            output_str += f"        if (_.get({message_name_camel_cased}, loadedKeyName)) " + "{\n"
-            output_str += f"            let loadedIds = _.get({message_name_camel_cased}, loadedKeyName).map(key => " \
-                          "getIdFromAbbreviatedKey(abbreviated, key));\n"
-            output_str += f"            let updatedArray = {dependent_message_camel_cased}Array.filter(strat => " \
-                          "loadedIds.includes(strat[DB_ID]));\n"
-            output_str += f"            dispatch(set{dependent_message}Array(updatedArray));\n"
-            output_str += f"            if (_.get({message_name_camel_cased}, loadedKeyName).length > 0) " + "{\n"
-            output_str += f"                let id = getIdFromAbbreviatedKey(abbreviated, " \
-                          f"_.get({message_name_camel_cased}, loadedKeyName)[0]);\n"
-            output_str += f"                dispatch(setSelected{dependent_message}Id(id));\n"
-            output_str += "                return;\n"
+            output_str += f"        let loadedKeys = _.get(modified{message_name}, loadedKeyName);\n"
+            output_str += "        if (loadedKeys && loadedKeys.length === 0) {\n"
+            output_str += f"            if (selected{dependent_message}Id) " + "{\n"
+            output_str += "                if (mode === Modes.EDIT_MODE) {\n"
+            output_str += "                    dispatch(setOpenWsPopup(true));\n"
+            output_str += "                }\n"
+            output_str += f"                dispatch(reset{dependent_message}());\n"
+            output_str += f"                dispatch(resetSelected{dependent_message}Id());\n"
+            output_str += f"                dispatch(setModified{dependent_message}(" + "{}));\n"
             output_str += "            }\n"
             output_str += "        }\n"
-            output_str += "    }" + f", [{message_name_camel_cased}])\n\n"
+            output_str += "    }" f", [modified{message_name}, mode])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += f"        if (!createMode && selected{dependent_message}Id) " + "{\n"
             output_str += f"            let modifiedObj = addxpath(cloneDeep({dependent_message_camel_cased}));\n"
@@ -714,6 +719,21 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                return () => socket.close();\n"
             output_str += "            })\n"
             output_str += "        }\n"
+            output_str += "        if (loadedKeys) {\n"
+            output_str += "            let loadedIds = loadedKeys.map(key => getIdFromAbbreviatedKey(abbreviated, " \
+                          "key));\n"
+            output_str += "            _.keys(socketDict.current).forEach(id => {\n"
+            output_str += "                id *= 1;\n"
+            output_str += "                if (!loadedIds.includes(id)) {\n"
+            output_str += "                    let socket = socketDict.current[id];\n"
+            output_str += "                    /* close the websocket on cleanup */\n"
+            output_str += "                    if (socket) {\n"
+            output_str += "                        socket.close();\n"
+            output_str += "                    }\n"
+            output_str += "                    delete socketDict.current[id];\n"
+            output_str += "                }\n"
+            output_str += "            })\n"
+            output_str += "        }\n"
             output_str += "    }" + f", [{message_name_camel_cased}])\n\n"
 
         output_str += "    /* if loading, render the skeleton view */\n"
@@ -806,6 +826,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onClosePopup = (e, reason) => {\n"
             output_str += "        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;\n"
             output_str += "        dispatch(setOpenWsPopup(false));\n"
+            if layout_type == JsxFileGenPlugin.abbreviated_type:
+                output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
             output_str += "    }\n\n"
             output_str += "    const onCloseConfirmPopup = (e, reason) => {\n"
             output_str += "        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;\n"

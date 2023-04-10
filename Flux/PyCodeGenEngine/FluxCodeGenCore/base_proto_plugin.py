@@ -106,6 +106,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_collection_link: str = "FluxFldCollectionLink"
     flux_fld_no_common_key: str = "FluxFldNoCommonKey"
     flux_fld_number_format: str = "FluxFldNumberFormat"
+    flux_fld_display_type: str = "FluxFldDisplayType"
     flux_msg_ui_get_all_limit: str = "FluxMsgUIGetAllLimit"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name

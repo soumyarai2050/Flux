@@ -31,7 +31,7 @@ PAIR_STRAT_DATA_DIR = (
 class AddressbookLogAnalyzer(LogAnalyzer):
     def __init__(self, regex_file: str, log_details: List[LogDetail] | None = None, simulation_mode: bool = False):
         if log_details is None:
-            log_details = []
+            log_details = list()
         logging.info(f"starting log analyzer. monitoring logs: {log_details}")
         self.portfolio_alerts_cache: List[Alert] = list()
         self.service_up: bool = False

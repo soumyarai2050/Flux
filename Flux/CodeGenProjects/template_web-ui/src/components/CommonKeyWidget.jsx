@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Tooltip, ClickAwayListener } from '@mui/material';
 import PropTypes from 'prop-types';
-import { clearxpath, getColorTypeFromValue, isValidJsonString } from '../utils';
+import { clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt } from '../utils';
 import { DataTypes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
 import _, { cloneDeep } from 'lodash';
@@ -96,6 +96,9 @@ const CommonKey = (props) => {
 
     let value = collection.value;
     if (value && (collection.type === DataTypes.NUMBER || typeof (value) === DataTypes.NUMBER)) {
+        if(collection.displayType === DataTypes.INTEGER) {
+            value = floatToInt(value);
+        }
         value = value.toLocaleString()
     } else {
         value = String(value);

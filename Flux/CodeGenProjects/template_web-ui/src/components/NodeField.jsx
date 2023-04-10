@@ -4,7 +4,7 @@ import { ColorTypes, DataTypes, Modes } from '../constants';
 import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment } from '@mui/material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue } from '../utils';
+import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt } from '../utils';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './NodeField.module.css';
@@ -119,13 +119,17 @@ const NodeField = (props) => {
         let value = props.data.value ? props.data.value : 0;
 
         let inputProps = {};
-        if(props.data.numberFormat) {
+        if (props.data.numberFormat) {
             if (props.data.numberFormat === "%") {
                 inputProps = {
                     endAdornment: <InputAdornment position="end">%</InputAdornment>
                 }
             }
-        } 
+        }
+
+        if (props.data.displayType == DataTypes.INTEGER) {
+            value = floatToInt(value);
+        }
 
         return (
             <NumericFormat

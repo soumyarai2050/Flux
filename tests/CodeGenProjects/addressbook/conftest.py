@@ -282,9 +282,9 @@ def pair_strat_(pair_securities_with_sides_):
         "common_premium": 40,
         "hedge_ratio": 5
         },
-        "pair_strat_params_update_counts": 0,
-        "strat_status_update_counts": 0,
-        "strat_limits_update_counts": 0
+        "pair_strat_params_update_seq_num": 0,
+        "strat_status_update_seq_num": 0,
+        "strat_limits_update_seq_num": 0
     })
 
 
@@ -410,7 +410,7 @@ def expected_portfolio_status_():
         "overall_sell_notional": 0,
         "overall_buy_fill_notional": 0,
         "overall_sell_fill_notional": 0,
-        "alert_update_counts":0
+        "alert_update_seq_num":0
     })
 
 

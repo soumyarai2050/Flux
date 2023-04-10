@@ -206,6 +206,7 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldFilterEnable = 55267;
   optional bool FluxFldNoCommonKey = 55268;
   optional string FluxFldNumberFormat = 55269; // currently only symbol `%` is supported , in future we can add precision etc.
+  optional string FluxFldDisplayType = 55270; // Use this to set display data type for field
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

@@ -17,7 +17,7 @@ simulate_reverse_path: False
 # to simulate unsolicited cxl functionality
 #simulate_unsolicited_cxl_orders: False
 
-# counts to be used in rej and cxl_rej simulations
+# count to be used in rej and cxl_rej simulations
 #continues_buy_count: 3
 #continues_buy_rej_count: 1
 #continues_sell_count: 3

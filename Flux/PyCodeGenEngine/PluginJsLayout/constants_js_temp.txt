@@ -48,7 +48,8 @@ export const DataTypes = {
     INT32: 'int32',
     INT64: 'int64',
     FLOAT: 'float',
-    DATE_TIME: 'date-time'
+    DATE_TIME: 'date-time',
+    INTEGER: 'int'
 }
 
 export const ComponentType = {

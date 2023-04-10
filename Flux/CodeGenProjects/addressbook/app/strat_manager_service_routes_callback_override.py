@@ -814,7 +814,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 # else not required: if consumable_cxl-qty is allowed then ignore
             # else not required: if there is not even a single sell order then consumable_cxl-qty will
             # become 0 in that case too, so ignoring this case if sell side all_bkr_cxlled_qty is 0
-        # else not required: if order counts are less than waived_min_orders
+        # else not required: if order count is less than waived_min_orders
 
     def __get_residual_obj(self, order_snapshot: OrderSnapshot, strat_brief: StratBrief) -> Residual | None:
         if order_snapshot.order_brief.side == Side.BUY:
@@ -1241,9 +1241,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         else:
             logging.warning(f"No filtered_portfolio_limits found for pair-strat: {pair_strat_obj}")
         pair_strat_obj.frequency = 1
-        pair_strat_obj.pair_strat_params_update_counts = 0
-        pair_strat_obj.strat_limits_update_counts = 0
-        pair_strat_obj.strat_status_update_counts = 0
+        pair_strat_obj.pair_strat_params_update_seq_num = 0
+        pair_strat_obj.strat_limits_update_seq_num = 0
+        pair_strat_obj.strat_status_update_seq_num = 0
         pair_strat_obj.last_active_date_time = DateTime.utcnow()
 
     async def _create_strat_brief_for_ready_to_active_pair_strat(self, pair_strat_obj: PairStrat):
@@ -1397,7 +1397,7 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 if updated_pair_strat_obj.strat_status.strat_alerts is None:
                     updated_pair_strat_obj.strat_status.strat_alerts = strat_alerts
                 else:
-                    updated_pair_strat_obj.strat_status.strat_alerts += strat_alerts
+                    updated_pair_strat_obj.strat_status.strat_alerts.extend(strat_alerts)
                 is_updated = True
             # else not required - no alerts - all checks passed
             if stored_pair_strat_obj.strat_status.strat_state != StratState.StratState_ACTIVE:
@@ -1430,17 +1430,17 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             updated_pair_strat_obj.frequency = 0
         updated_pair_strat_obj.frequency += 1
 
-        if updated_pair_strat_obj.strat_status_update_counts is None:
-            updated_pair_strat_obj.strat_status_update_counts = 0
-        updated_pair_strat_obj.strat_status_update_counts += 1
+        if updated_pair_strat_obj.strat_status_update_seq_num is None:
+            updated_pair_strat_obj.strat_status_update_seq_num = 0
+        updated_pair_strat_obj.strat_status_update_seq_num += 1
 
-        if updated_pair_strat_obj.pair_strat_params_update_counts is None:
-            updated_pair_strat_obj.pair_strat_params_update_counts = 0
-        updated_pair_strat_obj.pair_strat_params_update_counts += 1
+        if updated_pair_strat_obj.pair_strat_params_update_seq_num is None:
+            updated_pair_strat_obj.pair_strat_params_update_seq_num = 0
+        updated_pair_strat_obj.pair_strat_params_update_seq_num += 1
 
-        if updated_pair_strat_obj.strat_limits_update_counts is None:
-            updated_pair_strat_obj.strat_limits_update_counts = 0
-        updated_pair_strat_obj.strat_limits_update_counts += 1
+        if updated_pair_strat_obj.strat_limits_update_seq_num is None:
+            updated_pair_strat_obj.strat_limits_update_seq_num = 0
+        updated_pair_strat_obj.strat_limits_update_seq_num += 1
 
         await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
@@ -1456,20 +1456,20 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         updated_pair_strat_obj.frequency = stored_pair_strat_obj.frequency + 1
 
         if updated_pair_strat_obj.strat_status is not None:
-            if stored_pair_strat_obj.strat_status_update_counts is None:
-                updated_pair_strat_obj.strat_status_update_counts = 0
-            updated_pair_strat_obj.strat_status_update_counts = stored_pair_strat_obj.strat_status_update_counts + 1
+            if stored_pair_strat_obj.strat_status_update_seq_num is None:
+                updated_pair_strat_obj.strat_status_update_seq_num = 0
+            updated_pair_strat_obj.strat_status_update_seq_num = stored_pair_strat_obj.strat_status_update_seq_num + 1
 
         if updated_pair_strat_obj.pair_strat_params is not None:
-            if stored_pair_strat_obj.pair_strat_params_update_counts is None:
-                updated_pair_strat_obj.pair_strat_params_update_counts = 0
-            updated_pair_strat_obj.pair_strat_params_update_counts = \
-                stored_pair_strat_obj.pair_strat_params_update_counts + 1
+            if stored_pair_strat_obj.pair_strat_params_update_seq_num is None:
+                updated_pair_strat_obj.pair_strat_params_update_seq_num = 0
+            updated_pair_strat_obj.pair_strat_params_update_seq_num = \
+                stored_pair_strat_obj.pair_strat_params_update_seq_num + 1
 
         if updated_pair_strat_obj.strat_limits is not None:
-            if stored_pair_strat_obj.strat_limits_update_counts is None:
-                updated_pair_strat_obj.strat_limits_update_counts = 0
-            updated_pair_strat_obj.strat_limits_update_counts = stored_pair_strat_obj.strat_limits_update_counts + 1
+            if stored_pair_strat_obj.strat_limits_update_seq_num is None:
+                updated_pair_strat_obj.strat_limits_update_seq_num = 0
+            updated_pair_strat_obj.strat_limits_update_seq_num = stored_pair_strat_obj.strat_limits_update_seq_num + 1
 
         # After use of below compare_n_patch_dict we are also having one more compare_n_patch_dict call in
         # generic_patch_http causing below issues (or may be more which not got debugged yet):
@@ -1527,23 +1527,23 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         return updated_pair_strat_obj
 
     async def create_portfolio_status_pre(self, portfolio_status_obj: PortfolioStatus):
-        portfolio_status_obj.alert_update_counts = 0
+        portfolio_status_obj.alert_update_seq_num = 0
 
     async def update_portfolio_status_pre(self, stored_portfolio_status_obj: PortfolioStatus,
                                           updated_portfolio_status_obj: PortfolioStatus):
-        if stored_portfolio_status_obj.alert_update_counts is None:
-            updated_portfolio_status_obj.alert_update_counts = 1
+        if stored_portfolio_status_obj.alert_update_seq_num is None:
+            updated_portfolio_status_obj.alert_update_seq_num = 1
         else:
-            updated_portfolio_status_obj.alert_update_counts = stored_portfolio_status_obj.alert_update_counts + 1
+            updated_portfolio_status_obj.alert_update_seq_num = stored_portfolio_status_obj.alert_update_seq_num + 1
         return updated_portfolio_status_obj
 
     async def partial_update_portfolio_status_pre(self, stored_portfolio_status_obj: PortfolioStatus,
                                                   updated_portfolio_status_obj: PortfolioStatusOptional):
         if updated_portfolio_status_obj.portfolio_alerts:
-            if stored_portfolio_status_obj.alert_update_counts is None:
-                updated_portfolio_status_obj.alert_update_counts = 1
+            if stored_portfolio_status_obj.alert_update_seq_num is None:
+                updated_portfolio_status_obj.alert_update_seq_num = 1
             else:
-                updated_portfolio_status_obj.alert_update_counts = stored_portfolio_status_obj.alert_update_counts + 1
+                updated_portfolio_status_obj.alert_update_seq_num = stored_portfolio_status_obj.alert_update_seq_num + 1
         return updated_portfolio_status_obj
 
     async def _force_publish_symbol_overview_for_ready_to_active_strat(self, pair_strat: PairStrat) -> None:
@@ -1784,20 +1784,20 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         portfolio_limits_obj: PortfolioLimits = await underlying_read_portfolio_limits_by_id_http(1)
         max_allowed_rejection_within_period = portfolio_limits_obj.rolling_max_reject_count.max_rolling_tx_count
         period_in_sec = portfolio_limits_obj.rolling_max_reject_count.rolling_tx_count_period_seconds
-        order_counts_updated_order_journals: List[OrderJournal] = \
+        order_count_updated_order_journals: List[OrderJournal] = \
             await underlying_read_order_journal_http(get_last_n_sec_orders_by_event(None, period_in_sec, "OE_REJ"))
-        if len(order_counts_updated_order_journals) == 1:
-            if order_counts_updated_order_journals[0].current_period_order_count > max_allowed_rejection_within_period:
+        if len(order_count_updated_order_journals) == 1:
+            if order_count_updated_order_journals[0].current_period_order_count > max_allowed_rejection_within_period:
                 logging.debug(f"max_allowed_rejection_within_period breached found : "
-                              f"{order_counts_updated_order_journals[0].current_period_order_count} "
+                              f"{order_count_updated_order_journals[0].current_period_order_count} "
                               f"rejections in past period - initiating auto-kill switch")
                 # single top level objects are hardcoded id=1 , saves the query portfolio status, if always id=1
                 portfolio_status: PortfolioStatusOptional = PortfolioStatusOptional(id=1,
                                                                                     kill_switch=True)
                 await underlying_partial_update_portfolio_status_http(portfolio_status)
-        elif len(order_counts_updated_order_journals) != 0:
+        elif len(order_count_updated_order_journals) != 0:
             err_str_ = "Must receive only one object from get_last_n_sec_orders_by_event_query, " \
-                       f"received: {order_counts_updated_order_journals}"
+                       f"received: {order_count_updated_order_journals}"
         # else not required - no rejects found - no action
 
         # 3. No one expects anything useful to be returned - just return empty list
@@ -1989,9 +1989,9 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                         updated_pair_strat = PairStratOptional(_id=pair_strat.id,
                                                                pair_strat_params=pair_strat.pair_strat_params,
                                                                strat_status=strat_status,
-                                                               pair_strat_params_update_counts=0,
-                                                               strat_status_update_counts=0,
-                                                               strat_limits_update_counts=0)
+                                                               pair_strat_params_update_seq_num=0,
+                                                               strat_status_update_seq_num=0,
+                                                               strat_limits_update_seq_num=0)
                         await underlying_update_pair_strat_http(updated_pair_strat)
 
                 # else: deleted not unloaded - nothing to do , DB will remove entry
@@ -2030,7 +2030,10 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
     async def update_strat_collection_pre(self, stored_strat_collection_obj: StratCollection,
                                           updated_strat_collection_obj: StratCollection):
-
+        if not self.service_ready:
+            # raise service unavailable 503 exception, let the caller retry
+            raise HTTPException(status_code=503, detail="update_strat_collection_pre not ready - service is not "
+                                                        "initialized yet")
         # handling unloading pair_strats
         await self.unload_pair_strats(stored_strat_collection_obj, updated_strat_collection_obj)
 
@@ -2122,15 +2125,15 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         rolling_order_count_period_seconds = \
             portfolio_limits_obj.rolling_max_order_count.rolling_tx_count_period_seconds
 
-        order_counts_updated_order_journals = \
+        order_count_updated_order_journals = \
             await underlying_get_last_n_sec_orders_by_event_query_http(symbol,
                                                                        rolling_order_count_period_seconds,
                                                                        OrderEventType.OE_NEW)
-        if len(order_counts_updated_order_journals) == 1:
-            rolling_new_order_count = order_counts_updated_order_journals[-1].current_period_order_count
-        elif len(order_counts_updated_order_journals) > 1:
+        if len(order_count_updated_order_journals) == 1:
+            rolling_new_order_count = order_count_updated_order_journals[-1].current_period_order_count
+        elif len(order_count_updated_order_journals) > 1:
             err_str_ = "Must receive only one object by get_last_n_sec_orders_by_event_query, " \
-                       f"received {order_counts_updated_order_journals}"
+                       f"received {order_count_updated_order_journals}"
             logging.error(err_str_)
             return None
         else:

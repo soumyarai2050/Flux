@@ -44,7 +44,8 @@ const fieldProps = [
     { propertyName: "name_color", usageName: "nameColor" },
     { propertyName: "filter_enable", usageName: "filterEnable" },
     { propertyName: "number_format", usageName: "numberFormat" },
-    { propertyName: "no_common_key", usageName: "noCommonKey" }
+    { propertyName: "no_common_key", usageName: "noCommonKey" },
+    { propertyName: "display_type", usageName: "displayType" }
 ]
 
 // properties supported explicitly on the array types
@@ -1487,4 +1488,12 @@ export function applyFilter(arr, filter) {
         updatedArr = updatedArr.filter(data => values.includes(_.get(data, key)));
     })
     return updatedArr;
+}
+
+export function floatToInt(number) {
+    if (number > 0) {
+        return Math.floor(number);
+    } else {
+        return Math.ceil(number);
+    }
 }

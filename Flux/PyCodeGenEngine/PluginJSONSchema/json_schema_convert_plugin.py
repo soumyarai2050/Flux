@@ -44,7 +44,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_name_color,
         BaseProtoPlugin.flux_fld_filter_enable,
         BaseProtoPlugin.flux_fld_no_common_key,
-        BaseProtoPlugin.flux_fld_number_format
+        BaseProtoPlugin.flux_fld_number_format,
+        BaseProtoPlugin.flux_fld_display_type
     ]
     # Used to be added as property
     flx_fld_complex_attribute_options: List[str] = [
