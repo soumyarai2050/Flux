@@ -213,8 +213,8 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
     def handle_callback_query_methods_output(self) -> str:
         output_str = ""
 
-        for message in self.query_message_dict:
-            aggregate_value_list = self.query_message_dict[message]
+        for message in self.message_to_query_option_list_dict:
+            aggregate_value_list = self.message_to_query_option_list_dict[message]
 
             message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
             for aggregate_value in aggregate_value_list:

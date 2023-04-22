@@ -372,7 +372,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_DELETE_gen(message, aggregation_type, id_field_type, shared_lock_list)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}' + \
+        output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + \
                       '{' + f'{message_name_snake_cased}_id' + '}' + \
                       f'", response_model=DefaultWebResponse, status_code=200)\n'
         if id_field_type is not None:
@@ -933,7 +933,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_query_methods(self, message: protogen.Message) -> str:
         output_str = ""
-        aggregate_value_list = self.query_message_dict[message]
+        aggregate_value_list = self.message_to_query_option_list_dict[message]
 
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         for aggregate_value in aggregate_value_list:
@@ -942,12 +942,18 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             aggregate_params_data_types = aggregate_value[FastapiRoutesFileHandler.aggregate_params_data_types_key]
 
             if aggregate_params:
-                agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
-                                                      for param, param_type in zip(aggregate_params,
-                                                                                   aggregate_params_data_types)])
+                param_to_type_str_list = []
+                list_type_params = []
+                for param, param_type in zip(aggregate_params, aggregate_params_data_types):
+                    if "List" not in param_type:
+                        param_to_type_str_list.append(f"{param}: {param_type}")
+                    else:
+                        list_type_params.append((param, param_type))
+                for param, param_type in list_type_params:
+                    param_to_type_str_list.append(f"{param}: {param_type} = Query()")
+                agg_params_with_type_str = ", ".join(param_to_type_str_list)
                 agg_params_str = ", ".join(aggregate_params)
 
-                agg_params_url_query_str = "/".join(["{"+f"{param}"+"}" for param in aggregate_params])
                 output_str = f"async def underlying_{aggregate_var_name}_query_http({agg_params_with_type_str}) -> " \
                              f"List[{message.proto.name}]:\n"
                 output_str += f"    {message_name_snake_cased}_obj = await " \
@@ -955,8 +961,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 output_str += f"    {message_name_snake_cased}_obj = await " \
                               f"callback_class.{aggregate_var_name}_query_post({message_name_snake_cased}_obj)\n"
                 output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
-                output_str += f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}/' \
-                              f'{agg_params_url_query_str}' + \
+                output_str += f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}' + \
                               f'", response_model=List[{message.proto.name}], status_code=200)\n'
                 output_str += f"async def {aggregate_var_name}_query_http({agg_params_with_type_str}) -> " \
                               f"List[{message.proto.name}]:\n"
@@ -973,7 +978,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 output_str += f"    await callback_class.{aggregate_var_name}_query_post(" \
                               f"{message_name_snake_cased}_obj)\n"
                 output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
-                output_str += f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}/' + \
+                output_str += f'@{self.api_router_app_name}.get("/query-{aggregate_var_name}' + \
                               f'", response_model=List[{message.proto.name}], status_code=200)\n'
                 output_str += f"async def {aggregate_var_name}_query_http() -> " \
                               f"List[{message.proto.name}]:\n"
@@ -1025,7 +1030,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += "from threading import RLock\n"
         output_str += "import copy\n"
         output_str += "# third-party modules\n"
-        output_str += "from fastapi import APIRouter, Request, WebSocket\n"
+        output_str += "from fastapi import APIRouter, Request, WebSocket, Query\n"
         output_str += "from fastapi.templating import Jinja2Templates\n"
         output_str += "# project imports\n"
         output_str += self._handle_routes_callback_import()

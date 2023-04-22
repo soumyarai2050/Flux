@@ -6,7 +6,7 @@ import copy
 import pytz
 from pendulum import DateTime
 
-from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import get_pair_strat_key
+from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import get_pair_strat_key, get_fills_journal_key
 from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
 from Flux.CodeGenProjects.addressbook.app.ws_helper import *
 
@@ -151,7 +151,8 @@ class StratCache:
         symbol: str
         symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict.get(fill_journal.order_id)
         if not symbol_side_tuple:
-            logging.error(f"Unknown order id: {fill_journal.order_id} found for fill;;;fill_journal: {fill_journal}")
+            logging.error(f"Unknown order id: {fill_journal.order_id} found for fill "
+                          f"{get_fills_journal_key(fill_journal)};;;fill_journal: {fill_journal}")
             return None
         symbol, side = symbol_side_tuple
 

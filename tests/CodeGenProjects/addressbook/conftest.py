@@ -237,7 +237,7 @@ def expected_strat_limits_():
       },
       "residual_restriction": {
         "max_residual": 100_000,
-        "residual_mark_seconds": 10
+        "residual_mark_seconds": 40
       },
       "eligible_brokers": []
     })

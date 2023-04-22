@@ -152,9 +152,9 @@ message OrderSnapshot{
     is_repeated: True
   };
   option (FluxMsgJsonQuery) = {
-      AggregateVarName: "get_open_order_snapshots_by_order_status",
-      AggregateParams: "order_status",
-      AggregateParamsDataType: "str"
+      AggregateVarName: "trigger_residual_check",
+      AggregateParams: "order_status_list",
+      AggregateParamsDataType: "List[str]"
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
@@ -402,6 +402,23 @@ message PairStrat{
       AggregateParams: "security_id",
       AggregateParamsDataType: "str"
   };
+    option (FluxMsgJsonQuery) = {
+    AggregateVarName: "update_residuals",
+    AggregateParams: "security_id",
+    AggregateParamsDataType: "str",
+    AggregateParams: "side",
+    AggregateParamsDataType: "Side",
+    AggregateParams: "residual_qty",
+    AggregateParamsDataType: "int"
+  };
+    option (FluxMsgJsonQuery) = {
+    AggregateVarName: "get_ongoing_strat_from_symbol_side",
+    AggregateParams: "sec_id",
+    AggregateParamsDataType: "str",
+    AggregateParams: "side",
+    AggregateParamsDataType: "Side"
+  };
+
     option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
     option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
     option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_strat_alerts_obj", agg_params: ["-100"]};

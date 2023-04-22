@@ -1,6 +1,6 @@
 import requests
 from pydantic import BaseModel
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Dict
 import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, ConnectionClosed
@@ -174,11 +174,6 @@ def generic_http_index_client(url: str, query_params: List[Any], pydantic_type):
 
 
 @log_n_except
-def generic_http_query_client(url: str, query_params: List[Any], pydantic_type):
-    query_params = "/".join([str(param) for param in query_params])
-    if url.endswith("/"):
-        url = f"{url}{query_params}"
-    else:
-        url = f"{url}/{query_params}"
-    response: requests.Response = requests.get(url)
+def generic_http_query_client(url: str, query_params_dict: Dict[str, Any], pydantic_type):
+    response: requests.Response = requests.get(url, params=query_params_dict)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)

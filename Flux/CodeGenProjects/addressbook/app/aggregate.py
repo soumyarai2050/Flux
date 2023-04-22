@@ -225,11 +225,14 @@ def get_order_by_order_id_filter(order_id: str):
     ]}
 
 
-def get_open_order_snapshots_by_order_status(order_status: str):
+def get_open_order_snapshots_by_order_status(order_status_list: List[str]):
+    order_status_match = []
+    for order_status in order_status_list:
+        order_status_match.append({"order_status": order_status})
     return {"aggregate": [
         {
             "$match": {
-                "order_status": order_status
+                '$or': order_status_match
             }
         }
     ]}

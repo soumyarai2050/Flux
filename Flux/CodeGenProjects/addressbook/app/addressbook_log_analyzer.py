@@ -3,14 +3,14 @@ import logging
 import os
 import time
 from pathlib import PurePath
-from typing import List, Dict
+from typing import Callable, Set
 from pendulum import DateTime
 import re
 from threading import Lock
 
 os.environ["DBType"] = "beanie"
 # Project imports
-from FluxPythonUtils.scripts.utility_functions import configure_logger,get_host_port_from_env, load_yaml_configurations
+from FluxPythonUtils.scripts.utility_functions import configure_logger, get_host_port_from_env, load_yaml_configurations
 from FluxPythonUtils.log_analyzer.log_analyzer import LogAnalyzer, LogDetail
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
     StratManagerServiceWebClient
@@ -34,6 +34,8 @@ class AddressbookLogAnalyzer(LogAnalyzer):
             log_details = list()
         logging.info(f"starting log analyzer. monitoring logs: {log_details}")
         self.portfolio_alerts_cache: List[Alert] = list()
+        self.strat_id_by_symbol_side_dict: Dict[str, int] = dict()
+        self.strat_alert_cache_by_strat_id_dict: Dict[int, List[Alert]] = dict()
         self.service_up: bool = False
         self.send_alert_lock: Lock = Lock()
         self.strat_manager_service_web_client: StratManagerServiceWebClient = \
@@ -49,7 +51,10 @@ class AddressbookLogAnalyzer(LogAnalyzer):
             if self.service_up:
                 portfolio_status: PortfolioStatusBaseModel = \
                     self.strat_manager_service_web_client.get_portfolio_status_client(1)
-                self.portfolio_alerts_cache = portfolio_status.portfolio_alerts
+                if portfolio_status.portfolio_alerts is not None:
+                    self.portfolio_alerts_cache = portfolio_status.portfolio_alerts
+                else:
+                    self.portfolio_alerts_cache = list()
                 return True
             return False
 
@@ -129,7 +134,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
         # remove object hex memory path
         cleaned_alert_str: str = re.sub(r"0x[a-f0-9]*", "", alert_str)
         # remove all numeric digits
-        cleaned_alert_str = re.sub(r"[0-9]*", "", cleaned_alert_str)
+        cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)
         return cleaned_alert_str
 
     def _process_trade_simulator_message(self, message: str) -> None:
@@ -147,7 +152,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                 key, value = arg.split("^^")
                 kwargs[key] = value
 
-            callback_method = getattr(TradeSimulator, method_name)
+            callback_method: Callable = getattr(TradeSimulator, method_name)
             callback_method(**kwargs)
         except Exception as e:
             alert_brief: str = f"_process_trade_simulator_message failed in log analyzer"
@@ -155,6 +160,91 @@ class AddressbookLogAnalyzer(LogAnalyzer):
             logging.exception(f"{alert_brief};;; {alert_details}")
             self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
                               alert_details=alert_details)
+
+    def _process_strat_alert_message(self, prefix: str, message: str) -> None:
+        try:
+            pattern: re.Pattern = re.compile("%%.*%%")
+            match = pattern.search(message)
+            if not match:
+                raise Exception("unexpected error in _process_strat_alert_message. strat alert pattern not matched")
+
+            matched_text = match[0]
+            log_message: str = message.replace(matched_text, " ")
+            error_dict: Dict[str, str] | None = self._get_error_dict(error_patterns=self.error_patterns,
+                                                                     log_prefix=prefix, log_message=log_message)
+
+            # if error pattern does not match, ignore creating alert
+            if error_dict is None:
+                return
+
+            args: str = matched_text.replace("%%", "").strip()
+            symbol_side_set: Set = set()
+
+            # kwargs separated by "," if any
+            for arg in args.split(","):
+                key, value = [x.strip() for x in arg.split("=")]
+                symbol_side_set.add(value)
+                break
+
+            if len(symbol_side_set) == 0:
+                raise Exception("no symbol-side pair found while creating strat alert")
+            else:
+                symbol_side: str = list(symbol_side_set)[0]
+                symbol, side = symbol_side.split("-")
+                strat_id: int | None = self.strat_id_by_symbol_side_dict.get(symbol_side)
+                if strat_id is None or self.strat_alert_cache_by_strat_id_dict.get(strat_id) is None:
+                    pair_strat_list: List[PairStrat] = \
+                        self.strat_manager_service_web_client.get_ongoing_strat_from_symbol_side_query_client(
+                            sec_id=symbol, side=side)
+                    if len(pair_strat_list) == 0:
+                        raise Exception(f"no ongoing pair strat found for symbol_side: {symbol_side} while creating "
+                                        f"strat alert")
+                    elif len(pair_strat_list) == 1:
+                        pair_strat_obj: PairStrat = pair_strat_list[0]
+                        strat_id = pair_strat_obj.id
+                        if pair_strat_obj.strat_status.strat_alerts is not None:
+                            self.strat_alert_cache_by_strat_id_dict[strat_id] = \
+                                pair_strat_list[0].strat_status.strat_alerts
+                        else:
+                            self.strat_alert_cache_by_strat_id_dict[strat_id] = list()
+                    else:
+                        raise Exception(f"multiple pair strat found for symbol_side: {symbol_side} while creating "
+                                        f"strat alert, expected 1")
+                # else not required: alert cache exists
+
+                severity, alert_brief, alert_details = self._create_alert(error_dict=error_dict)
+                self._send_strat_alerts(strat_id, severity, alert_brief, alert_details)
+        except Exception as e:
+            alert_brief: str = f"_process_strat_alert_message failed in log analyzer"
+            alert_details: str = f"message: {message}, exception: {e}"
+            logging.exception(f"{alert_brief};;; {alert_details}")
+            self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
+                              alert_details=alert_details)
+
+    def _send_strat_alerts(self, strat_id: int, severity: str, alert_brief: str, alert_details: str) -> None:
+        with self.send_alert_lock:
+            logging.debug(f"sending strat alert with strat_id: {strat_id} severity: {severity}, alert_brief: "
+                          f"{alert_brief}, alert_details: {alert_details}")
+            created: bool = False
+            while self.run_mode and not created:
+                try:
+                    if not self.service_up:
+                        raise Exception("service up check failed. waiting for the service to start...")
+                    # else not required
+
+                    if not alert_details:
+                        alert_details = None
+                    severity: Severity = self.get_severity_type_from_severity_str(severity_str=severity)
+                    alert_obj: Alert = self.create_or_update_alert(self.strat_alert_cache_by_strat_id_dict[strat_id],
+                                                                   severity, alert_brief, alert_details)
+                    updated_pair_strat: PairStratBaseModel = \
+                        PairStratBaseModel(_id=strat_id, strat_status=StratStatusOptional())
+                    updated_pair_strat.strat_status.strat_alerts = [alert_obj]
+                    self.strat_manager_service_web_client.patch_pair_strat_client(updated_pair_strat)
+                    created = True
+                except Exception as e:
+                    logging.error(f"_send_strat_alerts failed;;;exception: {e}")
+                    time.sleep(30)
 
 
 if __name__ == '__main__':

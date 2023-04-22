@@ -390,7 +390,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"                state.{message_name_camel_cased}Array = updatedArray;\n"
                 output_str += f"                if (k === state.selected{message_name}Id) " + "{\n"
                 output_str += "                    let diff = compareObjects(updatedObj, " \
-                              f"state.modified{message_name}, state.modified{message_name});\n"
+                              f"state.{message_name_camel_cased}, state.{message_name_camel_cased});\n"
                 output_str += "                    if (_.keys(updatedObj).length === 1) {\n"
                 output_str += f"                        state.selected{message_name}Id = " \
                               f"initialState.selected{message_name}Id;\n"
@@ -433,8 +433,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"        set{message_name}Ws: (state, action) => " + "{\n"
                 output_str += "            const { dict, mode, collections } = action.payload;\n"
                 output_str += f"            let updatedObj = dict[state.selected{message_name}Id];\n"
-                output_str += f"            let diff = compareObjects(updatedObj, state.modified{message_name}, " \
-                              f"state.modified{message_name});\n"
+                output_str += f"            let diff = compareObjects(updatedObj, state.{message_name_camel_cased}, " \
+                              f"state.{message_name_camel_cased});\n"
                 output_str += "            if (_.keys(updatedObj).length === 1) {\n"
                 output_str += f"                state.selected{message_name}Id = " \
                               f"initialState.selected{message_name}Id;\n"

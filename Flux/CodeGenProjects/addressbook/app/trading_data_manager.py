@@ -6,7 +6,8 @@ from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from trading_cache import *
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import \
-    is_ongoing_pair_strat, get_order_journal_key
+    is_ongoing_pair_strat, get_pair_strat_key, get_strat_brief_key, get_fills_journal_key, get_order_journal_key, \
+    get_symbol_side_key
 from Flux.CodeGenProjects.addressbook.app.trading_link import TradingLinkBase, get_trading_link
 
 trading_link: TradingLinkBase = get_trading_link()
@@ -151,16 +152,18 @@ class TradingDataManager:
                     strat_executor, strat_executor_thread = self.executor_trigger_method(self, strat_cache)
                     # update strat key to python processing thread
                     if key_leg_1 in self.strat_thread_dict:
-                        logging.error(f"Unexpected: unable to proceed proceed with pair_strat key: {key_leg_1};;;"
+                        logging.error(f"Unexpected: unable to proceed proceed with pair_strat executor key: "
+                                      f"{key_leg_1}, pair_strat_key: {get_pair_strat_key(pair_strat_)};;;"
                                       f"existing entry found in strat_thread_dict: "
                                       f"{self.strat_thread_dict[key_leg_1]}, new requested: {pair_strat_}")
                     else:
                         self.strat_thread_dict[key_leg_1] = (strat_executor, strat_executor_thread)
                 else:
                     strat_cache.set_pair_strat(pair_strat_)
-            if self.strat_brief_ws_cont.notify:
+            if self.pair_strat_ws_cont.notify:
                 strat_cache.notify_semaphore.release()
-            logging.debug(f"Updated strat_brief cache for key: {key_leg_1} ;;; strat_brief: {pair_strat_}")
+            logging.debug(f"Updated strat_brief cache for key: {key_leg_1}, pair_strat_key: "
+                          f"{get_pair_strat_key(pair_strat_)} ;;; pair_strat: {pair_strat_}")
         else:
             strat_cache: StratCache = StratCache.get(key_leg_1)
             if strat_cache is not None:
@@ -173,7 +176,8 @@ class TradingDataManager:
                         self.strat_thread_dict.pop(key_leg_1)
                     # don't join on trading thread - let the demon self shutdown
                     strat_cache.notify_semaphore.release()
-                logging.warning(f"handle_pair_strat_ws: removed cache entry of non ongoing pair strat from trading;;;"
+                logging.warning(f"handle_pair_strat_ws: removed cache entry of non ongoing pair strat from trading"
+                                f"pair_strat_key: {get_pair_strat_key(pair_strat_)};;;"
                                 f"pair_strat: {pair_strat_}")
             # else not required - non-ongoing pair strat is not to exist in cache
 
@@ -190,21 +194,26 @@ class TradingDataManager:
                     cached_pair_strat, _ = cached_pair_strat_tuple
                     strat_cache.notify_semaphore.release()
                 elif (cached_pair_strat_tuple is None) or (cached_pair_strat_tuple[0] is None):
-                    logging.warning(f"ignoring: no ongoing pair strat matches this strat_brief: {strat_brief_}")
+                    logging.warning(f"ignoring: no ongoing pair strat matches this strat_brief_key: "
+                                    f"{get_strat_brief_key(strat_brief_)};;; strat_brief: {strat_brief_}")
                 # else not required - strat does not need this update notification
-                logging.debug(f"Updated strat_brief cache for key: {key1} {key2} ;;; strat_brief: {strat_brief_}")
+                logging.debug(f"Updated strat_brief cache for key: {key1} {key2}, strat_brief_key: "
+                                    f"{get_strat_brief_key(strat_brief_)};;; strat_brief: {strat_brief_}")
             else:
                 logging.debug("either a non-ongoing strat-brief or one before corresponding active pair_strat: "
                               "we discard this and expect algo to get snapshot with explicit web query - maybe we wire "
-                              f"explicit web query in ongoing pair-strat notification;;;strat_brief: {strat_brief_}")
+                              f"explicit web query in ongoing pair-strat notification, strat_brief_key: "
+                                    f"{get_strat_brief_key(strat_brief_)};;;strat_brief: {strat_brief_}")
         else:
             logging.error(f"ignoring strat brief update - missing required pair_buy_side_trading_brief or pair_sell_"
-                          f"side_trading_brief;;;strat_brief: {strat_brief_}")
+                          f"side_trading_brief, strat_brief_key: "
+                          f"{get_strat_brief_key(strat_brief_)};;;strat_brief: {strat_brief_}")
 
     def handle_fill_journal_ws(self, fill_journal_: FillsJournalBaseModel):
         key, symbol = StratCache.get_key_n_symbol_from_fill_journal(fill_journal_)
         if key is None or symbol is None:
-            logging.error(f"error: no ongoing pair strat matches this fill_journal_: {fill_journal_}")
+            logging.error(f"error: no ongoing pair strat matches this fill_journal_key: "
+                          f"{get_fills_journal_key(fill_journal_)};;; fill_journal_: {fill_journal_}")
             return
         strat_cache: StratCache = StratCache.get(key)
         if strat_cache is not None:
@@ -218,13 +227,16 @@ class TradingDataManager:
                 strat_cache.set_has_unack_leg2(False)
             else:
                 logging.error(f"unexpected: fills general with non-matching symbol found in pre-matched strat-cache "
-                              f"with key: {key}, fill journal symbol: {symbol}")
+                              f"with key: {key}, fill journal symbol: {symbol}, fill_journal_key: "
+                              f"{get_fills_journal_key(fill_journal_)}")
             if self.fill_journal_ws_cont.notify and cached_pair_strat is not None:
                 strat_cache.notify_semaphore.release()
             elif cached_pair_strat is None:
-                logging.error(f"error: no ongoing pair strat matches this fill_journal_: {fill_journal_}")
+                logging.error(f"error: no ongoing pair strat matches this fill_journal_key: "
+                              f"{get_fills_journal_key(fill_journal_)};;; fill_journal_: {fill_journal_}")
             # else not required - strat does not need this update notification
-            logging.debug(f"Updated fill_journal cache for key: {key} ;;; fill_journal: {fill_journal_}")
+            logging.debug(f"Updated fill_journal cache for key: {key}, fill_journal_key: "
+                          f"{get_fills_journal_key(fill_journal_)};;; fill_journal: {fill_journal_}")
         else:
             logging.error(f"error: no ongoing pair strat matches received fill journal: {fill_journal_}")
 
@@ -248,15 +260,18 @@ class TradingDataManager:
                 strat_cache.set_has_unack_leg2(is_unack)
             else:
                 logging.error(f"unexpected: order general with non-matching symbol found in pre-matched strat-cache "
-                              f"with key: {key}, order journal symbol: {order_journal_.order.security.sec_id}")
+                              f"with key: {key}, order_journal_key: {get_order_journal_key(order_journal_)}")
             if self.order_journal_ws_cont.notify and cached_pair_strat is not None:
                 strat_cache.notify_semaphore.release()
             elif cached_pair_strat is None:
-                logging.error(f"error: no ongoing pair strat matches this order_journal_: {order_journal_}")
+                logging.error(f"error: no ongoing pair strat matches this order_journal_key: "
+                              f"{get_order_journal_key(order_journal_)};;; order_journal_: {order_journal_}")
             # else not required - strat does not need this update notification
-            logging.debug(f"Updated order_journal cache for key: {key};;;order_journal: {order_journal_}")
+            logging.debug(f"Updated order_journal cache for key: {key}, order_journal_key: "
+                          f"{get_order_journal_key(order_journal_)};;;order_journal: {order_journal_}")
         else:
-            logging.error(f"error: no ongoing pair strat matches received order journal key: {key};;;"
+            logging.error(f"error: no ongoing pair strat matches received order journal key: {key}, "
+                          f"order_journal_key: {get_order_journal_key(order_journal_)};;;"
                           f"order_journal: {order_journal_}")
 
     def handle_cancel_order_ws(self, cancel_order_: CancelOrderBaseModel):
@@ -269,12 +284,17 @@ class TradingDataManager:
             if self.cancel_order_ws_cont.notify and cached_pair_strat is not None:
                 strat_cache.notify_semaphore.release()
             elif cached_pair_strat is None:
-                logging.error(f"error: cancel_order key: {key} matched strat_cache with None pair_strat ;;;"
+                logging.error(f"error: cancel_order key: {key} matched strat_cache with None pair_strat, "
+                              f"symbol_side_key: "
+                              f"{get_symbol_side_key([(cancel_order_.security.sec_id, cancel_order_.side)])} ;;;"
                               f"cancel_order: {cancel_order_}, strat_cache: {strat_cache}")
             # else not required - strat does not need this update notification
-            logging.debug(f"Updated cancel_order cache for key: {key} ;;; cancel_order: {cancel_order_}")
+            logging.debug(f"Updated cancel_order cache for key: {key}, symbol_side_key: "
+                          f"{get_symbol_side_key([(cancel_order_.security.sec_id, cancel_order_.side)])} ;;; "
+                          f"cancel_order: {cancel_order_}")
         else:
-            logging.error(f"error: no ongoing pair strat matches this cancel_order key: {key};;;"
+            logging.error(f"error: no ongoing pair strat matches this cancel_order key: {key} symbol_side_key: "
+                          f"{get_symbol_side_key([(cancel_order_.security.sec_id, cancel_order_.side)])};;; "
                           f"cancel_order: {cancel_order_}")
 
     def handle_new_order_ws(self, new_order_: NewOrderBaseModel):
@@ -287,13 +307,16 @@ class TradingDataManager:
             if self.new_order_ws_cont.notify and cached_pair_strat is not None:
                 strat_cache.notify_semaphore.release()
             elif cached_pair_strat is None:
-                logging.error(f"error: new_order_ key: {key}matched strat_cache with None pair_strat ;;;new_order_: "
-                              f"{new_order_}, strat_cache: {strat_cache}")
+                logging.error(f"error: new_order_ key: {key}matched strat_cache with None pair_strat, "
+                              f"symbol_side_key: "
+                              f"{get_symbol_side_key([(new_order_.security.sec_id, new_order_.side)])}"
+                              f";;;new_order_: {new_order_}, strat_cache: {strat_cache}")
             # else not required - strat does not need this update notification
             logging.debug(f"Updated new_order cache for key: {key};;;new_order_: {new_order_}")
         else:
-            logging.error(f"error: no ongoing pair strat matches this new_order_ key: {key};;;new_order_: "
-                          f"{new_order_}, strat_cache: {strat_cache}")
+            logging.error(f"error: no ongoing pair strat matches this new_order_ key: {key}, "
+                          f"symbol_side_key: {get_symbol_side_key([(new_order_.security.sec_id, new_order_.side)])}"
+                          f";;;new_order_: {new_order_}, strat_cache: {strat_cache}")
 
     def handle_symbol_overview_ws(self, symbol_overview_: SymbolOverviewBaseModel):
         if symbol_overview_.symbol in StratCache.fx_symbol_overview_dict:

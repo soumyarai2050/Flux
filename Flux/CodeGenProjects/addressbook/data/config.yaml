@@ -1,24 +1,217 @@
 mongo_server: "mongodb://localhost:27017"
-min_refresh_interval: 15
-is_test_run: True
-simulate_reverse_path: False
-#fill_percent: 100
 #log_mongo_uri: True
+min_refresh_interval: 20
+is_test_run: True
 # to run log analyzer in simulator mode
 #simulate_log_analyzer: True
 
-# to simulate rej functionality
-#simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
-#simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+symbol_configs:
+  CB_Sec_1:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
 
-# to simulate cxl-rej functionality
-#simulate_cxl_rej_orders: False
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
 
-# to simulate unsolicited cxl functionality
-#simulate_unsolicited_cxl_orders: False
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
 
-# count to be used in rej and cxl_rej simulations
-#continues_buy_count: 3
-#continues_buy_rej_count: 1
-#continues_sell_count: 3
-#continues_sell_rej_count: 2
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1
+
+  CB_Sec_2:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 2
+
+  CB_Sec_3:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1
+
+  CB_Sec_4:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1
+
+  CB_Sec_5:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1
+
+  EQT_Sec_1:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 2
+
+  EQT_Sec_2:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1
+
+  EQT_Sec_3:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1
+
+  EQT_Sec_4:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1
+
+  EQT_Sec_5:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1

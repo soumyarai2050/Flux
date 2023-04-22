@@ -254,15 +254,15 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_callback_query_example(self) -> str:
         output_str = ""
-        if self.query_message_dict:
+        if self.message_to_query_option_list_dict:
             output_str += f"\n"
             output_str += "    # Example: Soft API Query Interfaces\n"
             output_str += f"\n"
-        for message in self.query_message_dict:
+        for message in self.message_to_query_option_list_dict:
             msg_name = message.proto.name
             msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
 
-            aggregate_value_list = self.query_message_dict[message]
+            aggregate_value_list = self.message_to_query_option_list_dict[message]
 
             for aggregate_value in aggregate_value_list:
                 aggregate_var_name = aggregate_value[FastapiCallbackOverrideFileHandler.aggregate_var_name_key]

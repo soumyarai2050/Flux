@@ -63,8 +63,8 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                 # else not required: avoiding repetition
 
             if BeanieFastApiPlugin.flux_msg_json_query in str(message.proto.options):
-                if message not in self.query_message_dict:
-                    self.query_message_dict[message] = self.get_query_option_message_values(message)
+                if message not in self.message_to_query_option_list_dict:
+                    self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
                 # else not required: avoiding repetition
             # else not required: avoiding list append if msg is not having option for query
 

@@ -1248,29 +1248,34 @@ export function getTableRowsFromData(collections, data, xpath) {
     return rows;
 }
 
-export function getTableRows(collections, originalData, data, xpath) {
-    let originalDataTableRows = getTableRowsFromData(collections, addxpath(cloneDeep(originalData)), xpath);
-    let tableRows = getTableRowsFromData(collections, data, xpath);
-
-    // combine the original and modified data rows
-    for (let i = 0; i < originalDataTableRows.length; i++) {
-        if (i < tableRows.length) {
-            if (originalDataTableRows[i]['data-id'] !== tableRows[i]['data-id']) {
-                if (!tableRows.filter(row => row['data-id'] === originalDataTableRows[i]['data-id'])[0]) {
-                    let row = originalDataTableRows[i];
-                    row['data-remove'] = true;
-                    tableRows.splice(i, 0, row);
+export function getTableRows(collections, mode, originalData, data, xpath) {
+    let tableRows = [];
+    if (mode === Modes.READ_MODE) {
+        tableRows = getTableRowsFromData(collections, addxpath(cloneDeep(originalData)), xpath);
+    } else {
+        let originalDataTableRows = getTableRowsFromData(collections, addxpath(cloneDeep(originalData)), xpath);
+        tableRows = getTableRowsFromData(collections, data, xpath);
+    
+        // combine the original and modified data rows
+        for (let i = 0; i < originalDataTableRows.length; i++) {
+            if (i < tableRows.length) {
+                if (originalDataTableRows[i]['data-id'] !== tableRows[i]['data-id']) {
+                    if (!tableRows.filter(row => row['data-id'] === originalDataTableRows[i]['data-id'])[0]) {
+                        let row = originalDataTableRows[i];
+                        row['data-remove'] = true;
+                        tableRows.splice(i, 0, row);
+                    }
                 }
+            } else {
+                let row = originalDataTableRows[i];
+                row['data-remove'] = true;
+                tableRows.splice(i, 0, row);
             }
-        } else {
-            let row = originalDataTableRows[i];
-            row['data-remove'] = true;
-            tableRows.splice(i, 0, row);
         }
-    }
-    for (let i = 0; i < tableRows.length; i++) {
-        if (!originalDataTableRows.filter(row => row['data-id'] === tableRows[i]['data-id'])[0]) {
-            tableRows[i]['data-add'] = true;
+        for (let i = 0; i < tableRows.length; i++) {
+            if (!originalDataTableRows.filter(row => row['data-id'] === tableRows[i]['data-id'])[0]) {
+                tableRows[i]['data-add'] = true;
+            }
         }
     }
     return tableRows;

@@ -39,7 +39,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         # Since output file name for this plugin will be created at runtime
         self.output_file_name_suffix = ""
         self.root_message_list: List[protogen.Message] = []
-        self.query_message_dict: Dict[protogen.Message, List[Dict]] = {}
+        self.message_to_query_option_list_dict: Dict[protogen.Message, List[Dict]] = {}
         self.non_root_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
         self.fastapi_app_name: str = ""
@@ -77,8 +77,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 self.load_dependency_messages_and_enums_in_dicts(field.message)
 
                 if BaseFastapiPlugin.flux_msg_json_query in str(message.proto.options):
-                    if message not in self.query_message_dict:
-                        self.query_message_dict[message] = self.get_query_option_message_values(message)
+                    if message not in self.message_to_query_option_list_dict:
+                        self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
                     # else not required: avoiding repetition
                 # else not required: avoiding list append if msg is not having option for query
 
@@ -115,8 +115,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 # else not required: avoiding repetition
 
             if BaseFastapiPlugin.flux_msg_json_query in str(message.proto.options):
-                if message not in self.query_message_dict:
-                    self.query_message_dict[message] = self.get_query_option_message_values(message)
+                if message not in self.message_to_query_option_list_dict:
+                    self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
                 # else not required: avoiding repetition
             # else not required: avoiding list append if msg is not having option for query
 
@@ -126,7 +126,6 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         list_of_agg_value_dict = []
         options_list_of_dict = \
             self.get_complex_option_values_as_list_of_dict(message, BaseFastapiPlugin.flux_msg_json_query)
-        # print("##### ", options_list_of_dict)
         for option_dict in options_list_of_dict:
             agg_value_dict = {}
             agg_value_dict[BaseFastapiPlugin.aggregate_var_name_key] = \
@@ -135,6 +134,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                     BaseFastapiPlugin.flux_json_query_aggregate_params_field)) is not None:
                 aggregate_params_data_types = \
                     option_dict.get(BaseFastapiPlugin.flux_json_query_aggregate_params_data_type_field)
+                # if only one element exists in aggregate_params then it is received as single object so making it list
+                # same for aggregate_params_data_types
                 aggregate_params = aggregate_params if isinstance(aggregate_params, list) else [aggregate_params]
                 aggregate_params_data_types = aggregate_params_data_types \
                     if isinstance(aggregate_params_data_types, list) else [aggregate_params_data_types]

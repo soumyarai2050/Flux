@@ -1,5 +1,5 @@
 import logging
-from typing import ClassVar, List
+from typing import ClassVar, List, Dict
 from pendulum import DateTime
 
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import Security, \
@@ -8,55 +8,47 @@ from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBa
 
 
 class TradeSimulator(TradingLinkBase):
-    buy_order_counter: ClassVar[int] = 0
-    sell_order_counter: ClassVar[int] = 0
-    buy_rej_counter: ClassVar[int] = 0
-    sell_rej_counter: ClassVar[int] = 0
-    simulate_reverse_path: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_reverse_path") if TradingLinkBase.config_dict is not None else None
-    simulate_new_to_reject_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_new_to_reject_orders") if TradingLinkBase.config_dict is not None else None
-    simulate_ack_to_reject_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_ack_to_reject_orders") if TradingLinkBase.config_dict is not None else None
-    simulate_cxl_rej_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_cxl_rej_orders") if TradingLinkBase.config_dict is not None else None
-    simulate_unsolicited_cxl_orders: ClassVar[bool | None] = TradingLinkBase.config_dict.get("simulate_unsolicited_cxl_orders") if TradingLinkBase.config_dict is not None else None
-    fill_percent: ClassVar[int | None] = TradingLinkBase.config_dict.get("fill_percent") if TradingLinkBase.config_dict is not None else None
-    continues_buy_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_buy_count") if TradingLinkBase.config_dict is not None else None
-    continues_buy_rej_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_buy_rej_count") if TradingLinkBase.config_dict is not None else None
-    continues_sell_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_sell_count") if TradingLinkBase.config_dict is not None else None
-    continues_sell_rej_count: ClassVar[int | None] = TradingLinkBase.config_dict.get("continues_sell_rej_count") if TradingLinkBase.config_dict is not None else None
+    continuous_symbol_based_orders_counter: ClassVar[Dict | None] = {}
+    cxl_rej_symbol_to_bool_dict: ClassVar[Dict | None] = {}
+    symbol_configs: ClassVar[Dict | None] = TradingLinkBase.config_dict.get("symbol_configs") if TradingLinkBase.config_dict is not None else None
+
+    @classmethod
+    def reload_configs(cls):
+        cls.symbol_configs: ClassVar[Dict | None] = TradingLinkBase.config_dict.get("symbol_configs") \
+            if TradingLinkBase.config_dict is not None else None
 
     def __init__(self):
         pass
 
     @classmethod
-    def check_do_reject(cls, side: Side):
-        if side == Side.BUY:
-            if cls.continues_buy_count is not None and cls.continues_buy_rej_count is not None:
-                if cls.buy_order_counter < cls.continues_buy_count:
-                    cls.buy_order_counter += 1
-                    return False
-                else:
-                    if cls.buy_rej_counter < cls.continues_buy_rej_count:
-                        cls.buy_rej_counter += 1
-                        return True
-                    else:
-                        cls.buy_order_counter = 1
-                        cls.buy_rej_counter = 0
-                        return False
-            else:
-                return False
+    def is_special_order(cls, symbol: str) -> bool:
+
+        if symbol not in cls.continuous_symbol_based_orders_counter:
+            symbol_configs = cls.get_symbol_configs(symbol)
+            continuous_order_count = fetched_continuous_order_count \
+                if (fetched_continuous_order_count := symbol_configs.get("continues_order_count")) is not None else 1
+            continues_special_order_count = fetched_continues_special_order_count \
+                if (fetched_continues_special_order_count := symbol_configs.get("continues_special_order_count")) is not None else 0
+
+            cls.continuous_symbol_based_orders_counter[symbol] = {
+                "order_counter": 0,
+                "continues_order_count": continuous_order_count,
+                "special_order_counter": 0,
+                "continues_special_order_count": continues_special_order_count
+            }
+
+        if cls.continuous_symbol_based_orders_counter[symbol]["order_counter"] < \
+                cls.continuous_symbol_based_orders_counter[symbol]["continues_order_count"]:
+            cls.continuous_symbol_based_orders_counter[symbol]["order_counter"] += 1
+            return False
         else:
-            if cls.continues_sell_count is not None and cls.continues_sell_rej_count is not None:
-                if cls.sell_order_counter < cls.continues_sell_count:
-                    cls.sell_order_counter += 1
-                    return False
-                else:
-                    if cls.sell_rej_counter < cls.continues_sell_rej_count:
-                        cls.sell_rej_counter += 1
-                        return True
-                    else:
-                        cls.sell_order_counter = 1
-                        cls.sell_rej_counter = 0
-                        return False
+            if cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] < \
+                    cls.continuous_symbol_based_orders_counter[symbol]["continues_special_order_count"]:
+                cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] += 1
+                return True
             else:
+                cls.continuous_symbol_based_orders_counter[symbol]["order_counter"] = 1
+                cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] = 0
                 return False
 
     @classmethod
@@ -69,6 +61,12 @@ class TradeSimulator(TradingLinkBase):
               f"and side {order_journal.order.side}"
         add_to_texts(order_brief, msg)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
+
+    @classmethod
+    def get_symbol_configs(cls, symbol: str) -> Dict | None:
+        if cls.symbol_configs is not None:
+            return cls.symbol_configs.get(symbol)
+        return None
 
     @classmethod
     def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
@@ -91,19 +89,34 @@ class TradeSimulator(TradingLinkBase):
                                               order_event_date_time=create_date_time,
                                               order_event=OrderEventType.OE_NEW)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
-        if cls.simulate_reverse_path:
-            if cls.simulate_new_to_reject_orders and cls.check_do_reject(order_brief.side):
+
+        symbol_configs = cls.get_symbol_configs(system_sec_id)
+        if symbol_configs is not None and symbol_configs.get("simulate_reverse_path"):
+            if symbol_configs.get("simulate_new_to_reject_orders") and cls.is_special_order(system_sec_id):
                 cls.process_order_reject(order_brief)
+            elif symbol_configs.get("simulate_new_unsolicited_cxl_orders") and cls.is_special_order(system_sec_id):
+                cls.process_cxl_ack(order_brief)
             else:
                 cls.process_order_ack(order_id, order_brief.px, order_brief.qty, order_brief.side, system_sec_id,
                                       account)
         return True  # indicates order send success (send false otherwise)
 
     @classmethod
+    def get_partial_allowed_ack_qty(cls, symbol: str, qty: int):
+        symbol_configs = cls.get_symbol_configs(symbol)
+
+        if symbol_configs is not None:
+            if (ack_percent := symbol_configs.get("ack_percent")) is not None:
+                qty = int((ack_percent / 100) * qty)
+        return qty
+
+    @classmethod
     def process_order_ack(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
                           text: List[str] | None = None):
         """simulate order's Ack """
         security = Security(sec_id=sec_id)
+
+        qty = cls.get_partial_allowed_ack_qty(sec_id, qty)
         order_brief_obj = OrderBrief(order_id=order_id, security=security, side=side, px=px, qty=qty,
                                      underlying_account=underlying_account)
         msg = f"SIM: ACK received for {sec_id}, qty {qty} and px {px}"
@@ -114,31 +127,50 @@ class TradeSimulator(TradingLinkBase):
                                                   order_event_date_time=DateTime.utcnow(),
                                                   order_event=OrderEventType.OE_ACK)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal_obj)
-        if cls.simulate_reverse_path:
-            if cls.simulate_ack_to_reject_orders and cls.check_do_reject(side):
+
+        symbol_configs = cls.get_symbol_configs(sec_id)
+        if symbol_configs is not None and symbol_configs.get("simulate_reverse_path"):
+            if symbol_configs.get("simulate_ack_to_reject_orders") and cls.is_special_order(sec_id):
                 cls.process_order_reject(order_brief_obj)
-            elif cls.simulate_unsolicited_cxl_orders and cls.check_do_reject(side):
+            elif symbol_configs.get("simulate_ack_unsolicited_cxl_orders") and cls.is_special_order(sec_id):
                 cls.process_cxl_ack(order_brief_obj)
             else:
                 cls.process_fill(order_id, px, qty, side, sec_id, underlying_account)
+                if symbol_configs.get("simulate_cxl_rej_orders") and cls.is_special_order(sec_id):
+                    cls.cxl_rej_symbol_to_bool_dict[sec_id] = True
+                    cls.place_cxl_order(order_id, side, sec_id, sec_id, underlying_account)
 
     @classmethod
-    def get_partial_allowed_fill_qty(cls, qty: int):
-        qty = int((cls.fill_percent / 100) * qty)
+    def get_partial_qty_from_total_qty_and_percentage(cls, fill_percent: int, total_qty: int) -> int:
+        return int((fill_percent / 100) * total_qty)
+
+    @classmethod
+    def get_partial_allowed_fill_qty(cls, symbol: str, qty: int):
+        symbol_configs = cls.get_symbol_configs(symbol)
+
+        if symbol_configs is not None:
+            if (fill_percent := symbol_configs.get("fill_percent")) is not None:
+                qty = cls.get_partial_qty_from_total_qty_and_percentage(fill_percent, qty)
         return qty
 
     @classmethod
     def process_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
         """Simulates Order's fills"""
 
-        # simulate fill
-        if cls.fill_percent:
-            qty = cls.get_partial_allowed_fill_qty(qty)
-        fill_journal = FillsJournalBaseModel(order_id=order_id, fill_px=px, fill_qty=qty, fill_symbol=sec_id,
-                                             fill_side=side, underlying_account=underlying_account,
-                                             fill_date_time=DateTime.utcnow(),
-                                             fill_id=f"F{order_id[1:]}")
-        TradeSimulator.strat_manager_service_web_client.create_fills_journal_client(fill_journal)
+        symbol_configs = cls.get_symbol_configs(sec_id)
+        if symbol_configs is not None:
+            if (total_fill_count := symbol_configs.get("total_fill_count")) is None:
+                total_fill_count = 1
+        else:
+            total_fill_count = 1
+
+        qty = cls.get_partial_allowed_fill_qty(sec_id, qty)
+        for fill_count in range(total_fill_count):
+            fill_journal = FillsJournalBaseModel(order_id=order_id, fill_px=px, fill_qty=qty, fill_symbol=sec_id,
+                                                 fill_side=side, underlying_account=underlying_account,
+                                                 fill_date_time=DateTime.utcnow(),
+                                                 fill_id=f"F{order_id[1:]}")
+            TradeSimulator.strat_manager_service_web_client.create_fills_journal_client(fill_journal)
 
     @classmethod
     def process_cxl_rej(cls, order_brief: OrderBrief):
@@ -181,7 +213,8 @@ class TradeSimulator(TradingLinkBase):
                                               order_event=OrderEventType.OE_CXL)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
 
-        if cls.simulate_cxl_rej_orders and cls.check_do_reject(order_brief.side):
+        if system_sec_id in cls.cxl_rej_symbol_to_bool_dict and cls.cxl_rej_symbol_to_bool_dict.get(system_sec_id):
+            cls.cxl_rej_symbol_to_bool_dict[system_sec_id] = False
             cls.process_cxl_rej(order_brief)
         else:
             cls.process_cxl_ack(order_brief)

@@ -169,7 +169,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
     def _handle_client_query_url(self, message: protogen.Message):
         output_str = ""
 
-        aggregate_value_list = self.query_message_dict[message]
+        aggregate_value_list = self.message_to_query_option_list_dict[message]
 
         for aggregate_value in aggregate_value_list:
             aggregate_var_name = aggregate_value[FastapiClientFileHandler.aggregate_var_name_key]
@@ -185,7 +185,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         if message in self.root_message_list:
             output_str += self._handle_client_routes_url(message, message_name_snake_cased)
 
-        if message in self.query_message_dict:
+        if message in self.message_to_query_option_list_dict:
             output_str += self._handle_client_query_url(message)
 
         return output_str
@@ -194,21 +194,29 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         message_name = message.proto.name
 
         output_str = ""
-        aggregate_value_list = self.query_message_dict[message]
+        aggregate_value_list = self.message_to_query_option_list_dict[message]
         for aggregate_value in aggregate_value_list:
             aggregate_var_name = aggregate_value[FastapiClientFileHandler.aggregate_var_name_key]
             aggregate_params = aggregate_value[FastapiClientFileHandler.aggregate_params_key]
+            aggregate_params_types = aggregate_value[FastapiClientFileHandler.aggregate_params_data_types_key]
+
+            params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
+                                    for aggregate_param, aggregate_params_type in zip(aggregate_params,
+                                                                                      aggregate_params_types)])
 
             if aggregate_params:
-                output_str += " " * 4 + f"def {aggregate_var_name}_query_client(self, query_params: List[Any]) -> " \
+                output_str += " " * 4 + f"def {aggregate_var_name}_query_client(self, {params_str}) -> " \
                                         f"List[{message_name}]:\n"
+                params_dict_str = \
+                    ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in aggregate_params])
+                output_str += " " * 4 + "    query_params_dict = {"+f"{params_dict_str}"+"}\n"
                 output_str += " " * 4 + f"    return generic_http_query_client(self.query_{aggregate_var_name}_url, " \
-                                        f"query_params, {message_name}BaseModel)\n\n"
+                                        f"query_params_dict, {message_name}BaseModel)\n\n"
             else:
                 output_str += " " * 4 + f"def {aggregate_var_name}_query_client(self) -> " \
                                         f"List[{message_name}]:\n"
                 output_str += " " * 4 + f"    return generic_http_query_client(self.query_{aggregate_var_name}_url, " \
-                                        f"[], {message_name}BaseModel)\n\n"
+                                        "{}, "+f"{message_name}BaseModel)\n\n"
 
         return output_str
 
@@ -254,7 +262,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         if message in self.root_message_list:
             output_str += self._handle_client_route_methods(message)
 
-        if message in self.query_message_dict:
+        if message in self.message_to_query_option_list_dict:
             output_str += self._handle_client_query_methods(message)
 
         return output_str
@@ -285,14 +293,14 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         output_str += " "*4 + f'    self.host = {host} if host is None else host\n'
         output_str += " "*4 + f'    self.port = {port} if port is None else port\n\n'
         output_str += " "*4 + f'    # urls\n'
-        for message in self.root_message_list+list(self.query_message_dict):
+        for message in self.root_message_list+list(self.message_to_query_option_list_dict):
             output_str += self._handle_client_url_gen(message)
             output_str += "\n"
         output_str += f'    # interfaces\n'
         for message in self.root_message_list:
             output_str += self.handle_client_methods(message)
 
-        for message in list(self.query_message_dict):
+        for message in list(self.message_to_query_option_list_dict):
             if message not in self.root_message_list:
                 output_str += self.handle_client_methods(message)
             # else not required: root lvl message with query already executed in last loop

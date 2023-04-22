@@ -1,9 +1,5 @@
-import logging
-from typing import List, Tuple
+from typing import Tuple
 import sys
-import os
-from pendulum import DateTime
-from threading import Lock
 
 from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
@@ -67,8 +63,8 @@ async def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, aler
     with update_strat_status_lock:
         match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
         if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
-            logging.error(f"error: {alert_brief}; processing {sec_id}, side: {side} no viable pair_strat to report to"
-                          f";;; alert_details: {alert_details}")
+            logging.error(f"error: {alert_brief}; processing {get_symbol_side_key([(sec_id, side)])} "
+                          f"no viable pair_strat to report to;;; alert_details: {alert_details}")
             return
         else:
             pair_strat: PairStrat | None = None
@@ -86,23 +82,24 @@ async def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, aler
 async def get_single_exact_match_ongoing_strat_from_symbol_n_side(sec_id: str, side: Side) -> PairStrat | None:
     match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
     if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
-        logging.error(f"error: No viable pair_strat for symbol {sec_id}, side: {side}")
+        logging.error(f"error: No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
         return
     else:
         pair_strat: PairStrat | None = None
         if len(match_level_1_pair_strats) == 1:
             pair_strat = match_level_1_pair_strats[0]
         else:
-            logging.error(f"error: pair_strat should be found only one in match_lvl_1, "
-                          f"found {match_level_1_pair_strats}")
+            logging.error(f"error: processing {get_symbol_side_key([(sec_id, side)])} pair_strat should be "
+                          f"found only one in match_lvl_1, found {match_level_1_pair_strats}")
         if pair_strat is None:
             if len(match_level_2_pair_strats) == 1:
                 pair_strat = match_level_2_pair_strats[0]
-                logging.error(f"error: pair_strat should be found in level 1 only, when provided "
-                              f"symbol: {sec_id} and side: {side}")
+                logging.error(f"error: pair_strat should be found in level 1 only, symbol_side_key: "
+                              f"{get_symbol_side_key([(sec_id, side)])}")
             else:
                 logging.error(
-                    f"error: multiple ongoing pair strats matching symbol: {sec_id} & side: {side} found, one "
+                    f"error: multiple ongoing pair strats matching symbol_side_key: "
+                    f"{get_symbol_side_key([(sec_id, side)])} found, one "
                     f"match expected, found: {len(match_level_1_pair_strats)}")
         return pair_strat
 
@@ -311,23 +308,55 @@ def create_order_limits():
     strat_manager_service_web_client_internal.create_order_limits_client(ord_limit_obj)
 
 
+def get_symbol_side_key(symbol_side_tuple_list: List[Tuple[str, str]]) -> str:
+    key_str = ",".join([f"symbol-side={symbol}-{side}" for symbol, side in symbol_side_tuple_list])
+    return f"%%{key_str}%%"
+
+
 def get_pair_strat_key(pair_strat: PairStrat | PairStratBaseModel | PairStratOptional):
-    return f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}-" \
-           f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}-{pair_strat.id}"
+    leg_1_sec_id = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+    leg_1_side = pair_strat.pair_strat_params.strat_leg1.side
+    leg_2_sec_id = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+    leg_2_side = pair_strat.pair_strat_params.strat_leg2.side
+    symbol_side_key = get_symbol_side_key([(leg_1_sec_id, leg_1_side), (leg_2_sec_id, leg_2_side)])
+    return f"{leg_1_sec_id}-{leg_2_sec_id}-{pair_strat.id} {symbol_side_key}"
+
+
+def get_strat_brief_key(strat_brief: StratBrief | StratBriefBaseModel | StratBriefOptional):
+    buy_sec_id = strat_brief.pair_buy_side_trading_brief.security.sec_id
+    buy_side = strat_brief.pair_buy_side_trading_brief.side
+    sell_sec_id = strat_brief.pair_sell_side_trading_brief.security.sec_id
+    sell_side = strat_brief.pair_sell_side_trading_brief.side
+    symbol_side_key = get_symbol_side_key([(buy_sec_id, buy_side), (sell_sec_id, sell_side)])
+    return f"{symbol_side_key}-{strat_brief.id}"
 
 
 def get_order_journal_key(order_journal: OrderJournal | OrderJournalBaseModel | OrderJournalOptional):
-    return f"{order_journal.order.security.sec_id}-{order_journal.order.side}" \
-           f"{order_journal.order.order_id}"
+    sec_id = order_journal.order.security.sec_id
+    side = order_journal.order.side
+    symbol_side_key = get_symbol_side_key([(sec_id, side)])
+    return f"{symbol_side_key}-{order_journal.order.order_id}"
+
+
+def get_fills_journal_key(fills_journal: FillsJournal | FillsJournalBaseModel | FillsJournalOptional):
+    sec_id = fills_journal.fill_symbol
+    side = fills_journal.fill_side
+    symbol_side_key = get_symbol_side_key([(sec_id, side)])
+    return f"{symbol_side_key}-{fills_journal.fill_id}"
 
 
 def get_order_snapshot_key(order_snapshot: OrderSnapshot | OrderSnapshotBaseModel | OrderSnapshotOptional):
-    return f"{order_snapshot.order_brief.security.sec_id}-{order_snapshot.order_brief.side}" \
-           f"{order_snapshot.order_brief.order_id}-{order_snapshot.order_status}"
+    sec_id = order_snapshot.order_brief.security.sec_id
+    side = order_snapshot.order_brief.side
+    symbol_side_key = get_symbol_side_key([(sec_id, side)])
+    return f"{symbol_side_key}-{order_snapshot.order_brief.order_id}-{order_snapshot.order_status}"
 
 
 def get_symbol_side_snapshot_key(symbol_side_snapshot: SymbolSideSnapshot | SymbolSideSnapshotBaseModel | SymbolSideSnapshotOptional):
-    return f"{symbol_side_snapshot.security.sec_id}-{symbol_side_snapshot.side}"
+    sec_id = symbol_side_snapshot.security.sec_id
+    side = symbol_side_snapshot.side
+    symbol_side_key = get_symbol_side_key([(sec_id, side)])
+    return f"{symbol_side_key}"
 
 
 def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:
@@ -366,6 +395,6 @@ def get_consumable_participation_qty(
 def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_period_seconds: int,
                                           max_participation_rate: float) -> int:
     last_n_sec_trade_qty_and_order_qty_sum_obj_list: List[ExecutorCheckSnapshot] = \
-        strat_manager_service_web_client_internal.get_executor_check_snapshot_query_client(
-            [symbol, side, applicable_period_seconds])
+        strat_manager_service_web_client_internal.get_executor_check_snapshot_query_client(symbol, side,
+                                                                                           applicable_period_seconds)
     return get_consumable_participation_qty(last_n_sec_trade_qty_and_order_qty_sum_obj_list, max_participation_rate)
