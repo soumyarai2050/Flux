@@ -62,7 +62,7 @@ def test_place_sanity_orders(buy_sell_symbol_list, pair_strat_, expected_strat_l
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
@@ -324,7 +324,7 @@ def test_simulated_partial_fills(buy_sell_symbol_list, pair_strat_, expected_str
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     partial_filled_qty: int | None = None
     unfilled_amount: int | None = None
@@ -404,7 +404,7 @@ def test_multiple_partial_fills(buy_sell_symbol_list, pair_strat_, expected_stra
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     partial_filled_qty: int | None = None
     unfilled_amount: int | None = None
@@ -487,7 +487,7 @@ def test_filled_status(buy_sell_symbol_list, pair_strat_, expected_strat_limits_
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
@@ -541,7 +541,7 @@ def test_over_fill_case_1(buy_sell_symbol_list, pair_strat_, expected_strat_limi
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
@@ -610,7 +610,7 @@ def test_over_fill_case_2(buy_sell_symbol_list, pair_strat_, expected_strat_limi
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
@@ -928,7 +928,7 @@ def test_last_n_sec_order_qty_sum_and_order_count(buy_sell_symbol_list, pair_str
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
@@ -954,11 +954,12 @@ def test_last_n_sec_order_qty_sum_and_order_count(buy_sell_symbol_list, pair_str
                                                                             buy_symbol, last_order_id=buy_new_order_id)
         buy_new_order_id = ack_order_journal.order.order_id
         order_create_time_list.append(ack_order_journal.order_event_date_time)
+        time.sleep(2)
 
     order_create_time_list.reverse()
     for loop_count in range(total_order_count_for_each_side):
         delta = DateTime.utcnow() - order_create_time_list[loop_count]
-        last_n_sec = int(math.ceil(delta.total_seconds()))
+        last_n_sec = int(math.ceil(delta.total_seconds())) + 1
 
         # making portfolio_limits_obj.rolling_max_order_count.rolling_tx_count_period_seconds computed last_n_sec(s)
         # this is required as rolling_new_order_count takes internally this limit as last_n_sec to provide counts
@@ -999,7 +1000,7 @@ def test_acked_unsolicited_cxl(buy_sell_symbol_list, pair_strat_, expected_strat
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     handle_unsolicited_cxl(buy_sell_symbol_list, expected_strat_limits_, expected_start_status_, pair_strat_,
                            symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
@@ -1022,7 +1023,7 @@ def test_unacked_unsolicited_cxl(buy_sell_symbol_list, pair_strat_, expected_str
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     handle_unsolicited_cxl(buy_sell_symbol_list, expected_strat_limits_, expected_start_status_, pair_strat_,
                            symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
@@ -1086,7 +1087,7 @@ def test_cxl_order_cxl_confirmed_status(buy_sell_symbol_list, pair_strat_, expec
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
@@ -1183,7 +1184,7 @@ def test_partial_ack(config_dict, pair_strat_, expected_strat_limits_, top_of_bo
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     partial_ack_qty: int | None = None
     unacked_qty: int | None = None
@@ -1296,7 +1297,7 @@ def test_post_unack_unsol_cxl(buy_sell_symbol_list, pair_strat_, expected_strat_
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
@@ -1367,7 +1368,7 @@ def test_strat_pause_on_residual_notional_breach(buy_sell_symbol_list, pair_stra
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     expected_strat_limits_.residual_restriction.max_residual = 0
     underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,

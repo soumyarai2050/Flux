@@ -341,12 +341,18 @@ class StratExecutor:
         consumable_participation_qty: int = get_consumable_participation_qty_http \
             (system_symbol, side, self.strat_limit.market_trade_volume_participation.applicable_period_seconds,
              self.strat_limit.market_trade_volume_participation.max_participation_rate)
-
-        if consumable_participation_qty - qty < 0:
-            logging.error(f"blocked generated order, not enough consumable_participation_qty available, "
-                          f"expected higher than order qty: {qty}, found {consumable_participation_qty} for "
-                          f"strat_cache: {self.strat_cache.get_key()}, strat_brief: "
-                          f"{get_strat_brief_key(strat_brief)}")
+        if consumable_participation_qty is not None:
+            if consumable_participation_qty - qty < 0:
+                logging.error(f"blocked generated order, not enough consumable_participation_qty available, "
+                              f"expected higher than order qty: {qty}, found {consumable_participation_qty} for "
+                              f"strat_cache: {self.strat_cache.get_key()}, strat_brief: "
+                              f"{get_strat_brief_key(strat_brief)}")
+                check_passed = False
+            # else check passed - no action
+        else:
+            logging.error(f"Received consumable_participation_qty as None from get_consumable_participation_qty_http, "
+                          f"strat_brief_key: {get_strat_brief_key(strat_brief)}, could not check "
+                          f"available consumable_participation_qty")
             check_passed = False
 
         return check_passed

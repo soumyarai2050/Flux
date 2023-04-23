@@ -230,7 +230,7 @@ def test_px_check_if_tob_none(buy_sell_symbol_list, pair_strat_, expected_strat_
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
@@ -569,11 +569,59 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(buy_sell_symbol_list, 
                                                                   check_str, assert_fail_message)
 
 
-def test_strat_limits_with_low_consumable_participation_qty(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
-                                                            expected_start_status_, symbol_overview_obj_list,
-                                                            last_trade_fixture_list, market_depth_basemodel_list,
-                                                            top_of_book_list_, buy_order_, sell_order_,
-                                                            max_loop_count_per_side, residual_wait_sec, config_dict):
+def test_strat_limits_with_negative_consumable_participation_qty(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                                                                 expected_start_status_, symbol_overview_obj_list,
+                                                                 last_trade_fixture_list, market_depth_basemodel_list,
+                                                                 top_of_book_list_, buy_order_, sell_order_,
+                                                                 max_loop_count_per_side, residual_wait_sec, config_dict):
+    # updating yaml_configs according to this test
+    for symbol in config_dict["symbol_configs"]:
+        config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+        config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+    update_yaml_configurations(config_dict, str(config_file_path))
+
+    # delay to manually start addressbook_log_analyzer.py
+    time.sleep(30)
+
+    # reloading configs in TradeSimulator
+    TradeSimulator.reload_symbol_configs()
+
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                       expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                       market_depth_basemodel_list)
+
+    # buy test
+    loop_count = 1
+    run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_, is_non_systematic_run=True)
+
+    # placing new non-systematic new_order
+    px = 100
+    qty = 90
+    place_new_order(buy_symbol, Side.BUY, px, qty)
+
+    placed_new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol)
+
+    # making last trade unavailable to next order call to make consumable_participation_qty negative
+    last_order_obj_list = market_data_web_client.get_all_last_trade_client()
+    for last_order_obj in last_order_obj_list:
+        market_data_web_client.delete_last_trade_client(last_order_obj.id)
+
+    check_str = "blocked generated order, not enough consumable_participation_qty available"
+    assert_fail_message = "Could not find any alert containing message to block orders due to low " \
+                          "consumable_participation_qty"
+    handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                  check_str, assert_fail_message,
+                                                                  last_order_id=placed_new_order_journal.order.order_id)
+
+
+def test_strat_limits_with_0_consumable_participation_qty(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                                                          expected_start_status_, symbol_overview_obj_list,
+                                                          last_trade_fixture_list, market_depth_basemodel_list,
+                                                          top_of_book_list_, buy_order_, sell_order_,
+                                                          max_loop_count_per_side, residual_wait_sec, config_dict):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
 
@@ -607,6 +655,45 @@ def test_strat_limits_with_low_consumable_participation_qty(buy_sell_symbol_list
                                                                   check_str, assert_fail_message)
 
 
+def test_strat_limits_with_low_consumable_participation_qty(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+                                                            expected_start_status_, symbol_overview_obj_list,
+                                                            last_trade_fixture_list, market_depth_basemodel_list,
+                                                            top_of_book_list_, buy_order_, sell_order_,
+                                                            max_loop_count_per_side, residual_wait_sec, config_dict):
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    # Creating Strat
+    active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
+                                                copy.deepcopy(expected_strat_limits_),
+                                                copy.deepcopy(expected_start_status_))
+    # running symbol_overview
+    run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
+
+    # creating market_depth
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list)
+
+    # Adding strat in strat_collection
+    create_if_not_exists_and_validate_strat_collection(active_pair_strat)
+
+    # buy test
+    loop_count = 1
+    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, create_counts_per_side=1)
+    run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_, is_non_systematic_run=True)
+
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    # placing new non-systematic new_order
+    px = 100
+    qty = 90
+    check_str = "blocked generated order, not enough consumable_participation_qty available"
+    assert_fail_message = "Could not find any alert containing message to block orders due to low " \
+                          "consumable_participation_qty"
+    handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
+                                                                  check_str, assert_fail_message)
+
+
 # portfolio limits checks
 def test_portfolio_limits_rolling_new_order_breach(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                    expected_start_status_, symbol_overview_obj_list,
@@ -623,7 +710,7 @@ def test_portfolio_limits_rolling_new_order_breach(buy_sell_symbol_list, pair_st
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                              expected_start_status_, symbol_overview_obj_list,

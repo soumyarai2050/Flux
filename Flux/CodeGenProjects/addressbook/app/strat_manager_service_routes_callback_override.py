@@ -1336,12 +1336,19 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 underlying_get_executor_check_snapshot_query_http
             applicable_period_second = \
                 pair_strat_obj.strat_limits.market_trade_volume_participation.applicable_period_seconds
-            last_n_sec_trade_qty_and_order_qty_sum_obj_list = \
+            executor_check_snapshot_list = \
                 await underlying_get_executor_check_snapshot_query_http(symbol, side,
                                                                         applicable_period_second)
-            indicative_consumable_participation_qty = \
-                get_consumable_participation_qty(last_n_sec_trade_qty_and_order_qty_sum_obj_list,
-                                                 pair_strat_obj.strat_limits.market_trade_volume_participation.max_participation_rate)
+            if len(executor_check_snapshot_list) == 1:
+                indicative_consumable_participation_qty = \
+                    get_consumable_participation_qty(executor_check_snapshot_list,
+                                                     pair_strat_obj.strat_limits.market_trade_volume_participation.max_participation_rate)
+            else:
+                logging.error("Received unexpected length of executor_check_snapshot_list from query "
+                              f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
+                              f"{get_symbol_side_key([(symbol, side)])}, likely bug in "
+                              f"get_executor_check_snapshot_query pre implementation")
+                indicative_consumable_participation_qty = 0
             residual_qty = 0
             indicative_consumable_residual = pair_strat_obj.strat_limits.residual_restriction.max_residual
             all_bkr_cxlled_qty = 0
@@ -1720,14 +1727,22 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                                      symbol_side_snapshot.total_cxled_qty
                 applicable_period_second = \
                     pair_strat_obj.strat_limits.market_trade_volume_participation.applicable_period_seconds
-                last_n_sec_trade_qty_and_order_qty_sum_obj_list = \
+                executor_check_snapshot_list = \
                     await underlying_get_executor_check_snapshot_query_http(symbol, side,
                                                                             applicable_period_second)
-                participation_period_order_qty_sum = \
-                    last_n_sec_trade_qty_and_order_qty_sum_obj_list[0].last_n_sec_order_qty
-                indicative_consumable_participation_qty = \
-                    get_consumable_participation_qty(last_n_sec_trade_qty_and_order_qty_sum_obj_list,
-                                                     pair_strat_obj.strat_limits.market_trade_volume_participation.max_participation_rate)
+                if len(executor_check_snapshot_list) == 1:
+                    participation_period_order_qty_sum = \
+                        executor_check_snapshot_list[0].last_n_sec_order_qty
+                    indicative_consumable_participation_qty = \
+                        get_consumable_participation_qty(executor_check_snapshot_list,
+                                                         pair_strat_obj.strat_limits.market_trade_volume_participation.max_participation_rate)
+                else:
+                    logging.error("Received unexpected length of executor_check_snapshot_list from query "
+                                  f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
+                                  f"{get_symbol_side_key([(symbol, side)])}, likely bug in "
+                                  f"get_executor_check_snapshot_query pre implementation")
+                    indicative_consumable_participation_qty = 0
+                    participation_period_order_qty_sum = 0
 
                 updated_pair_side_brief_obj = \
                     PairSideTradingBrief(security=security, side=side,
@@ -2181,7 +2196,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
                 last_n_sec_trade_qty = last_n_sec_market_trade_vol_obj_list[0].last_n_sec_trade_vol
             else:
                 logging.error(f"could not receive any last_n_sec_market_trade_vol_obj to get last_n_sec_trade_qty "
-                              f"for symbol_side_key: {get_symbol_side_key([(symbol, side)])}")
+                              f"for symbol_side_key: {get_symbol_side_key([(symbol, side)])}, likely bug in "
+                              f"get_last_n_sec_total_qty_query pre impl")
         return last_n_sec_trade_qty
 
     async def get_rolling_new_order_count(self, symbol: str) -> int | None:
@@ -2226,13 +2242,15 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
         if last_n_sec_order_qty is not None and \
                 last_n_sec_trade_qty is not None and \
                 rolling_new_order_count is not None:
-
+            # if no data is found by respective queries then all fields are set to 0 and every call returns
+            # executor_check_snapshot object (except when exception occurs)
             executor_check_snapshot = \
                 ExecutorCheckSnapshot(last_n_sec_trade_qty=last_n_sec_trade_qty,
                                       last_n_sec_order_qty=last_n_sec_order_qty,
                                       rolling_new_order_count=rolling_new_order_count)
             return [executor_check_snapshot]
         else:
+            # will only return [] if some error occurred
             logging.error(f"symbol_side_key: {get_symbol_side_key([(symbol, side)])}, "
                           f"Received last_n_sec_order_qty - {last_n_sec_order_qty}, "
                           f"last_n_sec_trade_qty - {last_n_sec_trade_qty}, "

@@ -383,18 +383,30 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
 
 def get_consumable_participation_qty(
         executor_check_snapshot_obj_list: List[ExecutorCheckSnapshot],
-        max_participation_rate: float) -> int:
-    executor_check_snapshot_obj = executor_check_snapshot_obj_list[0]
-    participation_period_order_qty_sum = executor_check_snapshot_obj.last_n_sec_order_qty
-    participation_period_last_trade_qty_sum = executor_check_snapshot_obj.last_n_sec_trade_qty
+        max_participation_rate: float) -> int | None:
+    if len(executor_check_snapshot_obj_list) == 1:
+        executor_check_snapshot_obj = executor_check_snapshot_obj_list[0]
+        participation_period_order_qty_sum = executor_check_snapshot_obj.last_n_sec_order_qty
+        participation_period_last_trade_qty_sum = executor_check_snapshot_obj.last_n_sec_trade_qty
 
-    return int(((participation_period_last_trade_qty_sum / 100) *
-                max_participation_rate) - participation_period_order_qty_sum)
+        return int(((participation_period_last_trade_qty_sum / 100) *
+                    max_participation_rate) - participation_period_order_qty_sum)
+    else:
+        logging.error(f"Received executor_check_snapshot_obj_list with length {len(executor_check_snapshot_obj_list)}"
+                      f" expected 1")
+        return None
 
 
 def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_period_seconds: int,
-                                          max_participation_rate: float) -> int:
-    last_n_sec_trade_qty_and_order_qty_sum_obj_list: List[ExecutorCheckSnapshot] = \
+                                          max_participation_rate: float) -> int | None:
+    executor_check_snapshot_list: List[ExecutorCheckSnapshot] = \
         strat_manager_service_web_client_internal.get_executor_check_snapshot_query_client(symbol, side,
                                                                                            applicable_period_seconds)
-    return get_consumable_participation_qty(last_n_sec_trade_qty_and_order_qty_sum_obj_list, max_participation_rate)
+    if len(executor_check_snapshot_list) == 1:
+        return get_consumable_participation_qty(executor_check_snapshot_list, max_participation_rate)
+    else:
+        logging.error("Received unexpected length of executor_check_snapshot_list from query "
+                      f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
+                      f"{get_symbol_side_key([(symbol, side)])}, likely bug in "
+                      f"get_executor_check_snapshot_query pre implementation")
+        return

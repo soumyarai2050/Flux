@@ -959,11 +959,13 @@ def run_sell_top_of_book(sell_symbol: str, is_non_systematic_run: bool | None = 
     _update_tob(sell_stored_tob, px, Side.SELL)
 
 
-def run_last_trade(buy_symbol: str, sell_symbol: str, last_trade_json_list: List[Dict]):
-    obj_count = 20
+def run_last_trade(buy_symbol: str, sell_symbol: str, last_trade_json_list: List[Dict],
+                   create_counts_per_side: int | None = None):
+    if create_counts_per_side is None:
+        create_counts_per_side = 20
     symbol_list = [buy_symbol, sell_symbol]
     for index, last_trade_json in enumerate(last_trade_json_list):
-        for _ in range(obj_count):
+        for _ in range(create_counts_per_side):
             last_trade_obj = LastTradeBaseModel(**last_trade_json)
             last_trade_obj.symbol = symbol_list[index]
             last_trade_obj.time = DateTime.utcnow()
@@ -1763,7 +1765,6 @@ def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
 
-    # explicitly setting waived_min_orders to 10 for this test case
     create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
                                        market_depth_basemodel_list)
@@ -1834,7 +1835,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty(buy_sell_symbol_list,
     time.sleep(30)
 
     # reloading configs in TradeSimulator
-    TradeSimulator.reload_configs()
+    TradeSimulator.reload_symbol_configs()
 
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]

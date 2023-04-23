@@ -1,5 +1,7 @@
 import logging
 from typing import ClassVar, List, Dict
+import re
+
 from pendulum import DateTime
 
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import Security, \
@@ -7,15 +9,39 @@ from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_impo
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, add_to_texts
 
 
+def init_symbol_configs():
+    symbol_configs: Dict | None = TradingLinkBase.config_dict.get("symbol_configs") \
+        if TradingLinkBase.config_dict is not None else None
+    if symbol_configs:
+        regex_symbol_configs: Dict = {re.compile(k, re.IGNORECASE): v for k, v in symbol_configs.items()}
+        return regex_symbol_configs
+
+
 class TradeSimulator(TradingLinkBase):
     continuous_symbol_based_orders_counter: ClassVar[Dict | None] = {}
     cxl_rej_symbol_to_bool_dict: ClassVar[Dict | None] = {}
-    symbol_configs: ClassVar[Dict | None] = TradingLinkBase.config_dict.get("symbol_configs") if TradingLinkBase.config_dict is not None else None
+    symbol_configs: ClassVar[Dict | None] = init_symbol_configs()
 
     @classmethod
-    def reload_configs(cls):
-        cls.symbol_configs: ClassVar[Dict | None] = TradingLinkBase.config_dict.get("symbol_configs") \
-            if TradingLinkBase.config_dict is not None else None
+    def reload_symbol_configs(cls):
+        cls.symbol_configs = init_symbol_configs()
+
+    @classmethod
+    def get_symbol_configs(cls, symbol: str) -> Dict | None:
+        """ WARNING : SLOW FUNCTION to be used only on simulator or non-critical path"""
+        found_symbol_config_list: List = []
+        if cls.symbol_configs is not None:
+            for k, v in cls.symbol_configs.items():
+                if k.match(symbol):
+                    found_symbol_config_list.append(v)
+            if found_symbol_config_list:
+                if len(found_symbol_config_list) == 1:
+                    return found_symbol_config_list[0]
+                else:
+                    logging.error(f"bad configuration : multiple symbol matches found for passed symbol: {symbol};;;"
+                                  f"found_symbol_configurations: "
+                                  f"{[str(found_symbol_config) for found_symbol_config in found_symbol_config_list]}")
+        return None
 
     def __init__(self):
         pass
@@ -61,12 +87,6 @@ class TradeSimulator(TradingLinkBase):
               f"and side {order_journal.order.side}"
         add_to_texts(order_brief, msg)
         TradeSimulator.strat_manager_service_web_client.create_order_journal_client(order_journal)
-
-    @classmethod
-    def get_symbol_configs(cls, symbol: str) -> Dict | None:
-        if cls.symbol_configs is not None:
-            return cls.symbol_configs.get(symbol)
-        return None
 
     @classmethod
     def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
