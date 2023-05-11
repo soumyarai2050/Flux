@@ -83,20 +83,24 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
 
     def handle_init_db(self) -> str:
         root_msg_list = [message.proto.name for message in self.root_message_list]
-        model_names = ", ".join(root_msg_list)
-        output_str = "async def init_db():\n"
+        output_str = "def get_mongo_server_uri():\n"
         output_str += '    config_file_path: PurePath = PurePath(__file__).parent.parent / "data" / "config.yaml"\n'
         output_str += '    config_dict = load_yaml_configurations(str(config_file_path))\n'
         output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := ' \
                       'config_dict.get("mongo_server")) is None else mongo_env\n'
         output_str += '    if config_dict.get("log_mongo_uri", True):\n'
         output_str += '        logging.debug(f"mongo_server: {mongo_server}")\n'
-        output_str += f'    if (db_name := os.getenv("DB_NAME")) is not None:\n'
+        output_str += '    if (db_name := os.getenv("DB_NAME")) is not None:\n'
         output_str += '        mongo_server += f"/{db_name}?authSource=admin"\n'
-        output_str += f'        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server, tz_aware=True)\n'
+        output_str += '    return mongo_server\n\n'
+        output_str += "\n"
+        model_names = ", ".join(root_msg_list)
+        output_str += "async def init_db():\n"
+        output_str += '    mongo_server = get_mongo_server_uri()\n'
+        output_str += '    client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server, tz_aware=True)\n'
+        output_str += f'    if (db_name := os.getenv("DB_NAME")) is not None:\n'
         output_str += f'        db = client.get_default_database()\n'
         output_str += f'    else:\n'
-        output_str += f'        client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server, tz_aware=True)\n'
         output_str += f'        db = client.{self.proto_file_package}\n'
         output_str += '    logging.debug(f"db_name: {db_name}")\n'
         output_str += f'    await init_beanie(\n'

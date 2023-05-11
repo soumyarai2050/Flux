@@ -18,7 +18,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     """
     Plugin script to generate jsx file for ORM root messages
     -- Generated for all Json Root messages
-    ----- 1. Independent Case - Json Root message (some special treatment for uiLayout message)
+    ----- 1. Independent Case - Json Root message (some special treatment for uiLayout message and
+                                                   dependent widget message of abbreviated widget message)
     ----- 2. Dependent Case - Json Root message and layout as option set to any of the field type of it
     ----- 3. Abbreviated Case - Json Root message and having relationship as field contains abbreviated option
                                 having message name which is dependent on current message
@@ -86,6 +87,37 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 # else not required: Avoid if field doesn't contain abbreviated option
             else:
                 self.independent_message_list.append(message)
+
+        # handling for abbreviated message's dependent message is done specifically in dependent case
+        # removing abbreviated message's dependent message if present in independent_message_list and shifting to
+        # dependent_message_list
+        for abb_dependent_message_name in self.dependent_to_abbreviated_message_relation_dict:
+            for message in self.independent_message_list:
+                if message.proto.name == abb_dependent_message_name:
+                    abb_dependent_message = message
+                    self.independent_message_list.remove(abb_dependent_message)
+                    self.dependent_message_list.append(abb_dependent_message)
+
+        # checking if any field of abb_dependent_message is not of type of message having
+        # widget_ui_data option enabled, raises exception if is found
+        for dependent_message in self.dependent_message_list:
+            if dependent_message.proto.name in self.dependent_to_abbreviated_message_relation_dict:
+                if JsSliceFileGenPlugin.flux_msg_widget_ui_data in str(dependent_message.proto.options):
+                    for field in dependent_message.fields:
+                        if field.message is not None:
+                            if JsSliceFileGenPlugin.flux_msg_widget_ui_data in str(field.message.proto.options):
+                                err_str = "Dependent message of Abbreviated widget type message if is having " \
+                                          "widget_ui_data option enabled then none of the fields of this message can be of" \
+                                          "message type that also has widget_ui_data option enabled, currently message " \
+                                          f"{dependent_message.proto.name} which is dependent message of abbreviated type" \
+                                          f"{self.dependent_to_abbreviated_message_relation_dict.get(dependent_message.proto.name)}" \
+                                          f" has field {field.proto.name} of message type {field.message.proto.name} having " \
+                                          f"widget_ui_data option enabled; please carefully check for remaining fields of " \
+                                          f"this message for same issue"
+                                logging.exception(err_str)
+                                raise Exception(err_str)
+                # else not required: if abbreviated message's dependent message is not having widget_ui_data option
+                # then it is allowed to have fields of message type having widget_ui_data
 
     def handle_import_output(self, message: protogen.Message) -> str:
         output_str = "/* redux and third-party library imports */\n"
@@ -184,18 +216,18 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/" \
                              f"create', (payload, "+"{ dispatch, getState, rejectWithValue }) => " + "{\n"
                 output_str += "    let { data, abbreviated, loadedKeyName } = payload;\n"
-                output_str += "    abbreviated = abbreviated.substring(0, abbreviated.indexOf('$'));\n"
+                output_str += "    abbreviated = abbreviated.split('$')[0];\n"
                 output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + \
                               "`, data)\n"
                 output_str += "        .then(res => {\n"
                 output_str += "            let state = getState();\n"
                 output_str += f"            let updatedData = cloneDeep(state.{dependent_message_name_camel_cased}" \
                               f".{dependent_message_name_camel_cased});\n"
-                output_str += f"            let newStrat = res.data;\n"
-                output_str += "            let newStratKey = abbreviated.split('-').map(xpath => _.get(newStrat, " \
+                output_str += f"            let newObject = res.data;\n"
+                output_str += "            let newObjectKey = abbreviated.split('-').map(xpath => _.get(newObject, " \
                               "xpath.substring(xpath.indexOf('.') + 1)));\n"
-                output_str += "            newStratKey = newStratKey.join('-');\n"
-                output_str += "            _.get(updatedData, loadedKeyName).push(newStratKey);\n"
+                output_str += "            newObjectKey = newObjectKey.join('-');\n"
+                output_str += "            _.get(updatedData, loadedKeyName).push(newObjectKey);\n"
                 output_str += f"            dispatch(update{dependent_message_name}("+"updatedData));\n"
                 output_str += "            return res.data;\n"
                 output_str += "        })\n"

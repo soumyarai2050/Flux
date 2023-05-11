@@ -22,9 +22,15 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
-    def _handle_field_data_manipulation(self, json_content: Dict, message: protogen.Message, id_str: str | None = None,
-                                        single_field: bool | None = False):
-        if not single_field:
+    def _handle_field_data_manipulation(self, json_content: Dict, message: protogen.Message, id_str: str | None = None):
+        # checking if all simple fields are present in message
+        all_simple_fields = True
+        for field in message.fields:
+            if field.message is not None:
+                all_simple_fields = False
+                break
+
+        if not all_simple_fields:
             temp_str = ""
             for field in message.fields:
                 if BaseFastapiPlugin.default_id_field_name == field.proto.name:
@@ -123,7 +129,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'        logging.debug(f"{first_msg_name} From Ui: ' + '{' + \
                       f'{first_msg_name_snake_cased}_obj' + '}' + '")\n'
         output_str += f'        {first_msg_name_snake_cased}_obj.' \
-                      f'{self._handle_field_data_manipulation(json_sample_content, required_root_msg[0], single_field=True)}\n'
+                      f'{self._handle_field_data_manipulation(json_sample_content, required_root_msg[0])}\n'
         output_str += f'        logging.debug(f"{first_msg_name} pre test: ' + '{' + \
                       f'{first_msg_name_snake_cased}_obj' + '}' + '")\n\n'
         output_str += f'    async def create_{first_msg_name_snake_cased}_post(self, ' \
@@ -131,7 +137,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'        logging.debug(f"{first_msg_name} from DB: ' + '{' + \
                       f'{first_msg_name_snake_cased}_obj' + '}' + '")\n'
         output_str += f'        {first_msg_name_snake_cased}_obj.' \
-                      f'{self._handle_field_data_manipulation(json_sample_content, required_root_msg[0], single_field=True)}\n'
+                      f'{self._handle_field_data_manipulation(json_sample_content, required_root_msg[0])}\n'
         output_str += f'        logging.debug(f"{first_msg_name} Post test: ' + '{' + \
                       f'{first_msg_name_snake_cased}_obj' + '}' + '")\n\n'
         return output_str
@@ -162,7 +168,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                       f'{main_msg_name}):\n'
         output_str += f'        logging.debug(f"{main_msg_name} From Db: ' + '{' + f'{main_msg_name_snake_cased}' + '}' + '")\n'
         output_str += f'        {main_msg_name_snake_cased}.' \
-                      f'{self._handle_field_data_manipulation(json_sample_content, main_msg, single_field=True)}\n'
+                      f'{self._handle_field_data_manipulation(json_sample_content, main_msg)}\n'
         output_str += f'        logging.debug(f"{main_msg_name} Post test: ' + \
                       '{' + f'{main_msg_name_snake_cased}' + '}' + '")\n\n'
         return output_str
@@ -191,7 +197,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'        logging.debug(f"{main_msg_name} From Db: ' + \
                       '{' + f'{main_msg_name_snake_cased}_obj' + '}' + '")\n'
         output_str += f'        {main_msg_name_snake_cased}_obj.' \
-                      f'{self._handle_field_data_manipulation(json_sample_content, main_msg, single_field=True)}\n'
+                      f'{self._handle_field_data_manipulation(json_sample_content, main_msg)}\n'
         output_str += f'        logging.debug(f"{main_msg_name} Post test: ' + \
                       '{' + f'{main_msg_name_snake_cased}_obj' + '}' + '")\n\n'
         return output_str

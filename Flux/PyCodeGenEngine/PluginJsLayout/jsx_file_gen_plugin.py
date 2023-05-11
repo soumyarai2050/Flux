@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import logging
 import os
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, Final, ClassVar
 import time
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
@@ -23,12 +23,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
     ----- 3. Non-Root Type and Layout as table or tree
     ----- 4. Non-Root Type and Layout as table or tree in repeated view
     ----- 5. Layout as Abbreviated Type
+    ----- 6. Abbreviated dependent type
     """
     root_type: str = 'RootType'
     repeated_root_type: str = 'RepeatedRootType'
     non_root_type: str = 'NonRootType'
     repeated_non_root_type: str = 'RepeatedNonRootType'
     abbreviated_type: str = 'AbbreviatedType'
+    abbreviated_dependent_type: str = 'AbbreviatedDependentType'
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -42,7 +44,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
     def handle_import_output(self, message: protogen.Message, layout_type: str) -> str:
         output_str = "/* react and third-party library imports */\n"
-        if layout_type == JsxFileGenPlugin.non_root_type:
+        if layout_type == JsxFileGenPlugin.non_root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
             output_str += "import React, { Fragment, memo } from 'react';\n"
         else:
             output_str += "import React, { Fragment, useState, useEffect, useCallback, useRef, memo } from 'react';\n"
@@ -65,7 +67,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"    set{message_name}ArrayWs, set{message_name}Ws, setModified{message_name}, " \
                           f"setSelected{message_name}Id, resetError,\n"
             output_str += "    setUserChanges, setDiscardedChanges, setOpenWsPopup\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
+        elif layout_type == JsxFileGenPlugin.non_root_type or \
+                layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
             message_name = self.root_message.proto.name
             output_str += f"    setModified{message_name}, resetError,\n"
             output_str += "    setUserChanges, setOpenConfirmSavePopup\n"
@@ -73,11 +76,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"    getAll{message_name}, update{message_name},\n"
             output_str += f"    set{message_name}ArrayWs, set{message_name}Ws, setModified{message_name}, " \
                           f"setSelected{message_name}Id, resetError\n"
-        message_name_camel_cased = message_name[0].lower() + message_name[1:]
+        message_name_camel_cased = convert_to_camel_case(message_name)
         output_str += "}" + f" from '../features/{message_name_camel_cased}Slice';\n"
         if layout_type == JsxFileGenPlugin.abbreviated_type:
             dependent_message_name = self.abbreviated_dependent_message_name
-            dependent_message_name_camel_cased = dependent_message_name[0].lower() + dependent_message_name[1:]
+            dependent_message_name_camel_cased = convert_to_camel_case(dependent_message_name)
             output_str += "import {\n"
             output_str += f"    create{dependent_message_name}, update{dependent_message_name},\n"
             output_str += f"    set{dependent_message_name}Array, set{dependent_message_name}ArrayWs," \
@@ -88,12 +91,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "}" + f" from '../features/{dependent_message_name_camel_cased}Slice';\n"
         output_str += "/* project constants */\n"
         output_str += "import { Modes, Layouts, DB_ID"
-        if layout_type == JsxFileGenPlugin.repeated_root_type or layout_type == JsxFileGenPlugin.root_type:
-            output_str += ", API_ROOT_URL"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
-            output_str += ", SCHEMA_DEFINITIONS_XPATH, DataTypes"
-        else:
-            output_str += ", API_ROOT_URL, SCHEMA_DEFINITIONS_XPATH, NEW_ITEM_ID"
+        if layout_type != JsxFileGenPlugin.abbreviated_dependent_type:
+            if layout_type == JsxFileGenPlugin.repeated_root_type or layout_type == JsxFileGenPlugin.root_type:
+                output_str += ", API_ROOT_URL"
+            elif layout_type == JsxFileGenPlugin.non_root_type:
+                output_str += ", SCHEMA_DEFINITIONS_XPATH, DataTypes"
+            else:
+                output_str += ", API_ROOT_URL, SCHEMA_DEFINITIONS_XPATH, NEW_ITEM_ID"
         output_str += " } from '../constants';\n"
         output_str += "/* common util imports */\n"
         output_str += "import {\n"
@@ -103,7 +107,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    generateObjectFromSchema, addxpath, clearxpath, getObjectWithLeastId, " \
                           "generateRowTrees, createObjectFromDict,\n"
             output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, getXpathKeyValuePairFromObject\n"
-        elif layout_type == JsxFileGenPlugin.non_root_type:
+        elif layout_type == JsxFileGenPlugin.non_root_type or \
+                layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
             output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, lowerFirstLetter\n"
         else:
             output_str += "    generateObjectFromSchema, addxpath, clearxpath, getObjectWithLeastId, " \
@@ -153,11 +158,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           "onClick={onCreate}><Add fontSize='small' /></Icon>}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
-        else:
-            root_msg_name = self.root_message.proto.name
-            root_message_name_camel_cased = root_msg_name[0].lower() + root_msg_name[1:]
+        elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
             output_str = "    let menu = <DynamicMenu disabled={mode !== Modes.EDIT_MODE} " \
                          "currentSchema={currentSchema} collections=" \
+                         "{collections} commonKeyCollections={commonKeyCollections} data={" \
+                         f"modified{message_name}" \
+                         "} onButtonToggle={onButtonToggle} />;\n"
+        else:
+            root_msg_name = self.root_message.proto.name
+            output_str = "    let menu = <DynamicMenu disabled={mode !== Modes.EDIT_MODE} " \
+                         "currentSchema={currentSchema} xpath={currentSchemaXpath} collections=" \
                          "{collections} commonKeyCollections={commonKeyCollections}" \
                          " data={_.get(modified" + f"{root_msg_name}" + \
                          ", currentSchemaXpath)} onButtonToggle={onButtonToggle} />;\n"
@@ -189,13 +199,20 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
         else:
             root_msg_name = self.root_message.proto.name
-            root_message_name_camel_cased = root_msg_name[0].lower() + root_msg_name[1:]
+            root_message_name_camel_cased = convert_to_camel_case(root_msg_name)
             output_str += "                        onChangeLayout: props.onChangeLayout\n"
             output_str += "                    }}\n"
-            output_str += "                    name={parentSchemaName}\n"
+            if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += "                    name={props.name}\n"
+            else:
+                output_str += "                    name={parentSchemaName}\n"
             output_str += "                    schema={schema}\n"
-            output_str += "                    data={modified" + f"{root_msg_name}" + "}\n"
-            output_str += "                    originalData={" + f"{root_message_name_camel_cased}" + "}\n"
+            if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += "                    data={modified" + f"{message_name}" + "}\n"
+                output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
+            else:
+                output_str += "                    data={modified" + f"{root_msg_name}" + "}\n"
+                output_str += "                    originalData={" + f"{root_message_name_camel_cased}" + "}\n"
         output_str += "                    collections={collections}\n"
         output_str += "                    rows={rows}\n"
         output_str += "                    tableColumns={tableColumns}\n"
@@ -238,13 +255,20 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
         else:
             root_msg_name = self.root_message.proto.name
-            root_message_name_camel_cased = root_msg_name[0].lower() + root_msg_name[1:]
-            output_str += "                        onChangeLayout: props.onChangeLayout,\n"
+            root_message_name_camel_cased = convert_to_camel_case(root_msg_name)
+            output_str += "                        onChangeLayout: props.onChangeLayout\n"
             output_str += "                    }}\n"
-            output_str += "                    name={parentSchemaName}\n"
+            if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += "                    name={props.name}\n"
+            else:
+                output_str += "                    name={parentSchemaName}\n"
             output_str += "                    schema={schema}\n"
-            output_str += "                    data={modified" + f"{root_msg_name}" + "}\n"
-            output_str += "                    originalData={" + f"{root_message_name_camel_cased}" + "}\n"
+            if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += "                    data={modified" + f"{message_name}" + "}\n"
+                output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
+            else:
+                output_str += "                    data={modified" + f"{root_msg_name}" + "}\n"
+                output_str += "                    originalData={" + f"{root_message_name_camel_cased}" + "}\n"
         output_str += "                    mode={mode}\n"
         output_str += "                    onUpdate={onUpdate}\n"
         output_str += "                    error={error}\n"
@@ -277,7 +301,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         return output_str
 
     def __handle_const_on_layout(self, message_name: str, layout_type: str) -> str:
-        message_name_camel_cased: str = message_name[0].lower() + message_name[1:]
+        message_name_camel_cased: str = convert_to_camel_case(message_name)
         output_str = ""
         match layout_type:
             case JsxFileGenPlugin.repeated_root_type:
@@ -305,15 +329,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
                 output_str += "    const getWsDict = useRef({});\n"
-            case JsxFileGenPlugin.non_root_type:
+            case JsxFileGenPlugin.non_root_type | JsxFileGenPlugin.abbreviated_dependent_type:
                 message_name = self.root_message.proto.name
-                message_name_camel_cased = message_name[0].lower() + message_name[1:]
+                message_name_camel_cased = convert_to_camel_case(message_name)
                 output_str += "    /* global states from redux store */\n"
                 output_str += "    const {\n"
                 output_str += f"        {message_name_camel_cased}, modified{message_name}, selected{message_name}Id,\n"
                 output_str += "        userChanges, loading, error, mode\n"
                 output_str += "    } = useSelector(state => " + f"state.{message_name_camel_cased});\n"
-                output_str += "    const { schema, schemaCollections } = useSelector((state) => state.schema);\n"
+                output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
             case JsxFileGenPlugin.abbreviated_type:
                 output_str += "    /* global states from redux store */\n"
                 output_str += "    const {\n"
@@ -322,7 +346,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        loading, error\n"
                 output_str += "    } = useSelector(state => " + f"state.{message_name_camel_cased});\n"
                 dependent_message = self.abbreviated_dependent_message_name
-                dependent_message_camel_cased = dependent_message[0].lower() + dependent_message[1:]
+                dependent_message_camel_cased = convert_to_camel_case(dependent_message)
                 output_str += "    const {\n"
                 output_str += f"        {dependent_message_camel_cased}Array, {dependent_message_camel_cased}, " \
                               f"modified{dependent_message}, selected{dependent_message}Id,\n"
@@ -341,7 +365,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
     def handle_abbreviated_return(self, message_name: str, message_name_camel_cased: str) -> str:
         dependent_msg_name = self.abbreviated_dependent_message_name
-        dependent_msg_name_camel_cased = dependent_msg_name[0].lower() + dependent_msg_name[1:]
+        dependent_msg_name_camel_cased = convert_to_camel_case(dependent_msg_name)
         output_str = "    let createMenu = '';\n"
         output_str += "    if (mode === Modes.READ_MODE) {\n"
         output_str += "        createMenu = <Icon title='Create' name='Create' " \
@@ -354,11 +378,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                       "'alertBubbleSource'))[0].alertBubbleSource;\n"
         output_str += "        alertBubbleColorSource = collections.filter(col => col.hasOwnProperty(" \
                       "'alertBubbleSource'))[0].alertBubbleColor;\n"
-        output_str += "    }\n\n"
-        output_str += "    if (dependentName === alertBubbleSource.split('.')[0]) {\n"
-        output_str += "        alertBubbleSource = alertBubbleSource.substring(alertBubbleSource.indexOf('.') + 1);\n"
-        output_str += "        alertBubbleColorSource = alertBubbleColorSource.substring(" \
+        output_str += "        if (dependentName === alertBubbleSource.split('.')[0]) {\n"
+        output_str += "            alertBubbleSource = alertBubbleSource.substring(alertBubbleSource.indexOf('.') + " \
+                      "1);\n"
+        output_str += "            alertBubbleColorSource = alertBubbleColorSource.substring(" \
                       "alertBubbleColorSource.indexOf('.') + 1);\n"
+        output_str += "        }\n\n"
         output_str += "    }\n\n"
         output_str += "    return (\n"
         output_str += "        <Fragment>\n"
@@ -449,7 +474,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str = self.handle_import_output(message, layout_type)
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        message_name_camel_cased = message_name[0].lower() + message_name[1:]
+        message_name_camel_cased = convert_to_camel_case(message_name)
         root_message_name = ""
         root_message_name_camel_cased = ""
         dependent_message = ""
@@ -467,12 +492,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"    let originalData = applyFilter({message_name_camel_cased}, filter);\n"
                 output_str += "    let modifiedData = addxpath(cloneDeep(originalData));\n"
                 output_str += "    let rows = getTableRows(collections, mode, originalData, modifiedData);\n"
-            case JsxFileGenPlugin.root_type:
+            case JsxFileGenPlugin.root_type | JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += f"    let rows = getTableRows(collections, mode, {message_name_camel_cased}, " \
                               f"modified{message_name});\n"
             case JsxFileGenPlugin.non_root_type:
                 root_message_name = self.root_message.proto.name
-                root_message_name_camel_cased = root_message_name[0].lower() + root_message_name[1:]
+                root_message_name_camel_cased = convert_to_camel_case(root_message_name)
                 output_str += "    let currentSchemaXpath = null;\n"
                 output_str += "    let isJsonRoot = _.keys(schema).length > 0 && currentSchema.json_root ? true : " \
                               "false;\n"
@@ -507,7 +532,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                               'abbreviated !== "JSON")[0].abbreviated : null;\n'
                 output_str += '    let dependentName = abbreviated ? abbreviated.substring' \
                               '(abbreviated.indexOf(":") + 1).split(".")[0] : null;\n'
-                output_str += "    let dependentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, dependentName]);\n"
+                output_str += "    let dependentSchema = _.get(schema, dependentName);\n"
+                output_str += "    if (!dependentSchema) {\n"
+                output_str += "        dependentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, dependentName]);\n"
+                output_str += "    }\n"
                 output_str += "    let dependentCollections = " \
                               "createCollections(schema, dependentSchema, { mode: Modes.READ_MODE });\n\n"
         if layout_type != JsxFileGenPlugin.abbreviated_type:
@@ -515,7 +543,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           "props.disableOverride);\n"
             output_str += "    let commonKeyCollections = getCommonKeyCollections(rows, tableColumns);\n\n"
 
-        if layout_type != JsxFileGenPlugin.non_root_type:
+        if layout_type != JsxFileGenPlugin.non_root_type and layout_type != JsxFileGenPlugin.abbreviated_dependent_type:
             output_str += "    useEffect(() => {\n"
             output_str += "        /* fetch all objects. to be triggered only once when the component loads */\n"
             output_str += f"        dispatch(getAll{message_name}());\n"
@@ -553,7 +581,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        dispatch(setModified{message_name}(modifiedObj));\n"
             if layout_type == JsxFileGenPlugin.abbreviated_type:
                 dependent_message = self.abbreviated_dependent_message_name
-                dependent_message_camel_cased = dependent_message[0].lower() + dependent_message[1:]
+                dependent_message_camel_cased = convert_to_camel_case(dependent_message)
                 output_str += f"        let loadedKeys = _.get({message_name_camel_cased}, loadedKeyName);\n"
                 output_str += "        if (loadedKeys) {\n"
                 output_str += "            let loadedIds = loadedKeys.map(key => getIdFromAbbreviatedKey(abbreviated, " \
@@ -608,7 +636,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }" + f", [{dependent_message_camel_cased}Array, selected{dependent_message}Id, " \
                                     "createMode])\n\n"
 
-        if layout_type != JsxFileGenPlugin.non_root_type:
+        if layout_type != JsxFileGenPlugin.non_root_type and layout_type != JsxFileGenPlugin.abbreviated_dependent_type:
             output_str += "    const flushGetAllWs = useCallback(() => {\n"
             output_str += "        /* apply get-all websocket changes */\n"
             output_str += "        if (_.keys(getAllWsDict.current).length > 0) {\n"
@@ -770,7 +798,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "         * otherwise call confirmSave to reset states\n"
             output_str += "        */\n"
             output_str += "        if (e === null && openPopup) {\n"
-            if layout_type == JsxFileGenPlugin.root_type:
+            if layout_type == JsxFileGenPlugin.root_type or \
+                    layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += "            setOpenConfirmSavePopup(true);\n"
             else:
                 output_str += "            dispatch(setOpenConfirmSavePopup(true));\n"
@@ -790,13 +819,18 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type:
             output_str += "    const onUpdate = (updatedData) => {\n"
-            if layout_type == JsxFileGenPlugin.root_type:
+            if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
             else:
                 output_str += f"        dispatch(setModified{root_message_name}(updatedData));\n"
             output_str += "    }\n\n"
 
         if layout_type != JsxFileGenPlugin.repeated_root_type:
+            if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += "    const onUpdate = (updatedData) => {\n"
+                output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
+                output_str += "    }\n\n"
+
             output_str += "    const onButtonToggle = (e, xpath, value) => {\n"
             output_str += "        dispatch(setUserChanges({\n"
             output_str += "            ...userChanges,\n"
@@ -804,9 +838,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"            [DB_ID]: selected{root_message_name}Id,\n"
             elif layout_type == JsxFileGenPlugin.abbreviated_type:
                 output_str += f"            [DB_ID]: selected{dependent_message}Id,\n"
+            elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += f"            [DB_ID]: selected{message_name}Id,\n"
             output_str += "            [xpath]: value\n"
             output_str += "        }));\n"
-            if layout_type == JsxFileGenPlugin.root_type:
+            if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += f"        if ({message_name_camel_cased}[DB_ID]) " + "{\n"
             elif layout_type == JsxFileGenPlugin.non_root_type:
                 output_str += f"        if ({root_message_name_camel_cased}[DB_ID]) " + "{\n"
@@ -886,8 +922,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        setOpenConfirmSavePopup(false);\n"
             output_str += "    }\n\n"
         elif layout_type == JsxFileGenPlugin.abbreviated_type:
-            abbreviated_dependent_msg_camel_cased = self.abbreviated_dependent_message_name[0].lower() + \
-                                                    self.abbreviated_dependent_message_name[1:]
+            abbreviated_dependent_msg_camel_cased = convert_to_camel_case(self.abbreviated_dependent_message_name)
             output_str += "    const onReload = () => {\n"
             output_str += f"        if (selected{message_name}Id) " + "{\n"
             output_str += f"            let modifiedObj = addxpath(cloneDeep({message_name_camel_cased}));\n"
@@ -984,12 +1019,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        dispatch(setSelected{dependent_message}Id(id));\n"
             output_str += "    }\n\n"
 
-        if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type:
+        if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type or \
+                layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
             output_str += "    const onUserChange = (xpath, value, deleted = false, keyValueDict) => {\n"
             output_str += "        let updatedData = cloneDeep(userChanges);\n"
             output_str += "        if (deleted && keyValueDict) {\n"
-            if layout_type == self.non_root_type:
+            if layout_type == JsxFileGenPlugin.non_root_type:
                 output_str += f"            updatedData[DB_ID] = selected{root_message_name}Id;\n"
+            elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += f"            updatedData[DB_ID] = selected{message_name}Id;\n"
             output_str += "            if (updatedData.deleted) {\n"
             output_str += "                updatedData.deleted = { ...updatedData.deleted, ...keyValueDict };\n"
             output_str += "            } else {\n"
@@ -997,8 +1035,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            }\n"
             output_str += "        } else {\n"
             output_str += "            if (keyValueDict) {\n"
-            if layout_type == self.root_type:
+            if layout_type == JsxFileGenPlugin.root_type:
                 output_str += "                updatedData = { ...updatedData, ...keyValueDict };\n"
+            elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += "                updatedData = { ...updatedData, ...keyValueDict, [DB_ID]: " \
+                              f"selected{message_name}Id " + "};\n"
             else:
                 output_str += "                updatedData = { ...updatedData, ...keyValueDict, [DB_ID]: " \
                               f"selected{root_message_name}Id " + "};\n"
@@ -1009,8 +1050,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        }\n"
                 output_str += "        dispatch(setUserChanges(updatedData));\n"
             else:
-                output_str += "                updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
-                              f"selected{root_message_name}Id " + "};\n"
+                if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                    output_str += "                updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
+                                  f"selected{message_name}Id " + "};\n"
+                else:
+                    output_str += "                updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
+                                  f"selected{root_message_name}Id " + "};\n"
                 output_str += "            }\n"
                 output_str += "        }\n"
                 output_str += "        dispatch(setUserChanges(updatedData));\n"
@@ -1049,11 +1094,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                               f"message {message_name}"
                     logging.exception(err_str)
                     raise Exception(err_str)
-                abb_dependent_msg_name = fld_abbreviated_option_value.split(".")[0]
-                if ":" in abb_dependent_msg_name:
-                    abb_dependent_msg_name = abb_dependent_msg_name.split(":")[-1]
-                self.abbreviated_dependent_message_name = abb_dependent_msg_name
+                self.abbreviated_dependent_message_name = \
+                    self.abbreviated_msg_name_to_dependent_msg_name_dict.get(message.proto.name)
                 output_str = self.handle_jsx_const(message, JsxFileGenPlugin.abbreviated_type)
+            elif message.proto.name in self.abbreviated_msg_name_to_dependent_msg_name_dict.values():
+                self.root_message = message
+                output_str = self.handle_jsx_const(message, JsxFileGenPlugin.abbreviated_dependent_type)
             else:
                 # Root Type
                 if message in self.root_msg_list:

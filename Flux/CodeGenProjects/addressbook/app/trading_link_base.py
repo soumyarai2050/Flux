@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC
-from typing import List, ClassVar
+from typing import List, ClassVar, final
 from pendulum import DateTime
 import os
 
@@ -26,12 +26,21 @@ def add_to_texts(order_brief: OrderBrief, msg: str):
         order_brief.text.append(msg)
 
 
+def load_configs():
+    return load_yaml_configurations(str(config_file_path))
+
+
 class TradingLinkBase(ABC):
     host, port = get_host_port_from_env()
     strat_manager_service_web_client: ClassVar[StratManagerServiceWebClient] = StratManagerServiceWebClient(host, port)
     market_data_service_web_client: ClassVar[MarketDataServiceWebClient] = \
         MarketDataServiceWebClient(host, market_data_int_port)
-    config_dict = load_yaml_configurations(str(config_file_path))
+    config_dict = load_configs()
+
+    @classmethod
+    @final
+    def reload_configs(cls):
+        cls.config_dict = load_configs()
 
     @classmethod
     @abstractmethod

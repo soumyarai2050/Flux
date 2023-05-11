@@ -46,17 +46,26 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         self.root_msg_list: List[protogen.Message] = []
         self.__is_req_autocomplete: bool = False
 
+    def __check_is_autocomplete_req(self, message: protogen.Message):
+        for field in message.fields:
+            if field.message is not None:
+                self.__check_is_autocomplete_req(field.message)
+            if JsonSampleGenPlugin.flux_fld_auto_complete in str(field.proto.options):
+                self.__is_req_autocomplete = True
+                break
+        # else not required: If no field of any message has autocomplete option then using default
+        # value of __is_req_autocomplete data member where required
+
     def __load_root_json_msg(self, file: protogen.File):
         for message in file.messages:
             if JsonSampleGenPlugin.flux_msg_json_root in str(message.proto.options):
                 self.root_msg_list.append(message)
             # else not required: avoiding non-json msg append to list
 
-            for field in message.fields:
-                if JsonSampleGenPlugin.flux_fld_auto_complete in str(field.proto.options):
-                    self.__is_req_autocomplete = True
-            # else not required: If no field of any message has autocomplete option then using default
-            # value of __is_req_autocomplete data member where required
+            if not self.__is_req_autocomplete:
+                self.__check_is_autocomplete_req(message)
+            # else not required: if __is_req_autocomplete got already updated to true by any field having
+            # autocomplete option then avoiding unnecessary code execution
 
     def __json_non_repeated_field_sample_gen(self, field: protogen.Field, indent_space_count: int) -> str:
         json_sample_output = ""

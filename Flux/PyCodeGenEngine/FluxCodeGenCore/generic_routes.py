@@ -164,8 +164,8 @@ def get_by_id_ws_url(host: str, port: int, proto_package_name: str, pydantic_cla
 @http_except_n_log_error(status_code=500)
 async def generic_read_ws(ws: WebSocket, proto_package_name: str,
                           pydantic_class_type, filter_agg_pipeline: Any = None, has_links: bool = False):
-    is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager. \
-        connect(ws)  # prevent duplicate addition
+    # prevent duplicate addition
+    is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws)
 
     logging.debug(f"websocket client requested to connect: {ws.client}")
     logging.debug(f"connected to websocket: "

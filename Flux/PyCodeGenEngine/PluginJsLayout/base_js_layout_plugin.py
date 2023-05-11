@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import logging
 import os
-from typing import List, Callable
+from typing import List, Callable, Dict
 import protogen
 # below main is imported to be accessible to derived classes
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
@@ -25,6 +25,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
         self.table_layout_msg_list: List[protogen.Message] = []
         self.repeated_table_layout_msg_list: List[protogen.Message] = []
         self.abbreviated_filter_layout_msg_list: List[protogen.Message] = []
+        self.abbreviated_msg_name_to_dependent_msg_name_dict: Dict[str, str] = {}
         if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
             self.response_field_case_style: str = response_field_case_style
         else:
@@ -65,6 +66,24 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                             self.table_layout_msg_list.append(message)
                     elif BaseJSLayoutPlugin.flux_msg_abbreviated_filter_layout_value == layout_type:
                         self.abbreviated_filter_layout_msg_list.append(message)
+                        fld_abbreviated_option_value = None
+                        for field in message.fields:
+                            fld_abbreviated_option_value = \
+                                self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                                                                                 BaseJSLayoutPlugin.flux_fld_abbreviated)
+                            if fld_abbreviated_option_value is not None:
+                                break
+                        else:
+                            err_str = f"Could not find {BaseJSLayoutPlugin.flux_fld_abbreviated} in any of fields of " \
+                                      f"abbreviated type message {message.proto.name}"
+                            logging.exception(err_str)
+                            raise Exception(err_str)
+                        fld_abbreviated_option_value = fld_abbreviated_option_value[1:]
+                        dependent_msg_name = fld_abbreviated_option_value.split(".")[0]
+                        if ":" in dependent_msg_name:
+                            dependent_msg_name = dependent_msg_name.split(":")[-1]
+                        # else not required: if ":" not present then taking first '.' seperated name
+                        self.abbreviated_msg_name_to_dependent_msg_name_dict[message.proto.name] = dependent_msg_name
                     else:
                         err_str = f"{layout_type} is not a valid layout option value found in proto message " \
                                   f"{message.proto.name}"
