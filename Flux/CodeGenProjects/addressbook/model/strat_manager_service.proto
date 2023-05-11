@@ -1,7 +1,10 @@
 syntax = "proto2";
+
 import "flux_options.proto";
-import "strat_core.proto";
+import "trade_core.proto";
 import "ui_core.proto";
+import "strat_core.proto";
+
 package addressbook;
 
 option (FluxFileWebPageUIData) = {
@@ -14,6 +17,7 @@ message StratLeg{
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   required Security sec = 2;
   optional Side side = 3 [default = SIDE_UNSPECIFIED];
+  optional string company = 4 [(FluxFldServerPopulate) = true];
 }
 
 // Widget-2
@@ -32,7 +36,7 @@ message PairStratParams{
   optional StratLeg strat_leg2 = 2 [(FluxFldElaborateTitle) = true, (FluxFldOrmNoUpdate) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER, side=server_populate", (FluxFldHelp) = "EQT Tickers"];
   optional int32 exch_response_max_seconds = 3 [default = 30, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
   // these are specific to CB-EQT strat - move to derived later
-  required float common_premium = 4[(FluxFldNumberFormat) = "%"];
+  required float common_premium = 4 [(FluxFldNumberFormat) = "%"];
   optional float hedge_ratio = 5 [default = 1];
 }
 
@@ -43,7 +47,9 @@ message StratStatus{
     y: 23,
     w: 7,
     h: 8,
-    layout: UI_TABLE
+    layout: UI_TABLE,
+    alert_bubble_source: "PairStrat.strat_status.strat_alerts",
+    alert_bubble_color: "PairStrat.strat_status.strat_alerts.severity"
   };
 
   // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
@@ -87,9 +93,9 @@ message StratStatus{
   optional float total_cxl_exposure = 25 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_fill_buy_notional - total_fill_sell_notional"];
 
   // these are specific to CB-EQT strat - move to derived later
-  optional float average_premium = 26;
+  optional float average_premium = 26 [(FluxFldNumberFormat) = "%"];
   optional Residual residual = 27;
-  optional float balance_notional = 28 [(FluxFldDisplayType) = "int", (FluxFldValMin)="0.0", (FluxFldValMax)="PairStrat.strat_limits.max_cb_notional", (FluxFldProgressBar) = {
+  optional float balance_notional = 28 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="PairStrat.strat_limits.max_cb_notional", (FluxFldProgressBar) = {
     value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // order of condition matching -> left to right (select first match)
     hover_text_type: HoverTextType_VALUE,
     is_reverse: true
@@ -161,18 +167,18 @@ message OrderSnapshot{
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional OrderBrief order_brief = 2;
-  optional int64 filled_qty = 3;
-  optional float avg_fill_px = 4;
-  optional float fill_notional = 5 [(FluxFldDisplayType) = "int"];
-  optional int64 last_update_fill_qty = 6;
-  optional float last_update_fill_px = 7;
-  optional int64 cxled_qty = 8;
-  optional float avg_cxled_px = 9;
-  optional float cxled_notional = 10 [(FluxFldDisplayType) = "int"];
-  optional int64 create_date_time = 11 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
-  optional int64 last_update_date_time = 12 [(FluxFldValIsDateTime) = true];
-  optional OrderStatusType order_status = 13 ;
+  optional OrderStatusType order_status = 2 [(FluxFldNoCommonKey) = true];
+  optional OrderBrief order_brief = 3;
+  optional int64 filled_qty = 4;
+  optional float avg_fill_px = 5;
+  optional float fill_notional = 6 [(FluxFldDisplayType) = "int"];
+  optional int64 last_update_fill_qty = 7;
+  optional float last_update_fill_px = 8;
+  optional int64 cxled_qty = 9;
+  optional float avg_cxled_px = 10;
+  optional float cxled_notional = 11 [(FluxFldDisplayType) = "int"];
+  optional int64 create_date_time = 12 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
+  optional int64 last_update_date_time = 13 [(FluxFldValIsDateTime) = true];
   optional int64 last_n_sec_total_qty = 14 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec order qty
 }
 
@@ -214,7 +220,7 @@ message SymbolSideSnapshot{
   optional float avg_cxled_px = 12;
   optional float total_cxled_notional = 13 [(FluxFldDisplayType) = "int"];
   optional int64 last_update_date_time = 14 [(FluxFldValIsDateTime) = true];
-  optional int32 order_create_count = 15;
+  optional int32 order_count = 15 [(FluxFldNoCommonKey) = true];
 }
 
 // Widget - 5
@@ -271,7 +277,7 @@ message StratLimits{
   optional int32 max_open_orders_per_side = 1 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open orders allowed per side for this strat"];
   optional float max_cb_notional = 2 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000", (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
   optional float max_open_cb_notional = 3 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
-  optional float max_net_filled_notional = 4  [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "absolute [buy - sell] maximum notional allowed for this strat"];
+  optional float max_net_filled_notional = 4  [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "absolute [buy fill - sell fill] maximum notional allowed for this strat"];
   optional float max_concentration = 5 [(FluxFldValMax) = "10", (FluxFldHelp) = "max symbol specific concentration % (w.r.t. market total for the symbol)"];
   optional float limit_up_down_volume_participation_rate = 6 [(FluxFldValMax) = "30", (FluxFldHelp) = "At limit up down: % participation allowed against open interest on specific side of outstanding queue"];
   optional CancelRate cancel_rate = 7 [(FluxFldHelp) = "Allowed cxl size (side agnostic) as % of (open + executed + cxlled) volume (per broker per symbol) within configured interval; no time window implies SOD: window-start & checking-time as end"];
@@ -314,12 +320,12 @@ message OrderLimits{
 //Widget - 8
 message PortfolioLimits{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    UpdateDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIData) = {
     x: 7,
@@ -328,16 +334,14 @@ message PortfolioLimits{
     h: 11,
     layout: UI_TABLE
   };
-  option (FluxMsgNestedFldValFilterParam) = {field_name: "bkr_disable", bool_val_filters: [False]};
-  option (FluxMsgNestedFldValFilterParam) = {field_name: "pos_disable", bool_val_filters: [False]};
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 max_open_baskets = 2 [(FluxFldValMin) = "50", (FluxFldHelp) = "max simultaneous open orders allowed per side for this portfolio"];
   optional float max_open_notional_per_side = 3[(FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000"];
   optional float max_gross_n_open_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "50000000", (FluxFldHelp) = "aggregated buy+sell: open+executed max allowed notional"];
-  optional RollingMaxOrderCount rolling_max_order_count = 5 [(FluxFldElaborateTitle) = true, (FluxFldHelp) = "Allowed order count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
-  optional RollingMaxOrderCount rolling_max_reject_count = 6 [(FluxFldElaborateTitle) = true, (FluxFldHelp) = "Allowed rejection count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
+  optional RollingMaxOrderCount rolling_max_order_count = 5 [(FluxFldHelp) = "Allowed order count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
+  optional RollingMaxOrderCount rolling_max_reject_count = 6 [(FluxFldHelp) = "Allowed rejection count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
   // auto update symbol's availability when allocated/consumed by strat(block strat creation if not enough availability), this has both limit and status in Position
   repeated Broker eligible_brokers = 7;
 }
@@ -457,7 +461,7 @@ message StratCollection{
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
-  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Org/Ticker:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id$Strat State:PairStrat.strat_status.strat_state$Strat Notional:PairStrat.strat_status.balance_notional$Premium Limit:PairStrat.pair_strat_params.common_premium", (FluxFldAlertBubbleSource) = "PairStrat.strat_status.strat_alerts", (FluxFldAlertBubbleColor) = "PairStrat.strat_status.strat_alerts.severity"];
+  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id$Strat State:PairStrat.strat_status.strat_state$Strat Notional:PairStrat.strat_status.balance_notional$Premium Limit:PairStrat.pair_strat_params.common_premium", (FluxFldAlertBubbleSource) = "PairStrat.strat_status.strat_alerts", (FluxFldAlertBubbleColor) = "PairStrat.strat_status.strat_alerts.severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
   repeated string buffered_strat_keys = 3;
@@ -504,8 +508,8 @@ message StratBrief{
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional PairSideTradingBrief pair_buy_side_trading_brief = 2 [(FluxFldElaborateTitle) = true];
-  optional PairSideTradingBrief pair_sell_side_trading_brief = 3 [(FluxFldElaborateTitle) = true];
+  optional PairSideTradingBrief pair_buy_side_trading_brief = 2;
+  optional PairSideTradingBrief pair_sell_side_trading_brief = 3;
   optional float consumable_nett_filled_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_net_filled_notional - Absolute (filled_cb_notional - filled_egt_notional)"];
 }
 

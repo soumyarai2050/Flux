@@ -45,7 +45,9 @@ const fieldProps = [
     { propertyName: "filter_enable", usageName: "filterEnable" },
     { propertyName: "number_format", usageName: "numberFormat" },
     { propertyName: "no_common_key", usageName: "noCommonKey" },
-    { propertyName: "display_type", usageName: "displayType" }
+    { propertyName: "display_type", usageName: "displayType" },
+    { propertyName: "text_align", usageName: "textAlign" },
+    { propertyName: "display_zero", usageName: "displayZero" }
 ]
 
 // properties supported explicitly on the array types
@@ -102,6 +104,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 currentSchema[propertyName] = currentSchemaMetadata[propertyName];
             }
         })
+        callerProps.parent = callerProps.xpath;
         callerProps.xpath = null;
     }
     currentSchema.properties = sortSchemaProperties(currentSchema.properties);
@@ -114,6 +117,13 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
             collection.xpath = xpath ? xpath + '.' + k : k;
+            let parentxpath = xpath ? xpath !== callerProps.parent ? xpath : null : null;
+            if (parentxpath) {
+                if (callerProps.parent) {
+                    parentxpath = parentxpath.replace(callerProps.parent + '.', '');
+                }
+                collection.parentxpath = parentxpath;
+            }
             if (collection.xpath.indexOf('.') === -1 || (callerProps.parentSchema && collection.xpath.substring(collection.xpath.indexOf('.') + 1).indexOf('.') === -1)) {
                 collection.rootLevel = true;
             }
@@ -173,6 +183,13 @@ export function createCollections(schema, currentSchema, callerProps, collection
             let updatedxpath = xpath ? xpath + '.' + k : k;
             updatedxpath = updatedxpath + '[0]';
             collection.xpath = updatedxpath;
+            let parentxpath = xpath ? xpath !== callerProps.parent ? xpath : null : null;
+            if (parentxpath) {
+                if (callerProps.parent) {
+                    parentxpath.replace(callerProps + '.', '');
+                }
+                collection.parentxpath = parentxpath;
+            }
 
             fieldProps.map(({ propertyName, usageName }) => {
                 if (v.hasOwnProperty(propertyName)) {
@@ -224,6 +241,13 @@ export function createCollections(schema, currentSchema, callerProps, collection
             sequence.sequence += 1;
             let updatedxpath = xpath ? xpath + '.' + k : k;
             collection.xpath = updatedxpath;
+            let parentxpath = xpath ? xpath !== callerProps.parent ? xpath : null : null;
+            if (parentxpath) {
+                if (callerProps.parent) {
+                    parentxpath.replace(callerProps + '.', '');
+                }
+                collection.parentxpath = parentxpath;
+            }
 
             fieldProps.map(({ propertyName, usageName }) => {
                 if (v.hasOwnProperty(propertyName)) {
@@ -778,6 +802,9 @@ export function generateRowTrees(jsondata, collections, xpath) {
             if (!hasArrayField(tree)) {
                 tree['data-id'] = 0;
             }
+            if (!tree.hasOwnProperty('data-id')) {
+                tree['data-id'] = 0;
+            }
 
             if (trees.length > 0 && _.isEqual(trees[trees.length - 1], tree)) {
                 break;
@@ -992,22 +1019,28 @@ export function compareObjects(updated, original, current, xpath, diff = []) {
 }
 
 export function getNewItem(collections, abbreviated) {
-    let abbreviatedSplit = abbreviated.split('-');
+    const abbreviatedKeyPath = abbreviated.split('$')[0].split(':').pop();
+    const fields = abbreviatedKeyPath.split('-');
     let newItem = '';
-    for (let i = 0; i < abbreviatedSplit.length - 1; i++) {
-        let key = abbreviatedSplit[i].split('.').pop();
-        let collection = collections.filter(collection => collection.key === key)[0];
-        let value = 'XXXX';
-        if (collection) {
-            if (collection.placeholder) {
-                value = collection.placeholder;
-            } else if (collection.default) {
-                value = collection.default;
+    fields.forEach(field => {
+        let key = field.split('.').pop();
+        // DB_ID must be the last field in abbreviated key
+        if (key === DB_ID) {
+            newItem += NEW_ITEM_ID
+        } else {
+            let defaultValue = 'XXXX';
+            let collection = collections.filter(c => c.key === key)[0];
+            if (collection) {
+                if (collection.placeholder) {
+                    defaultValue = collection.placeholder;
+                } else if (collection.default) {
+                    defaultValue = collection.default;
+                }
             }
+            newItem += defaultValue + '-';
         }
-        newItem += value + '-';
-    }
-    newItem += NEW_ITEM_ID;
+
+    })
     return newItem;
 }
 
@@ -1255,7 +1288,7 @@ export function getTableRows(collections, mode, originalData, data, xpath) {
     } else {
         let originalDataTableRows = getTableRowsFromData(collections, addxpath(cloneDeep(originalData)), xpath);
         tableRows = getTableRowsFromData(collections, data, xpath);
-    
+
         // combine the original and modified data rows
         for (let i = 0; i < originalDataTableRows.length; i++) {
             if (i < tableRows.length) {
@@ -1410,7 +1443,12 @@ export function createObjectFromDict(obj, dict = {}) {
         objArray.push(updatedObj);
         return;
     })
-    return _.merge(...objArray);
+    let mergedObj = {};
+    objArray.forEach(obj => {
+        mergedObj = mergeObjects(mergedObj, obj);
+    })
+    // return _.merge(...objArray);
+    return mergedObj;
 }
 
 export function createObjectFromXpathDict(obj, xpath, value) {
@@ -1501,4 +1539,76 @@ export function floatToInt(number) {
     } else {
         return Math.ceil(number);
     }
+}
+
+export function groupCommonKeys(commonKeys) {
+    let groupStart = false;
+    commonKeys = commonKeys.map((commonKeyObj, idx) => {
+        if (commonKeyObj.parentxpath) {
+            if (!groupStart) {
+                groupStart = true;
+                commonKeyObj.groupStart = true;
+            }
+            if (groupStart) {
+                let nextIdx = idx + 1;
+                if (nextIdx < commonKeys.length) {
+                    let nextCommonKeyObj = commonKeys[nextIdx];
+                    if (commonKeyObj.parentxpath !== nextCommonKeyObj.parentxpath) {
+                        commonKeyObj.groupEnd = true;
+                        groupStart = false;
+                    }
+                } else {
+                    commonKeyObj.groupEnd = true;
+                    groupStart = false;
+                }
+            }
+        }
+        // remove grouping if only one element present in group
+        if (commonKeyObj.groupStart && commonKeyObj.groupEnd) {
+            delete commonKeyObj.groupStart;
+            delete commonKeyObj.groupEnd;
+        }
+        return commonKeyObj;
+    })
+    return commonKeys;
+}
+
+function mergeObjects(obj1, obj2) {
+    const mergedObj = {};
+
+    for (const prop in obj1) {
+        if (obj1.hasOwnProperty(prop)) {
+            if (Array.isArray(obj1[prop]) && Array.isArray(obj2[prop])) {
+                mergedObj[prop] = mergeArrays(obj1[prop], obj2[prop]);
+            } else if (typeof obj1[prop] === DataTypes.OBJECT && typeof obj2[prop] === DataTypes.OBJECT) {
+                mergedObj[prop] = mergeObjects(obj1[prop], obj2[prop]);
+            } else {
+                mergedObj[prop] = obj1[prop];
+            }
+        }
+    }
+
+    for (const prop in obj2) {
+        if (obj2.hasOwnProperty(prop) && !mergedObj.hasOwnProperty(prop)) {
+            mergedObj[prop] = obj2[prop];
+        }
+    }
+
+    return mergedObj;
+}
+
+function mergeArrays(arr1, arr2) {
+    const mergedArr = [...arr1];
+
+    for (const item2 of arr2) {
+        const matchingItem = mergedArr.find((item1) => item1[DB_ID] === item2[DB_ID]);
+        if (matchingItem) {
+            const index = mergedArr.indexOf(matchingItem);
+            mergedArr[index] = mergeObjects(matchingItem, item2);
+        } else {
+            mergedArr.push(item2);
+        }
+    }
+
+    return mergedArr;
 }

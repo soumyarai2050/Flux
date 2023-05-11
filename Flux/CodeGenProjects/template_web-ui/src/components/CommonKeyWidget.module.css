@@ -73,3 +73,11 @@
     }
 }
 
+.group_indicator {
+    color: yellow;
+}
+
+.break_line {
+    flex-basis: 100%;
+    height: 0;
+}

@@ -102,3 +102,8 @@
         opacity: 1
     }
 }
+
+.new_update {
+    color: maroon !important;
+    animation: blink 0.5s step-start infinite;
+}

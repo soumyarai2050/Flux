@@ -1,4 +1,5 @@
 import React, { Fragment, useRef } from 'react';
+import _ from 'lodash';
 import { Typography, Box } from '@mui/material';
 import { Save, Cached, Edit, AccountTree, TableView } from '@mui/icons-material';
 import { Icon } from './Icon';
@@ -26,12 +27,17 @@ const WidgetContainer = (props) => {
 
     let commonkeys = props.commonkeys ? props.commonkeys.filter(commonkey => {
         if (commonkey.value === null || commonkey.value === undefined) return false;
-        if (commonkey.value == {} || commonkey.value == []) return false;
-        return true;
+        else if (_.isObject(commonkey.value) && _.keys(commonkey.value).length === 0) return false;
+        else if (Array.isArray(commonkey.value) && commonkey.value.length === 0) return false;
+        else if (Number.isInteger(commonkey.value) && commonkey.value === 0) {
+            if (commonkey.displayZero) return true;
+            return false;
+        }
+        else return true;
     }) : [];
 
     let height = 0;
-    if(commonkeyRef.current !== null) {
+    if (commonkeyRef.current !== null) {
         height = commonkeyRef.current.offsetHeight;
     }
 
@@ -50,7 +56,7 @@ const WidgetContainer = (props) => {
                     </div>
                 </div>
             </Typography>
-            {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkeyRef} commonkeys={commonkeys} />}
+            {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkeyRef} commonkeys={commonkeys} lineBreakStart={props.lineBreakStart} lineBreakEnd={props.lineBreakEnd} />}
             <Box style={{ height: `calc(100% - 42px - ${height}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
                 {props.children}
             </Box>
@@ -68,11 +74,15 @@ WidgetContainer.propTypes = {
     onChangeMode: PropTypes.func,
     onChangeLayout: PropTypes.func,
     onSave: PropTypes.func,
-    children: PropTypes.any
+    children: PropTypes.any,
+    lineBreakStart: PropTypes.bool,
+    lineBreakEnd: PropTypes.bool
 }
 
 WidgetContainer.defaultProps = {
-    commonkeys: []
+    commonkeys: [],
+    lineBreakStart: true,
+    lineBreakEnd: true
 }
 
 export default WidgetContainer;

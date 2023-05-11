@@ -1,5 +1,6 @@
 import React from 'react';
-import { Box, TableHead, TableSortLabel, TableRow, TableCell } from '@mui/material';
+import { Box, TableHead, TableSortLabel, TableRow, TableCell, IconButton, Tooltip } from '@mui/material';
+import { ContentCopy } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { visuallyHidden } from '@mui/utils';
 import classes from './TableHead.module.css';
@@ -49,19 +50,21 @@ const CustomHeadCell = (props) => {
                             align='center'
                             padding='normal'
                             sortDirection={orderBy === cell.key ? order : false}>
+                            {props.copyColumnHandler && (
+                                <Tooltip title="Click to copy column">
+                                    <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cell.tableTitle)}><ContentCopy fontSize='small' /></IconButton>
+                                </Tooltip>
+                            )}
                             <TableSortLabel
                                 active={orderBy === cell.tableTitle}
                                 direction={orderBy === cell.tableTitle ? order : 'asc'}
                                 onClick={createSortHandler(cell.tableTitle)}>
-
                                 {cell.elaborateTitle ? cell.tableTitle : cell.title ? cell.title : cell.key}
-
                                 {orderBy === cell.key ? (
                                     <Box component="span" sx={visuallyHidden}>
                                         {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
                                     </Box>
                                 ) : null}
-
                             </TableSortLabel>
                         </TableCell>
                     )

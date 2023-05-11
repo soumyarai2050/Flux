@@ -1,29 +1,41 @@
-import React, { useState } from 'react';
+import React, { Fragment, useState } from 'react';
 import { Box, Tooltip, ClickAwayListener } from '@mui/material';
 import PropTypes from 'prop-types';
-import { clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt } from '../utils';
+import { clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt, groupCommonKeys } from '../utils';
 import { DataTypes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
 import _, { cloneDeep } from 'lodash';
 import classes from './CommonKeyWidget.module.css';
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
+    // filter unset or null values from common keys
+    let commonkeys = props.commonkeys.filter(commonKeyObj => {
+        if (commonKeyObj.value === undefined || commonKeyObj.value === null ||
+            (Array.isArray(commonKeyObj.value) && commonKeyObj.value.length === 0) ||
+            (_.isObject(commonKeyObj.value) && _.keys(commonKeyObj.value).length === 0)) {
+            return false;
+        }
+        return true;
+    })
 
-    let commonkeys = props.commonkeys.sort(function (a, b) {
+    // sort the common keys based on sequence in ascending order
+    commonkeys = props.commonkeys.sort(function (a, b) {
         if (a.sequenceNumber < b.sequenceNumber) return -1;
         return 1;
     })
 
+    // group the common keys with same parent
+    commonkeys = groupCommonKeys(commonkeys);
+
     return (
         <Box ref={ref} className={classes.container}>
             {commonkeys.map((collection, i) => {
-                if (collection.value === undefined || collection.value === null) return;
-                // if (collection.type === 'button') return;
-                if (Array.isArray(collection.value) && collection.value.length === 0) return;
-                if (_.isObject(collection.value) && _.keys(collection.value).length === 0) return;
-
                 return (
-                    <CommonKey key={i} collection={collection} />
+                    <Fragment key={i}>
+                        {props.lineBreakStart && collection.groupStart && <div className={classes.break_line} />}
+                        <CommonKey collection={collection} />
+                        {props.lineBreakEnd && collection.groupEnd && <div className={classes.break_line} />}
+                    </Fragment>
                 )
             })}
         </Box>
@@ -63,11 +75,22 @@ const CommonKey = (props) => {
             }
             abbreviatedField = (<AbbreviatedJson open={open} onClose={onCloseAbbreviatedField} src={updatedData} />)
         } else if (collection.type === DataTypes.STRING && !isValidJsonString(updatedData)) {
+            let tooltipText = "";
+            if (updatedData !== null && updatedData !== undefined) {
+                let lines = updatedData.split("\n");
+                tooltipText = (
+                    <>
+                        {lines.map((line, idx) => (
+                            <p key={idx}>{line}</p>
+                        ))}
+                    </>
+                )
+            }
             abbreviatedField = (
                 <ClickAwayListener onClickAway={onCloseAbbreviatedField}>
                     <div className={classes.abbreviated_json}>
                         <Tooltip
-                            title={updatedData}
+                            title={tooltipText}
                             placement="bottom-start"
                             open={open}
                             onClose={onCloseAbbreviatedField}
@@ -96,7 +119,7 @@ const CommonKey = (props) => {
 
     let value = collection.value;
     if (value && (collection.type === DataTypes.NUMBER || typeof (value) === DataTypes.NUMBER)) {
-        if(collection.displayType === DataTypes.INTEGER) {
+        if (collection.displayType === DataTypes.INTEGER) {
             value = floatToInt(value);
         }
         value = value.toLocaleString()
@@ -113,6 +136,7 @@ const CommonKey = (props) => {
 
     return (
         <Box className={classes.item}>
+            {collection.groupStart && <span className={classes.group_indicator}>{collection.parentxpath}: [ </span>}
             <span className={`${classes.key} ${commonkeyTitleColorClass}`}>
                 {collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}:
             </span>
@@ -125,6 +149,7 @@ const CommonKey = (props) => {
                     {value}{numberSuffix}
                 </span>
             )}
+            {collection.groupEnd && <span className={classes.group_indicator}> ]</span>}
         </Box>
     )
 }

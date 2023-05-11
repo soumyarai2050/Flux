@@ -28,7 +28,7 @@ const Node = (props) => {
         <Box className={classes.container}>
             <span className={classes.dash}>-</span>
             <Box className={classes.node_container} data-xpath={props.data.xpath} data-dataxpath={props.data.dataxpath}>
-                <div className={`${classes.node} ${nodeClass}`} onDoubleClick={() => props.data.onNodeDblClick(props.name)}>
+                <div className={`${classes.node} ${nodeClass}`}>
                     <span className={nodeTitleColorClass}>{props.data.title ? props.data.title : props.data.name}</span>
                     {props.data.showDataType && <span className={classes.type}>{capitalizeFirstLetter(props.data.type)}</span>}
                 </div>

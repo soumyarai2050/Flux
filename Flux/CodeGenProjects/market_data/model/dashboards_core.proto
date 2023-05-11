@@ -1,0 +1,39 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "trade_core.proto";
+
+package market_data;
+
+message PxRange {
+    optional float px_low = 1;
+    optional float px_high = 2;
+}
+
+message PremiumRange {
+    optional float premium_low = 1;
+    optional float premium_high = 2;
+    optional float premium_close_to_current_low = 3;
+    optional float premium_close_to_current_high = 4;
+}
+
+message AvailabilityRange {
+    optional float indicative_low = 1;
+    optional float indicative_high = 2;
+    optional float pth_low = 3;
+    optional float pth_high = 4;
+    optional float locate_low = 5;
+    optional float locate_high = 6;
+    optional float sod_low = 7;
+    optional float sod_high = 8;
+}
+
+message DashLeg {
+    optional string exch_id = 1 [(FluxFldServerPopulate) = true];
+    optional Security sec = 2;
+    optional string company = 3 [(FluxFldServerPopulate) = true];
+    optional float last_px = 4;
+    optional float last_px_change = 5;  // Against yesterday close px
+    optional float traded_nnotional = 6;  // market current total last trade notional
+    optional float consumed_notional = 7;  // all mstrat total cb notional (filled)
+}

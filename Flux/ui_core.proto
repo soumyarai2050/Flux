@@ -57,6 +57,7 @@ message WidgetUIData{
   optional string alert_bubble_color = 9;
   repeated string enable_override = 10;
   repeated string disable_override = 11;
+  optional bool highlight_update = 12 [default = false];
 }
 
 message UIButton{

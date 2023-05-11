@@ -1,0 +1,96 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+
+enum SecurityType{
+  SEC_TYPE_UNSPECIFIED = 0;
+  RIC = 1;
+  SEDOL = 2;
+  TICKER = 3;
+}
+
+enum Side{
+    SIDE_UNSPECIFIED = 0;
+    BUY = 1;
+    SELL = 3;
+    BTC = 2;  // Buy to Cover - Use Buy, set this only if downstream need's BTC awareness
+    SS = 4;  // Short Sell - Use Sell, set this only if downstream need's Short Sell awareness
+}
+
+enum PositionType{
+  POS_TYPE_UNSPECIFIED = 0;
+  PTH = 1; // Pay to hold driven
+  LOCATE = 2; // Borrow driven
+  SOD = 3; // past trades driven
+}
+
+// stores all position types from all sources for optimal selection, usage and clearance
+// one can design to make entry with the cheapest option first & clear the most expensive used position first
+message Position{
+  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional bool pos_disable = 2 [default = false, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
+    unpressed_caption: "disable",
+    pressed_caption: "enable",
+    value_color_map: "true=DEBUG,false=SUCCESS",
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true"
+  }];
+  required PositionType type = 3;
+  // available position size for consumption
+  required int64 available_size = 4;
+  // position committed but not consumed (portfolio to strat; day-2: maybe strat to open order)
+  required int64 allocated_size = 5;
+  // actual position consumption
+  required int64 consumed_size = 6;
+  // cost of using this position type
+  optional float acquire_cost = 7;
+  // un-avoidable charge due to this position type (irrespective of use / no-use)
+  optional float incurred_cost = 8;
+  // T+1 and onwards recurring daily cost
+  optional float carry_cost = 9;
+  optional int32 priority = 10 [default = 10, (FluxFldHelp) = "default priority: 10,  orders to respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional float premium_percentage = 11 [default = 2, (FluxFldNumberFormat) = "%"];
+}
+
+message SecPosition{
+  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required Security security = 2 [(FluxFldAutoComplete) = "sec_id:EQT_List, sec_type=TICKER", (FluxFldHelp) = "EQT Tickers"];
+  // per position type (PTH, LOCATE, LONG)
+  repeated Position positions = 3;
+}
+
+message Broker{
+  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required bool bkr_disable = 2 [default=false, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
+    unpressed_caption: "disable",
+    pressed_caption: "enable",
+    value_color_map: "true=DEBUG,false=SUCCESS"
+    button_type: BUTTON_TYPE_RECTANGLE,
+    button_size: BUTTON_SIZE_MEDIUM,
+    action: "flux_toggle",
+    pressed_value_as_text: "true"
+  }];
+  // per security positions
+  repeated SecPosition sec_positions = 3;
+  // broker identifier
+  required string broker = 4;
+  optional int32 bkr_priority = 5 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; orders respect specified priority (lower value is higher priority), duplicates allowed"];
+}
+
+// Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
+message Security{
+    required string sec_id = 1 [(FluxFldUIPlaceholder) = "SelectSecurity", (FluxFldSticky) = true];
+    optional SecurityType sec_type = 2 [default = SEC_TYPE_UNSPECIFIED, (FluxFldHide) = "True"];
+}
+
+message Quote{
+  optional float px = 1;
+  optional int64 qty = 2 [(FluxFldNoCommonKey) = true];
+  optional float premium = 3;
+  optional int64 last_update_date_time = 4[(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+}
+
+
+

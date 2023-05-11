@@ -5,7 +5,7 @@ import { Download, Delete } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { Icon } from './Icon';
 import _ from 'lodash';
-import { DB_ID, Modes, DataTypes } from '../constants';
+import { DB_ID, Modes, DataTypes, ColorTypes } from '../constants';
 import {
     getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getComparator, stableSort
 } from '../utils';
@@ -149,8 +149,12 @@ const AbbreviatedFilterWidget = (props) => {
                                 stableSort(rows, getComparator(order, orderBy)).map((row, index) => {
                                     let selected = row["data-id"] === props.selected;
                                     let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
-                                    let alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
-                                    let alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                                    let alertBubbleCount = 0;
+                                    let alertBubbleColor = ColorTypes.INFO;
+                                    if (props.alertBubbleSource) {
+                                        alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
+                                        alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                                    }
                                     let disabled = props.selected !== row["data-id"] ? true : false;
 
                                     return (

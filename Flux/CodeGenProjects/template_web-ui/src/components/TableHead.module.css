@@ -52,3 +52,7 @@
     }
 }
 
+.icon {
+    color: white !important;
+    margin-left: -4px !important;
+}

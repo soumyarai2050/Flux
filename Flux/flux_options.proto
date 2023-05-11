@@ -207,6 +207,8 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldNoCommonKey = 55268;
   optional string FluxFldNumberFormat = 55269; // currently only symbol `%` is supported , in future we can add precision etc.
   optional string FluxFldDisplayType = 55270; // Use this to set display data type for field
+  optional bool FluxFldDisplayZero = 55271;  // Use this to show field even if its value is 0
+  optional string FluxFldTextAlign = 55272;  // Use this to set text alignment
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

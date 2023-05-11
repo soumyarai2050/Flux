@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useSelector } from 'react-redux';
 import _, { cloneDeep, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
@@ -20,6 +20,9 @@ const Cell = (props) => {
     const state = useSelector(state => state);
     const [active, setActive] = useState(false);
     const [open, setOpen] = useState(false);
+    const [oldValue, setOldValue] = useState(null);
+    const [newUpdateClass, setNewUpdateClass] = useState("");
+    const timeoutRef = useRef(null);
 
     const {
         mode,
@@ -32,6 +35,19 @@ const Cell = (props) => {
         currentValue,
         previousValue,
     } = props;
+
+    useEffect(() => {
+        if (props.highlightUpdate && currentValue !== oldValue) {
+            setNewUpdateClass(classes.new_update);
+            if (timeoutRef.current !== null) {
+                clearTimeout(timeoutRef.current);
+            }
+            timeoutRef.current = setTimeout(() => {
+                setNewUpdateClass("");
+            }, 1500);
+            setOldValue(currentValue);
+        }
+    }, [currentValue, oldValue, timeoutRef, classes, props.highlightUpdate])
 
     const onFocusIn = useCallback(() => {
         setActive(true);
@@ -340,12 +356,23 @@ const Cell = (props) => {
                 </TableCell >
             )
         } else if (type === DataTypes.STRING && !isValidJsonString(updatedData)) {
+            let tooltipText = "";
+            if (updatedData !== null && updatedData !== undefined) {
+                let lines = updatedData.split("\n");
+                tooltipText = (
+                    <>
+                        {lines.map((line, idx) => (
+                            <p key={idx}>{line}</p>
+                        ))}
+                    </>
+                )
+            }
             return (
                 <TableCell className={`${classes.cell} ${classes.abbreviated_json_cell} ${tableCellRemove}`} align='center' size='medium' onClick={onOpenTooltip}>
                     <ClickAwayListener onClickAway={onCloseTooltip}>
                         <div className={classes.abbreviated_json_cell}>
                             <Tooltip
-                                title={updatedData}
+                                title={tooltipText}
                                 open={open}
                                 placement="bottom-start"
                                 onClose={onCloseTooltip}
@@ -384,6 +411,8 @@ const Cell = (props) => {
         }
     }
 
+    let textAlign = collection.textAlign ? collection.textAlign : 'center';
+
     if (mode === Modes.EDIT_MODE && dataModified) {
         let originalValue = previousValue !== undefined && previousValue !== null ? previousValue : '';
         if (collection.displayType === DataTypes.INTEGER && typeof (originalValue) === DataTypes.NUMBER) {
@@ -391,14 +420,14 @@ const Cell = (props) => {
         }
         originalValue = originalValue.toLocaleString();
         return (
-            <TableCell className={`${classes.cell} ${tableCellColorClass} ${disabledClass}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
+            <TableCell className={`${classes.cell} ${tableCellColorClass} ${disabledClass}`} align={textAlign} size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
                 {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
             </TableCell>
         )
     } else {
         return (
-            <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove}`} align='center' size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
+            <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`} align={textAlign} size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
             </TableCell>
         )

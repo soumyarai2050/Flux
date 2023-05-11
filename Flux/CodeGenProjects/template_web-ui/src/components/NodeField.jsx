@@ -53,6 +53,7 @@ const NodeField = (props) => {
     if (props.data.customComponentType === 'autocomplete') {
         return (
             <Autocomplete
+                id={props.data.key}
                 options={props.data.options}
                 getOptionLabel={(option) => option}
                 isOptionEqualToValue={(option, value) => option == value}
@@ -68,6 +69,7 @@ const NodeField = (props) => {
                 renderInput={(params) => (
                     <TextField
                         {...params}
+                        name={props.data.key}
                         error={error}
                         placeholder={props.data.placeholder}
                     />
@@ -77,6 +79,8 @@ const NodeField = (props) => {
     } else if (props.data.type === DataTypes.BOOLEAN) {
         return (
             <Checkbox
+                id={props.data.key}
+                name={props.data.key}
                 className={`${classes.checkbox} ${nodeFieldRemove} ${colorClass}`}
                 defaultValue={false}
                 checked={props.data.value ? props.data.value : false}
@@ -87,6 +91,8 @@ const NodeField = (props) => {
     } else if (props.data.type === DataTypes.ENUM) {
         return (
             <Select
+                id={props.data.key}
+                name={props.data.key}
                 className={`${classes.select} ${nodeFieldRemove} ${colorClass}`}
                 value={props.data.value ? props.data.value : ''}
                 onChange={(e) => props.data.onSelectItemChange(e, props.data.dataxpath, props.data.xpath)}
@@ -164,6 +170,8 @@ const NodeField = (props) => {
         return (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DateTimePicker
+                    id={props.data.key}
+                    name={props.data.key}
                     className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                     disabled={disabled}
                     error={error}

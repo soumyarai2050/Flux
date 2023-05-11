@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, Fragment, memo } from 'react';
 import _, { cloneDeep } from 'lodash';
 import {
     TableContainer, Table, TableBody, DialogTitle, DialogContent, DialogContentText,
-    DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination
+    DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination, Snackbar, Alert
 } from '@mui/material';
 import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp } from '@mui/icons-material';
 import { utils, writeFileXLSX } from 'xlsx';
@@ -38,6 +38,7 @@ const TableWidget = (props) => {
     const [orderBy, setOrderBy] = React.useState('');
     const [openModalPopup, setOpenModalPopup] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
+    const [toastMessage, setToastMessage] = useState(null);
 
     useEffect(() => {
         setData(props.data);
@@ -282,6 +283,20 @@ const TableWidget = (props) => {
         writeFileXLSX(wb, `${props.name}.xlsx`);
     }, [props.collections, props.originalData, props.xpath])
 
+    const copyColumnHandler = useCallback((xpath) => {
+        let columnName = xpath.split('.').pop();
+        let values = [columnName];
+        rows.map(row => {
+            values.push(row[xpath]);
+        })
+        navigator.clipboard.writeText(values.join("\n"));
+        setToastMessage("column copied to clipboard: " + columnName);
+    }, [rows])
+
+    const onCloseToastMessage = useCallback(() => {
+        setToastMessage(null);
+    }, [])
+
     let menu = (
         <Fragment>
             {props.headerProps.menu}
@@ -368,6 +383,7 @@ const TableWidget = (props) => {
                                 order={order}
                                 orderBy={orderBy}
                                 onRequestSort={handleRequestSort}
+                                copyColumnHandler={copyColumnHandler}
                             />
                             <TableBody>
                                 {stableSort(rows, getComparator(order, orderBy))
@@ -402,10 +418,16 @@ const TableWidget = (props) => {
 
                                         let cells = getFilteredCells();
                                         let selected = selectedRows.filter(id => id === row['data-id']).length > 0;
+                                        let rowKey = Number.isInteger(row['data-id']);
+                                        if (rowKey) {
+                                            rowKey = index;
+                                        } else {
+                                            rowKey = _.get(data, row['data-id'])[DB_ID];
+                                        }
 
                                         return (
                                             <Row
-                                                key={index}
+                                                key={rowKey}
                                                 className={tableRowClass}
                                                 cells={cells}
                                                 collections={props.collections}
@@ -481,6 +503,11 @@ const TableWidget = (props) => {
                     </DialogActions>
                 </Dialog>
             </FullScreenModal>
+            {toastMessage && (
+                <Snackbar open={toastMessage !== null} autoHideDuration={2000} onClose={onCloseToastMessage}>
+                    <Alert onClose={onCloseToastMessage} severity="success">{toastMessage}</Alert>
+                </Snackbar>
+            )}
 
             {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
         </WidgetContainer>
