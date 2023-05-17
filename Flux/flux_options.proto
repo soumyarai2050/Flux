@@ -58,6 +58,7 @@ message MessageJsonRoot{
   optional AggregateType ReadWebSocketDesc = 6;
   optional AggregateType UpdateWebSocketDesc = 7;
   optional bool SetReentrantLock = 8 [default=true];
+  optional bool SetReentrantLockToTop = 9 [default=false];
 }
 
 message MessageJsonQuery{
@@ -185,6 +186,7 @@ extend google.protobuf.FieldOptions
 
   //ORM options - 551
   optional bool FluxFldOrmNoUpdate = 55151;  //The field that gets persisted in create to ORM and subsequently can't be updated has this option set
+  optional string FluxFldAbbreviatedLink = 55152;  // Use to connect Data Tables that are not DB connected but share common key
 
   //UI option 552
   optional string FluxFldAbbreviated = 55251; // Use this to "Abbreviate" msg and show compressed single val

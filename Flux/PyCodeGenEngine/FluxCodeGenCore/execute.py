@@ -38,6 +38,8 @@ class Execute:
                         proto_path_str += f"--proto_path={proto_import_path}"
 
                 proto_files_str = " ".join(proto_file_paths_list)
+
+                # executing cmd for python output
                 protoc_cmd = f"protoc {proto_path_str} --python_out={out_dir} {proto_files_str}"
                 os.system(protoc_cmd)
                 return True

@@ -69,16 +69,16 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
 
     def handle_update_data(self, file: protogen.File) -> str:
         output_str = ""
-        if self.abbreviated_filter_layout_msg_list:
+        if self.simple_abbreviated_filter_layout_msg_list:
             temp_str = ""
-            for message in self.abbreviated_filter_layout_msg_list:
+            for message in self.simple_abbreviated_filter_layout_msg_list:
                 message_name_camel_cased = convert_camel_case_to_specific_case(message.proto.name)
                 temp_str += f"name === '{message_name_camel_cased}' "
-                if message != self.abbreviated_filter_layout_msg_list[-1]:
+                if message != self.simple_abbreviated_filter_layout_msg_list[-1]:
                     temp_str += "|| "
             output_str += f"if ({temp_str}&& show[name]) " + "{\n"
             for message in self.layout_msg_list:
-                if message not in self.root_msg_list and message not in self.abbreviated_filter_layout_msg_list:
+                if message not in self.root_msg_list and message not in self.simple_abbreviated_filter_layout_msg_list:
                     message_name_camel_cased = convert_camel_case_to_specific_case(message.proto.name)
                     output_str += f"    updatedData['{message_name_camel_cased}'] = false;\n"
                 # else not required: avoiding other than dependent type layout messages

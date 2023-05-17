@@ -24,8 +24,10 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
         self.repeated_tree_layout_msg_list: List[protogen.Message] = []
         self.table_layout_msg_list: List[protogen.Message] = []
         self.repeated_table_layout_msg_list: List[protogen.Message] = []
-        self.abbreviated_filter_layout_msg_list: List[protogen.Message] = []
+        self.simple_abbreviated_filter_layout_msg_list: List[protogen.Message] = []
+        self.parent_abbreviated_filter_layout_msg_list: List[protogen.Message] = []
         self.abbreviated_msg_name_to_dependent_msg_name_dict: Dict[str, str] = {}
+        self.parent_abb_msg_name_to_linked_abb_msg_name_dict: Dict[str, str] = {}
         if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
             self.response_field_case_style: str = response_field_case_style
         else:
@@ -65,7 +67,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                         else:
                             self.table_layout_msg_list.append(message)
                     elif BaseJSLayoutPlugin.flux_msg_abbreviated_filter_layout_value == layout_type:
-                        self.abbreviated_filter_layout_msg_list.append(message)
+                        self.simple_abbreviated_filter_layout_msg_list.append(message)
                         fld_abbreviated_option_value = None
                         for field in message.fields:
                             fld_abbreviated_option_value = \
@@ -91,6 +93,36 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                         raise Exception(err_str)
                 # else not required: Avoiding if flx_msg_widget_ui_data doesn't have layout field
             # else not required: If msg doesn't have flx_msg_widget_ui_data then it will not have layout field
+
+            # Collecting all parent_abbreviated_type message from simple_abbreviated_type list
+            parent_abb_msg_name_list = []
+            for abb_msg_name, abb_dependent_msg_name in self.abbreviated_msg_name_to_dependent_msg_name_dict.items():
+                for msg in file.messages:
+                    found_msg = False
+                    if abb_dependent_msg_name == msg.proto.name:
+                        found_msg = True
+                        for field in msg.fields:
+                            if BaseJSLayoutPlugin.flux_fld_abbreviated_link in str(field.proto.options):
+                                abb_link_option_val = \
+                                    self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                                                                                     BaseJSLayoutPlugin.flux_fld_abbreviated_link)
+                                dependent_abb_msg_name = abb_link_option_val.split(".")[0][1:]
+                                self.parent_abb_msg_name_to_linked_abb_msg_name_dict[abb_msg_name] = dependent_abb_msg_name
+                                parent_abb_msg_name_list.append(abb_msg_name)
+                                break
+                    if found_msg:
+                        break
+                else:
+                    err_str = f"Could not find any message in proto files with name {abb_dependent_msg_name}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+
+            for simple_abb_msg in self.simple_abbreviated_filter_layout_msg_list:
+                if simple_abb_msg.proto.name in parent_abb_msg_name_list:
+                    # adding parent abb type message in parent_abbreviated_filter_layout_msg_list and
+                    # removing it from simple abb type list
+                    self.parent_abbreviated_filter_layout_msg_list.append(simple_abb_msg)
+                    self.simple_abbreviated_filter_layout_msg_list.remove(simple_abb_msg)
 
         if self.response_field_case_style.lower() == "snake":
             self.case_style_convert_method = convert_camel_case_to_specific_case
