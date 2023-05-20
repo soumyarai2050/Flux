@@ -1,5 +1,5 @@
-import React, { Fragment, useState, useMemo } from 'react';
-import { Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell } from '@mui/material';
+import React, { Fragment, useState, useEffect, useMemo } from 'react';
+import { Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell, TablePagination } from '@mui/material';
 import WidgetContainer from './WidgetContainer';
 import { Download, Delete } from '@mui/icons-material';
 import PropTypes from 'prop-types';
@@ -7,7 +7,7 @@ import { Icon } from './Icon';
 import _ from 'lodash';
 import { DB_ID, Modes, DataTypes, ColorTypes } from '../constants';
 import {
-    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getComparator, stableSort
+    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getComparator, stableSort, getAbbreviatedKeyFromId
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { AlertErrorMessage } from './Alert';
@@ -17,9 +17,10 @@ import Cell from './Cell';
 import classes from './AbbreviatedFilterWidget.module.css';
 
 const AbbreviatedFilterWidget = (props) => {
-
     const [order, setOrder] = useState('asc');
     const [orderBy, setOrderBy] = useState('');
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [page, setPage] = useState(0);
 
     const onButtonClick = (e, action, xpath, value) => {
         if (action === 'flux_toggle') {
@@ -45,6 +46,15 @@ const AbbreviatedFilterWidget = (props) => {
         }
     }
 
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
     const collections = useMemo(() => {
         let collections = [];
         if (props.abbreviated && props.itemCollections.length > 0) {
@@ -57,13 +67,13 @@ const AbbreviatedFilterWidget = (props) => {
                 }
                 let xpath = source.split("-").map(path => path = path.substring(path.indexOf(".") + 1));
                 xpath = xpath.join("-");
-                source = source.split("-")[0];
-                let key = source.split('.').pop();
-                let collection = props.itemCollections.filter(col => col.key === key)[0];
+                source = xpath.split("-")[0];
+                let collection = props.itemCollections.filter(col => col.tableTitle === source)[0];
                 collection.xpath = xpath;
+                collection.tableTitle = xpath;
+                collection.elaborateTitle = false;
                 if (title) {
                     collection.title = title;
-                    collection.tableTitle = title;
                 }
                 collections.push(collection);
             })
@@ -99,6 +109,18 @@ const AbbreviatedFilterWidget = (props) => {
         return rows;
     }, [props.items, props.abbreviated, props.itemsMetadata, collections])
 
+    const activeRows = useMemo(() => {
+        return stableSort(rows, getComparator(order, orderBy))
+            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+    }, [rows, order, orderBy, page, rowsPerPage])
+
+    useEffect(() => {
+        let activeItems = activeRows.map(row => getAbbreviatedKeyFromId(props.items, props.abbreviated, row['data-id']));
+        if (!_.isEqual(activeItems, props.activeItems)) {
+            props.setOldActiveItems(props.activeItems);
+            props.setActiveItems(activeItems);
+        }
+    }, [activeRows, props.items, props.abbreviated])
 
     return (
         <WidgetContainer
@@ -131,102 +153,115 @@ const AbbreviatedFilterWidget = (props) => {
             </Box>
             <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
             {rows && rows.length > 0 && (
-                <TableContainer className={classes.container}>
-                    <Table
-                        className={classes.table}
-                        size='medium'>
-                        <TableHead
-                            prefixCells={1}
-                            suffixCells={1}
-                            headCells={headCells}
-                            mode={Modes.READ_MODE}
-                            order={order}
-                            orderBy={orderBy}
-                            onRequestSort={handleRequestSort}
+                <>
+                    <TableContainer className={classes.container}>
+                        <Table
+                            className={classes.table}
+                            size='medium'>
+                            <TableHead
+                                prefixCells={1}
+                                suffixCells={1}
+                                headCells={headCells}
+                                mode={Modes.READ_MODE}
+                                order={order}
+                                orderBy={orderBy}
+                                onRequestSort={handleRequestSort}
+                            />
+                            <TableBody>
+                                {
+                                    activeRows.map((row, index) => {
+                                        let selected = row["data-id"] === props.selected;
+                                        let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
+                                        let alertBubbleCount = 0;
+                                        let alertBubbleColor = ColorTypes.INFO;
+                                        if (props.alertBubbleSource) {
+                                            alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
+                                            alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                                        }
+                                        let disabled = props.selected !== row["data-id"] ? true : false;
+
+                                        return (
+                                            <Fragment key={index}>
+                                                <TableRow
+                                                    selected={selected}
+                                                    onClick={() => onRowSelect(row["data-id"])}>
+                                                    <TableCell className={classes.cell} sx={{ width: 10 }}>
+                                                        {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
+                                                    </TableCell>
+                                                    {headCells.map((cell, i) => {
+                                                        let mode = Modes.READ_MODE;
+                                                        let rowindex = row["data-id"];
+                                                        let collection = collections.filter(c => c.key === cell.key)[0];
+                                                        if (collection.type === "progressBar") {
+                                                            collection = _.cloneDeep(collection);
+                                                            let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
+                                                            if (typeof (collection.min) === DataTypes.STRING) {
+                                                                let min = collection.min;
+                                                                collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
+                                                            }
+                                                            if (typeof (collection.max) === DataTypes.STRING) {
+                                                                let max = collection.max;
+                                                                collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
+                                                                collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1))
+                                                            }
+
+                                                        }
+                                                        let xpath = collection.xpath;
+                                                        let value = row[collection.xpath];
+
+                                                        return (
+                                                            <Cell
+                                                                key={i}
+                                                                mode={mode}
+                                                                rowindex={rowindex}
+                                                                name={cell.key}
+                                                                elaborateTitle={cell.tableTitle}
+                                                                currentValue={value}
+                                                                previousValue={value}
+                                                                collection={collection}
+                                                                xpath={xpath}
+                                                                dataxpath={xpath}
+                                                                dataAdd={false}
+                                                                dataRemove={false}
+                                                                disabled={disabled}
+                                                                ignoreDisable={true}
+                                                                onUpdate={() => { }}
+                                                                onDoubleClick={() => { }}
+                                                                onButtonClick={onButtonClick}
+                                                                onCheckboxChange={() => { }}
+                                                                onTextChange={() => { }}
+                                                                onSelectItemChange={() => { }}
+                                                                onAutocompleteOptionChange={() => { }}
+                                                                onDateTimeChange={() => { }}
+                                                            />
+                                                        )
+                                                    })}
+
+                                                    <TableCell className={classes.cell} sx={{ width: 10 }}>
+                                                        <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
+                                                            <Delete fontSize='small' />
+                                                        </Icon>
+                                                    </TableCell>
+                                                </TableRow>
+                                            </Fragment>
+                                        )
+                                    })
+                                }
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                    {rows.length > 6 &&
+                        <TablePagination
+                            rowsPerPageOptions={[25, 50]}
+                            component="div"
+                            count={rows.length}
+                            rowsPerPage={rowsPerPage}
+                            page={page}
+                            onPageChange={handleChangePage}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
                         />
-                        <TableBody>
-                            {
-                                stableSort(rows, getComparator(order, orderBy)).map((row, index) => {
-                                    let selected = row["data-id"] === props.selected;
-                                    let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
-                                    let alertBubbleCount = 0;
-                                    let alertBubbleColor = ColorTypes.INFO;
-                                    if (props.alertBubbleSource) {
-                                        alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
-                                        alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
-                                    }
-                                    let disabled = props.selected !== row["data-id"] ? true : false;
-
-                                    return (
-                                        <Fragment key={index}>
-                                            <TableRow
-                                                selected={selected}
-                                                onClick={() => onRowSelect(row["data-id"])}>
-                                                <TableCell className={classes.cell} sx={{ width: 10 }}>
-                                                    {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
-                                                </TableCell>
-                                                {headCells.map((cell, i) => {
-                                                    let mode = Modes.READ_MODE;
-                                                    let rowindex = row["data-id"];
-                                                    let collection = collections.filter(c => c.key === cell.key)[0];
-                                                    if (collection.type === "progressBar") {
-                                                        collection = _.cloneDeep(collection);
-                                                        let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
-                                                        if (typeof (collection.min) === DataTypes.STRING) {
-                                                            let min = collection.min;
-                                                            collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
-                                                        }
-                                                        if (typeof (collection.max) === DataTypes.STRING) {
-                                                            let max = collection.max;
-                                                            collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
-                                                            collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1))
-                                                        }
-
-                                                    }
-                                                    let xpath = collection.xpath;
-                                                    let value = row[collection.xpath];
-
-                                                    return (
-                                                        <Cell
-                                                            key={i}
-                                                            mode={mode}
-                                                            rowindex={rowindex}
-                                                            name={cell.key}
-                                                            elaborateTitle={cell.tableTitle}
-                                                            currentValue={value}
-                                                            previousValue={value}
-                                                            collection={collection}
-                                                            xpath={xpath}
-                                                            dataxpath={xpath}
-                                                            dataAdd={false}
-                                                            dataRemove={false}
-                                                            disabled={disabled}
-                                                            ignoreDisable={true}
-                                                            onUpdate={() => { }}
-                                                            onDoubleClick={() => { }}
-                                                            onButtonClick={onButtonClick}
-                                                            onCheckboxChange={() => { }}
-                                                            onTextChange={() => { }}
-                                                            onSelectItemChange={() => { }}
-                                                            onAutocompleteOptionChange={() => { }}
-                                                            onDateTimeChange={() => { }}
-                                                        />
-                                                    )
-                                                })}
-
-                                                <TableCell className={classes.cell} sx={{ width: 10 }}>
-                                                    <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
-                                                        <Delete fontSize='small' />
-                                                    </Icon>
-                                                </TableCell>
-                                            </TableRow>
-                                        </Fragment>
-                                    )
-                                })
-                            }
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                    }
+                </>
             )}
             {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
         </WidgetContainer>

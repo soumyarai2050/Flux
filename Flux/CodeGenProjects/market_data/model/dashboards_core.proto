@@ -30,10 +30,10 @@ message AvailabilityRange {
 
 message DashLeg {
     optional string exch_id = 1 [(FluxFldServerPopulate) = true];
-    optional Security sec = 2;
+    required Security sec = 2;
     optional string company = 3 [(FluxFldServerPopulate) = true];
     optional float last_px = 4;
     optional float last_px_change = 5;  // Against yesterday close px
-    optional float traded_nnotional = 6;  // market current total last trade notional
+    optional float traded_notional = 6;  // market current total last trade notional
     optional float consumed_notional = 7;  // all mstrat total cb notional (filled)
 }

@@ -38,7 +38,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if BeanieFastApiPlugin.flux_msg_json_root in str(message.proto.options):
+            if self.is_option_enabled(message, BeanieFastApiPlugin.flux_msg_json_root):
                 json_root_msg_option_val_dict = \
                     self.get_complex_option_values_as_list_of_dict(message, BeanieFastApiPlugin.flux_msg_json_root)
                 # taking first obj since json root is of non-repeated option
@@ -51,6 +51,20 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                 # else not required: If json root option don't have reentrant field then considering it requires
                 # reentrant lock as default and avoiding its append to reentrant lock non-required list
 
+                if (is_reentrant_on_top := json_root_msg_option_val_dict[0].get(
+                        BeanieFastApiPlugin.flux_json_root_set_reentrant_lock_to_top_field)) is not None:
+                    if is_reentrant_required is not None and not is_reentrant_required:
+                        err_str = "Field SetReentrantLock is set to true, avoiding adding model's reentrant lock " \
+                                  "to generated route for this model therefor no use can be made of " \
+                                  "SetReentrantLockToTop field set to true, make changes to proto file for it"
+                        logging.error(err_str)
+                        raise Exception(err_str)
+                    else:
+                        if is_reentrant_on_top:
+                            self.reentrant_lock_on_top_required_msg.append(message)
+                        # else not required: if not set or is false then lock will be created on default position
+                # else not required: If not set then avoiding any processing for it
+
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
@@ -62,7 +76,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                     self.non_root_message_list.append(message)
                 # else not required: avoiding repetition
 
-            if BeanieFastApiPlugin.flux_msg_json_query in str(message.proto.options):
+            if self.is_option_enabled(message, BeanieFastApiPlugin.flux_msg_json_query):
                 if message not in self.message_to_query_option_list_dict:
                     self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
                 # else not required: avoiding repetition

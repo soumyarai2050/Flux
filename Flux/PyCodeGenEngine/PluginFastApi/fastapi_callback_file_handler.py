@@ -19,9 +19,11 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_POST_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def create_{message_name_snake_cased}_pre(self, " \
+        output_str = "    @perf_benchmark\n"
+        output_str += f"    async def create_{message_name_snake_cased}_pre(self, " \
                      f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
+        output_str += "    @perf_benchmark\n"
         output_str += f"    async def create_{message_name_snake_cased}_post(self, " \
                       f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
@@ -29,11 +31,13 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_GET_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = "    @perf_benchmark\n"
         if id_field_type is None:
-            output_str = f"    async def read_by_id_{message_name_snake_cased}_pre(self, obj_id: int):\n"
+            output_str += f"    async def read_by_id_{message_name_snake_cased}_pre(self, obj_id: int):\n"
         else:
-            output_str = f"    async def read_by_id_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
+            output_str += f"    async def read_by_id_{message_name_snake_cased}_pre(self, obj_id: {id_field_type}):\n"
         output_str += "        pass\n\n"
+        output_str += "    @perf_benchmark\n"
         output_str += f"    async def read_by_id_{message_name_snake_cased}_post(self, " \
                       f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
@@ -41,10 +45,12 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_PUT_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def update_{message_name_snake_cased}_pre(self, " \
+        output_str = "    @perf_benchmark\n"
+        output_str += f"    async def update_{message_name_snake_cased}_pre(self, " \
                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += f"        return updated_{message_name_snake_cased}_obj\n\n"
+        output_str += "    @perf_benchmark\n"
         output_str += f"    async def update_{message_name_snake_cased}_post(self, " \
                       f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                       f"updated_{message_name_snake_cased}_obj: {message.proto.name}):\n"
@@ -53,10 +59,12 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_PATCH_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
+        output_str = "    @perf_benchmark\n"
+        output_str += f"    async def partial_update_{message_name_snake_cased}_pre(self, " \
                      f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                      f"updated_{message_name_snake_cased}_obj: {message.proto.name}Optional):\n"
         output_str += f"        return updated_{message_name_snake_cased}_obj\n\n"
+        output_str += "    @perf_benchmark\n"
         output_str += f"    async def partial_update_{message_name_snake_cased}_post(self, " \
                       f"stored_{message_name_snake_cased}_obj: {message.proto.name}, " \
                       f"updated_{message_name_snake_cased}_obj: {message.proto.name}Optional):\n"
@@ -65,9 +73,11 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_DELETE_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def delete_{message_name_snake_cased}_pre(self, pydantic_obj_to_be_deleted: " \
+        output_str = "    @perf_benchmark\n"
+        output_str += f"    async def delete_{message_name_snake_cased}_pre(self, pydantic_obj_to_be_deleted: " \
                      f"{message.proto.name}):\n"
         output_str += "        pass\n\n"
+        output_str += "    @perf_benchmark\n"
         output_str += f"    async def delete_{message_name_snake_cased}_post(self, " \
                       f"delete_web_response):\n"
         output_str += "        pass\n\n"
@@ -87,8 +97,10 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_get_all_message_http_callback_methods(self, message: protogen.Message) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def read_all_{message_name_snake_cased}_pre(self):\n"
+        output_str = "    @perf_benchmark\n"
+        output_str += f"    async def read_all_{message_name_snake_cased}_pre(self):\n"
         output_str += "        pass\n\n"
+        output_str += "    @perf_benchmark\n"
         output_str += f"    async def read_all_{message_name_snake_cased}_post(self, " \
                       f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
         output_str += "        pass\n\n"
@@ -96,8 +108,10 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_index_callback_methods_gen(self, message: protogen.Message) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = f"    async def index_of_{message_name_snake_cased}_pre(self):\n"
+        output_str = "    @perf_benchmark\n"
+        output_str += f"    async def index_of_{message_name_snake_cased}_pre(self):\n"
         output_str += "        pass\n\n"
+        output_str += "    @perf_benchmark\n"
         output_str += f"    async def index_of_{message_name_snake_cased}_post(self, " \
                       f"{message_name_snake_cased}_obj: {message.proto.name}):\n"
         output_str += "        pass\n\n"
@@ -218,26 +232,30 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
 
             message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
             for aggregate_value in aggregate_value_list:
-                aggregate_var_name = aggregate_value[FastapiCallbackFileHandler.aggregate_var_name_key]
-                aggregate_params = aggregate_value[FastapiCallbackFileHandler.aggregate_params_key]
-                aggregate_params_data_types = aggregate_value[FastapiCallbackFileHandler.aggregate_params_data_types_key]
+                query_name = aggregate_value[FastapiCallbackFileHandler.query_name_key]
+                query_params = aggregate_value[FastapiCallbackFileHandler.query_params_key]
+                query_params_data_types = aggregate_value[FastapiCallbackFileHandler.query_params_data_types_key]
 
-                if aggregate_params:
+                if query_params:
                     agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
-                                                          for param, param_type in zip(aggregate_params,
-                                                                                       aggregate_params_data_types)])
-                    output_str += f"    async def {aggregate_var_name}_query_pre(self, " \
+                                                          for param, param_type in zip(query_params,
+                                                                                       query_params_data_types)])
+                    output_str += "    @perf_benchmark\n"
+                    output_str += f"    async def {query_name}_query_pre(self, " \
                                   f"{message_name_snake_cased}_class_type: Type[{message.proto.name}], " \
                                   f"{agg_params_with_type_str}):\n"
                     output_str += "        return []\n\n"
-                    output_str += f"    async def {aggregate_var_name}_query_post(self, " \
+                    output_str += "    @perf_benchmark\n"
+                    output_str += f"    async def {query_name}_query_post(self, " \
                                   f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
                     output_str += f"        return {message_name_snake_cased}_obj_list\n\n"
                 else:
-                    output_str += f"    async def {aggregate_var_name}_query_pre(self, " \
+                    output_str += "    @perf_benchmark\n"
+                    output_str += f"    async def {query_name}_query_pre(self, " \
                                   f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
                     output_str += "        return []\n\n"
-                    output_str += f"    async def {aggregate_var_name}_query_post(self, " \
+                    output_str += "    @perf_benchmark\n"
+                    output_str += f"    async def {query_name}_query_post(self, " \
                                   f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"
                     output_str += f"        return {message_name_snake_cased}_obj_list\n\n"
 
@@ -249,6 +267,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "from typing import Optional, TypeVar, List, Type\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
         output_str += f"from {model_file_path} import *\n"
+        output_str += f"from FluxPythonUtils.scripts.utility_functions import perf_benchmark\n"
         output_str += self.handle_get_set_instance()
 
         # Adding app pre- and post-launch methods

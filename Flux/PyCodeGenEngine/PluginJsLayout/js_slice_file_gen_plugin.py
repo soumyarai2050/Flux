@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import logging
 import os
+import re
 from typing import List, Callable, Dict
 import time
 
@@ -52,7 +53,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         super().load_root_message_to_data_member(file)
 
         for message in self.root_msg_list:
-            if JsSliceFileGenPlugin.flux_msg_widget_ui_data in str(message.proto.options):
+            if self.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_widget_ui_data):
                 widget_ui_data_option_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(message,
                                                                    JsSliceFileGenPlugin.flux_msg_widget_ui_data)[0]
@@ -62,7 +63,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
 
             for field in message.fields:
                 if field.message is not None and \
-                        JsSliceFileGenPlugin.flux_msg_widget_ui_data in str(field.message.proto.options):
+                        self.is_option_enabled(field.message, JsSliceFileGenPlugin.flux_msg_widget_ui_data):
                     # If field of message datatype of this message is found having widget_ui_data option
                     # with layout field then collecting those messages in dependent_message_list
                     widget_ui_data_option_list_of_dict = \
@@ -76,14 +77,16 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 # addition of message in dependent_message_list
 
                 # Checking abbreviated dependent relation
-                if JsSliceFileGenPlugin.flux_fld_abbreviated in str(field.proto.options):
+                if self.is_option_enabled(field, JsSliceFileGenPlugin.flux_fld_abbreviated):
                     abbreviated_option_value = \
-                        self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                        self.get_non_repeated_valued_custom_option_value(field,
                                                                          JsSliceFileGenPlugin.flux_fld_abbreviated)
-                    dependent_message_name = abbreviated_option_value.split(".")[0][1:]
-                    if ":" in dependent_message_name:
-                        dependent_message_name = dependent_message_name.split(":")[-1]
-                    self.dependent_to_abbreviated_message_relation_dict[dependent_message_name] = message.proto.name
+                    if any(special_char in abbreviated_option_value for special_char in [":", ".", "-"]):
+                        dependent_message_name = abbreviated_option_value.split(".")[0][1:]
+                        if ":" in dependent_message_name:
+                            dependent_message_name = dependent_message_name.split(":")[-1]
+                        self.dependent_to_abbreviated_message_relation_dict[dependent_message_name] = message.proto.name
+                        break
                 # else not required: Avoid if field doesn't contain abbreviated option
             else:
                 self.independent_message_list.append(message)
@@ -102,10 +105,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         # widget_ui_data option enabled, raises exception if is found
         for dependent_message in self.dependent_message_list:
             if dependent_message.proto.name in self.dependent_to_abbreviated_message_relation_dict:
-                if JsSliceFileGenPlugin.flux_msg_widget_ui_data in str(dependent_message.proto.options):
+                if self.is_option_enabled(dependent_message, JsSliceFileGenPlugin.flux_msg_widget_ui_data):
                     for field in dependent_message.fields:
                         if field.message is not None:
-                            if JsSliceFileGenPlugin.flux_msg_widget_ui_data in str(field.message.proto.options):
+                            if self.is_option_enabled(field, JsSliceFileGenPlugin.flux_msg_widget_ui_data):
                                 err_str = "Dependent message of Abbreviated widget type message if is having " \
                                           "widget_ui_data option enabled then none of the fields of this message can be of" \
                                           "message type that also has widget_ui_data option enabled, currently message " \
@@ -596,8 +599,17 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 self.current_message_is_dependent = False
             elif message in self.dependent_message_list:
                 self.current_message_is_dependent = True
+            elif message.proto.name in self.dependent_to_abbreviated_message_relation_dict.values():
+                self.current_message_is_dependent = False
             else:
-                err_str = f"message {message.proto.name} not found neither in dependent_list nor in independent_list"
+                independent_msg_names = [msg.proto.name for msg in self.independent_message_list]
+                dependent_msg_names = [msg.proto.name for msg in self.dependent_message_list]
+                abb_msg_names_to_dep_msg_names_dict = \
+                    {abb_msg: dep_msg for dep_msg, abb_msg in self.dependent_to_abbreviated_message_relation_dict.items()}
+                err_str = f"message {message.proto.name} not found neither in dependent_list or in independent_list, " \
+                          f"nor in abbreviated message dict, independent_msg_list: {independent_msg_names}, " \
+                          f"dependent_msg_list: {dependent_msg_names} and Abbreviated_to_dependent_msg_dict: " \
+                          f"{abb_msg_names_to_dep_msg_names_dict}"
                 logging.exception(err_str)
                 raise Exception(err_str)
             message_name_camel_cased = capitalized_to_camel_case(message.proto.name)

@@ -6,6 +6,7 @@ import time
 from pathlib import PurePath
 from threading import Thread
 import math
+import traceback
 
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 
@@ -954,7 +955,8 @@ class StratExecutor:
                 continue  # all good - go next run
             except Exception as e:
                 logging.error(f"Run returned with exception: {e};;;inspect.trace()[-1][3]: {inspect.trace()[-1][3]} "
-                              f"sys.exc_info: {str(sys.exc_info())}")
+                              f"sys.exc_info: {str(sys.exc_info())}, "
+                              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
                 return -1
         # we are outside while 1 (strat processing loop) - graceful shut down this strat processing
         return 0

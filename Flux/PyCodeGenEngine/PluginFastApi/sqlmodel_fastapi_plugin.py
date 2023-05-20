@@ -34,7 +34,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
                     self.enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if SQLModelFastApiPlugin.flux_msg_json_root in str(field.message.proto.options):
+                if self.is_option_enabled(field.message, SQLModelFastApiPlugin.flux_msg_json_root):
                     if field.message not in self.root_message_list:
                         self.root_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -47,7 +47,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if SQLModelFastApiPlugin.flux_msg_json_root in str(message.proto.options):
+            if self.is_option_enabled(message, SQLModelFastApiPlugin.flux_msg_json_root):
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
@@ -105,7 +105,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
 
     def handle_PUT_gen(self, message: protogen.Message, method_desc: str | None = None) -> str:
         for field in message.fields:
-            if SQLModelFastApiPlugin.flux_fld_primary in str(field.proto.options):
+            if self.is_option_enabled(field, SQLModelFastApiPlugin.flux_fld_primary):
                 primary_key_field_name: str = field.proto.name
                 break
         else:
@@ -140,7 +140,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
 
     def handle_DELETE_gen(self, message: protogen.Message, method_desc: str | None = None) -> str:
         for field in message.fields:
-            if SQLModelFastApiPlugin.flux_fld_primary in str(field.proto.options):
+            if self.is_option_enabled(field, SQLModelFastApiPlugin.flux_fld_primary):
                 primary_key_field_type: str = \
                     self.proto_to_py_datatype(field)
                 break
@@ -234,7 +234,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
             # else not required: Avoiding method creation if desc not provided in option
 
         for field in message.fields:
-            if SQLModelFastApiPlugin.flux_fld_index in str(field.proto.options):
+            if self.is_option_enabled(field, SQLModelFastApiPlugin.flux_fld_index):
                 output_str += self.handle_index_req_gen(message, field)
             # else not required: Avoiding field if index option is not enabled
 

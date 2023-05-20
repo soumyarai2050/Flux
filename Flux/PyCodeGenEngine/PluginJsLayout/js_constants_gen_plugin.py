@@ -49,12 +49,12 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
 
     def get_option_values(self, file: protogen.File):
         self.proto_package_name = str(file.proto.package)
-        if JsConstantsGenPlugin.flux_file_crud_host in str(file.proto.options):
-            self.host = self.get_non_repeated_valued_custom_option_value(file.proto.options,
+        if self.is_option_enabled(file, JsConstantsGenPlugin.flux_file_crud_host):
+            self.host = self.get_non_repeated_valued_custom_option_value(file,
                                                                     JsConstantsGenPlugin.flux_file_crud_host)
-        if JsConstantsGenPlugin.flux_file_crud_port_offset in str(file.proto.options):
+        if self.is_option_enabled(file, JsConstantsGenPlugin.flux_file_crud_port_offset):
             self.port_offset = \
-                int(self.get_non_repeated_valued_custom_option_value(file.proto.options,
+                int(self.get_non_repeated_valued_custom_option_value(file,
                                                                  JsConstantsGenPlugin.flux_file_crud_port_offset))
 
     def handle_api_root_url(self, file: protogen.File) -> str:

@@ -46,9 +46,9 @@ class PackageJsonGenPlugin(BaseJSLayoutPlugin):
 
     def get_option_values(self, file: protogen.File):
         self.proto_package_name = str(file.proto.package)
-        if PackageJsonGenPlugin.flux_file_crud_port_offset in str(file.proto.options):
+        if self.is_option_enabled(file, PackageJsonGenPlugin.flux_file_crud_port_offset):
             self.port_offset = \
-                int(self.get_non_repeated_valued_custom_option_value(file.proto.options,
+                int(self.get_non_repeated_valued_custom_option_value(file,
                                                                      PackageJsonGenPlugin.flux_file_crud_port_offset))
 
     def handle_temp_project_name(self, file: protogen.File) -> str:

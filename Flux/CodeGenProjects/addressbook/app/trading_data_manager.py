@@ -2,7 +2,7 @@ import logging
 from threading import Thread
 from typing import Callable
 
-from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
+from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env, perf_benchmark
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from trading_cache import *
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import \
@@ -70,6 +70,7 @@ class TradingDataManager:
         """
 
     # define callbacks for types you expect from ws as updates
+    @perf_benchmark
     def handle_portfolio_status_ws(self, portfolio_status_: PortfolioStatusBaseModel):
         # handle kill switch here (in portfolio status handler directly)
         with self.portfolio_status_ws_cont.single_obj_lock:
@@ -94,6 +95,7 @@ class TradingDataManager:
                                   f"current portfolio_status: {portfolio_status}, "
                                   f"found portfolio_status: {portfolio_status_} ")
 
+    @perf_benchmark
     def handle_portfolio_limits_ws(self, portfolio_limits_: PortfolioLimitsBaseModel):
         with self.portfolio_limits_ws_cont.single_obj_lock:
             portfolio_limits_tuple = self.trading_cache.get_portfolio_limits()
@@ -115,6 +117,7 @@ class TradingDataManager:
                                   f"current portfolio_limits: {portfolio_limits}, "
                                   f"found portfolio_limits: {portfolio_limits_} ")
 
+    @perf_benchmark
     def handle_order_limits_ws(self, order_limits_: OrderLimitsBaseModel):
         with self.order_limits_ws_cont.single_obj_lock:
             order_limits_tuple = self.trading_cache.get_order_limits()
@@ -135,6 +138,7 @@ class TradingDataManager:
                                   f"found: {order_limits_.id};;;current order_limits: {order_limits}"
                                   f", found order_limits: {order_limits_} ")
 
+    @perf_benchmark
     def handle_pair_strat_ws(self, pair_strat_: PairStratBaseModel):
         key_leg_1, key_leg_2 = StratCache.get_key_from_pair_strat(pair_strat_)
         if is_ongoing_pair_strat(pair_strat_):
@@ -181,6 +185,7 @@ class TradingDataManager:
                                 f"pair_strat: {pair_strat_}")
             # else not required - non-ongoing pair strat is not to exist in cache
 
+    @perf_benchmark
     def handle_strat_brief_ws(self, strat_brief_: StratBriefBaseModel):
         if strat_brief_.pair_buy_side_trading_brief and strat_brief_.pair_sell_side_trading_brief:
             key1, key2 = StratCache.get_key_from_strat_brief(strat_brief_)
@@ -209,6 +214,7 @@ class TradingDataManager:
                           f"side_trading_brief, strat_brief_key: "
                           f"{get_strat_brief_key(strat_brief_)};;;strat_brief: {strat_brief_}")
 
+    @perf_benchmark
     def handle_fill_journal_ws(self, fill_journal_: FillsJournalBaseModel):
         key, symbol = StratCache.get_key_n_symbol_from_fill_journal(fill_journal_)
         if key is None or symbol is None:
@@ -240,6 +246,7 @@ class TradingDataManager:
         else:
             logging.error(f"error: no ongoing pair strat matches received fill journal: {fill_journal_}")
 
+    @perf_benchmark
     def handle_order_journal_ws(self, order_journal_: OrderJournalBaseModel):
         key = StratCache.get_key_from_order_journal(order_journal_)
         strat_cache: StratCache = StratCache.get(key)
@@ -274,6 +281,7 @@ class TradingDataManager:
                           f"order_journal_key: {get_order_journal_key(order_journal_)};;;"
                           f"order_journal: {order_journal_}")
 
+    @perf_benchmark
     def handle_cancel_order_ws(self, cancel_order_: CancelOrderBaseModel):
         key = StratCache.get_key_from_cancel_order(cancel_order_)
         strat_cache: StratCache = StratCache.get(key)
@@ -297,6 +305,7 @@ class TradingDataManager:
                           f"{get_symbol_side_key([(cancel_order_.security.sec_id, cancel_order_.side)])};;; "
                           f"cancel_order: {cancel_order_}")
 
+    @perf_benchmark
     def handle_new_order_ws(self, new_order_: NewOrderBaseModel):
         key = StratCache.get_key_from_new_order(new_order_)
         strat_cache: StratCache = StratCache.get(key)
@@ -318,6 +327,7 @@ class TradingDataManager:
                           f"symbol_side_key: {get_symbol_side_key([(new_order_.security.sec_id, new_order_.side)])}"
                           f";;;new_order_: {new_order_}, strat_cache: {strat_cache}")
 
+    @perf_benchmark
     def handle_symbol_overview_ws(self, symbol_overview_: SymbolOverviewBaseModel):
         if symbol_overview_.symbol in StratCache.fx_symbol_overview_dict:
             # fx_symbol_overview_dict is pre initialized with supported fx pair symbols and None objects
@@ -346,6 +356,7 @@ class TradingDataManager:
         else:
             logging.debug(f"no matching strat: for symbol_overview keys: {key1}, {key2};;;detail: {symbol_overview_}")
 
+    @perf_benchmark
     def handle_top_of_book_ws(self, top_of_book_: TopOfBookBaseModel):
         if top_of_book_.symbol in StratCache.fx_symbol_overview_dict:
             # if we need fx TOB: StratCache needs to collect reference here (like we do in symbol_overview)
@@ -373,6 +384,7 @@ class TradingDataManager:
         else:
             logging.debug(f"no matching strat: for TOB keys: {key1}, {key2};;;TOB: {top_of_book_}")
 
+    @perf_benchmark
     def handle_market_depth_ws(self, market_depth_: MarketDepthBaseModel):
         if market_depth_.symbol in StratCache.fx_symbol_overview_dict:
             # if we need fx Market Depth: StratCache needs to collect reference here (like we do in symbol_overview)

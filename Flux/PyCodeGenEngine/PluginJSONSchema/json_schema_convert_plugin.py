@@ -99,7 +99,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
     def check_is_dependent_widget_field_name_snake_cased(self, field: protogen.Field) -> None:
         if field.message is not None:
-            if JsonSchemaConvertPlugin.flux_msg_widget_ui_data in str(field.message.proto.options):
+            if self.is_option_enabled(field, JsonSchemaConvertPlugin.flux_msg_widget_ui_data):
                 if field.proto.name != convert_camel_case_to_specific_case(field.message.proto.name):
                     err_str = f"field {field.proto.name} is of dependent widget message type " \
                               f"{field.message.proto.name} but is not snake_case of dependent widget message," \
@@ -119,7 +119,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     self.__enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if JsonSchemaConvertPlugin.flux_msg_widget_ui_data in str(field.message.proto.options):
+                if self.is_option_enabled(field, JsonSchemaConvertPlugin.flux_msg_widget_ui_data):
                     widget_ui_data_option_list_of_dict = \
                         self.get_complex_option_values_as_list_of_dict(field.message,
                                                                        JsonSchemaConvertPlugin.flux_msg_widget_ui_data)[0]
@@ -138,14 +138,14 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 self.__load_dependency_messages_and_enums_in_dicts(field.message)
             # else not required: avoiding other kinds than message or enum
 
-            if JsonSchemaConvertPlugin.flux_fld_auto_complete in str(field.proto.options):
+            if self.is_option_enabled(field, JsonSchemaConvertPlugin.flux_fld_auto_complete):
                 self.__add_autocomplete_dict = True
             # else not required: If AutoComplete option is not set then __add_autocomplete_dict's default
             # value will be used while generation check
 
     def __load_json_layout_and_non_layout_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if JsonSchemaConvertPlugin.flux_msg_widget_ui_data in str(message.proto.options):
+            if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data):
                 widget_ui_data_option_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(message,
                                                                    JsonSchemaConvertPlugin.flux_msg_widget_ui_data)[0]
@@ -346,8 +346,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                                 init_space_count: int) -> str:
         json_msg_str = ""
         for option in options_list:
-            if option in str(field_or_message_obj.proto.options):
-                option_value = self.get_non_repeated_valued_custom_option_value(field_or_message_obj.proto.options,
+            if self.is_option_enabled(field_or_message_obj, option):
+                option_value = self.get_non_repeated_valued_custom_option_value(field_or_message_obj,
                                                                                 option)
 
                 if option == JsonSchemaConvertPlugin.flux_fld_help:
@@ -361,14 +361,14 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     # then proceeding for further processing, since "'" causes issues with json once generated
 
                     # Adding Max/min Val option value in help comment if present
-                    if JsonSchemaConvertPlugin.flux_fld_val_max in str(field_or_message_obj.proto.options):
+                    if self.is_option_enabled(field_or_message_obj, JsonSchemaConvertPlugin.flux_fld_val_max):
                         max_val = \
-                            self.get_non_repeated_valued_custom_option_value(field_or_message_obj.proto.options,
+                            self.get_non_repeated_valued_custom_option_value(field_or_message_obj,
                                                                              JsonSchemaConvertPlugin.flux_fld_val_max)
                         option_value = f'{option_value[:-1]}, Max Value: {max_val[1:-1]}"'
-                    if JsonSchemaConvertPlugin.flux_fld_val_min in str(field_or_message_obj.proto.options):
+                    if self.is_option_enabled(field_or_message_obj, JsonSchemaConvertPlugin.flux_fld_val_min):
                         min_val = \
-                            self.get_non_repeated_valued_custom_option_value(field_or_message_obj.proto.options,
+                            self.get_non_repeated_valued_custom_option_value(field_or_message_obj,
                                                                              JsonSchemaConvertPlugin.flux_fld_val_min)
                         option_value = f'{option_value[:-1]}, Min Value: {min_val[1:-1]}"'
 
@@ -397,7 +397,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                                  init_space_count: int) -> str:
         json_msg_str = ""
         for option in options_list:
-            if option in str(field_or_message_obj.proto.options):
+            if self.is_option_enabled(field_or_message_obj, option):
                 option_value_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(field_or_message_obj, option)
                 # converting flux_option into json attribute name
@@ -439,9 +439,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     def __handle_fld_sequence_number_attribute(self, field: protogen.Field, init_space_count: int) -> str:
         sequence_number: int = field.proto.number
         sequence_number_option_name = JsonSchemaConvertPlugin.flux_fld_sequence_number
-        if sequence_number_option_name in str(field.proto.options):
+        if self.is_option_enabled(field, sequence_number_option_name):
             sequence_number = \
-                self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                self.get_non_repeated_valued_custom_option_value(field,
                                                                  sequence_number_option_name)
         # else not required: if sequence_number not set using option then using default assigned value
         sequence_number_option_name_prefix_removed = \
@@ -454,17 +454,17 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
     def __underlying_handle_title_output(self, field_or_msg_obj: protogen.Field | protogen.Message) -> str | None:
         if isinstance(field_or_msg_obj, protogen.Field):
-            if JsonSchemaConvertPlugin.flux_fld_title in str(field_or_msg_obj.proto.options):
+            if self.is_option_enabled(field_or_msg_obj, JsonSchemaConvertPlugin.flux_fld_title):
                 title_option_value = \
-                    self.get_non_repeated_valued_custom_option_value(field_or_msg_obj.proto.options,
+                    self.get_non_repeated_valued_custom_option_value(field_or_msg_obj,
                                                                      JsonSchemaConvertPlugin.flux_fld_title)
                 return title_option_value
             else:
                 return None
         elif isinstance(field_or_msg_obj, protogen.Message):
-            if JsonSchemaConvertPlugin.flux_msg_title in str(field_or_msg_obj.proto.options):
+            if self.is_option_enabled(field_or_msg_obj, JsonSchemaConvertPlugin.flux_msg_title):
                 title_option_value = \
-                    self.get_non_repeated_valued_custom_option_value(field_or_msg_obj.proto.options,
+                    self.get_non_repeated_valued_custom_option_value(field_or_msg_obj,
                                                                      JsonSchemaConvertPlugin.flux_msg_title)
                 return title_option_value
             else:
@@ -565,7 +565,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                                                     message, indent_space_count)
         json_msg_str += self.__handle_msg_leading_comment_as_attribute(message, indent_space_count)
         # Handling json root attribute
-        if JsonSchemaConvertPlugin.flux_msg_json_root in str(message.proto.options):
+        if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root):
             json_root_prefix_stripped = \
                 JsonSchemaConvertPlugin.flux_msg_json_root.lstrip(JsonSchemaConvertPlugin.msg_options_standard_prefix)
             json_root_prefix_stripped_case_styled = self.__case_style_convert_method(json_root_prefix_stripped)

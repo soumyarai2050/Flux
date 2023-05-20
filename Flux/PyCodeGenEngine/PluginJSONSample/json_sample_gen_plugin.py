@@ -50,7 +50,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         for field in message.fields:
             if field.message is not None:
                 self.__check_is_autocomplete_req(field.message)
-            if JsonSampleGenPlugin.flux_fld_auto_complete in str(field.proto.options):
+            if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_auto_complete):
                 self.__is_req_autocomplete = True
                 break
         # else not required: If no field of any message has autocomplete option then using default
@@ -58,7 +58,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
     def __load_root_json_msg(self, file: protogen.File):
         for message in file.messages:
-            if JsonSampleGenPlugin.flux_msg_json_root in str(message.proto.options):
+            if self.is_option_enabled(message, JsonSampleGenPlugin.flux_msg_json_root):
                 self.root_msg_list.append(message)
             # else not required: avoiding non-json msg append to list
 
@@ -77,7 +77,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
             field_name_case_styled = field_name
         match field.kind.name.lower():
             case "int32" | "int64":
-                if JsonSampleGenPlugin.flux_fld_val_is_datetime in str(field.proto.options):
+                if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_val_is_datetime):
                     json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": "{datetime.utcnow()}"'
                 else:
                     random_int = randint(*JsonSampleGenPlugin.random_int_range)
@@ -110,7 +110,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
             field_name_case_styled = field_name
         match field.kind.name.lower():
             case "int32" | "int64":
-                if JsonSampleGenPlugin.flux_fld_val_is_datetime in str(field.proto.options):
+                if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_val_is_datetime):
                     json_sample_output += " " * indent_space_count + f'"{field_name_case_styled}": ' \
                                           f'["{datetime.utcnow()}"\n' + " " * indent_space_count + ']'
                 else:
@@ -170,10 +170,9 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
         for field in message.fields:
 
-            if JsonSampleGenPlugin.flux_fld_auto_complete in str(field.proto.options):
+            if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_auto_complete):
                 option_value = \
-                    self.get_non_repeated_valued_custom_option_value(field.proto.options,
-                                                                     JsonSampleGenPlugin.flux_fld_auto_complete)
+                    self.get_non_repeated_valued_custom_option_value(field, JsonSampleGenPlugin.flux_fld_auto_complete)
                 if self.__response_field_case_style == "camel":
                     field_name_case_styled = convert_to_camel_case(field.proto.name)
                 else:

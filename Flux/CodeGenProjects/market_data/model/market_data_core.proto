@@ -1,5 +1,4 @@
 syntax = "proto2";
-import "flux_options.proto"; // needed by Security (if that moves out this is not needed either)
 
 package market_data;
 

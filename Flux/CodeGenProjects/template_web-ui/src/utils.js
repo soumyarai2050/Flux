@@ -186,7 +186,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             let parentxpath = xpath ? xpath !== callerProps.parent ? xpath : null : null;
             if (parentxpath) {
                 if (callerProps.parent) {
-                    parentxpath.replace(callerProps + '.', '');
+                    parentxpath = parentxpath.replace(callerProps.parent + '.', '');
                 }
                 collection.parentxpath = parentxpath;
             }
@@ -244,7 +244,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             let parentxpath = xpath ? xpath !== callerProps.parent ? xpath : null : null;
             if (parentxpath) {
                 if (callerProps.parent) {
-                    parentxpath.replace(callerProps + '.', '');
+                    parentxpath = parentxpath.replace(callerProps.parent + '.', '');
                 }
                 collection.parentxpath = parentxpath;
             }
@@ -295,7 +295,7 @@ export function generateObjectFromSchema(schema, currentSchema) {
         if (metadata.server_populate || metadata.ui_update_only) return;
 
         if (metadata.type === DataTypes.STRING) {
-            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : '';
+            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : null;
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
                 let autocompleteDict = getAutocompleteDict(autocomplete);
@@ -311,13 +311,13 @@ export function generateObjectFromSchema(schema, currentSchema) {
                 }
             }
         } else if (metadata.type === DataTypes.NUMBER) {
-            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : 0;
+            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : null;
         } else if (metadata.type === DataTypes.BOOLEAN) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : false;
         } else if (metadata.type === DataTypes.ENUM) {
             let ref = metadata.items.$ref.split('/')
             let enumdata = getEnumValues(schema, ref, metadata.type)
-            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : enumdata ? enumdata[0] : '';
+            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : enumdata ? enumdata[0] : null;
 
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
@@ -1563,7 +1563,7 @@ export function groupCommonKeys(commonKeys) {
                 }
             }
         }
-        // remove grouping if only one element present in group
+        // remove grouping if only one element is present in group
         if (commonKeyObj.groupStart && commonKeyObj.groupEnd) {
             delete commonKeyObj.groupStart;
             delete commonKeyObj.groupEnd;

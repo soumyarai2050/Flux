@@ -172,9 +172,9 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         aggregate_value_list = self.message_to_query_option_list_dict[message]
 
         for aggregate_value in aggregate_value_list:
-            aggregate_var_name = aggregate_value[FastapiClientFileHandler.aggregate_var_name_key]
-            url = f"self.query_{aggregate_var_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
-                  f"{self.proto_file_package}/" + f"query-{aggregate_var_name}'"
+            query_name = aggregate_value[FastapiClientFileHandler.query_name_key]
+            url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
+                  f"{self.proto_file_package}/" + f"query-{query_name}'"
             output_str += " " * 8 + f"{url}\n"
         return output_str
 
@@ -196,26 +196,26 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         output_str = ""
         aggregate_value_list = self.message_to_query_option_list_dict[message]
         for aggregate_value in aggregate_value_list:
-            aggregate_var_name = aggregate_value[FastapiClientFileHandler.aggregate_var_name_key]
-            aggregate_params = aggregate_value[FastapiClientFileHandler.aggregate_params_key]
-            aggregate_params_types = aggregate_value[FastapiClientFileHandler.aggregate_params_data_types_key]
+            query_name = aggregate_value[FastapiClientFileHandler.query_name_key]
+            query_params = aggregate_value[FastapiClientFileHandler.query_params_key]
+            query_params_types = aggregate_value[FastapiClientFileHandler.query_params_data_types_key]
 
             params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
-                                    for aggregate_param, aggregate_params_type in zip(aggregate_params,
-                                                                                      aggregate_params_types)])
+                                    for aggregate_param, aggregate_params_type in zip(query_params,
+                                                                                      query_params_types)])
 
-            if aggregate_params:
-                output_str += " " * 4 + f"def {aggregate_var_name}_query_client(self, {params_str}) -> " \
+            if query_params:
+                output_str += " " * 4 + f"def {query_name}_query_client(self, {params_str}) -> " \
                                         f"List[{message_name}]:\n"
                 params_dict_str = \
-                    ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in aggregate_params])
+                    ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
                 output_str += " " * 4 + "    query_params_dict = {"+f"{params_dict_str}"+"}\n"
-                output_str += " " * 4 + f"    return generic_http_query_client(self.query_{aggregate_var_name}_url, " \
+                output_str += " " * 4 + f"    return generic_http_query_client(self.query_{query_name}_url, " \
                                         f"query_params_dict, {message_name}BaseModel)\n\n"
             else:
-                output_str += " " * 4 + f"def {aggregate_var_name}_query_client(self) -> " \
+                output_str += " " * 4 + f"def {query_name}_query_client(self) -> " \
                                         f"List[{message_name}]:\n"
-                output_str += " " * 4 + f"    return generic_http_query_client(self.query_{aggregate_var_name}_url, " \
+                output_str += " " * 4 + f"    return generic_http_query_client(self.query_{query_name}_url, " \
                                         "{}, "+f"{message_name}BaseModel)\n\n"
 
         return output_str
@@ -268,15 +268,14 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         return output_str
 
     def handle_client_file_gen(self, file) -> str:
-        if FastapiClientFileHandler.flux_file_crud_host in str(file.proto.options):
-            host = self.get_non_repeated_valued_custom_option_value(file.proto.options,
-                                                                    FastapiClientFileHandler.flux_file_crud_host)
+        if self.is_option_enabled(file, FastapiClientFileHandler.flux_file_crud_host):
+            host = self.get_non_repeated_valued_custom_option_value(file, FastapiClientFileHandler.flux_file_crud_host)
         else:
             host = '"127.0.0.1"'
 
-        if FastapiClientFileHandler.flux_file_crud_port_offset in str(file.proto.options):
+        if self.is_option_enabled(file, FastapiClientFileHandler.flux_file_crud_port_offset):
             port_offset = \
-                self.get_non_repeated_valued_custom_option_value(file.proto.options,
+                self.get_non_repeated_valued_custom_option_value(file,
                                                                  FastapiClientFileHandler.flux_file_crud_port_offset)
             port = 8000 + int(port_offset)
         else:
@@ -293,7 +292,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         output_str += " "*4 + f'    self.host = {host} if host is None else host\n'
         output_str += " "*4 + f'    self.port = {port} if port is None else port\n\n'
         output_str += " "*4 + f'    # urls\n'
-        for message in self.root_message_list+list(self.message_to_query_option_list_dict):
+        for message in set(self.root_message_list+list(self.message_to_query_option_list_dict)):
             output_str += self._handle_client_url_gen(message)
             output_str += "\n"
         output_str += f'    # interfaces\n'

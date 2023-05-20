@@ -42,6 +42,11 @@ class Execute:
                 # executing cmd for python output
                 protoc_cmd = f"protoc {proto_path_str} --python_out={out_dir} {proto_files_str}"
                 os.system(protoc_cmd)
+
+                # executing cmd for CPP output
+                protoc_cmd = f"protoc {proto_path_str} --cpp_out={out_dir} {proto_files_str}"
+                os.system(protoc_cmd)
+
                 return True
             except Exception as e:
                 err_str = f"{e}"

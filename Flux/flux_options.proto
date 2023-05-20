@@ -62,9 +62,10 @@ message MessageJsonRoot{
 }
 
 message MessageJsonQuery{
-  required string AggregateVarName = 1; // name of variable from file to be used
-  repeated string AggregateParams = 2;  // list of params required for aggregation
-  repeated string AggregateParamsDataType = 3;  // list of data types of respective params in AggregateParams field
+  required string QueryName = 1;
+  optional string AggregateVarName = 2; // name of variable from file to be used
+  repeated string QueryParams = 3;  // list of params required for aggregation
+  repeated string QueryParamsDataType = 4;  // list of data types of respective params in AggregateParams field
 }
 
 extend google.protobuf.FileOptions 

@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import os
+import re
+
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
@@ -55,9 +57,10 @@ class BaseProtoPlugin(ABC):
     flux_json_root_update_websocket_field: ClassVar[str] = "UpdateWebSocketDesc"
     flux_json_root_set_reentrant_lock_field: ClassVar[str] = "SetReentrantLock"
     flux_json_root_set_reentrant_lock_to_top_field: ClassVar[str] = "SetReentrantLockToTop"
+    flux_json_query_name_field: ClassVar[str] = "QueryName"
     flux_json_query_aggregate_var_name_field: ClassVar[str] = "AggregateVarName"
-    flux_json_query_aggregate_params_field: ClassVar[str] = "AggregateParams"
-    flux_json_query_aggregate_params_data_type_field: ClassVar[str] = "AggregateParamsDataType"
+    flux_json_query_params_field: ClassVar[str] = "QueryParams"
+    flux_json_query_params_data_type_field: ClassVar[str] = "QueryParamsDataType"
     flux_fld_is_required: ClassVar[str] = "FluxFldIsRequired"
     flux_fld_cmnt: ClassVar[str] = "FluxFldCmnt"
     flux_msg_cmnt: ClassVar[str] = "FluxMsgCmnt"
@@ -165,8 +168,8 @@ class BaseProtoPlugin(ABC):
         self.insertion_points_to_content_dict: Dict[str, str] | Dict[str, Dict[str, str]] = {}
 
     def is_bool_option_enabled(self, msg_or_fld_option: protogen.Message | protogen.Field, option_name: str) -> bool:
-        if option_name in str(msg_or_fld_option.proto.options) and \
-                "true" == self.get_non_repeated_valued_custom_option_value(msg_or_fld_option.proto.options,
+        if self.is_option_enabled(msg_or_fld_option, option_name) and \
+                "true" == self.get_non_repeated_valued_custom_option_value(msg_or_fld_option,
                                                                            option_name):
             return True
         else:
@@ -204,13 +207,26 @@ class BaseProtoPlugin(ABC):
         # else not required: if condition fails then no need to raise exception
 
     @staticmethod
-    def get_non_repeated_valued_custom_option_value(option_obj, option_name: str):
-        options_list = [option for option in str(option_obj).split("\n") if ":" in option]
+    def get_non_repeated_valued_custom_option_value(proto_entity: protogen.Message | protogen.Field | protogen.File,
+                                                    option_name: str):
+        options_list = [option for option in str(proto_entity.proto.options).split("\n") if ":" in option]
         for option in options_list:
-            if option_name in option:
+            if re.search(r'\b' + option_name + r'\b', option):
                 option_content = ":".join(str(option).split(":")[1:])
                 return option_content.strip()
             # else not required: Avoiding if option_name not in option_obj
+
+    @staticmethod
+    def is_option_enabled(msg_or_fld_or_file: protogen.Message | protogen.Field | protogen.File,
+                          option_name: str):
+        """
+        Check and return True if provided message | field | file proto object contains provided option
+        enabled, return False otherwise
+        """
+        proto_option_str: str = str(msg_or_fld_or_file.proto.options)
+        if re.search(r'\b' + option_name + r'\b', proto_option_str):
+            return True
+        return False
 
     @staticmethod
     def __get_complex_option_value_as_list_of_tuple(option_string: str, option_name: str):
@@ -298,22 +314,20 @@ class BaseProtoPlugin(ABC):
 
     def get_flux_msg_cmt_option_value(self, message: protogen.Message) -> str:
         flux_msg_cmt_option_value = \
-            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(str(message.proto.options),
+            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(message,
                                                                         BaseProtoPlugin.flux_msg_cmnt)
         return flux_msg_cmt_option_value[2:-1] \
             if flux_msg_cmt_option_value is not None else ""
 
     def get_flux_fld_cmt_option_value(self, field: protogen.Field) -> str:
         flux_fld_cmt_option_value = \
-            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(field.proto.options,
-                                                                        BaseProtoPlugin.flux_fld_cmnt)
+            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(field, BaseProtoPlugin.flux_fld_cmnt)
         return flux_fld_cmt_option_value[2:-1] \
             if flux_fld_cmt_option_value is not None else ""
 
     def get_flux_file_cmt_option_value(self, file: protogen.File) -> str:
         flux_file_cmt_option_value = \
-            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(file.proto.options,
-                                                                        BaseProtoPlugin.flux_file_cmnt)
+            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(file, BaseProtoPlugin.flux_file_cmnt)
         return flux_file_cmt_option_value[2:-1] \
             if flux_file_cmt_option_value is not None else ""
 

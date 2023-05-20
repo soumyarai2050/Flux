@@ -48,17 +48,17 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                     output_str = f"{field.proto.name}: {field_type} | None"
             case "repeated":
                 if self.is_field_indexed_option_enabled(field):
-                    if BeanieModelPlugin.flux_fld_is_required in str(field.proto.options):
+                    if self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
                         output_str = f"{field.proto.name}: Indexed(List[{field_type}])"
                     else:
                         output_str = f"{field.proto.name}: Indexed(List[{field_type}]) | None"
                 elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
-                    if BeanieModelPlugin.flux_fld_is_required in str(field.proto.options):
+                    if self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
                         output_str = f"{field.proto.name}: List[Link[{field_type}]]"
                     else:
                         output_str = f"{field.proto.name}: List[Link[{field_type}]] | None"
                 else:
-                    if BeanieModelPlugin.flux_fld_is_required in str(field.proto.options):
+                    if self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
                         output_str = f"{field.proto.name}: List[{field_type}]"
                     else:
                         output_str = f"{field.proto.name}: List[{field_type}] | None"
@@ -79,12 +79,12 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
     def handle_field_output(self, field: protogen.Field) -> str:
         output_str = self._handle_field_cardinality(field)
         has_alias = False
-        if (has_alias := (BeanieModelPlugin.flux_fld_alias in str(field.proto.options))) or \
+        if (has_alias := self.is_option_enabled(field, BeanieModelPlugin.flux_fld_alias)) or \
                 field.location.leading_comments:
             output_str += f' = Field('
 
             if has_alias:
-                alias_name = self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                alias_name = self.get_non_repeated_valued_custom_option_value(field,
                                                                               BeanieModelPlugin.flux_fld_alias)
                 output_str += f'alias={alias_name}'
 
@@ -197,19 +197,18 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
 
         return output_str
 
+    def _handle_reentrant_lock(self, message: protogen.Message) -> str:
+        # taking first obj since json root is of non-repeated option
+        if message in self.root_message_list and message not in self.reentrant_lock_non_required_msg:
+            return "    reentrant_lock: ClassVar[AsyncRLock] = AsyncRLock()\n"
+        else:
+            return ""
+
     def handle_imports(self) -> str:
         output_str = "from beanie import Indexed, Document, PydanticObjectId, Link\n"
         output_str += "from pydantic import BaseModel, Field, validator\n"
         output_str += "import pendulum\n"
-        output_str += "from threading import Lock, RLock\n"
         output_str += "from typing import List, ClassVar, Dict\n"
-        ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                                   "ws_connection_manager")
-        output_str += f"from {ws_connection_manager_path} import PathWSConnectionManager, " \
-                      f"\\\n\tPathWithIdWSConnectionManager\n"
-        incremental_id_camel_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                                             "incremental_id_basemodel")
-        output_str += f'from {incremental_id_camel_base_model_path} import *\n'
 
         if self.enum_list:
             if self.enum_type == "int_enum":
@@ -218,8 +217,17 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                 output_str += "from enum import auto\n"
                 output_str += "from fastapi_utils.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
+
+        ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
+                                                                   "ws_connection_manager")
+        output_str += f"from {ws_connection_manager_path} import PathWSConnectionManager, " \
+                      f"\\\n\tPathWithIdWSConnectionManager\n"
+        incremental_id_camel_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
+                                                                             "incremental_id_basemodel")
+        output_str += f'from {incremental_id_camel_base_model_path} import *\n'
         generic_utils_import_path= self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_utils")
-        output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime"
+        output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime\n"
+        output_str += f"from FluxPythonUtils.scripts.async_rlock import AsyncRLock\n"
 
         output_str += "\n\n"
         return output_str

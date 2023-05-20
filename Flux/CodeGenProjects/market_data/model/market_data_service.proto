@@ -82,7 +82,7 @@ message DashFilters {
     layout: UI_TREE
   };
   //Server generated unique Id
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldAbbreviatedLink) = "DashCollection.id"];
   // used to create filtered table for ws update
   required string dash_name = 2 [(FluxFldOrmNoUpdate) = true];
   optional PxRange px_range = 3;
@@ -132,9 +132,10 @@ message TopOfBook {
     is_repeated: true
   };
   option (FluxMsgJsonQuery) = {
+    QueryName: "get_top_of_book_from_symbol",
     AggregateVarName: "get_top_of_book_from_symbol",
-    AggregateParams: "symbol",
-    AggregateParamsDataType: "str"
+    QueryParams: "symbol",
+    QueryParamsDataType: "str"
   };
   required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional Quote bid_quote = 2 [(FluxFldElaborateTitle) = true];
@@ -187,9 +188,10 @@ message SymbolOverview{
     is_repeated: true
   };
   option (FluxMsgJsonQuery) = {
+    QueryName: "get_symbol_overview_from_symbol",
     AggregateVarName: "get_symbol_overview_from_symbol",
-    AggregateParams: "symbol",
-    AggregateParamsDataType: "str"
+    QueryParams: "symbol",
+    QueryParamsDataType: "str"
   };
   required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional string  company = 2;
@@ -296,11 +298,12 @@ message LastTrade {
 
 message LastNSecMarketTradeVol{
   option (FluxMsgJsonQuery) = {
+    QueryName: "get_last_n_sec_total_qty",
     AggregateVarName: "get_last_n_sec_total_qty",
-    AggregateParams: "symbol",
-    AggregateParams: "last_n_sec",
-    AggregateParamsDataType: "str",
-    AggregateParamsDataType: "int"
+    QueryParams: "symbol",
+    QueryParams: "last_n_sec",
+    QueryParamsDataType: "str",
+    QueryParamsDataType: "int"
   };
   optional int64 last_n_sec_trade_vol = 1;
 }

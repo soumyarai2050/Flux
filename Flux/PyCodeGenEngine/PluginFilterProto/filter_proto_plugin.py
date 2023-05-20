@@ -33,9 +33,8 @@ class FilterProtoPlugin(BaseProtoPlugin):
         self.dependency_enum_list: List[protogen.Enum] = []
 
     def is_field_having_filter_option(self, field: protogen.Field) -> bool:
-        if FilterProtoPlugin.flux_fld_filter in str(field.proto.options) and \
-                "true" == self.get_non_repeated_valued_custom_option_value(field.proto.options,
-                                                                           FilterProtoPlugin.flux_fld_filter):
+        if self.is_option_enabled(field, FilterProtoPlugin.flux_fld_filter) and \
+                "true" == self.get_non_repeated_valued_custom_option_value(field, FilterProtoPlugin.flux_fld_filter):
             return True
         else:
             return False

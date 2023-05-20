@@ -60,7 +60,7 @@ const CustomHeadCell = (props) => {
                                 direction={orderBy === cell.tableTitle ? order : 'asc'}
                                 onClick={createSortHandler(cell.tableTitle)}>
                                 {cell.elaborateTitle ? cell.tableTitle : cell.title ? cell.title : cell.key}
-                                {orderBy === cell.key ? (
+                                {orderBy === cell.tableTitle ? (
                                     <Box component="span" sx={visuallyHidden}>
                                         {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
                                     </Box>

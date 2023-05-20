@@ -52,10 +52,6 @@ const TreeWidget = (props) => {
     const onTextChange = (e, type, xpath, value) => {
         let updatedData = cloneDeep(props.data);
         let dataxpath = e.target.getAttribute('dataxpath');
-        if (type === DataTypes.NUMBER) {
-            value = value * 1;
-        }
-
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);

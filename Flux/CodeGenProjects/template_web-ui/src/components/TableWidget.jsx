@@ -222,9 +222,6 @@ const TableWidget = (props) => {
     }
 
     const onTextChange = useCallback((e, type, xpath, value) => {
-        if (type === DataTypes.NUMBER) {
-            value = value * 1;
-        }
         let dataxpath = e.target.getAttribute('dataxpath');
         let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);

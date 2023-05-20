@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { Snackbar, Alert as AlertComponent, IconButton } from '@mui/material';
 import { Close } from '@mui/icons-material';
+import { DataTypes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
 import classes from './Alert.module.css';
+
 
 const Alert = (props) => {
     return (
@@ -46,7 +49,9 @@ export const AlertErrorMessage = (props) => {
 
     return (
         <Alert open={props.open} onClose={props.onClose} severity={props.severity}>
-            <span>error status: {status}, code: {code}, message: {message}, detail: {detail}</span>
+            <span>error status: {status}, code: {code}, message: {message}, </span>
+            {typeof (detail) === DataTypes.STRING && <span>detail: {detail}</span>}
+            {(Array.isArray(detail) || _.isObject(detail)) && <span>detail: {JSON.stringify(detail)}</span>}
             {payload && (
                 <>
                     <span>, payload: </span>

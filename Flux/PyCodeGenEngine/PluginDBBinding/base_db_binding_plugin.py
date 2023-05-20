@@ -125,7 +125,7 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
     def __set_db_fields_sequence_to_data_members(self, file: protogen.File):
         root_message = None
         for message in file.messages:
-            if BaseDbBindingPlugin.main_message_option_name in str(message.proto.options):
+            if self.is_option_enabled(message, BaseDbBindingPlugin.main_message_option_name):
                 root_message = message
                 break
             # else not required: Avoiding messages other than ORM root
@@ -170,11 +170,11 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
             temp_dict[db_only_field[2]] = db_only_field[0]
         # Adding other db fields
         for message in file.messages:
-            if BaseDbBindingPlugin.main_message_option_name in str(message.proto.options):
+            if self.is_option_enabled(message, BaseDbBindingPlugin.main_message_option_name):
                 for field in message.fields:
                     temp_dict[field.proto.number] = field.proto.name
                     temp_list = [field.proto.name, self.__get_proto_to_db_data_type(field), field.proto.number]
-                    if BaseDbBindingPlugin.primary_key_option_name in str(field.proto.options):
+                    if self.is_option_enabled(field, BaseDbBindingPlugin.primary_key_option_name):
                         temp_list.append(True)
                     else:
                         temp_list.append(False)
@@ -190,7 +190,7 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
                         raise Exception(err_str)
 
                     # Using Field level option to set foreign key
-                    if BaseDbBindingPlugin.foreign_key_fld_option_name in str(field.proto.options):
+                    if self.is_option_enabled(field, BaseDbBindingPlugin.foreign_key_fld_option_name):
                         temp_list.append(True)
 
                         field_option_fk_tuple_list = BaseProtoPlugin._get_complex_option_value_as_list_of_dict(
@@ -361,9 +361,9 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
         init_formatted_params_list = []
         init_formatted_params_list_with_default_value = []
         for message in file.messages:
-            if BaseDbBindingPlugin.main_message_option_name in str(message.proto.options):
+            if self.is_option_enabled(message, BaseDbBindingPlugin.main_message_option_name):
                 for field in message.fields:
-                    if BaseDbBindingPlugin.default_value_placeholder_string_option in str(field.proto.options):
+                    if self.is_option_enabled(field, BaseDbBindingPlugin.default_value_placeholder_string_option):
                         default_value = ""
                         for option in str(field.proto.options).split("\n"):
                             if BaseDbBindingPlugin.default_value_placeholder_string_option in option:
@@ -395,7 +395,7 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
         output_str += f"    self.{self.class_name_snake_cased}: {self.class_name_snake_cased}_pb2.{self.main_proto_msg_class_name} " \
                       f"= {self.class_name_snake_cased}_pb2.{self.main_proto_msg_class_name}() \n"
         for message in file.messages:
-            if BaseDbBindingPlugin.main_message_option_name in str(message.proto.options):
+            if self.is_option_enabled(message, BaseDbBindingPlugin.main_message_option_name):
                 for field in message.fields:
                     # Adding leading comment if available before field
                     if comment_content := field.location.leading_comments:
@@ -420,7 +420,7 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
         output_str = "def __str__(self):\n"
         output_str += "    return f'"
         for message in file.messages:
-            if BaseDbBindingPlugin.main_message_option_name in str(message.proto.options):
+            if self.is_option_enabled(message, BaseDbBindingPlugin.main_message_option_name):
                 counter = 0
                 for field in message.fields:
                     if counter > 1:
@@ -579,7 +579,7 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
 
     def handle_root_msg_comment(self, file: protogen.File) -> str:
         for message in file.messages:
-            if BaseDbBindingPlugin.main_message_option_name in str(message.proto.options):
+            if self.is_option_enabled(message, BaseDbBindingPlugin.main_message_option_name):
                 if self.get_flux_msg_cmt_option_value(message):
                     return f"# {self.get_flux_msg_cmt_option_value(message)}"
                 else:
@@ -596,9 +596,9 @@ class BaseDbBindingPlugin(BaseProtoPlugin):
         """
         Assigns data members associated with proto msg class name
         """
-        message_name: str| None = None
+        message_name: str | None = None
         for message in file.messages:
-            if BaseProtoPlugin.main_message_option_name in str(message.proto.options):
+            if self.is_option_enabled(message, BaseDbBindingPlugin.main_message_option_name):
                 message_name = message.proto.name
                 break
         # else not required: if no message finds "MainMessage" as true, then handling it below

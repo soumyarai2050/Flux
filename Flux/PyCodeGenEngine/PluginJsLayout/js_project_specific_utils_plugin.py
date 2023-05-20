@@ -39,7 +39,7 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         output_str = "export function getLayout() {\n"
         output_str += "    const layout = [\n"
         for index, message in enumerate(self.layout_msg_list):
-            if JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data in str(message.proto.options):
+            if self.is_option_enabled(message, JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data):
                 widget_ui_data_options_value_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(message,
                                                                    JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data)

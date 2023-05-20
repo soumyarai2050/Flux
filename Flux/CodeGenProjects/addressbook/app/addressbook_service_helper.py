@@ -1,7 +1,8 @@
+import asyncio
 from typing import Tuple
 import sys
 
-from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
+from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env, perf_benchmark
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
@@ -10,8 +11,8 @@ from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client
 host, port = get_host_port_from_env()
 strat_manager_service_web_client_internal = StratManagerServiceWebClient(host, port)
 
-update_portfolio_status_lock: Lock = Lock()
-update_strat_status_lock: Lock = Lock()
+update_portfolio_status_lock: asyncio.Lock = asyncio.Lock()
+update_strat_status_lock: asyncio.Lock = asyncio.Lock()
 
 
 def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
@@ -60,7 +61,7 @@ async def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, aler
         underlying_partial_update_pair_strat_http
     impacted_orders = [] if impacted_orders is None else impacted_orders
     alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
-    with update_strat_status_lock:
+    async with update_strat_status_lock:
         match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
         if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
             logging.error(f"error: {alert_brief}; processing {get_symbol_side_key([(sec_id, side)])} "
@@ -100,7 +101,7 @@ async def get_single_exact_match_ongoing_strat_from_symbol_n_side(sec_id: str, s
                 logging.error(
                     f"error: multiple ongoing pair strats matching symbol_side_key: "
                     f"{get_symbol_side_key([(sec_id, side)])} found, one "
-                    f"match expected, found: {len(match_level_1_pair_strats)}")
+                    f"match expected, found: {len(match_level_2_pair_strats)}")
         return pair_strat
 
 
@@ -110,7 +111,7 @@ async def update_strat_alert_async(strat_id: int, alert_brief: str, alert_detail
     alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
     from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
         underlying_read_pair_strat_by_id_http, underlying_partial_update_pair_strat_http
-    with update_strat_status_lock:
+    async with update_strat_status_lock:
         pair_strat: PairStrat = await underlying_read_pair_strat_by_id_http(strat_id)
         strat_status: StratStatus = StratStatus(strat_state=pair_strat.strat_status.strat_state,
                                                 strat_alerts=(pair_strat.strat_status.strat_alerts.append(alert)))
@@ -223,8 +224,7 @@ def is_service_up(ignore_error: bool = False):
                                          overall_sell_notional=0,
                                          overall_buy_fill_notional=0,
                                          overall_sell_fill_notional=0,
-                                         current_period_available_buy_order_count=0,
-                                         current_period_available_sell_order_count=0)
+                                         alert_update_seq_num=0)
             strat_manager_service_web_client_internal.create_portfolio_status_client(portfolio_status)
         return True
     except Exception as e:
@@ -381,6 +381,7 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
     return strat_limits
 
 
+@perf_benchmark
 def get_consumable_participation_qty(
         executor_check_snapshot_obj_list: List[ExecutorCheckSnapshot],
         max_participation_rate: float) -> int | None:
@@ -397,6 +398,7 @@ def get_consumable_participation_qty(
         return None
 
 
+@perf_benchmark
 def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_period_seconds: int,
                                           max_participation_rate: float) -> int | None:
     executor_check_snapshot_list: List[ExecutorCheckSnapshot] = \

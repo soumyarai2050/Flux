@@ -381,18 +381,24 @@ class StratCache:
         return None
 
     def set_top_of_book(self, top_of_book: TopOfBookBaseModel) -> DateTime | None:
-        if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
-            self._top_of_books[0] = top_of_book
-            self._top_of_books_update_date_time = top_of_book.last_update_date_time
-            return top_of_book.last_update_date_time
-        elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
-            self._top_of_books[1] = top_of_book
-            self._top_of_books_update_date_time = top_of_book.last_update_date_time
-            return top_of_book.last_update_date_time
+        if top_of_book.last_update_date_time > self._top_of_books_update_date_time:
+            if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+                self._top_of_books[0] = top_of_book
+                self._top_of_books_update_date_time = top_of_book.last_update_date_time
+                return top_of_book.last_update_date_time
+            elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+                self._top_of_books[1] = top_of_book
+                self._top_of_books_update_date_time = top_of_book.last_update_date_time
+                return top_of_book.last_update_date_time
+            else:
+                logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "
+                              f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
+                              f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+                return None
         else:
-            logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "
-                          f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
-                          f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+            logging.debug(f"set_top_of_book called with old last_update_date_time, ignoring this TOB, "
+                          f"latest_update_date_time: {self._top_of_books_update_date_time}, "
+                          f"update received TOB: {top_of_book}")
             return None
 
     def get_market_depths(self, symbol: str, side: Side, sorted_reverse: bool = False,

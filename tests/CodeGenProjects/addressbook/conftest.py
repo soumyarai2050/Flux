@@ -1,7 +1,7 @@
+import time
 import pytest
 import os
 import copy
-from pendulum import DateTime
 
 os.environ["DBType"] = "beanie"
 
@@ -9,6 +9,64 @@ os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import \
     MarketDepthBaseModel, SymbolOverviewBaseModel
 from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
+from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations, update_yaml_configurations
+from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_verify_limits, \
+    create_n_verify_portfolio_status, create_fx_symbol_overview, clean_all_collections_ignoring_ui_layout, \
+    get_ps_n_md_db_names, test_config_file_path
+from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, config_file_path
+from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
+
+
+@pytest.fixture()
+def max_loop_count_per_side():
+    max_loop_count_per_side = 5
+    return max_loop_count_per_side
+
+
+@pytest.fixture()
+def buy_sell_symbol_list():
+    return [
+        ("CB_Sec_1", "EQT_Sec_1"),
+        ("CB_Sec_2", "EQT_Sec_2"),
+        ("CB_Sec_3", "EQT_Sec_3"),
+        ("CB_Sec_4", "EQT_Sec_4"),
+        ("CB_Sec_5", "EQT_Sec_5")
+    ]
+
+
+@pytest.fixture()
+def residual_wait_sec() -> int:
+    return 80
+
+
+@pytest.fixture()
+def config_dict():
+    original_yaml_content_str = load_yaml_configurations(str(config_file_path), load_as_str=True)
+    TradingLinkBase.reload_configs()
+    TradeSimulator.reload_symbol_configs()
+    yield TradingLinkBase.config_dict
+
+    # reverting back file
+    update_yaml_configurations(original_yaml_content_str, str(config_file_path))
+    TradingLinkBase.reload_configs()
+    TradeSimulator.reload_symbol_configs()
+    time.sleep(2)
+
+
+@pytest.fixture
+def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_):
+    ps_db_name, md_db_name = get_ps_n_md_db_names(test_config_file_path)
+    # cleaning all collections
+    clean_all_collections_ignoring_ui_layout(ps_db_name, md_db_name)
+
+    # setting limits
+    set_n_verify_limits(expected_order_limits_, expected_portfolio_limits_)
+
+    # creating portfolio_status
+    create_n_verify_portfolio_status(copy.deepcopy(expected_portfolio_status_))
+
+    # creating symbol_override for fx
+    create_fx_symbol_overview()
 
 
 @pytest.fixture()
@@ -288,40 +346,6 @@ def pair_strat_(pair_securities_with_sides_):
     })
 
 
-@pytest.fixture()
-def delete_existing_strats_and_snapshots(strat_manager_service_web_client_):
-    # Cleaning order journal if already exists
-    stored_order_journal_objs = strat_manager_service_web_client_.get_all_order_journal_client()
-    for stored_order_journal_obj in stored_order_journal_objs:
-        strat_manager_service_web_client_.delete_order_journal_client(stored_order_journal_obj.id)
-
-    # Cleaning order snapshot if already exists
-    stored_order_snapshot_objs = strat_manager_service_web_client_.get_all_order_snapshot_client()
-    for stored_order_snapshot_obj in stored_order_snapshot_objs:
-        strat_manager_service_web_client_.delete_order_snapshot_client(stored_order_snapshot_obj.id)
-
-    # Cleaning symbol side snapshot if already exists
-    stored_symbol_side_snapshot_objs = strat_manager_service_web_client_.get_all_symbol_side_snapshot_client()
-    for stored_symbol_side_snapshot_obj in stored_symbol_side_snapshot_objs:
-        strat_manager_service_web_client_.delete_symbol_side_snapshot_client(stored_symbol_side_snapshot_obj.id)
-
-    # Cleaning pair_strats if already exists
-    stored_pair_strat_objs = strat_manager_service_web_client_.get_all_pair_strat_client()
-    for stored_pair_strat_obj in stored_pair_strat_objs:
-        strat_manager_service_web_client_.delete_pair_strat_client(stored_pair_strat_obj.id)
-
-    # Cleaning strat_brief if already exists
-    stored_strat_brief_objs = strat_manager_service_web_client_.get_all_strat_brief_client()
-    for stored_strat_brief_obj in stored_strat_brief_objs:
-        strat_manager_service_web_client_.delete_strat_brief_client(stored_strat_brief_obj.id)
-
-    # Cleaning portfolio_status if already exists
-    stored_portfolio_status_objs = strat_manager_service_web_client_.get_all_portfolio_status_client()
-    for stored_portfolio_status_obj in stored_portfolio_status_objs:
-        strat_manager_service_web_client_.delete_portfolio_status_client(stored_portfolio_status_obj.id)
-    yield
-
-
 def empty_pair_side_trading_brief_obj(symbol: str, side: str, sec_type: str | None = SecurityType.TICKER):
     return PairSideTradingBrief(**{
         "security": {
@@ -376,7 +400,7 @@ def expected_symbol_side_snapshot_():
             "avg_cxled_px": 0,
             "total_cxled_notional": 0,
             "last_update_date_time": "2023-02-13T20:30:35.165Z",
-            "order_create_count": 0
+            "order_count": 0
         }),
         SymbolSideSnapshotBaseModel(**{
             "security": {
@@ -395,7 +419,7 @@ def expected_symbol_side_snapshot_():
             "avg_cxled_px": 0,
             "total_cxled_notional": 0,
             "last_update_date_time": "2023-02-13T20:30:36.165Z",
-            "order_create_count": 0
+            "order_count": 0
         })
     ]
 
@@ -410,7 +434,7 @@ def expected_portfolio_status_():
         "overall_sell_notional": 0,
         "overall_buy_fill_notional": 0,
         "overall_sell_fill_notional": 0,
-        "alert_update_seq_num":0
+        "alert_update_seq_num": 0
     })
 
 

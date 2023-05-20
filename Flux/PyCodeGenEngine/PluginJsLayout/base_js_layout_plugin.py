@@ -39,11 +39,11 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
 
     def load_root_message_to_data_member(self, file: protogen.File):
         for message in file.messages:
-            if BaseJSLayoutPlugin.flux_msg_json_root in (options_str := str(message.proto.options)):
+            if self.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_json_root):
                 self.root_msg_list.append(message)
             # else not required: Avoiding non ORM root messages
 
-            if BaseJSLayoutPlugin.flux_msg_widget_ui_data in options_str:
+            if self.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_widget_ui_data):
                 widget_ui_data_option_list_of_dict = \
                     self.get_complex_option_values_as_list_of_dict(message,
                                                                    BaseJSLayoutPlugin.flux_msg_widget_ui_data)[0]
@@ -71,7 +71,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                         fld_abbreviated_option_value = None
                         for field in message.fields:
                             fld_abbreviated_option_value = \
-                                self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                                self.get_non_repeated_valued_custom_option_value(field,
                                                                                  BaseJSLayoutPlugin.flux_fld_abbreviated)
                             if fld_abbreviated_option_value is not None:
                                 break
@@ -102,9 +102,9 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                     if abb_dependent_msg_name == msg.proto.name:
                         found_msg = True
                         for field in msg.fields:
-                            if BaseJSLayoutPlugin.flux_fld_abbreviated_link in str(field.proto.options):
+                            if self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_abbreviated_link):
                                 abb_link_option_val = \
-                                    self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                                    self.get_non_repeated_valued_custom_option_value(field,
                                                                                      BaseJSLayoutPlugin.flux_fld_abbreviated_link)
                                 dependent_abb_msg_name = abb_link_option_val.split(".")[0][1:]
                                 self.parent_abb_msg_name_to_linked_abb_msg_name_dict[abb_msg_name] = dependent_abb_msg_name

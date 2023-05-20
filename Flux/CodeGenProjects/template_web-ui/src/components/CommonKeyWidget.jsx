@@ -13,13 +13,13 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
         if (commonKeyObj.value === undefined || commonKeyObj.value === null ||
             (Array.isArray(commonKeyObj.value) && commonKeyObj.value.length === 0) ||
             (_.isObject(commonKeyObj.value) && _.keys(commonKeyObj.value).length === 0)) {
-            return false;
+                return false;
         }
         return true;
     })
 
     // sort the common keys based on sequence in ascending order
-    commonkeys = props.commonkeys.sort(function (a, b) {
+    commonkeys = commonkeys.sort(function (a, b) {
         if (a.sequenceNumber < b.sequenceNumber) return -1;
         return 1;
     })

@@ -36,7 +36,7 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if CacheFastApiPlugin.flux_msg_json_root in str(message.proto.options):
+            if self.is_option_enabled(message, CacheFastApiPlugin.flux_msg_json_root):
                 json_root_msg_option_val_dict = \
                     self.get_complex_option_values_as_list_of_dict(message, CacheFastApiPlugin.flux_msg_json_root)
                 # taking first obj since json root is of non-repeated option
@@ -71,7 +71,7 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
                     self.non_root_message_list.append(message)
                 # else not required: avoiding repetition
 
-            if CacheFastApiPlugin.flux_msg_json_query in str(message.proto.options):
+            if self.is_option_enabled(message, CacheFastApiPlugin.flux_msg_json_query):
                 if message not in self.message_to_query_option_list_dict:
                     self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
                 # else not required: avoiding repetition

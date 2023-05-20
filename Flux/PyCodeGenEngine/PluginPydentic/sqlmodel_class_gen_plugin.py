@@ -37,14 +37,14 @@ class SQLModelModelPlugin(CachedPydanticModelPlugin):
             output_str += f' = Field(description="{comments}"'
         # else not required: Avoid if comment is not present
 
-        if is_primary := (SQLModelModelPlugin.flux_fld_primary in str(field.proto.options)):
+        if is_primary := self.is_option_enabled(field, SQLModelModelPlugin.flux_fld_primary):
             if leading_comments:
                 output_str += f', default=None, primary_key=True'
             else:
                 output_str += f' = Field(default=None, primary_key=True)\n'
         # else not required: Avoid if primary option in not set
 
-        if SQLModelModelPlugin.flux_fld_index in str(field.proto.options):
+        if self.is_option_enabled(field, SQLModelModelPlugin.flux_fld_index):
             if leading_comments or is_primary:
                 output_str += f', index=True)\n'
             else:

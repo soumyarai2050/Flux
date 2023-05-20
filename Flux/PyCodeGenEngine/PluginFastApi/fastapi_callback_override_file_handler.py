@@ -22,22 +22,20 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
-    def _handle_field_data_manipulation(self, json_content: Dict, message: protogen.Message, id_str: str | None = None):
-        # checking if all simple fields are present in message
-        all_simple_fields = True
-        for field in message.fields:
-            if field.message is not None:
-                all_simple_fields = False
-                break
-
-        if not all_simple_fields:
+    def _handle_field_data_manipulation(self, json_content: Dict, message: protogen.Message, id_str: str | None = None,
+                                        get_all_fields: bool | None = None, specify_message_name: str | None = None):
+        if get_all_fields is not None and get_all_fields:
             temp_str = ""
             for field in message.fields:
                 if BaseFastapiPlugin.default_id_field_name == field.proto.name:
                     temp_str += f"{field.proto.name}={id_str}"
                 else:
-                    message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-                    field_val = json_content[message_name_snake_cased][field.proto.name]
+                    if specify_message_name is None:
+                        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+                        field_val = json_content[message_name_snake_cased][field.proto.name]
+                    else:
+                        # message_name_snake_cased = convert_camel_case_to_specific_case(specify_message_name)
+                        field_val = json_content[field.proto.name]
                     if isinstance(field_val, str):
                         field_val = f'"{field_val}"'
                     elif field_val == 'true' or field_val == 'false':
@@ -53,7 +51,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                 if BaseFastapiPlugin.default_id_field_name != field.proto.name:
                     match field.kind.name.lower():
                         case "int32" | "int64" | "float":
-                            if BaseFastapiPlugin.flux_fld_val_is_datetime in str(field.proto.options):
+                            if self.is_option_enabled(field, BaseFastapiPlugin.flux_fld_val_is_datetime):
                                 return f'{field.proto.name} = DateTime.utcnow()'
                             else:
                                 return f"{field.proto.name} += 10"
@@ -61,6 +59,10 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                             return f'{field.proto.name} = "test_str"'
                         case "bool":
                             return f"{field.proto.name} = True"
+                        case "message":
+                            message_name_case_styled = convert_camel_case_to_specific_case(message.proto.name)
+                            return f"{field.proto.name} = {field.message.proto.name}(" \
+                                   f"{self._handle_field_data_manipulation(json_content.get(message_name_case_styled).get(field.proto.name), field.message, get_all_fields=True, specify_message_name=field.proto.name)})"
                 # else not required: field must not be id to be manipulated in this method's use case
             else:
                 err_str = f"Can't find any non-complex type field in this message: {message.proto.name}"
@@ -87,7 +89,10 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
             self.import_path_from_os_path("OUTPUT_DIR", f"{self.routes_callback_class_name}")
         callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += f"from {routes_callback} import " \
-                      f"{callback_class_name_camel_cased}\n\n\n"
+                      f"{callback_class_name_camel_cased}\n\n"
+        output_str += "# Example uses 2 webclients of same service working on different port numbers to show "
+        output_str += "# in some examples how can one service communicate to other (Practically other client must "
+        output_str += "# be of another service not of same)\n"
         output_str += f"{self.proto_file_name}_web_client_internal = " \
                       f"{web_client_name_caps_camel_cased}()\n"
         output_str += f"{self.proto_file_name}_web_client_external = " \
@@ -263,6 +268,9 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         if self.message_to_query_option_list_dict:
             output_str += f"\n"
             output_str += "    # Example: Soft API Query Interfaces\n"
+            output_str += "    # Note: Some Queries may have import errors this is because not all queries have \n"
+            output_str += "    # models in db, some are used to get processed data from db, so specific impl must \n"
+            output_str += "    # be implemented in main callback override file present in app dir of project\n"
             output_str += f"\n"
         for message in self.message_to_query_option_list_dict:
             msg_name = message.proto.name
@@ -271,37 +279,47 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
             aggregate_value_list = self.message_to_query_option_list_dict[message]
 
             for aggregate_value in aggregate_value_list:
-                aggregate_var_name = aggregate_value[FastapiCallbackOverrideFileHandler.aggregate_var_name_key]
-                aggregate_params = aggregate_value[FastapiCallbackOverrideFileHandler.aggregate_params_key]
-                aggregate_params_data_types = aggregate_value[
-                    FastapiCallbackOverrideFileHandler.aggregate_params_data_types_key]
+                query_name = aggregate_value[FastapiCallbackOverrideFileHandler.query_name_key]
+                aggregate_var_name = aggregate_value[FastapiCallbackOverrideFileHandler.query_aggregate_var_name_key]
+                query_params = aggregate_value[FastapiCallbackOverrideFileHandler.query_params_key]
+                query_params_data_types = aggregate_value[
+                    FastapiCallbackOverrideFileHandler.query_params_data_types_key]
 
                 routes_import_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
                 aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
 
-                if aggregate_params:
+                if query_params:
                     agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
-                                                          for param, param_type in zip(aggregate_params,
-                                                                                       aggregate_params_data_types)])
-                    agg_params_str = ", ".join(aggregate_params)
+                                                          for param, param_type in zip(query_params,
+                                                                                       query_params_data_types)])
+                    agg_params_str = ", ".join(query_params)
 
-                    output_str += f"    async def {aggregate_var_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
+                    output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
                                   f"Type[{msg_name}], {agg_params_with_type_str}):\n"
-                    output_str += f"        from {routes_import_path} import " \
-                                  f"underlying_read_{msg_name_snake_cased}_http\n"
-                    output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
-                    output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
-                                  f"{aggregate_var_name}({agg_params_str}))\n"
+                    if aggregate_var_name is not None:
+                        output_str += f"        from {routes_import_path} import " \
+                                      f"underlying_read_{msg_name_snake_cased}_http\n"
+                        output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
+                        output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
+                                      f"{aggregate_var_name}({agg_params_str}))\n"
+                    else:
+                        output_str += f"        # To be implemented in main callback override file\n"
+                        output_str += f"        pass\n"
+
                     output_str += "\n\n"
                 else:
-                    output_str += f"    async def {aggregate_var_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
+                    output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
                                   f"Type[{msg_name}]):\n"
-                    output_str += f"        from {routes_import_path} import " \
-                                  f"underlying_read_{msg_name_snake_cased}_http\n"
-                    output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
-                    output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
-                                  f"{aggregate_var_name})\n"
-                    output_str += "\n\n"
+                    if aggregate_var_name is not None:
+                        output_str += f"        from {routes_import_path} import " \
+                                      f"underlying_read_{msg_name_snake_cased}_http\n"
+                        output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
+                        output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
+                                      f"{aggregate_var_name})\n"
+                    else:
+                        output_str += f"        # To be implemented in main callback override file\n"
+                        output_str += f"        pass\n"
+                    output_str += "\n"
 
         return output_str
 

@@ -89,7 +89,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     self.enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if BasePydanticModelPlugin.flux_msg_json_root in str(field.message.proto.options):
+                if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root):
                     if field.message not in self.root_message_list:
                         self.root_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -99,7 +99,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     # else not required: avoiding repetition
                 self.load_dependency_messages_and_enums_in_dicts(field.message)
 
-                if BasePydanticModelPlugin.flux_msg_json_query in str(field.message.proto.options):
+                if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_query):
                     if field.message not in self.query_message_list:
                         self.query_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -108,7 +108,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if BasePydanticModelPlugin.flux_msg_json_root in str(message.proto.options):
+            if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root):
                 json_root_msg_option_val_dict = \
                     self.get_complex_option_values_as_list_of_dict(message, BasePydanticModelPlugin.flux_msg_json_root)
                 # taking first obj since json root is of non-repeated option
@@ -128,7 +128,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     self.non_root_message_list.append(message)
                 # else not required: avoiding repetition
 
-            if BasePydanticModelPlugin.flux_msg_json_query in str(message.proto.options):
+            if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_query):
                 if message not in self.query_message_list:
                     self.query_message_list.append(message)
                 # else not required: avoiding repetition
@@ -317,11 +317,11 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def _add_datetime_validator(self, message: protogen.Message) -> str:
         output_str = ""
         for field in message.fields:
-            if BasePydanticModelPlugin.flux_fld_date_time_format in str(field.proto.options):
+            if self.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_date_time_format):
                 output_str += "    @validator('date', pre=True)\n"
                 output_str += "    def time_validate(cls, v):\n"
                 date_time_format = \
-                    self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                    self.get_non_repeated_valued_custom_option_value(field,
                                                                      BasePydanticModelPlugin.flux_fld_date_time_format)
                 output_str += f"        return validate_pendulum_datetime(v, {date_time_format})\n"
                 break

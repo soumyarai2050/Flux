@@ -121,13 +121,14 @@ message OrderJournal{
     is_repeated: True
   };
   option (FluxMsgJsonQuery) = {
+      QueryName: "get_last_n_sec_orders_by_event",
       AggregateVarName: "get_last_n_sec_orders_by_event",
-      AggregateParams: "symbol",
-      AggregateParams: "last_n_sec",
-      AggregateParams: "order_event",
-      AggregateParamsDataType: "str | None",
-      AggregateParamsDataType: "int",
-      AggregateParamsDataType: "str"
+      QueryParams: "symbol",
+      QueryParams: "last_n_sec",
+      QueryParams: "order_event",
+      QueryParamsDataType: "str | None",
+      QueryParamsDataType: "int",
+      QueryParamsDataType: "str"
   };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
@@ -147,7 +148,8 @@ message OrderSnapshot{
     UpdateDesc: AggregateType_FilterAggregate,
     PatchDesc: AggregateType_FilterAggregate,
     DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+    ReadWebSocketDesc: AggregateType_FilterAggregate,
+    SetReentrantLockToTop: true,
   };
   option (FluxMsgWidgetUIData) = {
     x: 6,
@@ -158,9 +160,9 @@ message OrderSnapshot{
     is_repeated: True
   };
   option (FluxMsgJsonQuery) = {
-      AggregateVarName: "trigger_residual_check",
-      AggregateParams: "order_status_list",
-      AggregateParamsDataType: "List[str]"
+      QueryName: "trigger_residual_check",
+      QueryParams: "order_status_list",
+      QueryParamsDataType: "List[str]"
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
@@ -192,11 +194,12 @@ message SymbolSideSnapshot{
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
   option (FluxMsgJsonQuery) = {
+      QueryName: "get_symbol_side_snapshot_from_symbol_side",
       AggregateVarName: "get_symbol_side_snapshot_from_symbol_side",
-      AggregateParams: "security_id",
-      AggregateParams: "side",
-      AggregateParamsDataType: "str",
-      AggregateParamsDataType: "str",
+      QueryParams: "security_id",
+      QueryParams: "side",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str",
   };
   option (FluxMsgWidgetUIData) = {
     x: 8,
@@ -244,11 +247,12 @@ message FillsJournal{
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
   option (FluxMsgJsonQuery) = {
+      QueryName: "get_symbol_side_underlying_account_cumulative_fill_qty",
       AggregateVarName: "get_symbol_side_underlying_account_cumulative_fill_qty",
-      AggregateParams: "symbol",
-      AggregateParams: "side",
-      AggregateParamsDataType: "str",
-      AggregateParamsDataType: "str"
+      QueryParams: "symbol",
+      QueryParams: "side",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str"
   };
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -399,28 +403,29 @@ message PairStrat{
     UpdateDesc: AggregateType_FilterAggregate,
     PatchDesc: AggregateType_FilterAggregate,
     DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+    ReadWebSocketDesc: AggregateType_FilterAggregate,
+    SetReentrantLockToTop: true,
   };
     option (FluxMsgJsonQuery) = {
-      AggregateVarName: "get_pair_strat_sec_filter_json",
-      AggregateParams: "security_id",
-      AggregateParamsDataType: "str"
+      QueryName: "get_pair_strat_sec_filter_json",
+      QueryParams: "security_id",
+      QueryParamsDataType: "str"
   };
     option (FluxMsgJsonQuery) = {
-    AggregateVarName: "update_residuals",
-    AggregateParams: "security_id",
-    AggregateParamsDataType: "str",
-    AggregateParams: "side",
-    AggregateParamsDataType: "Side",
-    AggregateParams: "residual_qty",
-    AggregateParamsDataType: "int"
+    QueryName: "update_residuals",
+    QueryParams: "security_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "residual_qty",
+    QueryParamsDataType: "int"
   };
     option (FluxMsgJsonQuery) = {
-    AggregateVarName: "get_ongoing_strat_from_symbol_side",
-    AggregateParams: "sec_id",
-    AggregateParamsDataType: "str",
-    AggregateParams: "side",
-    AggregateParamsDataType: "Side"
+    QueryName: "get_ongoing_strat_from_symbol_side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side"
   };
 
     option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
@@ -502,9 +507,10 @@ message StratBrief{
     is_repeated: true
   };
   option (FluxMsgJsonQuery) = {
+      QueryName: "get_strat_brief_from_symbol",
       AggregateVarName: "get_strat_brief_from_symbol",
-      AggregateParams: "security_id",
-      AggregateParamsDataType: "str"
+      QueryParams: "security_id",
+      QueryParamsDataType: "str"
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -622,16 +628,16 @@ message SymbolNExchange{
 
 message OngoingStratsSymbolNExchange{
   option (FluxMsgJsonQuery) = {
-      AggregateVarName: "get_ongoing_strats_symbol_n_exch"
+      QueryName: "get_ongoing_strats_symbol_n_exch"
   };
   repeated SymbolNExchange symbol_n_exchange = 1;
 }
 
 message OpenOrderCount{
   option (FluxMsgJsonQuery) = {
-      AggregateVarName: "get_open_order_count"
-      AggregateParams: "symbol",
-      AggregateParamsDataType: "str"
+      QueryName: "get_open_order_count"
+      QueryParams: "symbol",
+      QueryParamsDataType: "str"
   };
   required int32 open_order_count = 1;
 }
@@ -643,24 +649,24 @@ message UnderlyingAccountNCumFillQty{
 
 message UnderlyingAccountCumFillQty{
   option (FluxMsgJsonQuery) = {
-      AggregateVarName: "get_underlying_account_cumulative_fill_qty",
-      AggregateParams: "symbol",
-      AggregateParams: "side",
-      AggregateParamsDataType: "str",
-      AggregateParamsDataType: "str"
+      QueryName: "get_underlying_account_cumulative_fill_qty",
+      QueryParams: "symbol",
+      QueryParams: "side",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str"
   };
   repeated UnderlyingAccountNCumFillQty underlying_account_n_cumulative_fill_qty = 1;
 }
 
 message ExecutorCheckSnapshot{
   option (FluxMsgJsonQuery) = {
-      AggregateVarName: "get_executor_check_snapshot",
-      AggregateParams: "symbol",
-      AggregateParams: "side",
-      AggregateParams: "last_n_sec",
-      AggregateParamsDataType: "str",
-      AggregateParamsDataType: "str",
-      AggregateParamsDataType: "int"
+      QueryName: "get_executor_check_snapshot",
+      QueryParams: "symbol",
+      QueryParams: "side",
+      QueryParams: "last_n_sec",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "int"
   };
   optional int32 last_n_sec_trade_qty = 1;
   optional int32 last_n_sec_order_qty = 2;

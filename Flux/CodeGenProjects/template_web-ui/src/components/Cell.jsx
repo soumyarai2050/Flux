@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useSelector } from 'react-redux';
-import _, { cloneDeep, isEqual } from 'lodash';
+import _, { cloneDeep, isEqual, debounce } from 'lodash';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
 import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener, InputAdornment } from '@mui/material';
@@ -17,13 +17,6 @@ import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import classes from './Cell.module.css';
 
 const Cell = (props) => {
-    const state = useSelector(state => state);
-    const [active, setActive] = useState(false);
-    const [open, setOpen] = useState(false);
-    const [oldValue, setOldValue] = useState(null);
-    const [newUpdateClass, setNewUpdateClass] = useState("");
-    const timeoutRef = useRef(null);
-
     const {
         mode,
         rowindex,
@@ -35,6 +28,14 @@ const Cell = (props) => {
         currentValue,
         previousValue,
     } = props;
+
+    const state = useSelector(state => state);
+    const [active, setActive] = useState(false);
+    const [open, setOpen] = useState(false);
+    const [oldValue, setOldValue] = useState(null);
+    const [newUpdateClass, setNewUpdateClass] = useState("");
+    const [inputValue, setInputValue] = useState(currentValue);
+    const timeoutRef = useRef(null);
 
     useEffect(() => {
         if (props.highlightUpdate && currentValue !== oldValue) {
@@ -48,6 +49,23 @@ const Cell = (props) => {
             setOldValue(currentValue);
         }
     }, [currentValue, oldValue, timeoutRef, classes, props.highlightUpdate])
+
+    const handleTextChangeDebounced = debounce((e, type, xpath, value) => {
+        props.onTextChange(e, type, xpath, value);
+    }, 500)
+
+    const handleTextChange = (e, type, xpath, value) => {
+        if (value === '') {
+            value = null;
+        }
+        if (type === DataTypes.NUMBER) {
+            if (value !== null) {
+                value = value * 1;
+            }
+        }
+        setInputValue(value);
+        handleTextChangeDebounced(e, type, xpath, value);
+    }
 
     const onFocusIn = useCallback(() => {
         setActive(true);
@@ -146,7 +164,7 @@ const Cell = (props) => {
             if (collection.underlyingtype === DataTypes.INT32 || collection.underlyingtype === DataTypes.INT64) {
                 decimalScale = 0;
             }
-            let value = currentValue ? currentValue : 0;
+            let value = inputValue ? inputValue : inputValue === 0 ? 0 : '';
 
             let min = collection.min;
             if (typeof (min) === DataTypes.STRING) {
@@ -185,7 +203,7 @@ const Cell = (props) => {
                         InputProps={inputProps}
                         customInput={TextField}
                         isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
-                        onValueChange={(values, sourceInfo) => props.onTextChange(sourceInfo.event, type, xpath, values.value)}
+                        onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, type, xpath, values.value)}
                         inputProps={{
                             style: { padding: '6px 10px' },
                             dataxpath: dataxpath,
@@ -216,7 +234,7 @@ const Cell = (props) => {
                 </TableCell>
             )
         } else if (type === DataTypes.STRING && !collection.abbreviated) {
-            let value = currentValue ? currentValue : '';
+            let value = inputValue ? inputValue : '';
             return (
                 <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <TextField
@@ -226,7 +244,7 @@ const Cell = (props) => {
                         value={value}
                         placeholder={collection.placeholder}
                         disabled={disabled}
-                        onChange={(e) => props.onTextChange(e, type, xpath, e.target.value)}
+                        onChange={(e) => handleTextChange(e, type, xpath, e.target.value)}
                         inputProps={{
                             style: { padding: '6px 10px' },
                             dataxpath: dataxpath,

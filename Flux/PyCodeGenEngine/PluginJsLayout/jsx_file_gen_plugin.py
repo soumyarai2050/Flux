@@ -1131,9 +1131,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 for field in message.fields:
                     # It's assumed that abbreviated layout type will also have  some field having flux_fld_abbreviated
                     # set to get abbreviated dependent message name
-                    if JsxFileGenPlugin.flux_fld_abbreviated in str(field.proto.options):
+                    if self.is_option_enabled(field, JsxFileGenPlugin.flux_fld_abbreviated):
                         fld_abbreviated_option_value = \
-                            self.get_non_repeated_valued_custom_option_value(field.proto.options,
+                            self.get_non_repeated_valued_custom_option_value(field,
                                                                              JsxFileGenPlugin.flux_fld_abbreviated)[1:]
                         break
                 else:

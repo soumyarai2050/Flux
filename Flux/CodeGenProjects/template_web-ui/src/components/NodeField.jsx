@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
+import { debounce } from 'lodash';
 import { ColorTypes, DataTypes, Modes } from '../constants';
 import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment } from '@mui/material';
 import PropTypes from 'prop-types';
@@ -11,6 +12,24 @@ import classes from './NodeField.module.css';
 
 const NodeField = (props) => {
     const state = useSelector(state => state);
+    const [inputValue, setInputValue] = useState(props.data.value);
+
+    const handleTextChangeDebounced = debounce((e, type, xpath, value) => {
+        props.data.onTextChange(e, type, xpath, value);
+    }, 500)
+
+    const handleTextChange = (e, type, xpath, value) => {
+        if (value === '') {
+            value = null;
+        }
+        if (type === DataTypes.NUMBER) {
+            if (value !== null) {
+                value = value * 1;
+            }
+        }
+        setInputValue(value);
+        handleTextChangeDebounced(e, type, xpath, value);
+    }
 
     let disabled = true;
     if (props.data.mode === Modes.EDIT_MODE) {
@@ -122,7 +141,7 @@ const NodeField = (props) => {
             max = getValueFromReduxStoreFromXpath(state, max);
         }
 
-        let value = props.data.value ? props.data.value : 0;
+        let value = inputValue ? inputValue : inputValue === 0 ? 0 : '';
 
         let inputProps = {};
         if (props.data.numberFormat) {
@@ -150,10 +169,7 @@ const NodeField = (props) => {
                 disabled={disabled}
                 thousandSeparator=','
                 isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
-                onValueChange={(values, sourceInfo) => props.data.onTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value)}
-                // onChange={(e) => props.data.onTextChange(e, props.data.type, props.data.xpath)}
-                // onKeyDown={(e) => props.data.onKeyDown(e, props.data.type)}
-                // type={props.data.type}
+                onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value)}
                 variant='outlined'
                 decimalScale={decimalScale}
                 placeholder={props.data.placeholder}
@@ -188,7 +204,7 @@ const NodeField = (props) => {
             </LocalizationProvider>
         )
     } else {
-        let value = props.data.value ? props.data.value : '';
+        let value = inputValue ? inputValue : '';
         return (
             <TextField
                 className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
@@ -199,9 +215,7 @@ const NodeField = (props) => {
                 error={error}
                 value={value}
                 disabled={disabled}
-                onChange={(e) => props.data.onTextChange(e, props.data.type, props.data.xpath, e.target.value)}
-                // onKeyDown={(e) => props.data.onKeyDown(e, props.data.type)}
-                // type={props.data.type}
+                onChange={(e) => handleTextChange(e, props.data.type, props.data.xpath, e.target.value)}
                 variant='outlined'
                 placeholder={props.data.placeholder}
                 inputProps={{
