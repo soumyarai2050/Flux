@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Importing here to get LOG_FILE_NAME and LOG_LEVEL set before getting logging config triggered in
     # template_model_service_cache_fastapi file
-    from Flux.CodeGenProjects.template_project_name.generated.template_model_service_launch_server import \
+    from Flux.CodeGenProjects.template_project_name.generated.FastApi.template_model_service_launch_server import \
         template_model_service_launch_server
 
     template_model_service_launch_server()

@@ -7,14 +7,15 @@ from typing import Callable, Set
 from pendulum import DateTime
 import re
 from threading import Lock
+from fastapi.encoders import jsonable_encoder
 
 os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.scripts.utility_functions import configure_logger, get_host_port_from_env, load_yaml_configurations
 from FluxPythonUtils.log_analyzer.log_analyzer import LogAnalyzer, LogDetail
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
+from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import create_alert
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import is_service_up
@@ -79,7 +80,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                                                                    alert_details)
                     updated_portfolio_status: PortfolioStatusBaseModel = \
                         PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert_obj])
-                    self.strat_manager_service_web_client.patch_portfolio_status_client(updated_portfolio_status)
+                    self.strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(updated_portfolio_status, by_alias=True, exclude_none=True))
                     created = True
                 except Exception as e:
                     logging.error(f"_send_alerts failed;;;exception: {e}")
@@ -240,7 +241,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                     updated_pair_strat: PairStratBaseModel = \
                         PairStratBaseModel(_id=strat_id, strat_status=StratStatusOptional())
                     updated_pair_strat.strat_status.strat_alerts = [alert_obj]
-                    self.strat_manager_service_web_client.patch_pair_strat_client(updated_pair_strat)
+                    self.strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(updated_pair_strat, by_alias=True, exclude_none=True))
                     created = True
                 except Exception as e:
                     logging.error(f"_send_strat_alerts failed;;;exception: {e}")

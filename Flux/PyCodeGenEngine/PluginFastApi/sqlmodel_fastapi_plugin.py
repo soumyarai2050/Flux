@@ -213,10 +213,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
         return output_str
 
     def handle_CRUD_for_message(self, message: protogen.Message) -> str:
-        options_list_of_dict = self.get_complex_option_values_as_list_of_dict(message, SQLModelFastApiPlugin.flux_msg_json_root)
-
-        # Since json_root option is of non-repeated type
-        option_dict = options_list_of_dict[0]
+        option_value_dict = self.get_complex_option_set_values(message, SQLModelFastApiPlugin.flux_msg_json_root)
 
         crud_field_name_to_method_call_dict = {
             SQLModelFastApiPlugin.flux_json_root_create_field: self.handle_POST_gen,
@@ -227,8 +224,8 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
 
         output_str = self.handle_GET_ALL_gen(message)
         for crud_option_field_name, crud_operation_method in crud_field_name_to_method_call_dict.items():
-            if crud_option_field_name in option_dict:
-                method_disc = option_dict[crud_option_field_name]
+            if crud_option_field_name in option_value_dict:
+                method_disc = option_value_dict[crud_option_field_name]
                 output_str += crud_operation_method(message, method_disc)
                 output_str += "\n\n"
             # else not required: Avoiding method creation if desc not provided in option

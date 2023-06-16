@@ -59,15 +59,8 @@ def generic_http_put_client(url: str, pydantic_obj, pydantic_type):
 
 
 @log_n_except
-def generic_http_patch_client(url: str, pydantic_obj, pydantic_type):
-    # When used for routes
-    if pydantic_obj is not None:
-        # When used for routes
-        json_data = jsonable_encoder(pydantic_obj, by_alias=True, exclude_none=True)
-    else:
-        # When used for queries like get last date query, as there is no pydantic obj in case of query
-        json_data = None
-    response: requests.Response = requests.patch(url, json=json_data)
+def generic_http_patch_client(url: str, pydantic_obj_json, pydantic_type):
+    response: requests.Response = requests.patch(url, json=pydantic_obj_json)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
 
 
@@ -117,7 +110,8 @@ async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Call
                 data = None
                 try:
                     for pydantic_obj in pydantic_obj_list.__root__:
-                        print(pydantic_obj)
+                        # print(pydantic_obj)
+                        logging.debug(pydantic_obj)
                 except KeyError:
                     continue
 
@@ -158,7 +152,8 @@ async def generic_ws_get_client(url: str, query_param: Any, pydantic_type, user_
                 user_callback(pydantic_type_obj)
                 data = None
                 try:
-                    print('\n', "Update: ", pydantic_type_obj)
+                    # print('\n', "Update: ", pydantic_type_obj)
+                    logging.debug(f"Update: {pydantic_type_obj}")
                 except KeyError:
                     continue
 

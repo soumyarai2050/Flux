@@ -95,23 +95,15 @@ class ExtendedProtogenOptions(Options):
         resp = plugin._response()
 
         # @@@ Included insertion points support in extended version
-        if not plugin.do_generate_multi_files:
-            if (insertion_points_to_content_dict := plugin.insertion_points_to_content_dict) is not None:
-                # Adding content at insertion points
-                for point, content in insertion_points_to_content_dict.items():
-                    resp_f = resp.file.add()
-                    resp_f.name = plugin.output_file_name
-                    resp_f.insertion_point = point
-                    resp_f.content = content
-            # else not required: ignore if custom plugin method ``f`` did not assign any
-            # value to plugin property insertion_points_to_content_dict
-        else:
-            insertion_imports_dict = list(plugin.insertion_points_to_content_dict.values())[0]
+        if (insertion_points_to_content_dict := plugin.insertion_points_to_content_dict) is not None:
             # Adding content at insertion points
-            for point, content in insertion_imports_dict.items():
-                resp_f = resp.file.add()
-                resp_f.name = point
-                resp_f.insertion_point = point
-                resp_f.content = content
+            for output_file_name, insert_point_content in insertion_points_to_content_dict.items():
+                for insert_point, content in insert_point_content.items():
+                    resp_f = resp.file.add()
+                    resp_f.name = output_file_name
+                    resp_f.insertion_point = insert_point
+                    resp_f.content = content
+        # else not required: ignore if custom plugin method ``f`` did not assign any
+        # value to plugin property insertion_points_to_content_dict
 
         self._output.write(resp.SerializeToString())

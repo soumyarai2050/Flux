@@ -44,14 +44,14 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
             # else not required: Avoiding non ORM root messages
 
             if self.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_widget_ui_data):
-                widget_ui_data_option_list_of_dict = \
-                    self.get_complex_option_values_as_list_of_dict(message,
-                                                                   BaseJSLayoutPlugin.flux_msg_widget_ui_data)[0]
-                if "layout" in widget_ui_data_option_list_of_dict:
+                widget_ui_data_option_value_dict = \
+                    self.get_complex_option_set_values(message,
+                                                       BaseJSLayoutPlugin.flux_msg_widget_ui_data)
+                if "layout" in widget_ui_data_option_value_dict:
                     self.layout_msg_list.append(message)
-                    layout_type: str = widget_ui_data_option_list_of_dict["layout"].strip()
+                    layout_type: str = widget_ui_data_option_value_dict["layout"].strip()
                     if BaseJSLayoutPlugin.flux_msg_tree_layout_value == layout_type:
-                        is_repeated: bool = widget_ui_data_option_list_of_dict.get("is_repeated")
+                        is_repeated: bool = widget_ui_data_option_value_dict.get("is_repeated")
                         if is_repeated is not None and is_repeated:
                             self.repeated_tree_layout_msg_list.append(message)
                         # if is_repeated field is not present in option val or is false both signifies message is not
@@ -59,7 +59,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
                         else:
                             self.tree_layout_msg_list.append(message)
                     elif BaseJSLayoutPlugin.flux_msg_table_layout_value == layout_type:
-                        is_repeated: bool = widget_ui_data_option_list_of_dict.get("is_repeated")
+                        is_repeated: bool = widget_ui_data_option_value_dict.get("is_repeated")
                         if is_repeated is not None and is_repeated:
                             self.repeated_table_layout_msg_list.append(message)
                         # if is_repeated field is not present in option val or is false both signifies message is not

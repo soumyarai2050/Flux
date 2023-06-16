@@ -1,35 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
-import { debounce } from 'lodash';
 import { ColorTypes, DataTypes, Modes } from '../constants';
-import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment } from '@mui/material';
+import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, Tooltip } from '@mui/material';
+import { Error } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt } from '../utils';
+import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints } from '../utils';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './NodeField.module.css';
 
 const NodeField = (props) => {
     const state = useSelector(state => state);
-    const [inputValue, setInputValue] = useState(props.data.value);
+    const validationError = useRef(null);
 
-    const handleTextChangeDebounced = debounce((e, type, xpath, value) => {
-        props.data.onTextChange(e, type, xpath, value);
-    }, 500)
-
-    const handleTextChange = (e, type, xpath, value) => {
-        if (value === '') {
-            value = null;
+    useEffect(() => {
+        if (props.data.onFormUpdate) {
+            props.data.onFormUpdate(props.data.xpath, validationError.current);
         }
-        if (type === DataTypes.NUMBER) {
-            if (value !== null) {
-                value = value * 1;
-            }
-        }
-        setInputValue(value);
-        handleTextChangeDebounced(e, type, xpath, value);
-    }
+    }, [props.data.onFormUpdate])
 
     let disabled = true;
     if (props.data.mode === Modes.EDIT_MODE) {
@@ -44,23 +33,6 @@ const NodeField = (props) => {
         }
     }
 
-    let error = false;
-    if (props.data.required && props.data.mode === Modes.EDIT_MODE && props.data['data-add']) {
-        if (props.data.type === DataTypes.STRING) {
-            if (!props.data.value || (props.data.value && props.data.value === '')) {
-                error = true;
-            }
-        } else if (props.data.type === DataTypes.NUMBER) {
-            if (!props.data.value) {
-                error = true;
-            }
-        } else if (props.data.type === DataTypes.ENUM) {
-            if (props.data.value.includes('UNSPECIFIED')) {
-                error = true;
-            }
-        }
-    }
-
     let color = '';
     if (props.data.color) {
         color = getColorTypeFromValue(props.data, props.data.value);
@@ -70,6 +42,16 @@ const NodeField = (props) => {
     let nodeFieldRemove = props.data['data-remove'] ? classes.remove : '';
 
     if (props.data.customComponentType === 'autocomplete') {
+        let value = props.data.value ? props.data.value : null;
+        validationError.current = validateConstraints(props.data, value);
+
+        const endAdornment = validationError.current ? (
+            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+        ) : null;
+        const inputProps = endAdornment ? {
+            endAdornment: endAdornment
+        } : {};
+
         return (
             <Autocomplete
                 id={props.data.key}
@@ -78,45 +60,68 @@ const NodeField = (props) => {
                 isOptionEqualToValue={(option, value) => option == value}
                 disableClearable
                 disabled={disabled}
+                forcePopupIcon={false}
                 variant='outlined'
                 size='small'
                 sx={{ minWidth: 160 }}
                 className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                 required={props.data.required}
-                value={props.data.value ? props.data.value : null}
+                value={value}
                 onChange={(e, v) => props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath)}
                 renderInput={(params) => (
                     <TextField
                         {...params}
                         name={props.data.key}
-                        error={error}
+                        error={validationError.current !== null}
                         placeholder={props.data.placeholder}
+                        InputProps={{
+                            ...params.InputProps,
+                            ...inputProps
+                        }}
                     />
                 )}
             />
         )
     } else if (props.data.type === DataTypes.BOOLEAN) {
+        let value = props.data.value ? props.data.value : props.data.value === false ? false : null;
+        validationError.current = validateConstraints(props.data, value);
+        const endAdornment = validationError.current ? (
+            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+        ) : null;
+        const inputProps = endAdornment ? {
+            endAdornment: endAdornment
+        } : {};
         return (
             <Checkbox
                 id={props.data.key}
                 name={props.data.key}
                 className={`${classes.checkbox} ${nodeFieldRemove} ${colorClass}`}
                 defaultValue={false}
-                checked={props.data.value ? props.data.value : false}
+                required={props.data.required}
+                checked={value}
                 disabled={disabled}
+                error={validationError.current !== null}
                 onChange={(e) => props.data.onCheckboxChange(e, props.data.dataxpath, props.data.xpath)}
+                InputProps={inputProps}
             />
         )
     } else if (props.data.type === DataTypes.ENUM) {
+        let value = props.data.value ? props.data.value : null;
+        validationError.current = validateConstraints(props.data, value);
+        const endAdornment = validationError.current ? (
+            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+        ) : null;
         return (
             <Select
                 id={props.data.key}
                 name={props.data.key}
                 className={`${classes.select} ${nodeFieldRemove} ${colorClass}`}
-                value={props.data.value ? props.data.value : ''}
+                value={value}
                 onChange={(e) => props.data.onSelectItemChange(e, props.data.dataxpath, props.data.xpath)}
                 size='small'
-                error={error}
+                endAdornment={endAdornment}
+                error={validationError.current !== null}
+                required={props.data.required}
                 disabled={disabled}>
                 {props.data.dropdowndataset && props.data.dropdowndataset.map((val) => {
                     return <MenuItem key={val} value={val}>
@@ -126,35 +131,46 @@ const NodeField = (props) => {
             </Select>
         )
     } else if (props.data.type === DataTypes.NUMBER) {
+        // round the decimal places for float. default precision is 2 digits for float
         let decimalScale = 2;
         if (props.data.underlyingtype === DataTypes.INT32 || props.data.underlyingtype === DataTypes.INT64) {
             decimalScale = 0;
         }
 
+        // min constrainsts for numeric field if set.
         let min = props.data.min;
         if (typeof (min) === DataTypes.STRING) {
             min = getValueFromReduxStoreFromXpath(state, min);
         }
 
+        // max constrainsts for numeric field if set.
         let max = props.data.max;
         if (typeof (max) === DataTypes.STRING) {
             max = getValueFromReduxStoreFromXpath(state, max);
         }
 
-        let value = inputValue ? inputValue : inputValue === 0 ? 0 : '';
-
-        let inputProps = {};
-        if (props.data.numberFormat) {
-            if (props.data.numberFormat === "%") {
-                inputProps = {
-                    endAdornment: <InputAdornment position="end">%</InputAdornment>
-                }
+        let value = props.data.value ? props.data.value : props.data.value === 0 ? 0 : '';
+        if (props.data.displayType == DataTypes.INTEGER) {
+            if (value !== '') {
+                value = floatToInt(value);
             }
         }
+        validationError.current = validateConstraints(props.data, value, min, max);
 
-        if (props.data.displayType == DataTypes.INTEGER) {
-            value = floatToInt(value);
-        }
+        const endAdornment = validationError.current || props.data.numberFormat ? (
+            <>
+                {props.data.numberFormat && props.data.numberFormat === '%' && (
+                    <InputAdornment position='end'>%</InputAdornment>
+                )}
+                {validationError.current && (
+                    <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+                )}
+
+            </>
+        ) : null;
+        const inputProps = endAdornment ? {
+            endAdornment: endAdornment
+        } : {};
 
         return (
             <NumericFormat
@@ -164,12 +180,13 @@ const NodeField = (props) => {
                 name={props.data.key}
                 size='small'
                 required={props.data.required}
-                error={error}
+                error={validationError.current !== null}
                 value={value}
                 disabled={disabled}
                 thousandSeparator=','
-                isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
-                onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value)}
+                // isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
+                onValueChange={(values, sourceInfo) => props.data.onTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value, props.data.dataxpath,
+                    validateConstraints(props.data, values.value, min, max))}
                 variant='outlined'
                 decimalScale={decimalScale}
                 placeholder={props.data.placeholder}
@@ -183,6 +200,14 @@ const NodeField = (props) => {
         )
     } else if (props.data.type === DataTypes.DATE_TIME) {
         let value = props.data.value ? new Date(props.data.value) : null;
+        validationError.current = validateConstraints(props.data, value);
+        const endAdornment = validationError.current ? (
+            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+        ) : null;
+        const inputProps = endAdornment ? {
+            endAdornment: endAdornment
+        } : {};
+
         return (
             <LocalizationProvider dateAdapter={AdapterDayjs}>
                 <DateTimePicker
@@ -190,9 +215,11 @@ const NodeField = (props) => {
                     name={props.data.key}
                     className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                     disabled={disabled}
-                    error={error}
+                    error={validationError.current !== null}
                     value={value}
+                    required={props.data.required}
                     inputFormat="DD-MM-YYYY HH:mm:ss"
+                    InputProps={inputProps}
                     onChange={(newValue) => props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, new Date(newValue).toISOString())}
                     inputProps={{
                         style: { padding: '6px 10px' },
@@ -204,7 +231,14 @@ const NodeField = (props) => {
             </LocalizationProvider>
         )
     } else {
-        let value = inputValue ? inputValue : '';
+        let value = props.data.value ? props.data.value : '';
+        validationError.current = validateConstraints(props.data, value);
+        const endAdornment = validationError.current ? (
+            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+        ) : null;
+        const inputProps = endAdornment ? {
+            endAdornment: endAdornment
+        } : {};
         return (
             <TextField
                 className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
@@ -212,12 +246,14 @@ const NodeField = (props) => {
                 name={props.data.key}
                 size='small'
                 required={props.data.required}
-                error={error}
+                error={validationError.current !== null}
                 value={value}
                 disabled={disabled}
-                onChange={(e) => handleTextChange(e, props.data.type, props.data.xpath, e.target.value)}
+                onChange={(e) => props.data.onTextChange(e, props.data.type, props.data.xpath, e.target.value, props.data.dataxpath,
+                    validateConstraints(props.data, e.target.value))}
                 variant='outlined'
                 placeholder={props.data.placeholder}
+                InputProps={inputProps}
                 inputProps={{
                     style: { padding: '6px 10px' },
                     dataxpath: props.data.dataxpath,

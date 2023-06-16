@@ -1,10 +1,12 @@
 import math
+import concurrent.futures
+import re
+from fastapi.encoders import jsonable_encoder
+
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, config_file_path
 from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations, update_yaml_configurations
 from FluxPythonUtils.scripts.utility_functions import drop_mongo_collections, clean_mongo_collections
-import concurrent.futures
-import re
 
 
 def test_clean_and_set_limits(clean_and_set_limits):
@@ -76,7 +78,7 @@ def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
         broker = broker_fixture()
 
         portfolio_limits_basemodel = PortfolioLimitsBaseModel(_id=1, eligible_brokers=[broker])
-        strat_manager_service_web_client.patch_portfolio_limits_client(portfolio_limits_basemodel)
+        strat_manager_service_web_client.patch_portfolio_limits_client(jsonable_encoder(portfolio_limits_basemodel, by_alias=True, exclude_none=True))
 
         stored_portfolio_limits_ = strat_manager_service_web_client.get_portfolio_limits_client(1)
         for stored_broker in stored_portfolio_limits_.eligible_brokers:
@@ -232,7 +234,7 @@ def test_validate_kill_switch_systematic(clean_and_set_limits, buy_sell_symbol_l
                                                market_depth_basemodel_list)
 
             portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-            updated_portfolio_status = strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status)
+            updated_portfolio_status = strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
             assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
                                                          "expected to be True"
 
@@ -264,7 +266,7 @@ def test_validate_kill_switch_non_systematic(clean_and_set_limits, buy_sell_symb
                                                market_depth_basemodel_list)
 
             portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-            updated_portfolio_status = strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status)
+            updated_portfolio_status = strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
             assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
                                                          "expected to be True"
 
@@ -712,7 +714,7 @@ def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_lis
                                    strat_status=StratStatusOptional(strat_alerts=[alert]),
                                    strat_limits=StratLimitsOptional(eligible_brokers=[broker]))
 
-            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
             assert alert in updated_pair_strat.strat_status.strat_alerts, f"Couldn't find alert {alert} in " \
                                                                           f"strat_alerts list" \
                                                                           f"{updated_pair_strat.strat_status.strat_alerts}"
@@ -730,7 +732,7 @@ def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_lis
             update_pair_strat = \
                 PairStratBaseModel(_id=active_pair_strat.id,
                                    strat_status=StratStatusOptional(strat_alerts=[updated_alert]))
-            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
 
             alert.impacted_order.extend(updated_alert.impacted_order)
             alert.alert_brief = updated_alert.alert_brief
@@ -744,7 +746,7 @@ def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_lis
             update_pair_strat = \
                 PairStratBaseModel(_id=active_pair_strat.id,
                                    strat_status=StratStatusOptional(strat_alerts=[delete_intended_alert]))
-            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
             alert_id_list = [alert.id for alert in updated_pair_strat.strat_status.strat_alerts]
             assert alert_id not in alert_id_list, f"Unexpectedly found alert_id {alert_id} " \
                                                   f"in alert_id list {alert_id_list}"
@@ -755,7 +757,7 @@ def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_lis
             update_pair_strat = \
                 PairStratBaseModel(_id=active_pair_strat.id,
                                    strat_limits=StratLimitsOptional(eligible_brokers=[delete_intended_broker]))
-            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(update_pair_strat)
+            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
             broker_id_list = [broker.id for broker in updated_pair_strat.strat_limits.eligible_brokers]
             assert broker_id not in broker_id_list, f"Unexpectedly found broker_id {broker_id} in broker_id list " \
                                                     f"{broker_id_list}"
@@ -869,7 +871,9 @@ def test_last_n_sec_order_qty_sum_and_order_count(clean_and_set_limits, buy_sell
             # in query
             rolling_max_order_count = RollingMaxOrderCountOptional(rolling_tx_count_period_seconds=last_n_sec)
             portfolio_limits = PortfolioLimitsBaseModel(_id=1, rolling_max_order_count=rolling_max_order_count)
-            updated_portfolio_limits = strat_manager_service_web_client.patch_portfolio_limits_client(portfolio_limits)
+            updated_portfolio_limits = \
+                strat_manager_service_web_client.patch_portfolio_limits_client(portfolio_limits.dict(by_alias=True,
+                                                                                                     exclude_none=True))
             assert updated_portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds == last_n_sec, \
                 f"Unexpected last_n_sec value: expected {last_n_sec}, " \
                 f"received {updated_portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds}"
@@ -942,7 +946,7 @@ def test_pair_strat_update_counters(clean_and_set_limits, buy_sell_symbol_list,
             pair_strat = \
                 PairStratBaseModel(_id=activated_strat.id,
                                    pair_strat_params=PairStratParamsOptional(common_premium=index))
-            updates_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(pair_strat)
+            updates_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
             assert updates_pair_strat.pair_strat_params_update_seq_num == \
                    activated_strat.pair_strat_params_update_seq_num + 1, \
                 f"Mismatched pair_strat_params_update_seq_num: expected " \
@@ -953,7 +957,7 @@ def test_pair_strat_update_counters(clean_and_set_limits, buy_sell_symbol_list,
             # updating pair_strat_params
             pair_strat = \
                 PairStratBaseModel(_id=activated_strat.id, strat_limits=StratLimitsOptional(max_concentration=index))
-            updates_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(pair_strat)
+            updates_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
             assert updates_pair_strat.strat_limits_update_seq_num == \
                    activated_strat.strat_limits_update_seq_num + 1, \
                 f"Mismatched strat_limits_update_seq_num: expected " \
@@ -968,7 +972,7 @@ def test_portfolio_status_alert_updates(clean_and_set_limits, sample_alert):
         alert = copy.deepcopy(sample_alert)
         portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert])
         updated_portfolio_status = \
-            strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_basemodel)
+            strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
         assert stored_portfolio_status.alert_update_seq_num + 1 == updated_portfolio_status.alert_update_seq_num, \
             f"Mismatched alert_update_seq_num: expected {stored_portfolio_status.alert_update_seq_num + 1}, " \
             f"received {updated_portfolio_status.alert_update_seq_num}"
@@ -978,7 +982,7 @@ def test_portfolio_status_alert_updates(clean_and_set_limits, sample_alert):
             alert.alert_brief = f"Test update - {loop_count}"
             portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert])
             alert_updated_portfolio_status = \
-                strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_basemodel)
+                strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
             assert updated_portfolio_status.alert_update_seq_num + (loop_count + 1) == \
                    alert_updated_portfolio_status.alert_update_seq_num, \
                 f"Mismatched alert_update_seq_num: expected " \

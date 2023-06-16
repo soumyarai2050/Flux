@@ -7,12 +7,13 @@ import { Icon } from './Icon';
 import _ from 'lodash';
 import { DB_ID, Modes, DataTypes, ColorTypes } from '../constants';
 import {
-    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getComparator, stableSort, getAbbreviatedKeyFromId
+    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getComparator, stableSort, getAbbreviatedKeyFromId, applyFilter
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { AlertErrorMessage } from './Alert';
 import AlertBubble from './AlertBubble';
 import TableHead from './TableHead';
+import DynamicMenu from './DynamicMenu';
 import Cell from './Cell';
 import classes from './AbbreviatedFilterWidget.module.css';
 
@@ -21,6 +22,35 @@ const AbbreviatedFilterWidget = (props) => {
     const [orderBy, setOrderBy] = useState('');
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const [page, setPage] = useState(0);
+    const [filter, setFilter] = useState({});
+
+    const itemsMetadata = useMemo(() => {
+        if (props.itemsMetadata && props.itemsMetadata.length > 0) {
+            return applyFilter(props.itemsMetadata, filter);
+        }
+        // return empty array if not set or no metadata found
+        return [];
+    }, [applyFilter, props.itemsMetadata, filter]);
+
+    const items = useMemo(() => {
+        if (itemsMetadata.length > 0) {
+            let items = props.items.filter(item => {
+                let id = getIdFromAbbreviatedKey(props.abbreviated, item);
+                let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
+                if (metadata) return true;
+                return false;
+            })
+            return items;
+        }
+        // return empty array if no metadata found
+        return [];
+    }, [props.items, props.abbreviated, itemsMetadata, getAbbreviatedKeyFromId])
+
+    useEffect(() => {
+        if (items.length === 0) {
+            props.setSelectedItem(null);
+        }
+    }, [items, props.setSelectedItem])
 
     const onButtonClick = (e, action, xpath, value) => {
         if (action === 'flux_toggle') {
@@ -68,7 +98,7 @@ const AbbreviatedFilterWidget = (props) => {
                 let xpath = source.split("-").map(path => path = path.substring(path.indexOf(".") + 1));
                 xpath = xpath.join("-");
                 source = xpath.split("-")[0];
-                let collection = props.itemCollections.filter(col => col.tableTitle === source)[0];
+                let collection = props.itemCollections.map(col => Object.assign({}, col)).filter(col => col.tableTitle === source)[0];
                 collection.xpath = xpath;
                 collection.tableTitle = xpath;
                 collection.elaborateTitle = false;
@@ -85,11 +115,11 @@ const AbbreviatedFilterWidget = (props) => {
 
     const rows = useMemo(() => {
         let rows = [];
-        if (props.items) {
-            props.items.map((item, i) => {
+        if (items) {
+            items.map((item, i) => {
                 let row = {};
                 let id = getIdFromAbbreviatedKey(props.abbreviated, item);
-                let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
+                let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
                 row['data-id'] = id;
                 collections.forEach(c => {
                     let value = "";
@@ -107,7 +137,7 @@ const AbbreviatedFilterWidget = (props) => {
             })
         }
         return rows;
-    }, [props.items, props.abbreviated, props.itemsMetadata, collections])
+    }, [items, props.abbreviated, itemsMetadata, collections])
 
     const activeRows = useMemo(() => {
         return stableSort(rows, getComparator(order, orderBy))
@@ -115,18 +145,31 @@ const AbbreviatedFilterWidget = (props) => {
     }, [rows, order, orderBy, page, rowsPerPage])
 
     useEffect(() => {
-        let activeItems = activeRows.map(row => getAbbreviatedKeyFromId(props.items, props.abbreviated, row['data-id']));
+        let activeItems = activeRows.map(row => getAbbreviatedKeyFromId(items, props.abbreviated, row['data-id']));
         if (!_.isEqual(activeItems, props.activeItems)) {
             props.setOldActiveItems(props.activeItems);
             props.setActiveItems(activeItems);
         }
-    }, [activeRows, props.items, props.abbreviated])
+    }, [activeRows, items, props.abbreviated])
+
+    let menu = (
+        <>
+            <DynamicMenu
+                collections={props.itemCollections}
+                currentSchema={props.itemSchema}
+                data={itemsMetadata}
+                filter={filter}
+                onFilterChange={setFilter}
+            />
+            {props.headerProps.menu}
+        </>
+    )
 
     return (
         <WidgetContainer
             title={props.headerProps.title}
             mode={props.headerProps.mode}
-            menu={props.headerProps.menu}
+            menu={menu}
             onChangeMode={props.headerProps.onChangeMode}
             onSave={props.headerProps.onSave}
             onReload={props.headerProps.onReload}>
@@ -171,7 +214,7 @@ const AbbreviatedFilterWidget = (props) => {
                                 {
                                     activeRows.map((row, index) => {
                                         let selected = row["data-id"] === props.selected;
-                                        let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
+                                        let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
                                         let alertBubbleCount = 0;
                                         let alertBubbleColor = ColorTypes.INFO;
                                         if (props.alertBubbleSource) {
@@ -194,7 +237,7 @@ const AbbreviatedFilterWidget = (props) => {
                                                         let collection = collections.filter(c => c.key === cell.key)[0];
                                                         if (collection.type === "progressBar") {
                                                             collection = _.cloneDeep(collection);
-                                                            let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
+                                                            let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
                                                             if (typeof (collection.min) === DataTypes.STRING) {
                                                                 let min = collection.min;
                                                                 collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));

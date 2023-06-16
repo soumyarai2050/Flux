@@ -130,10 +130,23 @@ message OrderJournal{
       QueryParamsDataType: "int",
       QueryParamsDataType: "str"
   };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_order_journal_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
-
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "order.security.sec_id-order.side",
+    LogKeySequence: "order.order_id"
+  };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional OrderBrief order = 2;
   optional int64 order_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
@@ -163,6 +176,20 @@ message OrderSnapshot{
       QueryName: "trigger_residual_check",
       QueryParams: "order_status_list",
       QueryParamsDataType: "List[str]"
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_order_snapshot_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "order_brief.security.sec_id-order_brief.side",
+    LogKeySequence: "order_brief.order_id-order_status"
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
@@ -200,6 +227,15 @@ message SymbolSideSnapshot{
       QueryParams: "side",
       QueryParamsDataType: "str",
       QueryParamsDataType: "str",
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_symbol_side_snapshot_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
+  option (FluxMsgExecutorOptions) = {
+    LogKeySequence: "id"
   };
   option (FluxMsgWidgetUIData) = {
     x: 8,
@@ -254,7 +290,20 @@ message FillsJournal{
       QueryParamsDataType: "str",
       QueryParamsDataType: "str"
   };
-
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_fills_journal_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "fill_symbol-fill_side",
+    LogKeySequence: "fill_id"
+  };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string order_id = 2;
   optional float fill_px = 3;
@@ -309,7 +358,11 @@ message OrderLimits{
     h: 11,
     layout: UI_TABLE
   };
-
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: True
+  };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 max_basis_points = 2 [(FluxFldValMax) = "1000", (FluxFldHelp) = "basis-points a single order can consume, if set to 1, it`s (1/100 of 1% of px @ BBO) or (0.01% of px @ BBO) + + px @ BBO"];
@@ -338,7 +391,11 @@ message PortfolioLimits{
     h: 11,
     layout: UI_TABLE
   };
-
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: true
+  };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 max_open_baskets = 2 [(FluxFldValMin) = "50", (FluxFldHelp) = "max simultaneous open orders allowed per side for this portfolio"];
@@ -371,7 +428,11 @@ message PortfolioStatus{
   };
   option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_portfolio_alerts_obj", agg_params: ["-100"]};
-
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: true
+  };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   //The big RED button
@@ -427,7 +488,21 @@ message PairStrat{
     QueryParams: "side",
     QueryParamsDataType: "Side"
   };
-
+    option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_pair_strat_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
+    option (FluxMsgExecutorOptions) = {
+      IsWebSocketModel: true,
+      EnableNotifyAll: false,
+      IsTopLvlModel: false,
+      ExecutorKeyCounts: 2,
+      ExecutorKeySequence: "pair_strat_params.strat_leg1.sec.sec_id-pair_strat_params.strat_leg1.side",
+      ExecutorKeySequence: "pair_strat_params.strat_leg2.sec.sec_id-pair_strat_params.strat_leg2.side",
+      LogKeySequence: "pair_strat_params.strat_leg1.sec.sec_id-pair_strat_params.strat_leg2.sec.sec_id-id"
+    };
     option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
     option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
     option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_strat_alerts_obj", agg_params: ["-100"]};
@@ -512,7 +587,23 @@ message StratBrief{
       QueryParams: "security_id",
       QueryParamsDataType: "str"
   };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_strat_brief_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 2,
+    ExecutorKeySequence: "pair_buy_side_trading_brief.security.sec_id-pair_buy_side_trading_brief.side",
+    ExecutorKeySequence: "pair_sell_side_trading_brief.security.sec_id-pair_sell_side_trading_brief.side",
+    LogKeySequence: "id"
+  };
+
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional PairSideTradingBrief pair_buy_side_trading_brief = 2;
   optional PairSideTradingBrief pair_sell_side_trading_brief = 3;
@@ -573,6 +664,12 @@ message NewOrder{
     ReadDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeySequence: "security.sec_id-side"
+  };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required Security security = 2;
   required Side side = 3;
@@ -586,6 +683,12 @@ message CancelOrder{
     ReadDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED,
     PatchDesc: AggregateType_UNSPECIFIED,
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeySequence: "security.sec_id-side"
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string order_id = 2;

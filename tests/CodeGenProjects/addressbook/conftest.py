@@ -6,9 +6,9 @@ import copy
 os.environ["DBType"] = "beanie"
 
 # Project Imports
-from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import \
+from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import \
     MarketDepthBaseModel, SymbolOverviewBaseModel
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations, update_yaml_configurations
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_verify_limits, \
     create_n_verify_portfolio_status, create_fx_symbol_overview, clean_all_collections_ignoring_ui_layout, \

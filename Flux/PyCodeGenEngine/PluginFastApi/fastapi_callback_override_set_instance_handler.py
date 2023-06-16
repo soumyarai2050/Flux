@@ -41,7 +41,7 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
 
         output_str += f"from {callback_override_path} import {routes_callback_class_name_override_camel_cased}\n\n\n"
 
-        callback_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.routes_callback_class_name}")
+        callback_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", f"{self.routes_callback_class_name}")
         routes_callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += f"from {callback_file_path} import {routes_callback_class_name_camel_cased}\n\n\n"
 

@@ -21,26 +21,6 @@ class PackageJsonGenPlugin(BaseJSLayoutPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.insertion_point_key_list: List[str] = [
-            "tmp_project_name",
-            "port_handling"
-        ]
-        self.insertion_point_key_to_callable_list: List[Callable] = [
-            self.handle_temp_project_name,
-            self.handle_port
-        ]
-        template_file_name = None
-        py_code_gen_engine_path = None
-        if (output_file_name := os.getenv("OUTPUT_FILE_NAME")) is not None and \
-                (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and \
-                (py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None:
-            self.output_file_name = output_file_name
-            self.template_file_path = PurePath(py_code_gen_engine_path) / PurePath(__file__).parent / template_file_name
-        else:
-            err_str = f"Env var 'OUTPUT_FILE_NAME', 'TEMPLATE_FILE_NAME' and 'PY_CODE_GEN_ENGINE_PATH'" \
-                      f"received as {output_file_name}, {template_file_name} and {py_code_gen_engine_path}"
-            logging.exception(err_str)
-            raise Exception(err_str)
         self.proto_package_name: str | None = None
         self.port_offset = 0
 
@@ -62,6 +42,25 @@ class PackageJsonGenPlugin(BaseJSLayoutPlugin):
         port = 3000 + self.port_offset
         output_str = f'"start": "cross-env PORT={port} react-scripts start",'
         return output_str
+
+    def output_file_generate_handler(self, file: protogen.File):
+        output_file_name = "package.json"
+        py_code_gen_engine_path = None
+        if (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and \
+                (py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None:
+            template_file_path = PurePath(py_code_gen_engine_path) / PurePath(__file__).parent / template_file_name
+        else:
+            err_str = f"Env var 'TEMPLATE_FILE_NAME' and 'PY_CODE_GEN_ENGINE_PATH'" \
+                      f"received as {template_file_name} and {py_code_gen_engine_path}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+        self.output_file_name_to_template_file_path_dict[output_file_name] = str(template_file_path)
+        return {
+            output_file_name: {
+                "tmp_project_name": self.handle_temp_project_name(file),
+                "port_handling": self.handle_port(file)
+            }
+        }
 
 
 if __name__ == "__main__":

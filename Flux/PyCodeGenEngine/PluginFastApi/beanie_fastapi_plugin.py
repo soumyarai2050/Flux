@@ -40,9 +40,9 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         for message in message_list:
             if self.is_option_enabled(message, BeanieFastApiPlugin.flux_msg_json_root):
                 json_root_msg_option_val_dict = \
-                    self.get_complex_option_values_as_list_of_dict(message, BeanieFastApiPlugin.flux_msg_json_root)
+                    self.get_complex_option_set_values(message, BeanieFastApiPlugin.flux_msg_json_root)
                 # taking first obj since json root is of non-repeated option
-                if (is_reentrant_required := json_root_msg_option_val_dict[0].get(
+                if (is_reentrant_required := json_root_msg_option_val_dict.get(
                         BeanieFastApiPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
                     if not is_reentrant_required:
                         self.reentrant_lock_non_required_msg.append(message)
@@ -51,7 +51,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                 # else not required: If json root option don't have reentrant field then considering it requires
                 # reentrant lock as default and avoiding its append to reentrant lock non-required list
 
-                if (is_reentrant_on_top := json_root_msg_option_val_dict[0].get(
+                if (is_reentrant_on_top := json_root_msg_option_val_dict.get(
                         BeanieFastApiPlugin.flux_json_root_set_reentrant_lock_to_top_field)) is not None:
                     if is_reentrant_required is not None and not is_reentrant_required:
                         err_str = "Field SetReentrantLock is set to true, avoiding adding model's reentrant lock " \
@@ -98,7 +98,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def handle_init_db(self) -> str:
         root_msg_list = [message.proto.name for message in self.root_message_list]
         output_str = "def get_mongo_server_uri():\n"
-        output_str += '    config_file_path: PurePath = PurePath(__file__).parent.parent / "data" / "config.yaml"\n'
+        output_str += '    config_file_path: PurePath = PurePath(__file__).parent.parent.parent / "data" / "config.yaml"\n'
         output_str += '    config_dict = load_yaml_configurations(str(config_file_path))\n'
         output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := ' \
                       'config_dict.get("mongo_server")) is None else mongo_env\n'
@@ -132,7 +132,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += "import logging\n"
 
         output_str += f"from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations\n"
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f'from {model_file_path} import *\n\n\n'
         output_str += self.handle_init_db()
 
@@ -141,12 +141,12 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def handle_fastapi_initialize_file_gen(self) -> str:
         output_str = "import os\n"
         output_str += "from fastapi import FastAPI\n"
-        routes_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
+        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_file_name)
         output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_file_path} import *\n"
         # else not required: if no message with custom id is found then avoiding import statement
-        database_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.database_file_name)
+        database_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.database_file_name)
         output_str += f"from {database_file_path} import init_db\n\n\n"
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
         output_str += f"async def init_max_id_handler(document):\n"
@@ -180,7 +180,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         self.database_file_name = f"{self.proto_file_name}_beanie_database"
         self.fastapi_file_name = f"{self.proto_file_name}_beanie_fastapi"
 
-    def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
+    def output_file_generate_handler(self, file: protogen.File):
         # Pre-code generation initializations
         self.load_root_and_non_root_messages_in_dicts(file.messages)
         self.set_req_data_members(file)

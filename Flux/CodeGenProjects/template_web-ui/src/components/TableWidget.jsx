@@ -17,6 +17,7 @@ import Row from './Row';
 import { Icon } from './Icon';
 import { AlertErrorMessage } from './Alert';
 import classes from './TableWidget.module.css';
+import CopyToClipboard from './CopyToClipboard';
 
 
 const TableWidget = (props) => {
@@ -39,13 +40,14 @@ const TableWidget = (props) => {
     const [openModalPopup, setOpenModalPopup] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
+    const [clipboardText, setClipboardText] = useState(null);
 
     useEffect(() => {
         setData(props.data);
         setRows(props.rows);
         setHeadCells(props.tableColumns);
         setCommonkeys(props.commonKeyCollections);
-    }, [props.data, props.tableColumns]);
+    }, [props.data]);
 
     useEffect(() => {
         let trees = generateRowTrees(cloneDeep(data), props.collections, props.xpath);
@@ -221,8 +223,18 @@ const TableWidget = (props) => {
         setShowSettings(false);
     }
 
-    const onTextChange = useCallback((e, type, xpath, value) => {
-        let dataxpath = e.target.getAttribute('dataxpath');
+    const onTextChange = useCallback((e, type, xpath, value, dataxpath) => {
+        if (value === '') {
+            value = null;
+        }
+        if (type === DataTypes.NUMBER) {
+            if (value !== null) {
+                value = value * 1;
+            }
+        }
+        if (e) {
+            dataxpath = e.target.getAttribute('dataxpath');
+        }
         let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
@@ -286,11 +298,17 @@ const TableWidget = (props) => {
         rows.map(row => {
             values.push(row[xpath]);
         })
-        navigator.clipboard.writeText(values.join("\n"));
+        const text = values.join('\n');
+        if (navigator) {
+            navigator.clipboard.writeText(text);
+        } else {
+            setClipboardText(text);
+        }
         setToastMessage("column copied to clipboard: " + columnName);
     }, [rows])
 
     const onCloseToastMessage = useCallback(() => {
+        setClipboardText(null);
         setToastMessage(null);
     }, [])
 
@@ -443,6 +461,7 @@ const TableWidget = (props) => {
                                                 row={row}
                                                 selected={selected}
                                                 mode={props.mode}
+                                                onFormUpdate={props.onFormUpdate}
                                             />
                                         )
                                     })}
@@ -507,6 +526,7 @@ const TableWidget = (props) => {
             )}
 
             {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
+            <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
         </WidgetContainer>
     )
 }

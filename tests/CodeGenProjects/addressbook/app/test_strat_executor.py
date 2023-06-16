@@ -111,7 +111,7 @@ def test_breach_threshold_px_with_wrong_tob(clean_and_set_limits, buy_sell_symbo
         update_date_time = DateTime.utcnow()
         buy_tob.bid_quote.last_update_date_time = update_date_time
         buy_tob.last_update_date_time = update_date_time
-        market_data_web_client.put_top_of_book_client(buy_tob)
+        market_data_web_client.put_top_of_book_client(jsonable_encoder(buy_tob.dict(), by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 100
@@ -126,7 +126,7 @@ def test_breach_threshold_px_with_wrong_tob(clean_and_set_limits, buy_sell_symbo
         update_date_time = DateTime.utcnow()
         sell_tob.ask_quote.last_update_date_time = update_date_time
         sell_tob.last_update_date_time = update_date_time
-        market_data_web_client.put_top_of_book_client(sell_tob)
+        market_data_web_client.put_top_of_book_client(jsonable_encoder(sell_tob, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 100
@@ -181,7 +181,7 @@ def test_breach_threshold_px_with_0_depth_px(clean_and_set_limits, buy_sell_symb
         for market_depth in market_depth_list:
             if market_depth.symbol == buy_symbol:
                 market_depth.px = 0
-                market_data_web_client.put_market_depth_client(market_depth)
+                market_data_web_client.put_market_depth_client(jsonable_encoder(market_depth, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 100
@@ -218,7 +218,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(clean_and_set_limits, bu
         update_date_time = DateTime.utcnow()
         buy_tob.bid_quote.last_update_date_time = update_date_time
         buy_tob.last_update_date_time = update_date_time
-        market_data_web_client.put_top_of_book_client(buy_tob)
+        market_data_web_client.put_top_of_book_client(jsonable_encoder(buy_tob, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 100
@@ -234,7 +234,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(clean_and_set_limits, bu
         update_date_time = DateTime.utcnow()
         sell_tob.ask_quote.last_update_date_time = update_date_time
         sell_tob.last_update_date_time = update_date_time
-        market_data_web_client.put_top_of_book_client(sell_tob)
+        market_data_web_client.put_top_of_book_client(jsonable_encoder(sell_tob, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 100
@@ -308,7 +308,7 @@ def test_breach_threshold_px_for_max_basis_points(clean_and_set_limits, buy_sell
         buy_tob.ask_quote.px = 10
         update_date_time = DateTime.utcnow()
         buy_tob.last_update_date_time = update_date_time
-        market_data_web_client.put_top_of_book_client(buy_tob)
+        market_data_web_client.put_top_of_book_client(jsonable_encoder(buy_tob, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 100
@@ -320,7 +320,7 @@ def test_breach_threshold_px_for_max_basis_points(clean_and_set_limits, buy_sell
         sell_tob.bid_quote.px = 100
         update_date_time = DateTime.utcnow()
         sell_tob.last_update_date_time = update_date_time
-        market_data_web_client.put_top_of_book_client(sell_tob)
+        market_data_web_client.put_top_of_book_client(jsonable_encoder(sell_tob, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 70
@@ -353,7 +353,7 @@ def test_breach_threshold_px_for_max_px_by_deviation(clean_and_set_limits, buy_s
         buy_tob.last_trade.px = 10
         update_date_time = DateTime.utcnow()
         buy_tob.last_update_date_time = update_date_time
-        market_data_web_client.put_top_of_book_client(buy_tob)
+        market_data_web_client.put_top_of_book_client(jsonable_encoder(buy_tob, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 100
@@ -366,7 +366,7 @@ def test_breach_threshold_px_for_max_px_by_deviation(clean_and_set_limits, buy_s
         sell_tob.last_trade.px = 100
         update_date_time = DateTime.utcnow()
         sell_tob.last_update_date_time = update_date_time
-        market_data_web_client.put_top_of_book_client(sell_tob)
+        market_data_web_client.put_top_of_book_client(jsonable_encoder(sell_tob, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 70
@@ -395,7 +395,7 @@ def test_breach_threshold_px_for_px_by_max_depth(clean_and_set_limits, buy_sell_
         for market_depth in market_depth_list:
             if market_depth.symbol == buy_symbol:
                 market_depth.px = 10
-                market_data_web_client.put_market_depth_client(market_depth)
+                market_data_web_client.put_market_depth_client(jsonable_encoder(market_depth, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 100
@@ -408,7 +408,7 @@ def test_breach_threshold_px_for_px_by_max_depth(clean_and_set_limits, buy_sell_
         for market_depth in market_depth_list:
             if market_depth.symbol == sell_symbol:
                 market_depth.px = 100
-                market_data_web_client.put_market_depth_client(market_depth)
+                market_data_web_client.put_market_depth_client(jsonable_encoder(market_depth, by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
         px = 70
@@ -485,7 +485,8 @@ def test_strat_limits_with_0_consumable_open_orders(clean_and_set_limits, buy_se
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
         strat_brief = strat_brief_list[0]
         strat_brief.pair_buy_side_trading_brief.consumable_open_orders = -1
-        updated_strat_brief = strat_manager_service_web_client.put_strat_brief_client(strat_brief)
+        updated_strat_brief = \
+            strat_manager_service_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
         assert updated_strat_brief.pair_buy_side_trading_brief.consumable_open_orders == -1, \
             "Updated strat_brief.pair_buy_side_trading_brief.consumable_open_orders to -1 using http route call but " \
             f"received unexpected returned value {updated_strat_brief}"
@@ -503,7 +504,8 @@ def test_strat_limits_with_0_consumable_open_orders(clean_and_set_limits, buy_se
         assert len(strat_brief_list) == 1
         strat_brief = strat_brief_list[0]
         strat_brief.pair_sell_side_trading_brief.consumable_open_orders = -1
-        updated_strat_brief = strat_manager_service_web_client.put_strat_brief_client(strat_brief)
+        updated_strat_brief = \
+            strat_manager_service_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
         assert updated_strat_brief.pair_sell_side_trading_brief.consumable_open_orders == -1
 
         # placing new non-systematic new_order
@@ -574,7 +576,7 @@ def test_strat_limits_with_less_consumable_concentration(clean_and_set_limits, b
         strat_brief = strat_brief_list[0]
         strat_brief.pair_buy_side_trading_brief.consumable_concentration = 0
         strat_brief.pair_sell_side_trading_brief.consumable_concentration = 0
-        updated_strat_brief = strat_manager_service_web_client.put_strat_brief_client(strat_brief)
+        updated_strat_brief = strat_manager_service_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
         assert updated_strat_brief.pair_buy_side_trading_brief.consumable_concentration == 0, \
             "Mismatch pair_buy_side_trading_brief.consumable_concentration: expected 0, received " \
             f"{updated_strat_brief.pair_buy_side_trading_brief.consumable_concentration}"
@@ -785,7 +787,7 @@ def test_portfolio_limits_rolling_new_order_breach(clean_and_set_limits, buy_sel
         rolling_max_order_count = RollingMaxOrderCountOptional(max_rolling_tx_count=1, rolling_tx_count_period_seconds=100)
         portfolio_limits_basemodel = PortfolioLimitsBaseModel(_id=1, rolling_max_order_count=rolling_max_order_count)
         updated_portfolio_limits = strat_manager_service_web_client.patch_portfolio_limits_client(
-            portfolio_limits_basemodel)
+            portfolio_limits_basemodel.dict(by_alias=True, exclude_none=True))
         assert updated_portfolio_limits.rolling_max_order_count == rolling_max_order_count, \
             f"Mismatch rolling_max_order_count: expected {rolling_max_order_count}, " \
             f"received {updated_portfolio_limits.rolling_max_order_count}"

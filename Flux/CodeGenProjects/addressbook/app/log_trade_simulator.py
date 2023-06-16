@@ -1,7 +1,7 @@
 import logging
 from abc import ABC
 from typing import List
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import Side
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import Side
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase
 
 

@@ -5,11 +5,15 @@ import copy
 
 import pytz
 from pendulum import DateTime
-
-from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import get_pair_strat_key, get_fills_journal_key
-from Flux.CodeGenProjects.addressbook.app.service_state import ServiceState
-from Flux.CodeGenProjects.addressbook.app.ws_helper import *
-
+from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import get_pair_strat_log_key, get_fills_journal_log_key
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.generated.StratExecutor.strat_manager_service_base_strat_cache import \
+    StratManagerServiceBaseStratCache
+from Flux.CodeGenProjects.market_data.generated.StratExecutor.market_data_service_base_strat_cache import \
+    MarketDataServiceBaseStratCache
+from Flux.CodeGenProjects.addressbook.generated.StratExecutor.strat_manager_service_key_handler import \
+    StratManagerServiceKeyHandler
 
 class MarketDepthsCont:
     def __init__(self, symbol: str):
@@ -46,7 +50,7 @@ class MarketDepthsCont:
                 self.ask_market_depths.append(market_depth)
 
 
-class StratCache:
+class StratCache(StratManagerServiceBaseStratCache, MarketDataServiceBaseStratCache):
     strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
     add_to_strat_cache_rlock: RLock = RLock()
     order_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
@@ -54,6 +58,8 @@ class StratCache:
     fx_symbol_overview_dict: Dict[str, SymbolOverviewBaseModel | None] = {"USD|SGD": None}
 
     def __init__(self):
+        StratManagerServiceBaseStratCache.__init__(self)
+        MarketDataServiceBaseStratCache.__init__(self)
         self.re_ent_lock: RLock = RLock()
         self.notify_semaphore = Semaphore()
         self.stopped = True  # used by consumer thread to stop processing
@@ -67,29 +73,14 @@ class StratCache:
         self.leg1_fx_tob: TopOfBookBaseModel | None = None
         self.leg1_fx_symbol_overview: SymbolOverviewBaseModel | None = None
 
-        self._cancel_orders: List[CancelOrderBaseModel] | None = None
-        self._cancel_orders_update_date_time: DateTime = DateTime.utcnow()
+        self._pair_strats: PairStratBaseModel | None = None
+        self._pair_strats_update_date_time: DateTime = DateTime.utcnow()
 
-        self._new_orders: List[NewOrderBaseModel] | None = None
-        self._new_orders_update_date_time: DateTime = DateTime.utcnow()
+        self._strat_briefs: StratBriefBaseModel | None = None
+        self._strat_briefs_update_date_time: DateTime = DateTime.utcnow()
 
-        self._pair_strat: PairStratBaseModel | None = None
-        self._pair_strat_update_date_time: DateTime = DateTime.utcnow()
-
-        self._strat_brief: StratBriefBaseModel | None = None
-        self._strat_brief_update_date_time: DateTime = DateTime.utcnow()
-
-        self._order_snapshots: List[OrderSnapshotBaseModel] | None = None
-        self._order_snapshots_update_date_time: DateTime = DateTime.utcnow()
-
-        self._order_journals: List[OrderJournalBaseModel] | None = None
-        self._order_journals_update_date_time: DateTime = DateTime.utcnow()
-
-        self._fills_journals: List[FillsJournalBaseModel] | None = None
-        self._fills_journals_update_date_time: DateTime = DateTime.utcnow()
-
-        self.symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]  # pre-create space for 2 legs
-        self.symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
+        self._symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]  # pre-create space for 2 legs
+        self._symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
 
         self._top_of_books: List[TopOfBookBaseModel | None] = [None, None]  # pre-create space for 2 legs
         self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
@@ -97,135 +88,24 @@ class StratCache:
         self._market_depths_conts: List[MarketDepthsCont] | None = None
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
-    @staticmethod
-    def get_key_from_order_snapshot(order_snapshot: OrderSnapshotBaseModel) -> str | None:
-        key: str | None = None
-        if order_snapshot.order_brief.security.sec_id is not None and \
-                order_snapshot.order_brief.side == Side.BUY:
-            key = order_snapshot.order_brief.security.sec_id + "_BID"
-        elif order_snapshot.order_brief.security.sec_id is not None and \
-                order_snapshot.order_brief.side == Side.SELL:
-            key = order_snapshot.order_brief.security.sec_id + "_ASK"
-        # else not required - returning None (default value of key)
-        return key
+    @property
+    def get_symbol_overviews(self) -> List[SymbolOverviewBaseModel | None]:
+        return self._symbol_overviews
 
     @staticmethod
-    def get_key_from_cancel_order(cancel_order: CancelOrderBaseModel) -> str | None:
-        key: str | None = None
-        if cancel_order.security.sec_id is not None and \
-                cancel_order.side == Side.BUY:
-            key = cancel_order.security.sec_id + "_BID"
-        elif cancel_order.security.sec_id is not None and \
-                cancel_order.side == Side.SELL:
-            key = cancel_order.security.sec_id + "_ASK"
-        # else not required - returning None (default value of key)
-        return key
-
-    @staticmethod
-    def get_key_from_new_order(new_order: NewOrderBaseModel) -> str | None:
-        key: str | None = None
-        if new_order.security.sec_id is not None and \
-                new_order.side == Side.BUY:
-            key = new_order.security.sec_id + "_BID"
-        elif new_order.security.sec_id is not None and \
-                new_order.side == Side.SELL:
-            key = new_order.security.sec_id + "_ASK"
-        # else not required - returning None (default value of key)
-        return key
-
-    @staticmethod
-    def get_key_from_order_journal(order_journal: OrderJournalBaseModel) -> str | None:
-        key: str | None = None
-        if order_journal.order.security.sec_id is not None and \
-                order_journal.order.side == Side.BUY:
-            key = order_journal.order.security.sec_id + "_BID"
-        elif order_journal.order.security.sec_id is not None and \
-                order_journal.order.side == Side.SELL:
-            key = order_journal.order.security.sec_id + "_ASK"
-        # else not required - returning None (default value of key)
-        return key
-
-    @staticmethod
-    def get_key_n_symbol_from_fill_journal(fill_journal: FillsJournalBaseModel) -> Tuple[str | None, str]:
-        key: str | None = None
+    def get_key_n_symbol_from_fills_journal(fills_journal: FillsJournalBaseModel) -> Tuple[str | None, str | None]:
         symbol: str
-        symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict.get(fill_journal.order_id)
+        symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict.get(fills_journal.order_id)
         if not symbol_side_tuple:
-            logging.error(f"Unknown order id: {fill_journal.order_id} found for fill "
-                          f"{get_fills_journal_key(fill_journal)};;;fill_journal: {fill_journal}")
-            return None
+            logging.error(f"Unknown order id: {fills_journal.order_id} found for fill "
+                          f"{get_fills_journal_log_key(fills_journal)};;;fill_journal: {fills_journal}")
+            return None, None
         symbol, side = symbol_side_tuple
-
-        if symbol is not None and side == Side.BUY:
-            key = symbol + "_BID"
-        elif symbol is not None and side == Side.SELL:
-            key = symbol + "_ASK"
-        # else not required - returning None (default value of key)
+        key: str | None = StratManagerServiceKeyHandler.get_key_from_fills_journal(fills_journal)
         return key, symbol
 
-    @staticmethod
-    def get_key_from_strat_brief(strat_brief: StratBriefBaseModel) -> Tuple[str | None, str | None]:
-        key1: str | None = None
-        if strat_brief.pair_buy_side_trading_brief.security.sec_id is not None:
-            key1 = strat_brief.pair_buy_side_trading_brief.security.sec_id + "_BID"
-        else:
-            raise Exception(f"get_key_from_strat_brief: did not find buy sec id;;; strat_brief: {strat_brief}")
-        # else not required - returning None (default value of key)
-        key2: str | None = None
-        if strat_brief.pair_sell_side_trading_brief.security.sec_id is not None:
-            key2 = strat_brief.pair_sell_side_trading_brief.security.sec_id + "_ASK"
-        else:
-            raise Exception(f"get_key_from_strat_brief: did not find sell sec id;;; strat_brief: {strat_brief}")
-        # else not required - returning None (default value of key)
-        return key1, key2
-
-    @staticmethod
-    def get_key_from_pair_strat(pair_strat: PairStratBaseModel) -> Tuple[str | None, str | None]:
-        key1: str | None = None
-        if pair_strat.pair_strat_params.strat_leg1.sec.sec_id is not None:
-            if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-                key1 = pair_strat.pair_strat_params.strat_leg1.sec.sec_id + "_BID"
-            elif pair_strat.pair_strat_params.strat_leg1.side == Side.SELL:
-                key1 = pair_strat.pair_strat_params.strat_leg1.sec.sec_id + "_ASK"
-        else:
-            raise Exception(f"get_key_from_pair_strat: did not find leg1 sec id;;; pair_strat: {pair_strat}")
-        key2: str | None = None
-        if pair_strat.pair_strat_params.strat_leg2.sec.sec_id is not None:
-            if pair_strat.pair_strat_params.strat_leg2.side == Side.BUY:
-                key2 = pair_strat.pair_strat_params.strat_leg2.sec.sec_id + "_BID"
-            elif pair_strat.pair_strat_params.strat_leg2.side == Side.SELL:
-                key2 = pair_strat.pair_strat_params.strat_leg2.sec.sec_id + "_ASK"
-        else:
-            raise Exception(f"get_key_from_pair_strat: did not find leg2 sec id;;; pair_strat: {pair_strat}")
-        return key1, key2
-
-    @staticmethod
-    def get_key_from_symbol_overview(symbol_overview_: SymbolOverviewBaseModel) -> Tuple[str, str] | None:
-        if symbol_overview_ and symbol_overview_.symbol:
-            return (symbol_overview_.symbol + "_BID"), (symbol_overview_.symbol + "_ASK")
-        else:
-            logging.error(f"get_key_from_symbol_overview invoked with invalid symbol_overview: {symbol_overview_}")
-            return None
-
-    @staticmethod
-    def get_key_from_top_of_book(top_of_book: TopOfBookBaseModel) -> Tuple[str, str]:
-        return (top_of_book.symbol + "_BID"), (top_of_book.symbol + "_ASK")
-
-    @staticmethod
-    def get_key_from_market_depth(market_depth_: MarketDepthBaseModel) -> Tuple[str, str]:
-        return (market_depth_.symbol + "_BID"), (market_depth_.symbol + "_ASK")
-
-    def get_pair_strat(self, date_time: DateTime | None = None) -> Tuple[PairStratBaseModel, DateTime] | None:
-        if date_time is None or date_time < self._pair_strat_update_date_time:
-            if self._pair_strat is not None:
-                return self._pair_strat, self._pair_strat_update_date_time
-            else:
-                return None
-        else:
-            return None
-
     def get_pair_strat_(self) -> PairStratBaseModel | None:
-        return self._pair_strat
+        return self._pair_strats
 
     def get_metadata(self, system_symbol: str) -> Tuple[str, str, str]:
         """function to check system symbol's corresponding trading_symbol, account, exchange (maybe fx in future ?)"""
@@ -235,120 +115,27 @@ class StratCache:
         return trading_symbol, account, exchange
 
     def get_trading_symbols(self):
-        primary_ticker = self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-        secondary_ticker = self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+        primary_ticker = self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id
+        secondary_ticker = self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id
         return primary_ticker, secondary_ticker
 
     # pass None to remove pair strat
     def set_pair_strat(self, pair_strat: PairStratBaseModel | None) -> DateTime:
-        self._pair_strat = pair_strat
-        self._pair_strat_update_date_time = DateTime.utcnow()
-        if self._pair_strat is not None:
+        self._pair_strats = pair_strat
+        self._pair_strats_update_date_time = DateTime.utcnow()
+        if self._pair_strats is not None:
             self.leg1_trading_symbol, self.leg2_trading_symbol = self.get_trading_symbols()
         # else not required: passing None to clear pair_strat form cache is valid
-        return self._pair_strat_update_date_time
-
-    def get_strat_brief(self, date_time: DateTime | None = None) -> Tuple[StratBriefBaseModel, DateTime] | None:
-        if date_time is None or date_time < self._strat_brief_update_date_time:
-            if self._strat_brief is not None:
-                return self._strat_brief, self._strat_brief_update_date_time
-            else:
-                return None
-        else:
-            return None
+        return self._pair_strats_update_date_time
 
     def set_strat_brief(self, strat_brief: StratBriefBaseModel) -> DateTime:
-        self._strat_brief = strat_brief
-        self._strat_brief_update_date_time = DateTime.utcnow()
-        return self._strat_brief_update_date_time
-
-    def get_order_snapshots(self, date_time: DateTime | None = None) -> \
-            Tuple[List[OrderSnapshotBaseModel], DateTime] | None:
-        if date_time is None or date_time < self._order_snapshots_update_date_time:
-            if self._order_snapshots is not None:
-                return self._order_snapshots, self._order_snapshots_update_date_time
-            else:
-                return None
-        else:
-            return None
-
-    def set_order_snapshot(self, order_snapshot: OrderSnapshotBaseModel) -> DateTime:
-        if self._order_snapshots is None:
-            self._order_snapshots = list()
-        self._order_snapshots.append(order_snapshot)
-        self._order_snapshots_update_date_time = DateTime.utcnow()
-        return self._order_snapshots_update_date_time
-
-    def get_order_journals(self, date_time: DateTime | None = None) -> \
-            Tuple[List[OrderJournalBaseModel], DateTime] | None:
-        if date_time is None or date_time < self._order_journals_update_date_time:
-            if self._order_journals is not None:
-                return self._order_journals, self._order_journals_update_date_time
-            else:
-                return None
-        else:
-            return None
-
-    def set_order_journal(self, order_journal: OrderJournalBaseModel) -> DateTime:
-        if self._order_journals is None:
-            self._order_journals = list()
-        self._order_journals.append(order_journal)
-        self._order_journals_update_date_time = DateTime.utcnow()
-        return self._order_journals_update_date_time
-
-    def get_fills_journals(self, date_time: DateTime | None = None) -> \
-            Tuple[List[FillsJournalBaseModel], DateTime] | None:
-        if date_time is None or date_time < self._fills_journals_update_date_time:
-            if self._fills_journals is not None:
-                return self._fills_journals, self._fills_journals_update_date_time
-            else:
-                return None
-        else:
-            return None
-
-    def set_fills_journal(self, fills_journal: FillsJournalBaseModel) -> DateTime:
-        if self._fills_journals is None:
-            self._fills_journals = list()
-        self._fills_journals.append(fills_journal)
-        self._fills_journals_update_date_time = DateTime.utcnow()
-        return self._fills_journals_update_date_time
-
-    def get_cancel_orders(self, date_time: DateTime | None = None) -> \
-            Tuple[List[CancelOrderBaseModel], DateTime] | None:
-        if date_time is None or date_time < self._cancel_orders_update_date_time:
-            if self._cancel_orders is not None:
-                return self._cancel_orders, self._cancel_orders_update_date_time
-            else:
-                return None
-        else:
-            return None
-
-    def set_cancel_order(self, cancel_order: CancelOrderBaseModel) -> DateTime:
-        if self._cancel_orders is None:
-            self._cancel_orders = list()
-        self._cancel_orders.append(cancel_order)
-        self._cancel_orders_update_date_time = DateTime.utcnow()
-        return self._cancel_orders_update_date_time
-
-    def get_new_orders(self, date_time: DateTime | None = None) -> Tuple[List[NewOrderBaseModel], DateTime] | None:
-        if date_time is None or date_time < self._new_orders_update_date_time:
-            if self._new_orders is not None:
-                return self._new_orders, self._new_orders_update_date_time
-            else:
-                return None
-        else:
-            return None
-
-    def set_new_order(self, new_order: NewOrderBaseModel) -> DateTime:
-        if self._new_orders is None:
-            self._new_orders = list()
-        self._new_orders.append(new_order)
-        self._new_orders_update_date_time = DateTime.utcnow()
-        return self._new_orders_update_date_time
+        self._strat_briefs = strat_brief
+        self._strat_briefs_update_date_time = DateTime.utcnow()
+        return self._strat_briefs_update_date_time
 
     def get_symbol_overview(self, symbol, date_time: DateTime | None = None) -> Tuple[SymbolOverviewBaseModel, DateTime] | None:
-        if date_time is None or date_time < self.symbol_overviews_update_date_time:
-            for symbol_overview in self.symbol_overviews:
+        if date_time is None or date_time < self._symbol_overviews_update_date_time:
+            for symbol_overview in self._symbol_overviews:
                 if symbol_overview is not None and symbol_overview.symbol == symbol:
                     if date_time is None or date_time < symbol_overview.last_update_date_time:
                         return symbol_overview, symbol_overview.last_update_date_time
@@ -356,21 +143,21 @@ class StratCache:
         return None
 
     def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel):
-        if symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
-            self.symbol_overviews[0] = symbol_overview_
-            self.symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
+        if symbol_overview_.symbol == self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id:
+            self._symbol_overviews[0] = symbol_overview_
+            self._symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
             return symbol_overview_.last_update_date_time
-        elif symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
-            self.symbol_overviews[1] = symbol_overview_
-            self.symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
+        elif symbol_overview_.symbol == self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id:
+            self._symbol_overviews[1] = symbol_overview_
+            self._symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
             return symbol_overview_.last_update_date_time
         else:
             logging.error(f"set_symbol_overview called with non matching symbol: {symbol_overview_.symbol}, "
-                          f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
-                          f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+                          f"supported symbols: {self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id}, "
+                          f"{self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id}")
             return None
 
-    def get_top_of_books(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
+    def get_top_of_book(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
         if date_time is None or date_time < self._top_of_books_update_date_time:
             with self.re_ent_lock:
                 if self._top_of_books[0] is not None and self._top_of_books[1] is not None:
@@ -382,18 +169,18 @@ class StratCache:
 
     def set_top_of_book(self, top_of_book: TopOfBookBaseModel) -> DateTime | None:
         if top_of_book.last_update_date_time > self._top_of_books_update_date_time:
-            if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+            if top_of_book.symbol == self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id:
                 self._top_of_books[0] = top_of_book
                 self._top_of_books_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
-            elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+            elif top_of_book.symbol == self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id:
                 self._top_of_books[1] = top_of_book
                 self._top_of_books_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
             else:
                 logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "
-                              f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
-                              f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+                              f"supported symbols: {self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id}, "
+                              f"{self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id}")
                 return None
         else:
             logging.debug(f"set_top_of_book called with old last_update_date_time, ignoring this TOB, "
@@ -401,8 +188,8 @@ class StratCache:
                           f"update received TOB: {top_of_book}")
             return None
 
-    def get_market_depths(self, symbol: str, side: Side, sorted_reverse: bool = False,
-                          date_time: DateTime | None = None) -> Tuple[List[MarketDepthBaseModel], DateTime] | None:
+    def get_market_depth(self, symbol: str, side: Side, sorted_reverse: bool = False,
+                         date_time: DateTime | None = None) -> Tuple[List[MarketDepthBaseModel], DateTime] | None:
         if date_time is None or date_time < self._market_depths_update_date_time:
             with self.re_ent_lock:
                 if self._market_depths_conts is not None:
@@ -435,59 +222,6 @@ class StratCache:
         self._market_depths_update_date_time = market_depth.time
         return self._market_depths_update_date_time
 
-    @classmethod
-    def notify_all(cls):
-        for strat_cache in cls.strat_cache_dict.values():
-            strat_cache.notify_semaphore.release()
-
-    @classmethod
-    def add(cls, key: str, strat_cache_: 'StratCache'):
-        with cls.add_to_strat_cache_rlock:
-            strat_cache: StratCache | None = cls.strat_cache_dict.get(key)
-            if strat_cache is None:
-                cls.strat_cache_dict[key] = strat_cache_
-            else:
-                error_str: str = f"Existing StratCache found for add StratCache request, key: {key};;; " \
-                                 f"existing_cache: {strat_cache}, strat_cache send to add: {strat_cache_}"
-                logging.error(error_str)
-                raise Exception(error_str)
-
-    @classmethod
-    def pop(cls, key1: str, key2: str):
-        with cls.add_to_strat_cache_rlock:
-            cls.strat_cache_dict.pop(key1)
-            cls.strat_cache_dict.pop(key2)
-
-    @classmethod
-    def get(cls, key1: str, key2: str | None = None) -> Optional['StratCache']:
-        strat_cache: StratCache = cls.strat_cache_dict.get(key1)
-        if strat_cache is None and key2 is not None:
-            strat_cache: StratCache = cls.strat_cache_dict.get(key2)
-        return strat_cache
-
-    @classmethod
-    def guaranteed_get_by_key(cls, key1, key2) -> 'StratCache':
-        strat_cache: StratCache = cls.get(key1)
-        if strat_cache is None:
-            with cls.add_to_strat_cache_rlock:
-                strat_cache2: StratCache = cls.get(key2)
-                if strat_cache2 is None:  # key2 is guaranteed None, key1 maybe None
-                    strat_cache1: StratCache = cls.get(key1)
-                    if strat_cache1 is None:  # DCLP (maybe apply SM-DCLP)  # both key-1 and key-1 are none - add
-                        strat_cache = StratCache()
-                        cls.add(key1, strat_cache)
-                        cls.add(key2, strat_cache)
-                        logging.info(f"Created strat_cache for key: {key1} {key2}")
-                    else:
-                        cls.add(key2, strat_cache1)  # add key1 found cache to key2
-                        strat_cache = strat_cache1
-                else:  # key2 is has cache, key1 maybe None
-                    strat_cache1: StratCache = cls.get(key1)
-                    if strat_cache1 is None:
-                        cls.add(key1, strat_cache2) # add key2 found cache to key1
-                        strat_cache = strat_cache2
-        return strat_cache
-
     def set_has_unack_leg1(self, has_unack: bool):
         self.unack_leg1 = has_unack
 
@@ -501,15 +235,15 @@ class StratCache:
         return self.unack_leg2
 
     def get_key(self):
-        return f"{get_pair_strat_key(self._pair_strat)}-{self.stopped}"
+        return f"{get_pair_strat_log_key(self._pair_strats)}-{self.stopped}"
 
     def __str__(self):
         return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.leg1_trading_symbol},  " \
-               f"secondary_leg_trading_symbol: {self.leg2_trading_symbol}, pair_strat: {self._pair_strat}, " \
+               f"secondary_leg_trading_symbol: {self.leg2_trading_symbol}, pair_strat: {self._pair_strats}, " \
                f"unack_leg1 {self.unack_leg1}, unack_leg2 {self.unack_leg2}" \
-               f"strat_brief: {self._strat_brief}, cancel_orders: [{self._cancel_orders}], " \
+               f"strat_brief: {self._strat_briefs}, cancel_orders: [{self._cancel_orders}], " \
                f"new_orders: [{self._new_orders}], order_snapshots: {self._order_snapshots}, " \
                f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
-               f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self.symbol_overviews] if self.symbol_overviews else str(None)}, " \
+               f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self._symbol_overviews] if self._symbol_overviews else str(None)}, " \
                f"top of books: {[str(top_of_book) for top_of_book in self._top_of_books] if self._top_of_books else str(None)}, " \
                f"market_depth: {[str(market_depth) for market_depth in self._market_depths_conts] if self._market_depths_conts else str(None)}"

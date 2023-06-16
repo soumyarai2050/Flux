@@ -11,7 +11,6 @@ from Flux.code_gen_engine_env import CodeGenEngineEnvManager
 if __name__ == "__main__":
     code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
     env_var_dict = CodeGenEngineEnvManager.default_gen_env_var_dict
-    env_var_dict["OUTPUT_FILE_NAME_SUFFIX"] = "beanie_fastapi.py"
     env_var_dict["PLUGIN_FILE_NAME"] = "beanie_fastapi_plugin.py"
 
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",

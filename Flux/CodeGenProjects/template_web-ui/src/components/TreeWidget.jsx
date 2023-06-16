@@ -35,7 +35,8 @@ const TreeWidget = (props) => {
             'onSelectItemChange': props.onSelectItemChange ? props.onSelectItemChange : onSelectItemChange,
             'onCheckboxChange': props.onCheckboxChange ? props.onCheckboxChange : onCheckboxChange,
             'onAutocompleteOptionChange': props.onAutocompleteOptionChange ? props.onAutocompleteOptionChange : onAutocompleteOptionChange,
-            'onDateTimeChange': props.onDateTimeChange ? props.onDateTimeChange : onDateTimeChange
+            'onDateTimeChange': props.onDateTimeChange ? props.onDateTimeChange : onDateTimeChange,
+            'onFormUpdate': props.onFormUpdate
         }))
         setIsOpen();
     }, [props.schema, props.data, props.mode, props.subtree, props.xpath, isOpen, hide, showDataType])
@@ -49,12 +50,22 @@ const TreeWidget = (props) => {
         setIsOpen(value);
     }
 
-    const onTextChange = (e, type, xpath, value) => {
+    const onTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
+        if (value === '') {
+            value = null;
+        }
+        if (type === DataTypes.NUMBER) {
+            if (value !== null) {
+                value = value * 1;
+            }
+        }
         let updatedData = cloneDeep(props.data);
-        let dataxpath = e.target.getAttribute('dataxpath');
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);
+        if (props.onFormUpdate) {
+            props.onFormUpdate(xpath, validationRes);
+        }
     }
 
     const onDateTimeChange = (dataxpath, xpath, value) => {

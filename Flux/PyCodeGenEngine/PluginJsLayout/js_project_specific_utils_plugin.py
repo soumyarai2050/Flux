@@ -21,18 +21,8 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.insertion_point_key_to_callable_list: List[Callable] = [
-            self.generate
-        ]
-        if (output_file_name := os.getenv("OUTPUT_FILE_NAME")) is not None:
-            self.output_file_name = output_file_name
-        else:
-            err_str = f"Env var 'OUTPUT_FILE_NAME' " \
-                      f"received as {output_file_name}"
-            logging.exception(err_str)
-            raise Exception(err_str)
 
-    def generate(self, file: protogen.File) -> str:
+    def output_file_generate_handler(self, file: protogen.File):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
 
@@ -40,20 +30,18 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         output_str += "    const layout = [\n"
         for index, message in enumerate(self.layout_msg_list):
             if self.is_option_enabled(message, JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data):
-                widget_ui_data_options_value_list_of_dict = \
-                    self.get_complex_option_values_as_list_of_dict(message,
-                                                                   JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data)
-                # since widget_ui_data option is non-repeated type
-                widget_ui_data_options_value = widget_ui_data_options_value_list_of_dict[0]
+                widget_ui_data_option_value_dict = \
+                    self.get_complex_option_set_values(message,
+                                                       JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data)
 
-                title_val = widget_ui_data_options_value["i"] \
-                    if "i" in widget_ui_data_options_value else convert_camel_case_to_specific_case(message.proto.name)
+                title_val = widget_ui_data_option_value_dict["i"] \
+                    if "i" in widget_ui_data_option_value_dict else convert_camel_case_to_specific_case(message.proto.name)
                 output_str += '        {' + f' i: "{title_val}", ' \
-                                            f'x: {widget_ui_data_options_value["x"].strip()}, ' \
-                                            f'y: {widget_ui_data_options_value["y"].strip()}, ' \
-                                            f'w: {widget_ui_data_options_value["w"].strip()}, ' \
-                                            f'h: {widget_ui_data_options_value["h"].strip()}, ' \
-                                            f'layout: "{widget_ui_data_options_value["layout"].strip()}", ' \
+                                            f'x: {widget_ui_data_option_value_dict["x"].strip()}, ' \
+                                            f'y: {widget_ui_data_option_value_dict["y"].strip()}, ' \
+                                            f'w: {widget_ui_data_option_value_dict["w"].strip()}, ' \
+                                            f'h: {widget_ui_data_option_value_dict["h"].strip()}, ' \
+                                            f'layout: "{widget_ui_data_option_value_dict["layout"].strip()}", ' \
                                             f'enable_override: [], disable_override: [] ' + '},\n'
         output_str += "    ]\n"
         output_str += "    return layout;\n"
@@ -69,7 +57,8 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         output_str += "    }\n"
         output_str += "}\n"
 
-        return output_str
+        output_file_name = "projectSpecificUtils.js"
+        return {output_file_name: output_str}
 
 
 if __name__ == "__main__":

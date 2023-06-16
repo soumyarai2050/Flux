@@ -33,6 +33,12 @@ python gen_beanie_model.py
 python gen_beanie_fastapi.py
 python gen_js_layouts.py
 python gen_json_schema.py
+python gen_executor_files.py
+# cpp plugins
+python gen_cpp_db_handler.py
+python gen_cpp_serialize_deserialize.py
+python gen_cpp_db_encode_decode.py
+python gen_cpp_key_handler.py
 
 cd ../../
 "$PWD"/gen_web_project.sh "$PROJECT_NAME"

@@ -1,12 +1,14 @@
 # system imports
+import copy
 import json
 import os
-from typing import List, Any, Dict, Final
+import asyncio
+from typing import List, Any, Dict, Final, Callable, Set
 import logging
 import websockets
-from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException
+from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException, ConnectionClosed
 from copy import deepcopy
-from beanie import WriteRules, DeleteRules
+from beanie import WriteRules, DeleteRules, PydanticObjectId
 
 # other package imports
 from pydantic import ValidationError
@@ -36,9 +38,35 @@ async def publish_ws(pydantic_class_type, stored_obj, stored_obj_id=None):
     if pydantic_class_type.read_ws_path_ws_connection_manager is not None:
         json_data = jsonable_encoder(stored_obj, by_alias=True, exclude_unset=True, exclude_none=True)
         json_str = json.dumps(json_data)
-        await pydantic_class_type.read_ws_path_ws_connection_manager.broadcast(json_str)
+        tasks_list: List[asyncio.Task] = []
+        await pydantic_class_type.read_ws_path_ws_connection_manager.broadcast(json_str, tasks_list)
         if stored_obj_id is not None:
-            await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast(json_str, stored_obj.id)
+            await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast(json_str, stored_obj.id,
+                                                                                           tasks_list)
+        pending_tasks: Set[asyncio.Task] | None = None
+        completed_tasks: Set[asyncio.Task] | None = None
+        if tasks_list:
+            try:
+                # wait doesn't raise TimeoutError! Futures that aren't done when timeout occurs are returned in 2nd set
+                completed_tasks, pending_tasks = await asyncio.wait(tasks_list, return_when=asyncio.ALL_COMPLETED,
+                                                                    timeout=20.0)
+            except Exception as e:
+                logging.error(f"await asyncio.wait raised exception: {e}")
+        else:
+            logging.debug("Called publish_ws with no active ws registrations for both with and without id "
+                          f"of model {pydantic_class_type.__name__}")
+
+        while completed_tasks:
+            completed_task = None
+            try:
+                completed_task = completed_tasks.pop()
+            except Exception as e:
+                idx = int(completed_task.get_name())
+                logging.exception(f"publish_ws failed for task {tasks_list[idx]} with exception: {e}")
+
+        if pending_tasks:
+            logging.error("Received timed out pending tasks in publish_ws, dropping them. "
+                          f"PendingTasks: {[pending_task for pending_task in pending_tasks]}")
 
 
 async def execute_update_agg_pipeline(pydantic_class_type, update_agg_pipeline: Any = None):
@@ -70,13 +98,24 @@ async def _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj, pyda
                                   updated_pydantic_obj_dict, filter_agg_pipeline: Any = None,
                                   update_agg_pipeline: Any = None, has_links: bool = False):
     if not has_links:
-        request_obj = {'$set': updated_pydantic_obj_dict.items()}
+        if pydantic_class_type.__fields__.get("id").type_ == PydanticObjectId:
+            # Handling to prevent below error caused due to some cases using PydanticObjectId as id type
+            # in beanie model, as PydanticObjectId id type is default type in beanie and can't be updated
+            # Error: pymongo.errors.WriteError: Performing an update on the path '_id' would modify the immutable
+            #        field '_id'
+            # Just replacing '_id' with 'id' in request json as handling
+            request_dict = copy.deepcopy(updated_pydantic_obj_dict)
+            request_dict["id"] = request_dict["_id"]
+            del request_dict["_id"]
+            request_obj = {'$set': request_dict.items()}
+        else:
+            request_obj = {'$set': updated_pydantic_obj_dict.items()}
         await stored_pydantic_obj.update(request_obj)
     else:
         tmp_obj = pydantic_class_type(**updated_pydantic_obj_dict)
         await tmp_obj.save(link_rule=WriteRules.WRITE)
     await execute_update_agg_pipeline(pydantic_class_type, update_agg_pipeline)
-    stored_obj = await get_obj(pydantic_class_type, pydantic_obj_updated.id, filter_agg_pipeline, has_links)
+    stored_obj = await get_obj(pydantic_class_type, updated_pydantic_obj_dict.get("_id"), filter_agg_pipeline, has_links)
     await publish_ws(pydantic_class_type, stored_obj, stored_obj.id)
     return stored_obj
 
@@ -85,17 +124,19 @@ async def _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj, pyda
 async def generic_put_http(pydantic_class_type, stored_pydantic_obj, pydantic_obj_updated,
                            filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None, has_links: bool = False):
     return await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
-                                         pydantic_obj_updated, pydantic_obj_updated.dict(), filter_agg_pipeline,
+                                         pydantic_obj_updated, pydantic_obj_updated.dict(by_alias=True),
+                                         filter_agg_pipeline,
                                          update_agg_pipeline, has_links)
 
 
 @http_except_n_log_error(status_code=500)
-async def generic_patch_http(pydantic_class_type, stored_pydantic_obj, pydantic_obj_updated,
+async def generic_patch_http(pydantic_class_type, stored_pydantic_obj, pydantic_obj_update_json,
                              filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None, has_links: bool = False):
-    updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(),
-                                                     pydantic_obj_updated.dict(exclude_none=True))
+    updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(by_alias=True),
+                                                     pydantic_obj_update_json)
+
     return await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
-                                         pydantic_obj_updated, updated_pydantic_obj_dict, filter_agg_pipeline,
+                                         pydantic_obj_update_json, updated_pydantic_obj_dict, filter_agg_pipeline,
                                          update_agg_pipeline, has_links)
 
 
@@ -164,9 +205,7 @@ def get_by_id_ws_url(host: str, port: int, proto_package_name: str, pydantic_cla
 @http_except_n_log_error(status_code=500)
 async def generic_read_ws(ws: WebSocket, proto_package_name: str,
                           pydantic_class_type, filter_agg_pipeline: Any = None, has_links: bool = False):
-    # prevent duplicate addition
     is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws)
-
     logging.debug(f"websocket client requested to connect: {ws.client}")
     logging.debug(f"connected to websocket: "
                   f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}")
@@ -213,7 +252,62 @@ async def generic_read_ws(ws: WebSocket, proto_package_name: str,
         raise HTTPException(status_code=404, detail=str(e))
     finally:
         if need_disconnect:
-            pydantic_class_type.read_ws_path_ws_connection_manager.disconnect(ws)
+            await pydantic_class_type.read_ws_path_ws_connection_manager.disconnect(ws)
+            logging.debug(f"Disconnected to websocket: "
+                          f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}")
+
+
+@http_except_n_log_error(status_code=500)
+async def generic_query_ws(ws: WebSocket, proto_package_name: str, pydantic_class_type,
+                           filter_callable: Callable[..., Any] | None = None, call_kwargs: Dict[Any, Any] | None = None):
+    if call_kwargs is None:
+        call_kwargs = {}
+    is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws, filter_callable,
+                                                                                           call_kwargs)
+    logging.debug(f"websocket client requested to connect: {ws.client}")
+    logging.debug(f"connected to websocket: "
+                  f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}")
+    need_disconnect = False
+    try:
+        await pydantic_class_type.read_ws_path_ws_connection_manager. \
+            send_json_to_websocket("[]", ws)
+        need_disconnect = await handle_ws(ws, is_new_ws)
+    except WebSocketException as e:
+        need_disconnect = True
+        logging.info(f"WebSocketException in url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
+    except ConnectionClosedOK as e:
+        need_disconnect = True
+        logging.info(f"ConnectionClosedOK: web socket connection closed gracefully "
+                     f"within while loop in ws url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
+    except ConnectionClosedError as e:
+        need_disconnect = True
+        logging.info(f"ConnectionClosedError: web socket connection closed with error "
+                     f"within while loop in ws url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
+    except websockets.ConnectionClosed as e:
+        need_disconnect = True
+        logging.info(f"generic_beanie_get_ws - connection closed by client in ws url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
+    except WebSocketDisconnect as e:
+        need_disconnect = True
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws url "
+                          f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        need_disconnect = True
+        logging.info(f"RuntimeError: web socket raised runtime error within while loop in ws url "
+                     f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        need_disconnect = True
+        logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws url "
+                          f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
+    finally:
+        if need_disconnect:
+            await pydantic_class_type.read_ws_path_ws_connection_manager.disconnect(ws)
             logging.debug(f"Disconnected to websocket: "
                           f"{get_all_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type)}")
 
@@ -289,7 +383,7 @@ async def generic_read_by_id_ws(ws: WebSocket, proto_package_name: str, pydantic
         raise HTTPException(status_code=404, detail=str(e))
     finally:
         if need_disconnect:
-            pydantic_class_type.read_ws_path_with_id_ws_connection_manager.disconnect(ws, pydantic_obj_id)
+            await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.disconnect(ws, pydantic_obj_id)
             logging.debug(f"Disconnected to websocket: "
                           f"{get_by_id_ws_url(host_env_var, port_env_var, proto_package_name, pydantic_class_type, pydantic_obj_id)}")
 

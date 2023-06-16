@@ -22,12 +22,8 @@ class FilterProtoPlugin(BaseProtoPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.insertion_point_key_to_callable_list: List[Callable] = [
-            self.generate_output
-        ]
         self.proto_file_name: str = ""
         self.package_name: str = ""
-        self.output_file_name: str = ""
         self.filter_field_msg_list: List[protogen.Message] = []
         self.dependency_msg_list: List[protogen.Message] = []
         self.dependency_enum_list: List[protogen.Enum] = []
@@ -156,9 +152,8 @@ class FilterProtoPlugin(BaseProtoPlugin):
     def assign_required_data_members(self, file: protogen.File):
         self.proto_file_name = str(file.proto.name).split('.')[0]
         self.package_name = str(file.proto.package)
-        self.output_file_name = f"{self.proto_file_name}_filter.proto"
 
-    def generate_output(self, file: protogen.File) -> str:
+    def output_file_generate_handler(self, file: protogen.File):
         self.assign_required_data_members(file)
         self.load_root_and_non_root_messages_in_dicts(file.messages)
         # print("##enum##", [msg.proto.name for msg in self.dependency_enum_list])
@@ -174,7 +169,8 @@ class FilterProtoPlugin(BaseProtoPlugin):
             output_str += self.handle_message_output(message)
             output_str += "\n"
 
-        return output_str
+        return_json = {f"{self.proto_file_name}_filter.proto": output_str}
+        return return_json
 
 
 if __name__ == "__main__":

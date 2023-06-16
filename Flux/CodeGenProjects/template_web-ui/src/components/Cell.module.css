@@ -1,5 +1,5 @@
 .cell {
-    padding: 4px 2px !important;
+    padding: 6px 2px !important;
     padding-right: 24px !important;
 }
 
@@ -55,15 +55,18 @@
 
 .select {
     background-color: white;
+    width: 100%;
 }
 
-.select :global .MuiSelect-outlined {
+/* .select :global .MuiSelect-outlined {
     padding: 6px 10px;
-}
+} */
 
 .text_field {
     background-color: white;
     min-width: 50px !important;
+    border-radius: 0px !important;
+    width: 100%;
     /* width: 100px !important; */
 }
 
@@ -106,4 +109,37 @@
 .new_update {
     color: maroon !important;
     animation: blink 0.5s step-start infinite;
+}
+
+.cell_input_field {
+    padding: 2px 4px !important;
+}
+
+/* .text_field :global .MuiOutlinedInput-root {
+    border-radius: 0px !important;
+} */
+
+/* .text_field :global fieldset {
+    border: none;
+}
+
+.text_field :hover {
+    cursor: pointer !important;
+}
+
+.text_field :focus-visible {
+    cursor: text !important;
+}
+
+.text_field :focus-within :global fieldset {
+    border: 1px solid;
+} */
+
+:global .MuiSvgIcon-root {
+    vertical-align: bottom;
+}
+
+:global .MuiAutocomplete-root .MuiInputBase-sizeSmall {
+    padding: 5px !important;
+    /* margin: 2px !important; */
 }

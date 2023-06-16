@@ -8,12 +8,14 @@ from typing import Tuple
 import re
 import pexpect
 from pathlib import PurePath
+from fastapi.encoders import jsonable_encoder
 
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
-from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client import MarketDataServiceWebClient
+from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import \
+    MarketDataServiceWebClient
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
@@ -1067,7 +1069,7 @@ def _create_tob(buy_symbol: str, sell_symbol: str, top_of_book_json_list: List[D
     update_date_time = DateTime.utcnow()
     buy_top_of_book_basemodel.bid_quote.last_update_date_time = update_date_time
     buy_top_of_book_basemodel.last_update_date_time = update_date_time
-    updated_tob = market_data_web_client.patch_top_of_book_client(buy_top_of_book_basemodel)
+    updated_tob = market_data_web_client.patch_top_of_book_client(jsonable_encoder(buy_top_of_book_basemodel, by_alias=True, exclude_none=True))
     for market_trade_vol in updated_tob.market_trade_volume:
         market_trade_vol.id = None
     assert updated_tob.bid_quote.px == buy_top_of_book_basemodel.bid_quote.px, \
@@ -1089,7 +1091,7 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side):
         tob_obj.ask_quote.px = px
         tob_obj.ask_quote.last_update_date_time = update_date_time
         tob_obj.last_update_date_time = update_date_time
-    updated_tob_obj = market_data_web_client.patch_top_of_book_client(tob_obj)
+    updated_tob_obj = market_data_web_client.patch_top_of_book_client(jsonable_encoder(tob_obj, by_alias=True, exclude_none=True))
 
     for market_trade_vol in updated_tob_obj.market_trade_volume:
         market_trade_vol.id = None
@@ -1196,7 +1198,8 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     # updating pair_strat for this test-case
     pair_strat_base_model = PairStratBaseModel(_id=stored_pair_strat_basemodel.id,
                                                strat_limits=expected_strat_limits)
-    updated_pair_strat_basemodel = strat_manager_service_web_client.patch_pair_strat_client(pair_strat_base_model)
+    print(f"----------------- {jsonable_encoder(pair_strat_base_model, by_alias=True, exclude_none=True)}")
+    updated_pair_strat_basemodel = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat_base_model, by_alias=True, exclude_none=True))
     assert stored_pair_strat_basemodel.frequency + 1 == updated_pair_strat_basemodel.frequency, \
         f"Mismatch pair_strat_basemodel.frequency: expected {stored_pair_strat_basemodel.frequency + 1}, " \
         f"received {updated_pair_strat_basemodel.frequency}"
@@ -1224,7 +1227,7 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     pair_strat_active_obj = PairStratBaseModel(_id=stored_pair_strat_basemodel.id)
     pair_strat_active_obj.strat_status = StratStatus(strat_state=StratState.StratState_ACTIVE)
     activated_pair_strat_basemodel = \
-        strat_manager_service_web_client.patch_pair_strat_client(pair_strat_active_obj)
+        strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat_active_obj, by_alias=True, exclude_none=True))
 
     assert updated_pair_strat_basemodel.frequency + 1 == activated_pair_strat_basemodel.frequency, \
         f"Mismatch pair_strat_basemodel.frequency: expected {updated_pair_strat_basemodel.frequency + 1}, " \
@@ -1285,7 +1288,7 @@ def create_if_not_exists_and_validate_strat_collection(pair_strat_: PairStratBas
         strat_collection_obj = strat_collection_obj_list[0]
         strat_collection_obj.loaded_strat_keys.append(strat_key)
         updated_strat_collection_obj = \
-            strat_manager_service_web_client.put_strat_collection_client(strat_collection_obj)
+            strat_manager_service_web_client.put_strat_collection_client(jsonable_encoder(strat_collection_obj, by_alias=True, exclude_none=True))
 
         assert updated_strat_collection_obj == strat_collection_obj, \
             f"Mismatch strat_collection: expected {strat_collection_obj} received {updated_strat_collection_obj}"

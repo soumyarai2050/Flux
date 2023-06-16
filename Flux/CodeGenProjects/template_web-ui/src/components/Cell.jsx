@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useSelector } from 'react-redux';
-import _, { cloneDeep, isEqual, debounce } from 'lodash';
+import _, { cloneDeep, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
 import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener, InputAdornment } from '@mui/material';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
+import { Error } from '@mui/icons-material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
-    getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt
+    getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints
 } from '../utils';
 import { DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
@@ -34,8 +35,14 @@ const Cell = (props) => {
     const [open, setOpen] = useState(false);
     const [oldValue, setOldValue] = useState(null);
     const [newUpdateClass, setNewUpdateClass] = useState("");
-    const [inputValue, setInputValue] = useState(currentValue);
     const timeoutRef = useRef(null);
+    const validationError = useRef(null);
+    
+    useEffect(() => {
+        if (props.onFormUpdate && xpath) {
+            props.onFormUpdate(xpath, validationError.current);
+        }
+    }, [validationError.current])
 
     useEffect(() => {
         if (props.highlightUpdate && currentValue !== oldValue) {
@@ -49,23 +56,6 @@ const Cell = (props) => {
             setOldValue(currentValue);
         }
     }, [currentValue, oldValue, timeoutRef, classes, props.highlightUpdate])
-
-    const handleTextChangeDebounced = debounce((e, type, xpath, value) => {
-        props.onTextChange(e, type, xpath, value);
-    }, 500)
-
-    const handleTextChange = (e, type, xpath, value) => {
-        if (value === '') {
-            value = null;
-        }
-        if (type === DataTypes.NUMBER) {
-            if (value !== null) {
-                value = value * 1;
-            }
-        }
-        setInputValue(value);
-        handleTextChangeDebounced(e, type, xpath, value);
-    }
 
     const onFocusIn = useCallback(() => {
         setActive(true);
@@ -91,52 +81,134 @@ const Cell = (props) => {
 
     let type = DataTypes.STRING;
     let enumValues = [];
+    let required = false;
 
+    let value = currentValue;
     if (collection) {
         type = collection.type;
         enumValues = collection.autocomplete_list;
+        required = collection.required;
+
+        if (collection.autocomplete) {
+            value = value ? value : null;
+        } else if (type === DataTypes.BOOLEAN) {
+            value = value ? value : value === false ? false : null;
+        } else if (type === DataTypes.ENUM) {
+            value = value ? value : null;
+        } else if (type === DataTypes.NUMBER) {
+            value = value ? value : value === 0 ? 0 : '';
+            if (collection.displayType === DataTypes.INTEGER) {
+                if (value !== '') {
+                    value = floatToInt(value);
+                }
+            }
+        } else if (type === DataTypes.DATE_TIME) {
+            value = value ? new Date(value) : null;
+        } else if (type === DataTypes.STRING) {
+            value = value ? value : '';
+        }
+    }
+
+    if (disabled) {
+        return <TableCell className={`${classes.cell} ${classes.disabled}`} />
     }
 
     if (mode === Modes.EDIT_MODE && active && !disabled) {
         if (collection.autocomplete) {
+            validationError.current = validateConstraints(collection, value);
+
+            const endAdornment = validationError.current ? (
+                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            ) : null;
+            const inputProps = endAdornment ? {
+                endAdornment: endAdornment
+            } : {};
+
             return (
-                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Autocomplete
-                        sx={{ minWidth: 160 }}
-                        className={classes.text_field}
-                        variant='outlined'
-                        size='small'
+                        id={collection.key}
                         options={collection.options}
-                        disableClearable
-                        disabled={disabled}
-                        clearOnBlur={false}
-                        value={collection.value}
                         getOptionLabel={(option) => option}
                         isOptionEqualToValue={(option, value) => option == value}
+                        disableClearable
+                        disabled={disabled}
+                        forcePopupIcon={false}
+                        variant='outlined'
+                        size='small'
+                        sx={{ minWidth: 160 }}
+                        className={classes.text_field}
+                        required={required}
+                        // clearOnBlur={false}
+                        value={collection.value}
                         onBlur={onFocusOut}
+                        autoFocus
                         onChange={(e, v) => props.onAutocompleteOptionChange(e, v, dataxpath, xpath)}
                         renderInput={(params) => (
                             <TextField
                                 {...params}
-                                autoFocus
+                                name={collection.key}
+                                error={validationError.current !== null}
                                 placeholder={collection.placeholder}
+                                InputProps={{
+                                    ...params.InputProps,
+                                    ...inputProps
+                                }}
                             />
                         )}
                     />
                 </TableCell>
             )
-        } else if (type === DataTypes.ENUM) {
+        } else if (type === DataTypes.BOOLEAN) {
+            validationError.current = validateConstraints(collection, value);
+            const endAdornment = validationError.current ? (
+                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            ) : null;
+            const inputProps = endAdornment ? {
+                endAdornment: endAdornment
+            } : {};
             return (
-                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
-                    <Select
-                        className={classes.select}
-                        size='small'
-                        open={active}
+                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                    <Checkbox
+                        id={collection.key}
+                        name={collection.key}
+                        className={classes.checkbox}
+                        defaultValue={false}
+                        required={required}
+                        checked={value}
                         disabled={disabled}
-                        value={currentValue}
-                        onOpen={onFocusIn}
+                        error={validationError.current !== null}
+                        // ref={inputRef}
+                        onChange={(e) => props.onCheckboxChange(e, dataxpath, xpath)}
+                        // InputProps={inputProps}
+                        autoFocus
+                    />
+                </TableCell >
+            )
+        } else if (type === DataTypes.ENUM) {
+            validationError.current = validateConstraints(collection, value);
+            const endAdornment = validationError.current ? (
+                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            ) : null;
+            return (
+                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                    <Select
+                        id={collection.key}
+                        name={collection.key}
+                        className={classes.select}
+                        value={value}
+                        onChange={(e) => props.onSelectItemChange(e, dataxpath, xpath)}
+                        size='small'
+                        endAdornment={endAdornment}
+                        error={validationError.current !== null}
+                        required={required}
+                        disabled={disabled}
+                        open={active}
+                        // onOpen={onFocusIn}
                         onClose={onFocusOut}
-                        onChange={(e) => props.onSelectItemChange(e, dataxpath, xpath)}>
+                        // ref={inputRef}
+                        autoFocus
+                    >
                         {enumValues.map((val) => {
                             return (
                                 <MenuItem key={val} value={val}>
@@ -147,63 +219,62 @@ const Cell = (props) => {
                     </Select>
                 </TableCell >
             )
-        } else if (type === DataTypes.BOOLEAN) {
-            return (
-                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
-                    <Checkbox
-                        className={classes.checkbox}
-                        defaultValue={false}
-                        checked={currentValue}
-                        disabled={disabled}
-                        onChange={(e) => props.onCheckboxChange(e, dataxpath, xpath)}
-                    />
-                </TableCell >
-            )
         } else if (type === DataTypes.NUMBER) {
+            // round the decimal places for float. default precision is 2 digits for float
             let decimalScale = 2;
             if (collection.underlyingtype === DataTypes.INT32 || collection.underlyingtype === DataTypes.INT64) {
                 decimalScale = 0;
             }
-            let value = inputValue ? inputValue : inputValue === 0 ? 0 : '';
 
+            // min constrainsts for numeric field if set.
             let min = collection.min;
             if (typeof (min) === DataTypes.STRING) {
                 min = getValueFromReduxStoreFromXpath(state, min);
             }
 
+            // max constrainsts for numeric field if set.
             let max = collection.max;
             if (typeof (max) === DataTypes.STRING) {
                 max = getValueFromReduxStoreFromXpath(state, max);
             }
 
-            let inputProps = {};
-            if (collection.numberFormat) {
-                if (collection.numberFormat === "%") {
-                    inputProps = {
-                        endAdornment: <InputAdornment position="end">%</InputAdornment>
-                    }
-                }
-            }
-
-            if (collection.displayType === DataTypes.INTEGER) {
-                value = floatToInt(value);
-            }
+            validationError.current = validateConstraints(collection, value, min, max);
+            const endAdornment = validationError.current || collection.numberFormat ? (
+                <>
+                    {collection.numberFormat && collection.numberFormat === '%' && (
+                        <InputAdornment position='end'>%</InputAdornment>
+                    )}
+                    {validationError.current && (
+                        <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+                    )}
+                </>
+            ) : null;
+            const inputProps = endAdornment ? {
+                endAdornment: endAdornment
+            } : {};
 
             return (
-                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <NumericFormat
                         className={classes.text_field}
-                        size='small'
-                        value={value}
-                        placeholder={collection.placeholder}
-                        thousandSeparator=','
-                        decimalScale={decimalScale}
-                        autoFocus
-                        disabled={disabled}
-                        InputProps={inputProps}
                         customInput={TextField}
-                        isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
-                        onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, type, xpath, values.value)}
+                        id={collection.key}
+                        name={collection.key}
+                        size='small'
+                        required={required}
+                        error={validationError.current !== null}
+                        value={value}
+                        disabled={disabled}
+                        thousandSeparator=','
+                        onValueChange={(values, sourceInfo) => props.onTextChange(sourceInfo.event, type, xpath, values.value, dataxpath,
+                            validateConstraints(collection, values.value, min, max))}
+                        variant='outlined'
+                        decimalScale={decimalScale}
+                        placeholder={collection.placeholder}
+                        autoFocus
+                        // ref={inputRef}
+                        InputProps={inputProps}
+                        // isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
                         inputProps={{
                             style: { padding: '6px 10px' },
                             dataxpath: dataxpath,
@@ -213,15 +284,28 @@ const Cell = (props) => {
                 </TableCell>
             )
         } else if (type === DataTypes.DATE_TIME) {
-            let value = currentValue ? new Date(currentValue) : null;
+            validationError.current = validateConstraints(collection, value);
+            const endAdornment = validationError.current ? (
+                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            ) : null;
+            const inputProps = endAdornment ? {
+                endAdornment: endAdornment
+            } : {};
             return (
-                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                         <DateTimePicker
+                            id={collection.key}
+                            name={collection.key}
                             className={classes.text_field}
                             disabled={disabled}
+                            autoFocus
+                            // ref={inputRef}
+                            error={validationError.current !== null}
                             value={value}
+                            required={required}
                             inputFormat="DD-MM-YYYY HH:mm:ss"
+                            InputProps={inputProps}
                             onChange={(newValue) => props.onDateTimeChange(dataxpath, xpath, new Date(newValue).toISOString())}
                             inputProps={{
                                 style: { padding: '6px 10px' },
@@ -234,17 +318,31 @@ const Cell = (props) => {
                 </TableCell>
             )
         } else if (type === DataTypes.STRING && !collection.abbreviated) {
-            let value = inputValue ? inputValue : '';
+            validationError.current = validateConstraints(collection, value);
+            const endAdornment = validationError.current ? (
+                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            ) : null;
+            const inputProps = endAdornment ? {
+                endAdornment: endAdornment
+            } : {};
             return (
-                <TableCell className={classes.cell} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
+                <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <TextField
                         className={classes.text_field}
+                        id={collection.key}
+                        name={collection.key}
                         size='small'
                         autoFocus
+                        required={required}
+                        error={validationError.current !== null}
                         value={value}
-                        placeholder={collection.placeholder}
                         disabled={disabled}
-                        onChange={(e) => handleTextChange(e, type, xpath, e.target.value)}
+                        // ref={inputRef}
+                        placeholder={collection.placeholder}
+                        onChange={(e) => props.onTextChange(e, type, xpath, e.target.value, dataxpath,
+                            validateConstraints(collection, e.target.value))}
+                        variant='outlined'
+                        InputProps={inputProps}
                         inputProps={{
                             style: { padding: '6px 10px' },
                             dataxpath: dataxpath,
@@ -263,14 +361,13 @@ const Cell = (props) => {
                     className={classes.checkbox}
                     disabled
                     defaultValue={false}
-                    checked={currentValue}
+                    checked={value}
                 />
             </TableCell >
         )
     }
 
     if (type === 'button') {
-        let value = currentValue;
         if (value === undefined || value === null) {
             let tableCellRemove = dataRemove ? classes.remove : '';
             return (
@@ -319,7 +416,6 @@ const Cell = (props) => {
     }
 
     if (type === 'progressBar') {
-        let value = currentValue;
         if (value === undefined || value === null) {
             let tableCellRemove = dataRemove ? classes.remove : '';
             return (
@@ -417,9 +513,23 @@ const Cell = (props) => {
     }
 
 
-    let value = currentValue !== undefined && currentValue !== null ? currentValue : '';
-    if (collection.displayType === DataTypes.INTEGER && typeof (value) === DataTypes.NUMBER) {
-        value = floatToInt(value);
+    // let value = currentValue !== undefined && currentValue !== null ? currentValue : '';
+    // if (collection.displayType === DataTypes.INTEGER && typeof (value) === DataTypes.NUMBER) {
+    //     value = floatToInt(value);
+    // }
+    let min = collection.min;
+    if (typeof (min) === DataTypes.STRING) {
+        min = getValueFromReduxStoreFromXpath(state, min);
+    }
+
+    let max = collection.max;
+    if (typeof (max) === DataTypes.STRING) {
+        max = getValueFromReduxStoreFromXpath(state, max);
+    }
+    validationError.current = validateConstraints(collection, value, min, max);
+
+    if (value === null) {
+        value = '';
     }
     value = value.toLocaleString();
     let numberSuffix = ""
@@ -441,12 +551,18 @@ const Cell = (props) => {
             <TableCell className={`${classes.cell} ${tableCellColorClass} ${disabledClass}`} align={textAlign} size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
                 {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
+                {validationError.current && (
+                    <Tooltip sx={{ marginLeft: '20px' }} title={validationError.current}><Error color='error' /></Tooltip>
+                )}
             </TableCell>
         )
     } else {
         return (
             <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`} align={textAlign} size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
+                {validationError.current && (
+                    <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }}><Error color='error' /></Tooltip>
+                )}
             </TableCell>
         )
     }

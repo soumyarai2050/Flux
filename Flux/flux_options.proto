@@ -61,12 +61,30 @@ message MessageJsonRoot{
   optional bool SetReentrantLockToTop = 9 [default=false];
 }
 
+enum QueryTypeEnum{
+  HTTP = 0;
+  WS = 1;
+  BOTH = 2;
+}
+
 message MessageJsonQuery{
   required string QueryName = 1;
   optional string AggregateVarName = 2; // name of variable from file to be used
   repeated string QueryParams = 3;  // list of params required for aggregation
   repeated string QueryParamsDataType = 4;  // list of data types of respective params in AggregateParams field
+  optional QueryTypeEnum QueryType = 5 [default=HTTP];
 }
+
+
+message ExecutorUtilOptions{
+  optional bool IsWebSocketModel = 1 [default=false];
+  optional bool EnableNotifyAll = 2 [default=true];
+  optional bool IsTopLvlModel = 3 [default=true];
+  optional int32 ExecutorKeyCounts = 4 [default=1];
+  repeated string ExecutorKeySequence = 5; // field names delimited by '-'
+  optional string LogKeySequence = 6; // field names delimited by '-'
+}
+
 
 extend google.protobuf.FileOptions 
 {
@@ -107,6 +125,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgOpName = 53151;
   optional string FluxMsgRsp = 53152;
   optional string FluxMsgNotify = 53153;
+  optional ExecutorUtilOptions FluxMsgExecutorOptions = 53154;
 
   //DAO Options - 54
   optional string FluxMsgDaoAccessType = 54151;

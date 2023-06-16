@@ -52,22 +52,22 @@ else  # test WebUi exist in the current project
 fi
 
 # 0. cp package.json to web-ui/.
-cp -p "$PWD"/generated/package.json "$PWD"/web-ui/.
+cp -p "$PWD"/generated/JsLayout/package.json "$PWD"/web-ui/.
 # 1. rename strat_manager_service_json_schema.json to schema.json ; then copy to web-ui/public/.
-FILES_TO_COPY=$(ls "$PWD"/generated/*_json_schema.json)
+FILES_TO_COPY=$(ls "$PWD"/generated/JSONSchema/*_json_schema.json)
 cp -p "$FILES_TO_COPY" "$PWD"/web-ui/public/schema.json
 # 2.cp Layout.jsx to web-ui/src/components/.
-cp -p "$PWD"/generated/Layout.jsx "$PWD"/web-ui/src/components/.
+cp -p "$PWD"/generated/JsLayout/Layout.jsx "$PWD"/web-ui/src/components/.
 # 3. cp *.jsx to web-ui/src/widgets/.   # excluding Layout -
-find "$PWD"/generated/ -type f -name "*.jsx" -exec cp {} "$PWD"/web-ui/src/widgets/. \;
+find "$PWD"/generated/JsLayout/ -type f -name "*.jsx" -exec cp {} "$PWD"/web-ui/src/widgets/. \;
 rm -f "$PWD"/web-ui/src/widgets/Layout.jsx
 # 4. cp store.js and constants.js to web-ui/src/.
-cp -p "$PWD"/generated/store.js "$PWD"/web-ui/src/.
-cp -p "$PWD"/generated/constants.js "$PWD"/web-ui/src/.
+cp -p "$PWD"/generated/JsLayout/store.js "$PWD"/web-ui/src/.
+cp -p "$PWD"/generated/JsLayout/constants.js "$PWD"/web-ui/src/.
 # 4.5 cp projectSpecificUtils.js web-ui/src/.
-cp -p "$PWD"/generated/projectSpecificUtils.js "$PWD"/web-ui/src/.
+cp -p "$PWD"/generated/JsLayout/projectSpecificUtils.js "$PWD"/web-ui/src/.
 # 5. cp *.js web-ui/src/features/.   # excluding store.js, projectSpecificUtils.js, constants.js
-find "$PWD"/generated/ -type f -name "*.js" -exec cp {} "$PWD"/web-ui/src/features/. \;
+find "$PWD"/generated/JsLayout/ -type f -name "*.js" -exec cp {} "$PWD"/web-ui/src/features/. \;
 rm -f "$PWD"/web-ui/src/features/store.js
 rm -f "$PWD"/web-ui/src/features/projectSpecificUtils.js
 rm -f "$PWD"/web-ui/src/features/constants.js

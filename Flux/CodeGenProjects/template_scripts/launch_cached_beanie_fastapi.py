@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     # Importing here to get LOG_FILE_NAME and LOG_LEVEL set before getting logging config triggered in
     # template_model_service_cached_beanie_fastapi file
-    from Flux.CodeGenProjects.template_project_name.generated.template_model_service_cached_beanie_fastapi import \
+    from Flux.CodeGenProjects.template_project_name.generated.FastApi.template_model_service_cached_beanie_fastapi import \
         launch_template_model_service_cached_beanie_fastapi
 
     launch_template_model_service_cached_beanie_fastapi()

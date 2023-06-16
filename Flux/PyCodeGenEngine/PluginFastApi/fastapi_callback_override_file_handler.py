@@ -79,14 +79,14 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         output_str += "\n"
         output_str += "# project imports\n"
         web_client_path = \
-            self.import_path_from_os_path("OUTPUT_DIR", f"{self.client_file_name}")
+            self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", f"{self.client_file_name}")
         web_client_name_caps_camel_cased = convert_to_capitalized_camel_case(self.client_file_name)
         output_str += f"from {web_client_path} import {web_client_name_caps_camel_cased}\n"
         model_path = \
-            self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_file_name}")
+            self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_path} import *\n"
         routes_callback = \
-            self.import_path_from_os_path("OUTPUT_DIR", f"{self.routes_callback_class_name}")
+            self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", f"{self.routes_callback_class_name}")
         callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += f"from {routes_callback} import " \
                       f"{callback_class_name_camel_cased}\n\n"
@@ -285,7 +285,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                 query_params_data_types = aggregate_value[
                     FastapiCallbackOverrideFileHandler.query_params_data_types_key]
 
-                routes_import_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
+                routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_file_name)
                 aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
 
                 if query_params:
@@ -325,9 +325,9 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_callback_override_file_gen(self) -> str:
         if (output_dir_path := os.getenv("OUTPUT_DIR")) is not None:
-            json_sample_file_path = PurePath(output_dir_path) / f"{self.proto_file_name}_json_sample.json"
+            json_sample_file_path = PurePath(output_dir_path) / "JSONSample" / f"{self.proto_file_name}_json_sample.json"
         else:
-            err_str = "Env var 'OUTPUT_DIR' received as None"
+            err_str = "Env var 'PLUGIN_OUTPUT_DIR' received as None"
             logging.exception(err_str)
             raise Exception(err_str)
         with open(json_sample_file_path) as json_sample:

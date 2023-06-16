@@ -4,9 +4,11 @@ import sys
 
 from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env, perf_benchmark
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
+from Flux.CodeGenProjects.addressbook.generated.StratExecutor.strat_manager_service_key_handler import \
+    StratManagerServiceKeyHandler
 
 host, port = get_host_port_from_env()
 strat_manager_service_web_client_internal = StratManagerServiceWebClient(host, port)
@@ -32,7 +34,7 @@ def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
 
 # caller must take any locks as required for any read-write consistency - function operates without lock
 async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
-    from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+    from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_routes import \
         underlying_read_pair_strat_http
     read_pair_strat_filter = get_ongoing_pair_strat_filter(sec_id)
     pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
@@ -57,7 +59,7 @@ async def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, aler
                                                    alert_details: str | None = None,
                                                    severity: Severity = Severity.Severity_ERROR,
                                                    impacted_orders: List[OrderBrief] | None = None):
-    from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+    from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_routes import \
         underlying_partial_update_pair_strat_http
     impacted_orders = [] if impacted_orders is None else impacted_orders
     alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
@@ -77,7 +79,7 @@ async def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, aler
             updated_strat_status.strat_state = pair_strat.strat_status.strat_state
             updated_strat_status.strat_alerts.append(alert)
         pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=updated_strat_status)
-        await underlying_partial_update_pair_strat_http(pair_strat_updated)
+        await underlying_partial_update_pair_strat_http(pair_strat_updated.dict(by_alias=True, exclude_none=True))
 
 
 async def get_single_exact_match_ongoing_strat_from_symbol_n_side(sec_id: str, side: Side) -> PairStrat | None:
@@ -109,14 +111,14 @@ async def update_strat_alert_async(strat_id: int, alert_brief: str, alert_detail
                                    impacted_orders: List[OrderBrief] | None = None,
                                    severity: Severity = Severity.Severity_ERROR):
     alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
-    from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_routes import \
+    from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_routes import \
         underlying_read_pair_strat_by_id_http, underlying_partial_update_pair_strat_http
     async with update_strat_status_lock:
         pair_strat: PairStrat = await underlying_read_pair_strat_by_id_http(strat_id)
         strat_status: StratStatus = StratStatus(strat_state=pair_strat.strat_status.strat_state,
                                                 strat_alerts=(pair_strat.strat_status.strat_alerts.append(alert)))
         pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=strat_status)
-    await underlying_partial_update_pair_strat_http(pair_strat_updated)
+    await underlying_partial_update_pair_strat_http(pair_strat_updated.dict(by_alias=True, exclude_none=True))
 
 
 def except_n_log_alert(severity: Severity = Severity.Severity_ERROR):
@@ -313,50 +315,57 @@ def get_symbol_side_key(symbol_side_tuple_list: List[Tuple[str, str]]) -> str:
     return f"%%{key_str}%%"
 
 
-def get_pair_strat_key(pair_strat: PairStrat | PairStratBaseModel | PairStratOptional):
+def get_pair_strat_log_key(pair_strat: PairStrat | PairStratBaseModel | PairStratOptional):
     leg_1_sec_id = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
     leg_1_side = pair_strat.pair_strat_params.strat_leg1.side
     leg_2_sec_id = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
     leg_2_side = pair_strat.pair_strat_params.strat_leg2.side
     symbol_side_key = get_symbol_side_key([(leg_1_sec_id, leg_1_side), (leg_2_sec_id, leg_2_side)])
-    return f"{leg_1_sec_id}-{leg_2_sec_id}-{pair_strat.id} {symbol_side_key}"
+    base_pair_strat_key = StratManagerServiceKeyHandler.get_log_key_from_pair_strat(pair_strat)
+    return f"{symbol_side_key}-{base_pair_strat_key}"
 
 
-def get_strat_brief_key(strat_brief: StratBrief | StratBriefBaseModel | StratBriefOptional):
+def get_strat_brief_log_key(strat_brief: StratBrief | StratBriefBaseModel | StratBriefOptional):
     buy_sec_id = strat_brief.pair_buy_side_trading_brief.security.sec_id
     buy_side = strat_brief.pair_buy_side_trading_brief.side
     sell_sec_id = strat_brief.pair_sell_side_trading_brief.security.sec_id
     sell_side = strat_brief.pair_sell_side_trading_brief.side
     symbol_side_key = get_symbol_side_key([(buy_sec_id, buy_side), (sell_sec_id, sell_side)])
-    return f"{symbol_side_key}-{strat_brief.id}"
+    base_strat_brief_key = StratManagerServiceKeyHandler.get_log_key_from_strat_brief(strat_brief)
+    return f"{symbol_side_key}-{base_strat_brief_key}"
 
 
-def get_order_journal_key(order_journal: OrderJournal | OrderJournalBaseModel | OrderJournalOptional):
+def get_order_journal_log_key(order_journal: OrderJournal | OrderJournalBaseModel | OrderJournalOptional):
     sec_id = order_journal.order.security.sec_id
     side = order_journal.order.side
     symbol_side_key = get_symbol_side_key([(sec_id, side)])
-    return f"{symbol_side_key}-{order_journal.order.order_id}"
+    base_order_journal_key = StratManagerServiceKeyHandler.get_log_key_from_order_journal(order_journal)
+    return f"{symbol_side_key}-{base_order_journal_key}"
 
 
-def get_fills_journal_key(fills_journal: FillsJournal | FillsJournalBaseModel | FillsJournalOptional):
+def get_fills_journal_log_key(fills_journal: FillsJournal | FillsJournalBaseModel | FillsJournalOptional):
     sec_id = fills_journal.fill_symbol
     side = fills_journal.fill_side
     symbol_side_key = get_symbol_side_key([(sec_id, side)])
-    return f"{symbol_side_key}-{fills_journal.fill_id}"
+    base_fill_journal_key = StratManagerServiceKeyHandler.get_log_key_from_fills_journal(fills_journal)
+    return f"{symbol_side_key}-{base_fill_journal_key}"
 
 
-def get_order_snapshot_key(order_snapshot: OrderSnapshot | OrderSnapshotBaseModel | OrderSnapshotOptional):
+def get_order_snapshot_log_key(order_snapshot: OrderSnapshot | OrderSnapshotBaseModel | OrderSnapshotOptional):
     sec_id = order_snapshot.order_brief.security.sec_id
     side = order_snapshot.order_brief.side
     symbol_side_key = get_symbol_side_key([(sec_id, side)])
-    return f"{symbol_side_key}-{order_snapshot.order_brief.order_id}-{order_snapshot.order_status}"
+    base_order_snapshot_key = StratManagerServiceKeyHandler.get_log_key_from_order_snapshot(order_snapshot)
+    return f"{symbol_side_key}-{base_order_snapshot_key}"
 
 
-def get_symbol_side_snapshot_key(symbol_side_snapshot: SymbolSideSnapshot | SymbolSideSnapshotBaseModel | SymbolSideSnapshotOptional):
+def get_symbol_side_snapshot_log_key(symbol_side_snapshot: SymbolSideSnapshot | SymbolSideSnapshotBaseModel | SymbolSideSnapshotOptional):
     sec_id = symbol_side_snapshot.security.sec_id
     side = symbol_side_snapshot.side
     symbol_side_key = get_symbol_side_key([(sec_id, side)])
-    return f"{symbol_side_key}"
+    base_symbol_side_snapshot_key = \
+        StratManagerServiceKeyHandler.get_log_key_from_symbol_side_snapshot(symbol_side_snapshot)
+    return f"{symbol_side_key}-{base_symbol_side_snapshot_key}"
 
 
 def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:

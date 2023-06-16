@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from typing import List, Callable
+from typing import Dict
 import time
 from pathlib import PurePath
 import logging
@@ -21,28 +21,7 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.insertion_point_key_list: List[str] = [
-            "api_root_url",
-            "api_public_url",
-            "cookie_name"
-        ]
-        self.insertion_point_key_to_callable_list: List[Callable] = [
-            self.handle_api_root_url,
-            self.handle_api_public_url,
-            self.handle_cookie_name
-        ]
-        template_file_name = None
-        py_code_gen_engine_path = None
-        if (output_file_name := os.getenv("OUTPUT_FILE_NAME")) is not None and \
-                (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and \
-                (py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None:
-            self.output_file_name = output_file_name
-            self.template_file_path = PurePath(py_code_gen_engine_path) / PurePath(__file__).parent / template_file_name
-        else:
-            err_str = f"Env var 'OUTPUT_FILE_NAME', 'TEMPLATE_FILE_NAME' and 'PY_CODE_GEN_ENGINE_PATH'" \
-                      f"received as {output_file_name}, {template_file_name} and {py_code_gen_engine_path}"
-            logging.exception(err_str)
-            raise Exception(err_str)
+        self.output_file_name_to_template_file_path_dict: Dict[str, str] = {}
         self.proto_package_name: str | None = None
         self.host = "127.0.0.1"
         self.port_offset = 0
@@ -51,16 +30,13 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
         self.proto_package_name = str(file.proto.package)
         if self.is_option_enabled(file, JsConstantsGenPlugin.flux_file_crud_host):
             self.host = self.get_non_repeated_valued_custom_option_value(file,
-                                                                    JsConstantsGenPlugin.flux_file_crud_host)
+                                                                         JsConstantsGenPlugin.flux_file_crud_host)
         if self.is_option_enabled(file, JsConstantsGenPlugin.flux_file_crud_port_offset):
             self.port_offset = \
                 int(self.get_non_repeated_valued_custom_option_value(file,
-                                                                 JsConstantsGenPlugin.flux_file_crud_port_offset))
+                                                                     JsConstantsGenPlugin.flux_file_crud_port_offset))
 
     def handle_api_root_url(self, file: protogen.File) -> str:
-        # Loading root messages to data member
-        self.load_root_message_to_data_member(file)
-        self.get_option_values(file)
         port = 8000 + self.port_offset
         output_str = f"export const API_ROOT_URL = 'http://{self.host}:{port}/{self.proto_package_name}';"
         return output_str
@@ -73,6 +49,30 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
     def handle_cookie_name(self, file: protogen.File) -> str:
         output_str = f"export const COOKIE_NAME = '{self.proto_package_name}';"
         return output_str
+
+    def output_file_generate_handler(self, file: protogen.File):
+        # Loading root messages to data member
+        self.load_root_message_to_data_member(file)
+        self.get_option_values(file)
+
+        output_file_name = "constants.js"
+        py_code_gen_engine_path = None
+        if (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and \
+                (py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None:
+            template_file_path = PurePath(py_code_gen_engine_path) / PurePath(__file__).parent / template_file_name
+        else:
+            err_str = f"Env var 'TEMPLATE_FILE_NAME' and 'PY_CODE_GEN_ENGINE_PATH'" \
+                      f"received as {template_file_name} and {py_code_gen_engine_path}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+        self.output_file_name_to_template_file_path_dict[output_file_name] = str(template_file_path)
+        return {
+            output_file_name: {
+                "api_root_url": self.handle_api_root_url(file),
+                "api_public_url": self.handle_api_public_url(file),
+                "cookie_name": self.handle_cookie_name(file)
+            }
+        }
 
 
 if __name__ == "__main__":

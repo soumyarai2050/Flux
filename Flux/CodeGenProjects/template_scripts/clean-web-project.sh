@@ -9,6 +9,7 @@ cd .. # parent of script dir
 # clean generated
 cd generated
 find . -type f ! \( -name "data.py" -o -name "forward_notification_ws_server.py" -o -name "get_all_from_ws_client.py" -o -name "get_from_ws_client.py" \) -print0 | xargs -0 -n1 rm
+find . -type d -empty -delete
 cd - # parent of generated (same as parent of script DIR)
 if [ -d "web-ui" ] ; then
   # clean web-ui excluding node_modules install folder

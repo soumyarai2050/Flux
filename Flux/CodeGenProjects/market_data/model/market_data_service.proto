@@ -137,6 +137,20 @@ message TopOfBook {
     QueryParams: "symbol",
     QueryParamsDataType: "str"
   };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_tob_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 2,
+    ExecutorKeySequence: "symbol-'BUY'",
+    ExecutorKeySequence: "symbol-'SELL'"
+  };
   required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional Quote bid_quote = 2 [(FluxFldElaborateTitle) = true];
   optional Quote ask_quote = 3 [(FluxFldElaborateTitle) = true];
@@ -193,6 +207,14 @@ message SymbolOverview{
     QueryParams: "symbol",
     QueryParamsDataType: "str"
   };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 2,
+    ExecutorKeySequence: "symbol-'BUY'",
+    ExecutorKeySequence: "symbol-'SELL'"
+  };
   required string symbol = 1 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional string  company = 2;
   optional string status = 3;
@@ -223,7 +245,7 @@ message BarData {
   required float low = 6;
   required float close = 7;
   required int32 volume = 8;
-  required int32 barCount = 9;
+  required int32 bar_count = 9;
 }
 
 message BBO {
@@ -326,6 +348,14 @@ message MarketDepth {
     is_repeated: true
   };
   option (FluxMsgAggregateQueryVarName) = "cum_px_qty_aggregate_query";
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: False,
+    ExecutorKeyCounts: 2,
+    ExecutorKeySequence: "symbol-'BUY'",
+    ExecutorKeySequence: "symbol-'SELL'"
+  };
   required string symbol = 2 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   required int64 time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
   required TickTypeEnum side = 4;

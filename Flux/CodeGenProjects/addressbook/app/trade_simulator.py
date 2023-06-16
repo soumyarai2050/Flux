@@ -3,9 +3,11 @@ from typing import ClassVar, List, Dict
 import re
 
 from pendulum import DateTime
+from fastapi.encoders import jsonable_encoder
 
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import Security, \
-    OrderBrief, OrderJournalBaseModel, Side, OrderEventType, FillsJournalBaseModel, PortfolioStatusBaseModel
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import \
+    Security, OrderBrief, OrderJournalBaseModel, Side, OrderEventType, FillsJournalBaseModel, \
+    PortfolioStatusBaseModel, SecurityType
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, add_to_texts
 
 
@@ -98,7 +100,8 @@ class TradeSimulator(TradingLinkBase):
         """
         create_date_time = DateTime.utcnow()
         order_id: str = f"{trading_sec_id}-{create_date_time}"
-        security = Security(sec_id=system_sec_id)  # use system_sec_id to create system's internal order brief / journal
+        # use system_sec_id to create system's internal order brief / journal
+        security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
 
         order_brief = OrderBrief(order_id=order_id, security=security, side=side, px=px, qty=qty,
                                  underlying_account=account)
@@ -134,7 +137,7 @@ class TradeSimulator(TradingLinkBase):
     def process_order_ack(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
                           text: List[str] | None = None):
         """simulate order's Ack """
-        security = Security(sec_id=sec_id)
+        security = Security(sec_id=sec_id, sec_type=SecurityType.TICKER)
 
         qty = cls.get_partial_allowed_ack_qty(sec_id, qty)
         order_brief_obj = OrderBrief(order_id=order_id, security=security, side=side, px=px, qty=qty,
@@ -221,7 +224,7 @@ class TradeSimulator(TradingLinkBase):
         pydantic default conversion handles conversion - any util functions called should be called with
         explicit type convertors or pydantic object converted values
         """
-        security = Security(sec_id=system_sec_id)
+        security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
         # query order
         order_brief = OrderBrief(order_id=order_id, security=security, side=side,
                                  underlying_account=underlying_account)
@@ -248,7 +251,7 @@ class TradeSimulator(TradingLinkBase):
         if not portfolio_status.kill_switch:
             portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1)
             portfolio_status_basemodel.kill_switch = True
-            TradeSimulator.strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_basemodel)
+            TradeSimulator.strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
             logging.debug("Portfolio_status - Kill Switch turned to True")
             return True
         else:
@@ -264,7 +267,7 @@ class TradeSimulator(TradingLinkBase):
         if portfolio_status.kill_switch:
             portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1)
             portfolio_status_basemodel.kill_switch = False
-            TradeSimulator.strat_manager_service_web_client.patch_portfolio_status_client(portfolio_status_basemodel)
+            TradeSimulator.strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
             logging.debug("Portfolio_status - Kill Switch turned to False")
             return True
         else:

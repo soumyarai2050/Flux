@@ -4,10 +4,10 @@ from pendulum import DateTime
 import os
 
 from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import Security, \
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import Security, \
     OrderBrief, OrderJournalBaseModel, Side, OrderEventType, FillsJournalBaseModel
-from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client import MarketDataServiceWebClient
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_web_client import \
+from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import MarketDataServiceWebClient
+from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 
 from pathlib import PurePath

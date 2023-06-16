@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 import os
 import re
-
+from typing import List, Dict, ClassVar
+import logging
+from abc import ABC, abstractmethod
 import protogen
+
+# project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
-from typing import List, Callable, Dict, ClassVar
-import logging
-from abc import ABC
 
 # Required for accessing custom options from schema
 from Flux.PyCodeGenEngine.FluxCodeGenCore import insertion_imports
@@ -61,6 +62,7 @@ class BaseProtoPlugin(ABC):
     flux_json_query_aggregate_var_name_field: ClassVar[str] = "AggregateVarName"
     flux_json_query_params_field: ClassVar[str] = "QueryParams"
     flux_json_query_params_data_type_field: ClassVar[str] = "QueryParamsDataType"
+    flux_json_query_type_field: ClassVar[str] = "QueryType"
     flux_fld_is_required: ClassVar[str] = "FluxFldIsRequired"
     flux_fld_cmnt: ClassVar[str] = "FluxFldCmnt"
     flux_msg_cmnt: ClassVar[str] = "FluxMsgCmnt"
@@ -115,6 +117,13 @@ class BaseProtoPlugin(ABC):
     flux_fld_text_align: str = "FluxFldTextAlign"
     flux_msg_ui_get_all_limit: str = "FluxMsgUIGetAllLimit"
     flux_fld_abbreviated_link: str = "FluxFldAbbreviatedLink"
+    flux_msg_executor_options: str = "FluxMsgExecutorOptions"
+    executor_option_is_websocket_model_field: str = "IsWebSocketModel"
+    executor_option_enable_notify_all_field: str = "EnableNotifyAll"
+    executor_option_is_top_lvl_model_field: str = "IsTopLvlModel"
+    executor_option_executor_key_count_field: str = "ExecutorKeyCounts"
+    executor_option_executor_key_sequence_field: str = "ExecutorKeySequence"
+    executor_option_log_key_sequence_field: str = "LogKeySequence"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: str = "ProtoPackageName"  # to be used in models as proto_package_name variable name
@@ -137,35 +146,18 @@ class BaseProtoPlugin(ABC):
         "double": "number"
     }
 
-    # This class member is used to add content in output file if no template file is provided for output
-    # This insertion point is added in output file while creating output file and this insertion point
-    # is used to add whole generated content in output file
-    default_output_insertion_key = "create_output"
-
     def __init__(self, base_dir_path: str):
         self.base_dir_path: str = base_dir_path
 
-        # self.insertion_point_key_list needs to be overriden if any template file is provided in
-        # derived class. It must then contain insertion points according to that template file
-        self.insertion_point_key_list: List[str] = [BaseProtoPlugin.default_output_insertion_key]
-        self.template_file_path: str | None = None
-
-        # Out of Below 2 data members one needs to be overridden by derived class else exception will be risen
-        self.output_file_name_suffix: str | None = None
-        self.output_file_name: str | None = None
-
-        # self.insertion_point_key_to_callable_list needs to be overriden to handle both cases:
-        # 1. When self.insertion_point_key_list and self.template_file_path are not overriden (which signifies
-        #    no template file is required for derived plugin) then derived class must have caller of single method
-        #    that returns whole plugin generated content that could be added in generated output file
-        # 2. When template file is required to generate output then self.insertion_point_key_list needs to be
-        #    overridden in derived plugin to hold insertion point of template file and template_file_path
-        #    should be provided. In this case self.insertion_point_key_to_callable_list needs to hold callers
-        #    of handler methods of respective insertion point in self.insertion_point_key_list
-        self.insertion_point_key_to_callable_list: List[Callable] = []
-
+        self.output_file_name_to_template_file_path_dict: Dict[str, str] = {}
         # Below data member will override on the run time
         self.insertion_points_to_content_dict: Dict[str, str] | Dict[str, Dict[str, str]] = {}
+
+    @abstractmethod
+    def output_file_generate_handler(self, file: protogen.File):
+        raise NotImplementedError("Derived implementation must return dict of "
+                                  "output file name-respective content key-value pair or "
+                                  "output file name-dict of insertion points-respective content key-value pair ")
 
     def is_bool_option_enabled(self, msg_or_fld_option: protogen.Message | protogen.Field, option_name: str) -> bool:
         if self.is_option_enabled(msg_or_fld_option, option_name) and \
@@ -175,37 +167,6 @@ class BaseProtoPlugin(ABC):
         else:
             return False
 
-    def insertion_points_and_resp_methods_checker(self):
-        """
-        Checks if number of insertion points in insertion_point_key_list is equal to number of handler
-        methods in insertion_point_key_to_callable_list
-        """
-        if len(self.insertion_point_key_list) != len(self.insertion_point_key_to_callable_list):
-            err_str = f"Mismatch found in Length of insertion points and respective implemented methods " \
-                      f"Length of insertion keys: {len(self.insertion_point_key_list)} vs " \
-                      f"Length of respective callables {len(self.insertion_point_key_to_callable_list)}"
-            logging.exception(err_str)
-            raise Exception(err_str)
-        # else not required: if mismatch not found then ignore
-
-    def required_overrides_checker(self):
-        """
-        Checks if required data members got overriden by derived class or not
-        """
-        if self.output_file_name_suffix is None and self.output_file_name is None:
-            err_str = "At-least one of output_file_name_suffix and output_file_name data members needs to " \
-                      "overriden by derived class"
-            logging.exception(err_str)
-            raise Exception(err_str)
-        # else not required: if condition fails then no need to raise exception
-
-        if not self.insertion_point_key_to_callable_list:
-            err_str = "At-least one caller needs to be inside self.insertion_point_key_to_callable_list to handle " \
-                      "default insertion point"
-            logging.exception(err_str)
-            raise Exception(err_str)
-        # else not required: if condition fails then no need to raise exception
-
     @staticmethod
     def get_non_repeated_valued_custom_option_value(proto_entity: protogen.Message | protogen.Field | protogen.File,
                                                     option_name: str):
@@ -213,6 +174,8 @@ class BaseProtoPlugin(ABC):
         for option in options_list:
             if re.search(r'\b' + option_name + r'\b', option):
                 option_content = ":".join(str(option).split(":")[1:])
+                if option_content.isspace():
+                    return option_content
                 return option_content.strip()
             # else not required: Avoiding if option_name not in option_obj
 
@@ -263,6 +226,31 @@ class BaseProtoPlugin(ABC):
         return option_value_list_of_tuples
 
     @staticmethod
+    def get_field_default_value(field: protogen.Field):
+        """
+        Returns python syntax-ed default value of field (used by python code generators)
+        Returns None if no default value is found in field proto object
+        """
+        output_str = None
+        if default_val := field.proto.default_value:
+            match field.kind.name.lower():
+                case "string":
+                    output_str = f"'{default_val}'"
+                case "int32" | "int64" | "float":
+                    output_str = default_val
+                case "bool":
+                    output_str = True if default_val == "true" else False
+                case "enum":
+                    enum_name = field.enum.proto.name
+                    output_str = f"{enum_name}.{default_val}"
+                case other:
+                    err_str = f"Unsupported field type for default value, field {field.proto.name} of " \
+                              f"message {field.parent.proto.name} has type {other}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+        return output_str
+
+    @staticmethod
     def _get_complex_option_value_as_list_of_dict(option_string: str, option_name: str) -> List[Dict]:
         option_value_list_of_dict: List[Dict] = []
         for option_str_line in str(option_string).split("\n"):
@@ -301,8 +289,9 @@ class BaseProtoPlugin(ABC):
         return option_value_list_of_dict
 
     @staticmethod
-    def get_complex_option_values_as_list_of_dict(proto_entity: protogen.Message | protogen.Field | protogen.File,
-                                                  option_name: str) -> List[Dict]:
+    def get_complex_option_set_values(proto_entity: protogen.Message | protogen.Field | protogen.File,
+                                      option_name: str,
+                                      is_option_repeated: bool | None = None) -> List[Dict] | Dict:
         """
         Returns list of dictionaries containing each complex option's value tree on each index.
         If Option is repeated type returns list of option value tree dicts else returns only one for non-repeated.
@@ -310,22 +299,38 @@ class BaseProtoPlugin(ABC):
         proto_entity_options_str = str(proto_entity.proto.options)
         option_value_list_of_dict = \
             BaseProtoPlugin._get_complex_option_value_as_list_of_dict(proto_entity_options_str, option_name)
-        return option_value_list_of_dict
+        if is_option_repeated is not None and is_option_repeated:
+            return option_value_list_of_dict
+        else:
+            if len(option_value_list_of_dict) < 2:
+                if len(option_value_list_of_dict) == 1:
+                    return option_value_list_of_dict[0]
+                else:
+                    return {}
+            else:
+                err_str = "Interface get_complex_option_values_as_list_of_dict has param is_option_repeated set " \
+                          f"as either None or False but received repeated option values for option name {option_name}" \
+                          f" in proto_entity {proto_entity.proto.name}"
+                logging.exception(err_str)
+                raise Exception(err_str)
 
-    def get_flux_msg_cmt_option_value(self, message: protogen.Message) -> str:
+    @staticmethod
+    def get_flux_msg_cmt_option_value(message: protogen.Message) -> str:
         flux_msg_cmt_option_value = \
             BaseProtoPlugin.get_non_repeated_valued_custom_option_value(message,
                                                                         BaseProtoPlugin.flux_msg_cmnt)
         return flux_msg_cmt_option_value[2:-1] \
             if flux_msg_cmt_option_value is not None else ""
 
-    def get_flux_fld_cmt_option_value(self, field: protogen.Field) -> str:
+    @staticmethod
+    def get_flux_fld_cmt_option_value(field: protogen.Field) -> str:
         flux_fld_cmt_option_value = \
             BaseProtoPlugin.get_non_repeated_valued_custom_option_value(field, BaseProtoPlugin.flux_fld_cmnt)
         return flux_fld_cmt_option_value[2:-1] \
             if flux_fld_cmt_option_value is not None else ""
 
-    def get_flux_file_cmt_option_value(self, file: protogen.File) -> str:
+    @staticmethod
+    def get_flux_file_cmt_option_value(file: protogen.File) -> str:
         flux_file_cmt_option_value = \
             BaseProtoPlugin.get_non_repeated_valued_custom_option_value(file, BaseProtoPlugin.flux_file_cmnt)
         return flux_file_cmt_option_value[2:-1] \
@@ -352,119 +357,59 @@ class BaseProtoPlugin(ABC):
             logging.exception(err_str)
             raise Exception(err_str)
 
-    def __handle_single_file_generation(self, plugin: ExtendedProtogenPlugin, file: protogen.File) -> None:
-        # If template file is provided then using the content of it to add in generated file
-        if self.template_file_path is not None:
-            if os.path.exists(self.template_file_path):
-                with open(self.template_file_path, "r") as fl:
-                    file_content = fl.read()
-            else:
-                err_str = f"file: {self.template_file_path} does not exist"
-                logging.exception(err_str)
-                raise Exception(err_str)
-        # else adding only one insertion point in generated file to add whole content in
-        # generated file using this insertion point
-        else:
-            file_content = f"# @@protoc_insertion_point({BaseProtoPlugin.default_output_insertion_key})"
-
-        if self.output_file_name:
-            plugin.output_file_name = self.output_file_name
-        else:
-            proto_file_name = str(file.proto.name).split(os.sep)[-1]
-            if self.output_file_name_suffix:
-                plugin.output_file_name = f"{str(proto_file_name).split('.')[0]}_{self.output_file_name_suffix}"
-            else:
-                plugin.output_file_name = f"{str(proto_file_name).split('.')[0]}.py"
-
-        generator = plugin.new_generated_file(plugin.output_file_name, file.py_import_path)
-
-        generator.P(file_content)
-
-    def __handle_multi_file_generation(self, plugin: ExtendedProtogenPlugin, file: protogen.File,
-                                       file_name_to_content_dict: Dict[str, str]):
-
-        for file_name, _ in file_name_to_content_dict.items():
-            if self.output_file_name_suffix is None:
-                err_str = "output_file_name_suffix can't be None when handling multi file generation"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            # else not required: Avoiding if output_file_name_suffix is not None
-
-            generator = plugin.new_generated_file(file_name, file.py_import_path)
-            file_content = f"# @@protoc_insertion_point({file_name})"
-            generator.P(file_content)
-        return file_name_to_content_dict
-
-    def __process(self, plugin: ExtendedProtogenPlugin) -> None:
+    def _process(self, plugin: ExtendedProtogenPlugin) -> None:
         """
         Underlying method, handles the task of creating dictionary of insertion point keys and there
         insertion content as value. This Dictionary is then assigned to `insertion_points_to_content_dict`
         data member of ``ExtendedProtogenPlugin``
         """
-
-        # Handling mismatch in insertion points and respective implemented methods
-        self.insertion_points_and_resp_methods_checker()
-
-        # Handling any missed override in derived class
-        self.required_overrides_checker()
-
         # @@@ May contain bug for explicit multi input files, so protoc command should
         # be used for single input file explicitly
         for file in plugin.files_to_generate:
+            output_file_name_to_insertion_points_n_content_dict: Dict[str, Dict[str, str]] = {}
+            received_output_file_name_to_content = self.output_file_generate_handler(file)
 
-            # Getting content to be injected in insertion points in generated file
-            # 1. If template is provided then dict assigned to plugin.insertion_points_to_content_dict
-            # will contain insertion points and contents to be injected to respective point as key-value pair
-            # 2. If template is not provided then below 2 cases could occur:
-            #    2.1 If string return type is received from insertion_point_handler_method: In this case,
-            #    single file generation handling needs to be done. In this case, received dict will contain
-            #    default insertion point used for output file as key and respective content as value. Generated
-            #    file name will be dependent on either provided output file or provided output suffix string
-            #    2.2 If Dictionary return type is received from insertion_point_handler_method: In this case,
-            #    multi file generation handling needs to be done. In this case, received dict's keys will
-            #    have file names to be generated that will be concatenated with suffix string provided
-            #    from config (suffix must be provided from config or exception will occur).
-            for insert_point, insertion_point_handler_method in zip(self.insertion_point_key_list,
-                                                                    self.insertion_point_key_to_callable_list):
-                self.insertion_points_to_content_dict[insert_point] = insertion_point_handler_method(file)
-            plugin.insertion_points_to_content_dict = self.insertion_points_to_content_dict
-
-            # @@@ Case - 2 from above - Now identifying between 2.1 and 2.2
-            if self.template_file_path is None:
-
-                insertion_points_to_content_dict_values: List[str | Dict[str, str]] = \
-                    list(self.insertion_points_to_content_dict.values())
-
-                # First checking if when template_file_path is not provided then length of
-                # insertion_points_to_content_dict_values should not be more than 1
-                # (For Reason refer to above comment paragraph)
-                if len(insertion_points_to_content_dict_values) != 1:
-                    err_str = f"Length of insertion point - injection content dict should be only 1 when " \
-                              f"template file is not provided"
-                    logging.exception(err_str)
-                    raise Exception(err_str)
-                # else not required: If length is 1 then ignoring
-
-                # @@@ Case - 2.1
-                if isinstance(insertion_points_to_content_dict_values[0], str):
-                    self.__handle_single_file_generation(plugin, file)
-                # @@@ Case - 2.2
-                elif isinstance(insertion_points_to_content_dict_values[0], dict):
-                    plugin.do_generate_multi_files = True
-                    self.__handle_multi_file_generation(plugin, file, insertion_points_to_content_dict_values[0])
-
+            for output_file_name, output_file_content in received_output_file_name_to_content.items():
+                if isinstance(output_file_content, dict):
+                    file_content_path = self.output_file_name_to_template_file_path_dict.get(output_file_name)
+                    if file_content_path is not None:
+                        if os.path.exists(file_content_path):
+                            with open(file_content_path, "r") as fl:
+                                file_content = fl.read()
+                        else:
+                            err_str = f"file: {file_content_path} does not exist"
+                            logging.exception(err_str)
+                            raise Exception(err_str)
+                        generator = plugin.new_generated_file(output_file_name, file.py_import_path)
+                        generator.P(file_content)
+                    else:
+                        err_str = "output_file_name_to_template_file_path_dict could not find any key matching " \
+                                  f"output_file_name: {output_file_name}"
+                        logging.exception(err_str)
+                        raise Exception(err_str)
+                    
+                    output_file_name_to_insertion_points_n_content_dict[output_file_name] = {}
+                    for insert_point, replacing_content in output_file_content.items():
+                        output_file_name_to_insertion_points_n_content_dict[output_file_name][insert_point] = \
+                            replacing_content
+                elif isinstance(output_file_content, str):
+                    generator = plugin.new_generated_file(output_file_name, file.py_import_path)
+                    file_content = f"# @@protoc_insertion_point({output_file_name})"
+                    generator.P(file_content)
+                    output_file_name_to_insertion_points_n_content_dict[output_file_name] = {}
+                    output_file_name_to_insertion_points_n_content_dict[output_file_name][output_file_name] = \
+                        output_file_content
                 else:
-                    err_str = f"Invalid data type returned from insertion_point_handler_method: " \
-                              f"{insertion_points_to_content_dict_values[0]}"
+                    err_str = f"unsupported type: {type(output_file_content)} of output_file_content " \
+                              f"for output_file_name {output_file_name}"
                     logging.exception(err_str)
                     raise Exception(err_str)
-            # @@@ Case - 1
-            else:
-                self.__handle_single_file_generation(plugin, file)
+
+            plugin.insertion_points_to_content_dict = output_file_name_to_insertion_points_n_content_dict
 
     def process(self):
         extended_protogen_options = ExtendedProtogenOptions()
-        extended_protogen_options.run(self.__process)
+        extended_protogen_options.run(self._process)
 
 
 def main(plugin_class):

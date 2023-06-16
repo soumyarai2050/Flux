@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 from abc import ABC
@@ -49,10 +50,10 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
     def handle_PATCH_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = " "*4 + f"def patch_{message_name_snake_cased}_client(self, pydantic_obj: " \
-                     f"{message_name}BaseModel) -> {message_name}BaseModel:\n"
+        output_str = " "*4 + f"def patch_{message_name_snake_cased}_client(self, pydantic_obj_json: " \
+                     f"Dict) -> {message_name}BaseModel:\n"
         output_str += " "*4 + f"    return generic_http_patch_client(self.patch_{message_name_snake_cased}" \
-                      f"_client_url, pydantic_obj, {message_name}BaseModel)"
+                      f"_client_url, pydantic_obj_json, {message_name}BaseModel)"
         return output_str
 
     def handle_DELETE_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
@@ -103,18 +104,15 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         return output_str
 
     def _import_model_in_client_file(self) -> str:
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str = f"from {model_file_path} import *\n"
         return output_str
 
     def _handle_client_routes_url(self, message: protogen.Message, message_name_snake_cased: str) -> str:
         output_str = ""
-        options_list_of_dict = \
-            self.get_complex_option_values_as_list_of_dict(message,
-                                                           BaseFastapiPlugin.flux_msg_json_root)
-
-        # Since json_root option is of non-repeated type
-        option_dict = options_list_of_dict[0]
+        option_value_dict = \
+            self.get_complex_option_set_values(message,
+                                               BaseFastapiPlugin.flux_msg_json_root)
 
         crud_field_name_to_url_dict = {
             BaseFastapiPlugin.flux_json_root_create_field: f"self.create_{message_name_snake_cased}_client_url: "
@@ -151,7 +149,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                       + f"{self.proto_file_package}/get-all-{message_name_snake_cased}-ws'\n"
 
         for crud_option_field_name, url in crud_field_name_to_url_dict.items():
-            if crud_option_field_name in option_dict:
+            if crud_option_field_name in option_value_dict:
                 output_str += " " * 8 + f"{url}"
                 output_str += "\n"
             # else not required: Avoiding method creation if desc not provided in option
@@ -173,8 +171,24 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
         for aggregate_value in aggregate_value_list:
             query_name = aggregate_value[FastapiClientFileHandler.query_name_key]
-            url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
-                  f"{self.proto_file_package}/" + f"query-{query_name}'"
+            query_type = str(aggregate_value[FastapiClientFileHandler.query_type_key]).lower()[1:] \
+                if aggregate_value[FastapiClientFileHandler.query_type_key] is not None else None
+
+            if query_type is None or query_type == "http":
+                url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
+                      f"{self.proto_file_package}/" + f"query-{query_name}'"
+            elif query_type == "ws":
+                url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
+                      f"{self.proto_file_package}/" + f"ws-query-{query_name}'"
+            elif query_type == "both":
+                url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
+                      f"{self.proto_file_package}/" + f"query-{query_name}'\n"
+                url += f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
+                       f"{self.proto_file_package}/" + f"ws-query-{query_name}'"
+            else:
+                err_str = f"Unexpected query type {query_type} for web client code generation"
+                logging.exception(err_str)
+                raise Exception(err_str)
             output_str += " " * 8 + f"{url}\n"
         return output_str
 
@@ -190,44 +204,65 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
         return output_str
 
-    def _handle_client_query_methods(self, message: protogen.Message) -> str:
+    def _handle_client_http_query_output(self, message: protogen.Message, query_name: str, query_params: List[str],
+                                         params_str: str):
         message_name = message.proto.name
+        if query_params:
+            output_str = " " * 4 + f"def {query_name}_query_client(self, {params_str}) -> " \
+                                    f"List[{message_name}]:\n"
+            params_dict_str = \
+                ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
+            output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
+            output_str += " " * 4 + f"    return generic_http_query_client(self.query_{query_name}_url, " \
+                                    f"query_params_dict, {message_name}BaseModel)\n\n"
+        else:
+            output_str = " " * 4 + f"def {query_name}_query_client(self) -> " \
+                                    f"List[{message_name}]:\n"
+            output_str += " " * 4 + f"    return generic_http_query_client(self.query_{query_name}_url, " \
+                                    "{}, " + f"{message_name}BaseModel)\n\n"
+        return output_str
 
+    def _handle_client_ws_query_output(self, message: protogen.Message, query_name: str):
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = " " * 4 + f"async def {query_name}_ws_query_client(self, user_callable: Callable):\n"
+        output_str += " " * 4 + f"    await generic_ws_get_all_client(self.get_all_{message_name_snake_cased}" \
+                                f"_client_ws_url, {message_name}BaseModel, user_callable)\n\n"
+        return output_str
+
+    def _handle_client_query_methods(self, message: protogen.Message) -> str:
         output_str = ""
         aggregate_value_list = self.message_to_query_option_list_dict[message]
         for aggregate_value in aggregate_value_list:
             query_name = aggregate_value[FastapiClientFileHandler.query_name_key]
             query_params = aggregate_value[FastapiClientFileHandler.query_params_key]
             query_params_types = aggregate_value[FastapiClientFileHandler.query_params_data_types_key]
+            query_type = str(aggregate_value[FastapiClientFileHandler.query_type_key]).lower()[1:] \
+                if aggregate_value[FastapiClientFileHandler.query_type_key] is not None else None
 
             params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
                                     for aggregate_param, aggregate_params_type in zip(query_params,
                                                                                       query_params_types)])
 
-            if query_params:
-                output_str += " " * 4 + f"def {query_name}_query_client(self, {params_str}) -> " \
-                                        f"List[{message_name}]:\n"
-                params_dict_str = \
-                    ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
-                output_str += " " * 4 + "    query_params_dict = {"+f"{params_dict_str}"+"}\n"
-                output_str += " " * 4 + f"    return generic_http_query_client(self.query_{query_name}_url, " \
-                                        f"query_params_dict, {message_name}BaseModel)\n\n"
+            if query_type is None or query_type == "http":
+                output_str += self._handle_client_http_query_output(message, query_name, query_params, params_str)
+            elif query_type == "ws":
+                output_str += self._handle_client_ws_query_output(message, query_name)
+            elif query_type == "both":
+                output_str += self._handle_client_http_query_output(message, query_name, query_params, params_str)
+                output_str += self._handle_client_ws_query_output(message, query_name)
             else:
-                output_str += " " * 4 + f"def {query_name}_query_client(self) -> " \
-                                        f"List[{message_name}]:\n"
-                output_str += " " * 4 + f"    return generic_http_query_client(self.query_{query_name}_url, " \
-                                        "{}, "+f"{message_name}BaseModel)\n\n"
+                err_str = f"Unsupported Query type for query web client code generation {query_type}"
+                logging.exception(err_str)
+                raise Exception(err_str)
 
         return output_str
 
     def _handle_client_route_methods(self, message: protogen.Message) -> str:
         output_str = ""
-        options_list_of_dict = \
-            self.get_complex_option_values_as_list_of_dict(message,
-                                                           BaseFastapiPlugin.flux_msg_json_root)
-
-        # Since json_root option is of non-repeated type
-        option_dict = options_list_of_dict[0]
+        option_value_dict = \
+            self.get_complex_option_set_values(message,
+                                               BaseFastapiPlugin.flux_msg_json_root)
 
         crud_field_name_to_method_call_dict = {
             BaseFastapiPlugin.flux_json_root_create_field: self.handle_POST_client_gen,
@@ -244,7 +279,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         id_field_type: str = self._get_msg_id_field_type(message)
 
         for crud_option_field_name, crud_operation_method in crud_field_name_to_method_call_dict.items():
-            if crud_option_field_name in option_dict:
+            if crud_option_field_name in option_value_dict:
                 output_str += crud_operation_method(message, id_field_type)
                 output_str += "\n\n"
             # else not required: Avoiding method creation if desc not provided in option

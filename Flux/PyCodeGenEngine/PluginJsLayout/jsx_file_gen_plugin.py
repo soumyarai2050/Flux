@@ -36,13 +36,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.insertion_point_key_to_callable_list: List[Callable] = [
-            self.handle_jsx_file_convert
-        ]
         self.root_message: protogen.Message | None = None
         self.abbreviated_dependent_message_name: str | None = None
-        # Since output file name for this plugin will be created at runtime
-        self.output_file_name_suffix: str = ""
 
     def handle_import_output(self, message: protogen.Message, layout_type: str) -> str:
         output_str = "/* react and third-party library imports */\n"
@@ -68,12 +63,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"    getAll{message_name}, create{message_name}, update{message_name},\n"
             output_str += f"    set{message_name}ArrayWs, set{message_name}Ws, setModified{message_name}, " \
                           f"setSelected{message_name}Id, resetError,\n"
-            output_str += "    setUserChanges, setDiscardedChanges, setOpenWsPopup\n"
+            output_str += "    setUserChanges, setDiscardedChanges, setActiveChanges, setOpenWsPopup\n"
         elif layout_type == JsxFileGenPlugin.non_root_type or \
                 layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
             message_name = self.root_message.proto.name
             output_str += f"    setModified{message_name}, resetError,\n"
-            output_str += "    setUserChanges, setOpenConfirmSavePopup\n"
+            output_str += "    setUserChanges, setActiveChanges, setOpenConfirmSavePopup, setFormValidationWithCallback, setOpenFormValidationPopup\n"
         else:
             output_str += f"    getAll{message_name}, update{message_name},\n"
             output_str += f"    set{message_name}ArrayWs, set{message_name}Ws, setModified{message_name}, " \
@@ -84,12 +79,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             dependent_message_name = self.abbreviated_dependent_message_name
             dependent_message_name_camel_cased = convert_to_camel_case(dependent_message_name)
             output_str += "import {\n"
-            output_str += f"    create{dependent_message_name}, update{dependent_message_name},\n"
+            output_str += f"    getAll{dependent_message_name}, create{dependent_message_name}, " \
+                          f"update{dependent_message_name},\n"
             output_str += f"    set{dependent_message_name}Array, set{dependent_message_name}ArrayWs," \
                           f"setModified{dependent_message_name}, setSelected{dependent_message_name}Id,\n"
-            output_str += "    setUserChanges, setDiscardedChanges, setOpenWsPopup,\n"
+            output_str += "    setUserChanges, setDiscardedChanges, setActiveChanges, setOpenWsPopup,\n"
             output_str += f"    setMode, setCreateMode, setOpenConfirmSavePopup, set{dependent_message_name}, " \
-                          f"reset{dependent_message_name}, resetSelected{dependent_message_name}Id\n"
+                          f"reset{dependent_message_name}, resetSelected{dependent_message_name}Id, setFormValidation, setOpenFormValidationPopup\n"
             output_str += "}" + f" from '../features/{dependent_message_name_camel_cased}Slice';\n"
         if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
             output_str += "import {\n"
@@ -112,15 +108,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "    addxpath, getTableColumns, getTableRows, getCommonKeyCollections, applyFilter\n"
         elif layout_type == JsxFileGenPlugin.root_type:
-            output_str += "    generateObjectFromSchema, addxpath, clearxpath, getObjectWithLeastId, " \
-                          "generateRowTrees, createObjectFromDict,\n"
-            output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, getXpathKeyValuePairFromObject\n"
+            output_str += "    generateObjectFromSchema, addxpath, clearxpath, getObjectWithLeastId,\n"
+            output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, compareJSONObjects\n"
         elif layout_type == JsxFileGenPlugin.non_root_type or \
                 layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-            output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, lowerFirstLetter\n"
+            output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, lowerFirstLetter, clearxpath, " \
+                          "compareJSONObjects\n"
         else:
             output_str += "    generateObjectFromSchema, addxpath, clearxpath, getObjectWithLeastId, " \
-                          "createObjectFromDict,\n"
+                          "compareJSONObjects,\n"
             output_str += "    getNewItem, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId, createCollections\n"
         output_str += "} from '../utils';\n"
         if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
@@ -138,7 +134,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "import { Icon } from '../components/Icon';\n"
         if layout_type != JsxFileGenPlugin.non_root_type and layout_type != JsxFileGenPlugin.abbreviated_dependent_type:
-            output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup } from '../components/Popup';\n"
+            output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation } from '../components/Popup';\n"
         output_str += "\n\n"
         return output_str
 
@@ -237,6 +233,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    enableOverride={props.enableOverride}\n"
         output_str += "                    disableOverride={props.disableOverride}\n"
         output_str += "                    onOverrideChange={props.onOverrideChange}\n"
+        output_str += "                    onFormUpdate={onFormUpdate}\n"
         output_str += "                />\n"
         output_str += "            ) : props.layout === Layouts.TREE_LAYOUT ? (\n"
         output_str += "                <TreeWidget\n"
@@ -286,17 +283,26 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                    xpath={currentSchemaXpath}\n"
         output_str += "                    onUserChange={onUserChange}\n"
         output_str += "                    onButtonToggle={onButtonToggle}\n"
+        output_str += "                    onFormUpdate={onFormUpdate}\n"
         output_str += "                />\n"
         output_str += "            ) : (\n"
         output_str += "                <h1>Unsupported Layout</h1>\n"
         output_str += "            )}\n"
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type or \
                 layout_type == JsxFileGenPlugin.repeated_non_root_type:
+            output_str += "            <FormValidation\n"
+            output_str += "                title={title}\n"
+            output_str += "                open={openFormValidationPopup}\n"
+            output_str += "                onClose={onCloseFormValidationPopup}\n"
+            output_str += "                onContinue={onContinueFormEdit}\n"
+            output_str += "                src={formValidation}\n"
+            output_str += "            />\n"
             output_str += "            <ConfirmSavePopup\n"
+            output_str += "                title={title}\n"
             output_str += "                open={openConfirmSavePopup}\n"
             output_str += "                onClose={onCloseConfirmPopup}\n"
             output_str += "                onSave={onConfirmSave}\n"
-            output_str += "                src={userChanges}\n"
+            output_str += "                src={activeChanges}\n"
             output_str += "            />\n"
             output_str += "            <WebsocketUpdatePopup\n"
             output_str += "                title={title}\n"
@@ -314,41 +320,45 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str = ""
         match layout_type:
             case JsxFileGenPlugin.repeated_root_type:
-                output_str += "    /* global states from redux store */\n"
+                output_str += "    /* states from redux store */\n"
                 output_str += "    const {\n"
-                output_str += f"        {message_name_camel_cased}, userChanges, discardedChanges, openWsPopup," \
+                output_str += f"        {message_name_camel_cased}, activeChanges, discardedChanges, openWsPopup," \
                               " loading, error\n"
                 output_str += "    } = useSelector(state => " + f"state.{message_name_camel_cased});\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    /* local react states */\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
-                output_str += "    const [openConfirmSavePopup,] = useState(false);\n"
+                output_str += "    const [formValidation, setFormValidation] = useState({});\n"
+                output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
+                output_str += "    const [openFormValidationPopup, setOpenFormValidationPopup] = useState(false);\n"
                 output_str += "    const [filter, setFilter] = useState({});\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
             case JsxFileGenPlugin.root_type:
-                output_str += "    /* global states from redux store */\n"
+                output_str += "    /* states from redux store */\n"
                 output_str += "    const {\n"
                 output_str += f"        {message_name_camel_cased}Array, {message_name_camel_cased}, " \
                               f"modified{message_name}, selected{message_name}Id,\n"
-                output_str += "        userChanges, discardedChanges, openWsPopup, loading, error\n"
+                output_str += "        userChanges, discardedChanges, activeChanges, openWsPopup, loading, error\n"
                 output_str += "    } = useSelector(state => " + f"state.{message_name_camel_cased});\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    /* local react states */\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
+                output_str += "    const [formValidation, setFormValidation] = useState({});\n"
                 output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
+                output_str += "    const [openFormValidationPopup, setOpenFormValidationPopup] = useState(false);\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
                 output_str += "    const getWsDict = useRef({});\n"
             case JsxFileGenPlugin.non_root_type | JsxFileGenPlugin.abbreviated_dependent_type:
                 message_name = self.root_message.proto.name
                 message_name_camel_cased = convert_to_camel_case(message_name)
-                output_str += "    /* global states from redux store */\n"
+                output_str += "    /* states from redux store */\n"
                 output_str += "    const {\n"
                 output_str += f"        {message_name_camel_cased}, modified{message_name}, selected{message_name}Id,\n"
-                output_str += "        userChanges, loading, error, mode\n"
+                output_str += "        userChanges, loading, error, mode, formValidation\n"
                 output_str += "    } = useSelector(state => " + f"state.{message_name_camel_cased});\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
             case JsxFileGenPlugin.simple_abbreviated_type | JsxFileGenPlugin.parent_abbreviated_type:
-                output_str += "    /* global states from redux store */\n"
+                output_str += "    /* states from redux store */\n"
                 output_str += "    const {\n"
                 output_str += f"        {message_name_camel_cased}Array, {message_name_camel_cased}, " \
                               f"modified{message_name}, selected{message_name}Id,\n"
@@ -359,8 +369,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const {\n"
                 output_str += f"        {dependent_message_camel_cased}Array, {dependent_message_camel_cased}, " \
                               f"modified{dependent_message}, selected{dependent_message}Id,\n"
-                output_str += "        userChanges, discardedChanges, openWsPopup, mode, createMode, " \
-                              "openConfirmSavePopup\n"
+                output_str += "        userChanges, discardedChanges, activeChanges, openWsPopup, mode, createMode, " \
+                              "openConfirmSavePopup, formValidation, openFormValidationPopup\n"
                 output_str += "    } = useSelector(state => " + f"state.{dependent_message_camel_cased});\n"
                 output_str += "    const { schema, schemaCollections } = useSelector((state) => state.schema);\n"
                 output_str += "    /* local react states */\n"
@@ -453,6 +463,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    setActiveItems={setActive" + f"{dependent_msg_name}List" + "}\n"
         output_str += "                    setOldActiveItems={setOldActive" + f"{dependent_msg_name}List" + "}\n"
         output_str += "                    selected={selected" + f"{dependent_msg_name}" + "Id}\n"
+        output_str += "                    setSelectedItem={setSelectedItem}\n"
         output_str += "                    onSelect={onSelect}\n"
         output_str += "                    onUnload={onUnload}\n"
         output_str += "                    abbreviated={abbreviated}\n"
@@ -467,14 +478,22 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onButtonToggle={onButtonToggle}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
+        output_str += "            <FormValidation\n"
+        output_str += "                title={dependentSchema.title}\n"
+        output_str += "                open={openFormValidationPopup}\n"
+        output_str += "                onClose={onCloseFormValidationPopup}\n"
+        output_str += "                onContinue={onContinueFormEdit}\n"
+        output_str += "                src={formValidation}\n"
+        output_str += "            />\n"
         output_str += "            <ConfirmSavePopup\n"
+        output_str += "                title={dependentSchema.title}\n"
         output_str += "                open={openConfirmSavePopup}\n"
         output_str += "                onClose={onCloseConfirmPopup}\n"
         output_str += "                onSave={onConfirmSave}\n"
-        output_str += "                src={userChanges}\n"
+        output_str += "                src={activeChanges}\n"
         output_str += "            />\n"
         output_str += "            <WebsocketUpdatePopup\n"
-        output_str += "                title={title}\n"
+        output_str += "                title={dependentSchema.title}\n"
         output_str += "                open={openWsPopup}\n"
         output_str += "                onClose={onClosePopup}\n"
         output_str += "                src={discardedChanges}\n"
@@ -562,6 +581,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    useEffect(() => {\n"
             output_str += "        /* fetch all objects. to be triggered only once when the component loads */\n"
             output_str += f"        dispatch(getAll{message_name}());\n"
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.abbreviated_dependent_type]:
+                dependent_message = self.abbreviated_dependent_message_name
+                output_str += f"        dispatch(getAll{dependent_message}());\n"
             output_str += "    }, []);\n\n"
 
         if layout_type == JsxFileGenPlugin.root_type or \
@@ -603,11 +625,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_message_camel_cased = convert_to_camel_case(dependent_message)
                 output_str += f"        let loadedKeys = _.get({message_name_camel_cased}, loadedKeyName);\n"
                 output_str += "        if (loadedKeys) {\n"
-                output_str += "            let loadedIds = loadedKeys.map(key => getIdFromAbbreviatedKey(abbreviated, " \
-                              "key));\n"
-                output_str += f"            let updatedArray = {dependent_message_camel_cased}Array.filter(strat => " \
-                              "loadedIds.includes(strat[DB_ID]));\n"
-                output_str += f"            dispatch(set{dependent_message}Array(updatedArray));\n"
                 output_str += "            if (loadedKeys.length > 0) {\n"
                 output_str += "                let id = getIdFromAbbreviatedKey(abbreviated, loadedKeys[0]);\n"
                 output_str += f"                dispatch(setSelected{dependent_message}Id(id));\n"
@@ -839,6 +856,30 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "         * if user local changes is present, open confirm save dialog for confirmation,\n"
             output_str += "         * otherwise call confirmSave to reset states\n"
             output_str += "        */\n"
+            output_str += "        if (_.keys(formValidation).length > 0) {\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += "            setOpenFormValidationPopup(true);\n"
+            else:
+                output_str += "            dispatch(setOpenFormValidationPopup(true));\n"
+            output_str += "            return;\n"
+            output_str += "        }\n"
+            if layout_type == JsxFileGenPlugin.root_type or \
+                    layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+                output_str += "        let differences = {};\n"
+                output_str += "        if (e) {\n"
+                if layout_type == JsxFileGenPlugin.root_type:
+                    output_str += f"            let modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+                    output_str += f"            differences = compareJSONObjects({message_name_camel_cased}, " \
+                                  f"modifiedObj);\n"
+                else:
+                    output_str += f"            let modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
+                    output_str += "            if (createMode) {\n"
+                    output_str += "                delete modifiedObj[DB_ID];\n"
+                    output_str += "            }\n"
+                    output_str += f"            differences = compareJSONObjects({dependent_message_camel_cased}, " \
+                                  f"modifiedObj);\n"
+                output_str += "            dispatch(setActiveChanges(differences));\n"
+                output_str += "        }\n"
             output_str += "        if (e === null && openPopup) {\n"
             if layout_type == JsxFileGenPlugin.root_type or \
                     layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
@@ -850,7 +891,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             if layout_type == JsxFileGenPlugin.root_type or \
                     layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
 
-                output_str += "        if (_.keys(userChanges).length > 0) {\n"
+                output_str += "        if (_.keys(differences).length > 0) {\n"
                 if layout_type == JsxFileGenPlugin.root_type:
                     output_str += "            setOpenConfirmSavePopup(true);\n"
                 else:
@@ -875,8 +916,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    }\n\n"
 
             output_str += "    const onButtonToggle = (e, xpath, value) => {\n"
-            output_str += "        dispatch(setUserChanges({\n"
-            output_str += "            ...userChanges,\n"
+            output_str += "        let xpathDict = {\n"
             if layout_type == JsxFileGenPlugin.non_root_type:
                 output_str += f"            [DB_ID]: selected{root_message_name}Id,\n"
             elif layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -884,7 +924,23 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += f"            [DB_ID]: selected{message_name}Id,\n"
             output_str += "            [xpath]: value\n"
-            output_str += "        }));\n"
+            output_str += "        };\n"
+            if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
+            elif layout_type == JsxFileGenPlugin.non_root_type:
+                output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{root_message_name}));\n"
+            else:
+                output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
+            output_str += "        _.keys(xpathDict).forEach(xpath => {\n"
+            output_str += "            _.set(modifiedObj, xpath, xpathDict[xpath]);\n"
+            output_str += "        })\n"
+            if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += f"        let differences = compareJSONObjects({message_name_camel_cased}, modifiedObj);\n"
+            elif layout_type == JsxFileGenPlugin.non_root_type:
+                output_str += f"        let differences = compareJSONObjects({root_message_name_camel_cased}, modifiedObj);\n"
+            else:
+                output_str += f"        let differences = compareJSONObjects({dependent_message_camel_cased}, modifiedObj);\n"
+            output_str += "        dispatch(setActiveChanges(differences));\n"
             if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += f"        if ({message_name_camel_cased}[DB_ID]) " + "{\n"
             elif layout_type == JsxFileGenPlugin.non_root_type:
@@ -911,6 +967,20 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             else:
                 output_str += "        dispatch(setOpenConfirmSavePopup(false));\n"
             output_str += "    }\n\n"
+            output_str += "    const onCloseFormValidationPopup = (e, reason) => {\n"
+            output_str += "        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;\n"
+            output_str += "        onReload();\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += "        setOpenFormValidationPopup(false);\n"
+            else:
+                output_str += "        dispatch(setOpenFormValidationPopup(false));\n"
+            output_str += "    }\n\n"
+            output_str += "    const onContinueFormEdit = () => {\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += "        setOpenFormValidationPopup(false);\n"
+            else:
+                output_str += "        dispatch(setOpenFormValidationPopup(false));\n"
+            output_str += "    }\n\n"
 
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "    const onSave = () => { }\n\n"
@@ -924,6 +994,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onClosePopup = () => { }\n\n"
             output_str += "    const onCloseConfirmPopup = () => { }\n\n"
             output_str += "    const onUserChange = () => { }\n\n"
+            output_str += "    const onCloseFormValidationPopup = () => { }\n\n"
+            output_str += "    const onContinueFormEdit = () => { }\n\n"
+            output_str += "    const onFormUpdate = () => { }\n\n"
+
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str += "    const onReload = () => {\n"
             output_str += f"        if (selected{message_name}Id) " + "{\n"
@@ -932,6 +1006,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        } else {\n"
             output_str += f"            dispatch(getAll{message_name}());\n"
             output_str += "        }\n"
+            output_str += "        dispatch(setActiveChanges({}));\n"
             output_str += "        dispatch(setUserChanges({}));\n"
             output_str += "        dispatch(setDiscardedChanges({}));\n"
             output_str += "        setMode(Modes.READ_MODE);\n"
@@ -940,26 +1015,21 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        let updatedObj = generateObjectFromSchema(schema, _.get(schema, props.name));\n"
             output_str += "        updatedObj = addxpath(updatedObj);\n"
             output_str += f"        dispatch(setModified{message_name}(updatedObj));\n"
-            output_str += "        let changesDict = getXpathKeyValuePairFromObject(updatedObj);\n"
-            output_str += "        dispatch(setUserChanges(changesDict));\n"
             output_str += "        setMode(Modes.EDIT_MODE);\n"
             output_str += "    }\n\n"
             output_str += "    const onConfirmSave = () => {\n"
             output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{message_name}));\n"
             output_str += f"        if (!_.isEqual({message_name_camel_cased}, modifiedObj)) " + "{\n"
             output_str += f"            if (_.get({message_name_camel_cased}, DB_ID)) " + "{\n"
-            output_str += f"                let updatedObj = createObjectFromDict({message_name_camel_cased}, " \
-                          "userChanges);\n"
-            output_str += f"                dispatch(update{message_name}(updatedObj));\n"
+            output_str += f"                dispatch(update{message_name}(activeChanges));\n"
             output_str += "            } else {\n"
-            output_str += f"                dispatch(create{message_name}(modifiedObj));\n"
+            output_str += f"                dispatch(create{message_name}(activeChanges));\n"
             output_str += "            }\n"
-            output_str += "        } else if (_.keys(userChanges).length > 0) {\n"
-            output_str += f"            let updatedObj = createObjectFromDict({message_name_camel_cased}, " \
-                          "userChanges);\n"
-            output_str += f"            dispatch(update{message_name}(updatedObj));\n"
+            output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
+            output_str += f"            dispatch(update{message_name}(activeChanges));\n"
             output_str += "        }\n"
             output_str += "        /* reset states */\n"
+            output_str += "        dispatch(setActiveChanges({}));\n"
             output_str += "        dispatch(setUserChanges({}));\n"
             output_str += "        dispatch(setDiscardedChanges({}));\n"
             output_str += "        setMode(Modes.READ_MODE);\n"
@@ -974,6 +1044,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        } else {\n"
             output_str += f"            dispatch(getAll{message_name}());\n"
             output_str += "        }\n"
+            output_str += "        dispatch(setActiveChanges({}));\n"
             output_str += "        dispatch(setUserChanges({}));\n"
             output_str += "        dispatch(setDiscardedChanges({}));\n"
             output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
@@ -1003,23 +1074,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"
             output_str += "        if (createMode) {\n"
             output_str += "            dispatch(setCreateMode(false));\n"
-            output_str += "            delete modifiedObj[DB_ID];\n"
             output_str += "        }\n"
             output_str += f"        if (!_.isEqual({dependent_message_camel_cased}, modifiedObj)) " + "{\n"
             output_str += f"            if (_.get({dependent_message_camel_cased}, DB_ID)) " + "{\n"
-            output_str += f"                let updatedObj = createObjectFromDict({dependent_message_camel_cased}, " \
-                          "userChanges);\n"
-            output_str += f"                dispatch(update{dependent_message}(updatedObj));\n"
+            output_str += f"                dispatch(update{dependent_message}(activeChanges));\n"
             output_str += "            } else {\n"
             output_str += f"                dispatch(create{dependent_message}(" \
-                          "{ data: modifiedObj, abbreviated, loadedKeyName }));\n"
+                          "{ data: activeChanges, abbreviated, loadedKeyName }));\n"
             output_str += "            }\n"
-            output_str += "        } else if (_.keys(userChanges).length > 0) {\n"
-            output_str += f"            let updatedObj = createObjectFromDict({dependent_message_camel_cased}, " \
-                          "userChanges);\n"
-            output_str += f"            dispatch(update{dependent_message}(updatedObj));\n"
+            output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
+            output_str += f"            dispatch(update{dependent_message}(activeChanges));\n"
             output_str += "        }\n"
             output_str += "        /* reset states */\n"
+            output_str += "        dispatch(setActiveChanges({}));\n"
             output_str += "        dispatch(setUserChanges({}));\n"
             output_str += "        dispatch(setDiscardedChanges({}));\n"
             output_str += "        dispatch(setMode(Modes.READ_MODE));\n"
@@ -1065,47 +1132,47 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_abb_msg = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
                 output_str += f"        setSelected{dependent_abb_msg}Id(id);\n"
             output_str += "    }\n\n"
+            output_str += "    const setSelectedItem = (id) => {\n"
+            output_str += "        if (id === null) {\n"
+            output_str += f"            dispatch(resetSelected{dependent_message}Id());\n"
+            output_str += "        } else {\n"
+            output_str += f"            dispatch(setSelected{dependent_message}Id(id));\n"
+            output_str += "        }\n"
+            output_str += "    }\n\n"
 
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type or \
                 layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-            output_str += "    const onUserChange = (xpath, value, deleted = false, keyValueDict) => {\n"
+            output_str += "    const onUserChange = (xpath, value) => {\n"
             output_str += "        let updatedData = cloneDeep(userChanges);\n"
-            output_str += "        if (deleted && keyValueDict) {\n"
-            if layout_type == JsxFileGenPlugin.non_root_type:
-                output_str += f"            updatedData[DB_ID] = selected{root_message_name}Id;\n"
-            elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-                output_str += f"            updatedData[DB_ID] = selected{message_name}Id;\n"
-            output_str += "            if (updatedData.deleted) {\n"
-            output_str += "                updatedData.deleted = { ...updatedData.deleted, ...keyValueDict };\n"
-            output_str += "            } else {\n"
-            output_str += "                updatedData.deleted = keyValueDict;\n"
-            output_str += "            }\n"
-            output_str += "        } else {\n"
-            output_str += "            if (keyValueDict) {\n"
-            if layout_type == JsxFileGenPlugin.root_type:
-                output_str += "                updatedData = { ...updatedData, ...keyValueDict };\n"
-            elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-                output_str += "                updatedData = { ...updatedData, ...keyValueDict, [DB_ID]: " \
-                              f"selected{message_name}Id " + "};\n"
-            else:
-                output_str += "                updatedData = { ...updatedData, ...keyValueDict, [DB_ID]: " \
-                              f"selected{root_message_name}Id " + "};\n"
-            output_str += "            } else {\n"
             if layout_type == self.root_type:
-                output_str += "                updatedData = { ...updatedData, [xpath]: value };\n"
-                output_str += "            }\n"
-                output_str += "        }\n"
-                output_str += "        dispatch(setUserChanges(updatedData));\n"
+                output_str += "        updatedData = { ...updatedData, [xpath]: value };\n"
             else:
                 if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-                    output_str += "                updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
+                    output_str += "        updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
                                   f"selected{message_name}Id " + "};\n"
                 else:
-                    output_str += "                updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
+                    output_str += "        updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
                                   f"selected{root_message_name}Id " + "};\n"
-                output_str += "            }\n"
-                output_str += "        }\n"
-                output_str += "        dispatch(setUserChanges(updatedData));\n"
+            output_str += "        dispatch(setUserChanges(updatedData));\n"
+            output_str += "    }\n\n"
+            output_str += "    const onFormUpdate = (xpath, value) => {\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += "        setFormValidation((prevState) => {\n"
+            else:
+                output_str += "        dispatch(setFormValidationWithCallback((prevState) => {\n"
+            output_str += "            let updatedData = cloneDeep(prevState);\n"
+            output_str += "            if (value) {\n"
+            output_str += "                updatedData = { ...updatedData, [xpath]: value };\n"
+            output_str += "            } else {\n"
+            output_str += "                if (xpath in updatedData) {\n"
+            output_str += "                    delete updatedData[xpath];\n"
+            output_str += "                }\n"
+            output_str += "            }\n"
+            output_str += "            return updatedData;\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += "        });\n"
+            else:
+                output_str += "        }));\n"
             output_str += "    }\n\n"
 
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -1116,7 +1183,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
         return output_str
 
-    def handle_jsx_file_convert(self, file: protogen.File) -> Dict[str, str]:
+    def output_file_generate_handler(self, file: protogen.File):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
         output_dict: Dict[str, str] = {}

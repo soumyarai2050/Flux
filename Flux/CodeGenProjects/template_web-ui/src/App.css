@@ -70,3 +70,7 @@ code {
     opacity: 1
   }
 }
+
+.react-json-view .copy-to-clipboard-container {
+  display: inline-block !important;
+}

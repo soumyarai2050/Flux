@@ -27,17 +27,10 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.insertion_point_key_to_callable_list: List[Callable] = [
-            self.__json_sample_gen_handler
-        ]
-        response_field_case_style = None
-        if (output_file_name_suffix := os.getenv("OUTPUT_FILE_NAME_SUFFIX")) is not None and \
-                (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
-            self.output_file_name_suffix = output_file_name_suffix
+        if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
             self.__response_field_case_style: str = response_field_case_style
         else:
-            err_str = f"Env var 'OUTPUT_FILE_NAME_SUFFIX' and 'RESPONSE_FIELD_CASE_STYLE' " \
-                      f"received as {output_file_name_suffix} and {response_field_case_style}"
+            err_str = f"Env var 'RESPONSE_FIELD_CASE_STYLE' received as {response_field_case_style}"
             logging.exception(err_str)
             raise Exception(err_str)
         self.__auto_complete_data_cache: List[Tuple[protogen.Field, str]] = []
@@ -249,7 +242,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
             # else not required: If option_field is last in option_fields then avoiding comma
         return new_option_value
 
-    def __json_sample_gen_handler(self, file: protogen.File) -> str:
+    def output_file_generate_handler(self, file: protogen.File):
         self.__load_root_json_msg(file)
         self.auto_complete_data = self.__load_auto_complete_json()
         if self.__response_field_case_style.lower() == "snake":
@@ -269,7 +262,11 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
         json_sample_output += "}"
 
-        return json_sample_output
+        proto_file_name = str(file.proto.name).split(".")[0]
+        output_file_name = f"{proto_file_name}_json_sample.json"
+        return {
+            output_file_name: json_sample_output
+        }
 
 
 if __name__ == "__main__":

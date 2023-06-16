@@ -16,7 +16,8 @@ const complexFieldProps = [
     { propertyName: "ui_update_only", usageName: "uiUpdateOnly" },
     { propertyName: "orm_no_update", usageName: "ormNoUpdate" },
     { propertyName: "auto_complete", usageName: "autocomplete" },
-    { propertyName: "elaborate_title", usageName: "elaborateTitle" }
+    { propertyName: "elaborate_title", usageName: "elaborateTitle" },
+    { propertyName: "filter_enable", usageName: "filterEnable" },
 ]
 
 const fieldProps = [
@@ -42,7 +43,6 @@ const fieldProps = [
     { propertyName: "progress_bar", usageName: "progressBar" },
     { propertyName: "elaborate_title", usageName: "elaborateTitle" },
     { propertyName: "name_color", usageName: "nameColor" },
-    { propertyName: "filter_enable", usageName: "filterEnable" },
     { propertyName: "number_format", usageName: "numberFormat" },
     { propertyName: "no_common_key", usageName: "noCommonKey" },
     { propertyName: "display_type", usageName: "displayType" },
@@ -117,6 +117,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
             collection.xpath = xpath ? xpath + '.' + k : k;
+            collection.required = currentSchema.required.filter(p => p === k).length > 0 ? true : false;
             let parentxpath = xpath ? xpath !== callerProps.parent ? xpath : null : null;
             if (parentxpath) {
                 if (callerProps.parent) {
@@ -406,28 +407,19 @@ export function getDataxpath(data, xpath) {
 
 function compareNodes(originalData, data, dataxpath, propname, xpath) {
     let object = {};
+    let current = data[propname];
+    let original = originalData[propname];
     if (dataxpath || xpath) {
-        let current = hasxpath(data, dataxpath) ? _.get(data, dataxpath)[propname] : undefined;
-        let original = hasxpath(originalData, xpath) ? _.get(originalData, xpath)[propname] : undefined;
-        if (current !== undefined && original !== undefined && (current !== original)) {
-            object['data-modified'] = true;
-        } else if (current !== undefined && original === undefined) {
-            object['data-add'] = true;
-        } else if (current === undefined && original !== undefined) {
-            object['data-remove'] = true;
-            object.value = original;
-        }
-    } else {
-        let current = data[propname];
-        let original = originalData[propname];
-        if (current !== undefined && original !== undefined && (current !== original)) {
-            object['data-modified'] = true;
-        } else if (current !== undefined && original === undefined) {
-            object['data-add'] = true;
-        } else if (current === undefined && original !== undefined) {
-            object['data-remove'] = true;
-            object.value = original;
-        }
+        current = hasxpath(data, dataxpath) ? _.get(data, dataxpath)[propname] : undefined;
+        original = hasxpath(originalData, xpath) ? _.get(originalData, xpath)[propname] : undefined;
+    }
+    if (current !== undefined && original !== undefined && (current !== original)) {
+        object['data-modified'] = true;
+    } else if (current !== undefined && original === undefined) {
+        object['data-add'] = true;
+    } else if (current === undefined && original !== undefined) {
+        object['data-remove'] = true;
+        object.value = original;
     }
     return object;
 }
@@ -450,6 +442,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
         node.parentcollection = currentSchema.title;
         node.customComponent = Node;
         node.onTextChange = callerProps.onTextChange;
+        node.onFormUpdate = callerProps.onFormUpdate;
         node.mode = callerProps.mode;
         node.showDataType = callerProps.showDataType;
 
@@ -606,9 +599,9 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
         let metadata = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
         metadata = cloneDeep(metadata);
 
-        if (currentSchema.hasOwnProperty('required') && currentSchema.required.length === 0) {
-            metadata.required = [];
-        }
+        // if (currentSchema.hasOwnProperty('required') && currentSchema.required.length === 0) {
+        //     metadata.required = [];
+        // }
 
         if (currentSchema.hasOwnProperty('orm_no_update') || metadata.hasOwnProperty('orm_no_update')) {
             metadata.orm_no_update = metadata.no_orm_update ? metadata.no_orm_update : currentSchema.orm_no_update;
@@ -1215,7 +1208,7 @@ export function hasxpath(data, xpath) {
     if (_.get(data, xpath)) return true;
     else {
         let value = _.get(data, xpath);
-        if (value === 0 || value === false || value === '') return true;
+        if (value === 0 || value === false || value === '' || value === null) return true;
     }
     return false;
 }
@@ -1525,12 +1518,15 @@ export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
 }
 
 export function applyFilter(arr, filter) {
-    let updatedArr = cloneDeep(arr);
-    Object.keys(filter).forEach(key => {
-        let values = filter[key].split(",").map(val => val.trim()).filter(val => val !== "");
-        updatedArr = updatedArr.filter(data => values.includes(_.get(data, key)));
-    })
-    return updatedArr;
+    if (arr && arr.length > 0) {
+        let updatedArr = cloneDeep(arr);
+        Object.keys(filter).forEach(key => {
+            let values = filter[key].split(",").map(val => val.trim()).filter(val => val !== "");
+            updatedArr = updatedArr.filter(data => values.includes(_.get(data, key)));
+        })
+        return updatedArr;
+    }
+    return [];
 }
 
 export function floatToInt(number) {
@@ -1611,4 +1607,102 @@ function mergeArrays(arr1, arr2) {
     }
 
     return mergedArr;
+}
+
+export function compareJSONObjects(obj1, obj2) {
+    const differences = getJSONDifferences(obj1, obj2);
+    if (_.keys(differences).length > 0) {
+        if (DB_ID in obj1) {
+            differences[DB_ID] = obj1[DB_ID];
+        }
+    }
+    return differences;
+}
+
+function getJSONDifferences(obj1, obj2) {
+    const differences = {};
+
+    function compareNestedArrays(arr1, arr2, parentKey) {
+        const arrDifferences = [];
+
+        arr1.forEach(element1 => {
+            let found = false;
+
+            if (element1 instanceof Object && DB_ID in element1) {
+                found = arr2.some(element2 => element2 instanceof Object && DB_ID in element2 && element2[DB_ID] === element1[DB_ID]);
+            }
+
+            if (!found) {
+                arrDifferences.push({ [DB_ID]: element1[DB_ID] });
+            } else {
+                let element2 = arr2.find(element2 => element2 instanceof Object && DB_ID in element2 && element2[DB_ID] === element1[DB_ID]);
+                let nestedDifferences = compareJSONObjects(element1, element2);
+                if (Object.keys(nestedDifferences).length > 0) {
+                    arrDifferences.push({ [DB_ID]: element1[DB_ID], ...nestedDifferences });
+                }
+            }
+        });
+
+        arr2.forEach(element2 => {
+            if (element2 instanceof Object && !(DB_ID in element2)) {
+                arrDifferences.push(element2);
+            }
+        })
+
+        return arrDifferences;
+    }
+
+    for (const key in obj1) {
+        if (obj1.hasOwnProperty(key) && obj2.hasOwnProperty(key)) {
+            if (Array.isArray(obj1[key]) && Array.isArray(obj2[key])) {
+                const nestedDifferences = compareNestedArrays(obj1[key], obj2[key], key);
+                if (nestedDifferences.length > 0) {
+                    differences[key] = nestedDifferences;
+                }
+            } else if (typeof obj1[key] === DataTypes.OBJECT && typeof obj2[key] === DataTypes.OBJECT) {
+                const nestedDifferences = compareJSONObjects(obj1[key], obj2[key]);
+                if (Object.keys(nestedDifferences).length > 0) {
+                    differences[key] = nestedDifferences;
+                }
+            } else if (obj1[key] !== obj2[key]) {
+                differences[key] = obj2[key];
+            }
+        }
+    }
+
+    for (const key in obj2) {
+        if (obj2.hasOwnProperty(key) && !obj1.hasOwnProperty(key)) {
+            if (!differences.hasOwnProperty(key)) {
+                differences[key] = obj2[key];
+            }
+        }
+    }
+    return differences;
+}
+
+export function validateConstraints(collection, value, min, max) {
+    if (collection.serverPopulate) {
+        return null;
+    }
+    if (value === '') {
+        value = null;
+    }
+    const errors = [];
+    if (collection.required && (value === null || value === undefined)) {
+        errors.push("required field cannot be None");
+    }
+    if (collection.type === DataTypes.ENUM && value && value.includes('UNSPECIFIED')) {
+        errors.push('enum field cannot be UNSPECIFIED');
+    }
+    if (min) {
+        if (value && value < min) {
+            errors.push("field value is less than min value: " + min);
+        }
+    }
+    if (max) {
+        if (value && value > max) {
+            errors.push("field value is greater than max value: " + max);
+        }
+    }
+    return errors.length > 0 ? errors.join(", ") : null;
 }

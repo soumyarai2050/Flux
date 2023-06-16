@@ -80,7 +80,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         output_str = self._handle_field_cardinality(field)
         has_alias = False
         if (has_alias := self.is_option_enabled(field, BeanieModelPlugin.flux_fld_alias)) or \
-                field.location.leading_comments:
+                field.location.leading_comments or field.proto.default_value:
             output_str += f' = Field('
 
             if has_alias:
@@ -101,6 +101,11 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                 comments = ", ".join(leading_comments.split("\n"))
                 output_str += f'description="{comments}"'
             # else not required: If leading_comments are not present then avoiding text to be added
+
+            if field.proto.default_value:
+                if has_alias or leading_comments:
+                    output_str += ", "
+                output_str += f"default={BeanieModelPlugin.get_field_default_value(field)}"
 
             output_str += ')\n'
         else:

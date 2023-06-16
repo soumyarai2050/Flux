@@ -1,4 +1,5 @@
 import time
+import random
 import pytest
 from selenium import webdriver
 from selenium.common import NoSuchElementException
@@ -8,7 +9,7 @@ from selenium.webdriver.support import expected_conditions as EC  # noqa
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from pathlib import PurePath
-from typing import Final, Dict, Optional
+from typing import Final, Dict, Optional, List
 from enum import auto
 from fastapi_utils.enums import StrEnum
 
@@ -84,10 +85,10 @@ def pair_strat_edit() -> Dict:
 def strat_limits() -> Dict:
     strat_limits = {
         "max_open_orders_per_side": 4,
-        "max_cb_notional": 1000,
-        "max_open_cb_notional": 2000,
-        "max_net_filled_notional": 3000,
-        "max_concentration": 4,
+        "max_cb_notional": 500,
+        "max_open_cb_notional": 600,
+        "max_net_filled_notional": 700,
+        "max_concentration": 7,
         "limit_up_down_volume_participation_rate": 20,
         "cancel_rate": {
             "max_cancel_rate": 10,
@@ -144,8 +145,7 @@ def load_web_project(driver: WebDriver) -> None:
     assert kill_switch_btn.is_displayed(), "failed to load web project, kill switch button not found"
 
 
-def set_input_field(widget: WebElement, xpath: str, name: str, value: str,
-                    search_type: SearchType = SearchType.NAME,
+def set_input_field(widget: WebElement, xpath: str, name: str, value: str,search_type: SearchType = SearchType.NAME,
                     autocomplete: bool = False) -> None:
     if not hasattr(By, search_type):  # ..
         raise Exception(f"unsupported search type: {search_type}")  # ..
@@ -155,7 +155,6 @@ def set_input_field(widget: WebElement, xpath: str, name: str, value: str,
     input_element.click()
     input_element.send_keys(Keys.CONTROL + "a")
     input_element.send_keys(Keys.BACK_SPACE)
-    # set input field
     input_element.send_keys(value)
     if autocomplete:
         input_element.send_keys(Keys.ARROW_DOWN + Keys.ENTER)
@@ -180,7 +179,7 @@ def set_dropdown_field(widget: WebElement, xpath: str, name: str, value: str) ->
 
 def confirm_save(driver: WebDriver) -> None:
     confirm_save_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
-    confirm_btn = confirm_save_dialog.find_element(By.XPATH, "//button[normalize-space()='Confirm']")
+    confirm_btn = confirm_save_dialog.find_element(By.XPATH, "//button[normalize-space()='Confirm Save']")
     confirm_btn.click()
     time.sleep(short_delay)
 
@@ -194,6 +193,7 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict) -> None:
     create_strat_btn = strat_collection_widget.find_element(By.XPATH, "//button[@name='Create']")
     create_strat_btn.click()
     time.sleep(short_delay)
+
 
     pair_strat_params_widget = driver.find_element(By.ID, "pair_strat_params")
     xpath: str
@@ -215,6 +215,10 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict) -> None:
     value = pair_strat["pair_strat_params"]["strat_leg2"]["sec"]["sec_id"]
     set_autocomplete_field(widget=pair_strat_params_widget, xpath=xpath, name="sec_id", search_type=SearchType.NAME,
                            value=value)
+
+    strat_status_widget = driver.find_element(By.ID, "strat_status")
+    driver.execute_script('arguments[0].scrollIntoView(true)', strat_status_widget)
+    time.sleep(short_delay)
 
     # select pair_strat_params.common_premium
     xpath = "pair_strat_params.common_premium"
@@ -284,23 +288,23 @@ def switch_layout(widget: WebElement, widget_name: str, layout: Layout) -> None:
         raise Exception(f"failed to switch to layout: {layout};;; exception: {e}")
 
 
-def activate_strat(driver) -> None:
+def activate_strat(driver: webdriver) -> None:
     # Find the button with the name 'strat_state'
-    strat_state_btn = driver.find_element(By.XPATH, "//button[contains(@name,'strat_state')]")
+    activate_btn = driver.find_element(By.XPATH, "//tbody//button[@value='Activate'][normalize-space()='Activate']")
 
     # Get the button text
-    button_text = strat_state_btn.text
+    button_text = activate_btn.text
 
     # Check if the button text is ACTIVATE, ERROR, or PAUSED
     assert button_text in ["ACTIVATE", "ERROR", "PAUSE"], "Unknown button state."
 
     if button_text == "ACTIVATE":
         # Activate the strat
-        strat_state_btn.click()
+        activate_btn.click()
         time.sleep(short_delay)
 
         # Confirm the activation
-        confirm_btn = driver.find_element(By.XPATH, "//button[normalize-space()='Confirm']")
+        confirm_btn = driver.find_element(By.XPATH, "//button[normalize-space()='Confirm Save']")
         confirm_btn.click()
         time.sleep(short_delay)
 
@@ -309,20 +313,31 @@ def activate_strat(driver) -> None:
                                           "//tbody//button[@value='Pause'][normalize-space()='Pause']")
         btn_text = pause_strat.text
         assert btn_text == "PAUSE", "Failed to activate strat."
-        print("Strat is active.")
 
     elif button_text in ["ERROR", "PAUSE"]:
         print(f"Strat is in {button_text} state. Cannot activate.")
 
 
+def update_max_value_field_strats_limits(widget: WebElement, xpath: str, name: str, input_value: int) -> None:
+    input_div_xpath: str = f"//div[@data-xpath='{xpath}']"
+    div_xpath = widget.find_element(By.XPATH, input_div_xpath)
+    input_element = div_xpath.find_element(By.ID, name)
+    input_element.click()
+    input_element.send_keys(Keys.CONTROL+ "a")
+    input_element.send_keys(Keys.BACK_SPACE)
+    input_element.send_keys(input_value)
+
+
+
+
 def test_update_strat_n_activate_using_tree_view(config_dict: Dict, pair_strat: Dict, pair_strat_edit: Dict,
                                                  strat_limits: Dict) -> None:
-    # load driver
+
     driver_type: DriverType = DriverType.CHROME
     driver: webdriver.Chrome = get_driver(config_dict=config_dict, driver_type=driver_type)
     create_pair_strat(driver=driver, pair_strat=pair_strat)
 
-    # edit_btn, first take out strat collection
+
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
     edit_btn = strat_collection_widget.find_element(By.NAME, "Edit")
     edit_btn.click()
@@ -333,7 +348,8 @@ def test_update_strat_n_activate_using_tree_view(config_dict: Dict, pair_strat: 
     # pair_strat_params.common_premium
     xpath = "pair_strat_params.common_premium"
     value = pair_strat_edit["pair_strat_params"]["common_premium"]
-    set_input_field(widget=pair_strat_params_widget, xpath=xpath, name="common_premium", value=value,
+    name = "common_premium"
+    set_input_field(widget=pair_strat_params_widget, xpath=xpath, name= name, value=value,
                     search_type=SearchType.ID)
 
     # pair_strat_params.hedge_ratio
@@ -344,121 +360,146 @@ def test_update_strat_n_activate_using_tree_view(config_dict: Dict, pair_strat: 
 
     # strat_limits_widget
     strat_limits_widget = driver.find_element(By.ID, "strat_limits")
+    switch_layout(widget=strat_limits_widget, widget_name="strat_limits", layout=Layout.TREE)
+
 
     # scroll into view
     driver.execute_script('arguments[0].scrollIntoView(true)', strat_limits_widget)
     time.sleep(short_delay)
+
+    #
+    xpath: str = "strat_limits.cancel_rate.max_cancel_rate"
+    input_value: int = 20
+    name: str = "max_cancel_rate"
+    update_max_value_field_strats_limits(widget=strat_limits_widget, xpath=xpath,name=name, input_value=input_value)
+
+    max_partipation_rate_input_field = driver.find_element(By.ID, "max_participation_rate")
+
+    driver.execute_script('arguments[0].scrollIntoView(true)',max_partipation_rate_input_field)
+    time.sleep(short_delay)
+
+    xpath: str = "strat_limits.market_trade_volume_participation.max_participation_rate"
+    input_value: int = 30
+    name: str = "max_participation_rate"
+    update_max_value_field_strats_limits(widget=strat_limits_widget, xpath=xpath, name=name, input_value=input_value)
+
+
     # save
     save_btn = strat_collection_widget.find_element(By.NAME, "Save")
     save_btn.click()
     time.sleep(short_delay)
     confirm_save(driver=driver)
 
-    # tree_view_btn
-    switch_layout(widget=strat_limits_widget, widget_name="strat_limits", layout=Layout.TREE)
+    edit_btn.click()
 
     # creating_strat_of_strat_limits_in_tree_view
     # strat_limits.max_open_orders_per_side
     xpath = "strat_limits.max_open_orders_per_side"
     value = strat_limits["max_open_orders_per_side"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="max_open_orders_per_side", value=value, search_type=SearchType.ID)
+    name = "max_open_orders_per_side"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # strat_limits.max_cb_notional
     xpath = "strat_limits.max_cb_notional"
     value = strat_limits["max_cb_notional"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="max_cb_notional", value=value,
-                    search_type=SearchType.ID)
+    name = "max_cb_notional"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
+
 
     # strat_limits.max_open_cb_notional
     xpath = "strat_limits.max_open_cb_notional"
     value = strat_limits["max_open_cb_notional"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="max_open_cb_notional", value=value,
-                    search_type=SearchType.ID)
+    name = "max_open_cb_notional"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name= name, value=value)
 
     # strat_limits.max_net_filled_notional
     xpath = "strat_limits.max_net_filled_notional"
     value = strat_limits["max_net_filled_notional"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="max_net_filled_notional", value=value,
-                    search_type=SearchType.ID)
+    name = "max_net_filled_notional"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # strat_limits.max_concentration
     xpath = "strat_limits.max_concentration"
     value = strat_limits["max_concentration"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="max_concentration", value=value,
-                    search_type=SearchType.ID)
+    name = "max_concentration"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # strat_limits.limit_up_down_volume_participation_rate
     xpath = "strat_limits.limit_up_down_volume_participation_rate"
     value = strat_limits["limit_up_down_volume_participation_rate"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="limit_up_down_volume_participation_rate",
-                    value=value,
-                    search_type=SearchType.ID)
+    name = "limit_up_down_volume_participation_rate"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name,value=value)
 
     # strat_limits.cancel_rate.max_cancel_rate
     xpath = "strat_limits.cancel_rate.max_cancel_rate"
     value = strat_limits["cancel_rate"]["max_cancel_rate"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="max_cancel_rate", value=value,
-                    search_type=SearchType.ID)
+    name = "max_cancel_rate"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # applicable_period_seconds
     # xpath = "strat_limits.cancel_rate.applicable_period_seconds"
     # value = strat_limits["cancel_rate"]["applicable_period_seconds"]
 
+    input_residual_mark_second_element = strat_limits_widget.find_element(By.ID, "residual_mark_seconds")
+    driver.execute_script('arguments[0].scrollIntoView(true)', input_residual_mark_second_element)
+    time.sleep(short_delay)
+
     # strat_limits.cancel_rate.waived_min_orders
     xpath = "strat_limits.cancel_rate.waived_min_orders"
     value = strat_limits["cancel_rate"]["waived_min_orders"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="waived_min_orders", value=value,
-                    search_type=SearchType.ID)
+    name = "waived_min_orders"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # strat_limits.market_trade_volume_participation.max_participation_rate
     xpath = "strat_limits.market_trade_volume_participation.max_participation_rate"
     value = strat_limits["market_trade_volume_participation"]["max_participation_rate"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="max_participation_rate", value=value,
-                    search_type=SearchType.ID)
+    name = "max_participation_rate"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # mrket_trde_applicable_periods_seconds
-    xpath = "strat_limits.market_trade_volume_participation.applicable_period_seconds"
-    value = strat_limits["market_trade_volume_participation"]["applicable_period_seconds"]
-    mrket_trde_applicable_periods_seconds = strat_limits_widget. \
-        find_element(By.XPATH, "//div[@data-xpath='strat_limits."
-                               "market_trade_volume_participation.applicable_period_seconds']")
-    mrket_trde_applicable_periods_seconds.click()
-    set_input_field(widget=mrket_trde_applicable_periods_seconds, xpath=xpath, name="input", value=value,
-                    search_type=SearchType.TAG_NAME)
+    # xpath = "strat_limits.market_trade_volume_participation.applicable_period_seconds"
+    # value = strat_limits["market_trade_volume_participation"]["applicable_period_seconds"]
+    # mrket_trde_applicable_periods_seconds = strat_limits_widget. \
+    #     find_element(By.XPATH, "//div[@data-xpath='strat_limits."
+    #                            "market_trade_volume_participation.applicable_period_seconds")
+    # mrket_trde_applicable_periods_seconds.click()
+    # set_input_field(widget=mrket_trde_applicable_periods_seconds, xpath=xpath, name="input", value=value,
+    #                 search_type=SearchType.TAG_NAME)
 
     # strat_limits.market_depth.participation_rate
     xpath = "strat_limits.market_depth.participation_rate"
     value = strat_limits["market_depth"]["participation_rate"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="participation_rate", value=value,
-                    search_type=SearchType.ID)
+    name = "participation_rate"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # strat_limits.market_depth.depth_levels
     xpath = "strat_limits.market_depth.depth_levels"
     value = strat_limits["market_depth"]["depth_levels"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="depth_levels", value=value,
-                    search_type=SearchType.ID)
+    name = "depth_levels"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # strat_limits.residual_restriction.max_residual
     xpath = "strat_limits.residual_restriction.max_residual"
     value = strat_limits["residual_restriction"]["max_residual"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="max_residual", value=value,
-                    search_type=SearchType.ID)
+    name = "max_residual"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # strat_limits.residual_restriction.residual_mark_seconds
     xpath = "strat_limits.residual_restriction.residual_mark_seconds"
     value = strat_limits["residual_restriction"]["residual_mark_seconds"]
-    set_input_field(widget=strat_limits_widget, xpath=xpath, name="residual_mark_seconds", value=value,
-                    search_type=SearchType.ID)
+    name = "residual_mark_seconds"
+    set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
     # activate_strat
-    activate_strat(driver)
+    activate_strat(driver=driver)
+    # edit_btn.click()
 
     # validate_strat_limits
     validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
     driver.quit()
 
 
-def get_value_from_input_field(widget: WebElement, name: str, xpath: str, layout: Layout):
+def get_value_from_input_field(widget: WebElement, xpath: str, layout: Layout):
     parent_tag: str = ""
     if layout == Layout.TREE:
         parent_tag = "div"
@@ -473,58 +514,57 @@ def get_value_from_input_field(widget: WebElement, name: str, xpath: str, layout
     return value
 
 
-def validate_strat_limits(widget: WebElement, strat_limits: Dict, layout: Layout) -> None:
+def validate_strat_limits(widget: WebElement, strat_limits: Dict,  layout: Layout) -> None:
     # max_open_orders_per_side
     xpath = "strat_limits.max_open_orders_per_side"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="max_open_orders_per_side", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["max_open_orders_per_side"])
 
     # max_cb_notional
     xpath = "strat_limits.max_cb_notional"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="max_cb_notional", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     value = value.replace(",", '')
     assert value == str(strat_limits["max_cb_notional"])
 
     # max_open_cb_notional
     xpath = "strat_limits.max_open_cb_notional"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="max_open_cb_notional", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     value = value.replace(",", '')
     assert value == str(strat_limits["max_open_cb_notional"])
 
     # max_net_filled_notional
     xpath = "strat_limits.max_net_filled_notional"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="max_net_filled_notional", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     value = value.replace(",", '')
     assert value == str(strat_limits["max_net_filled_notional"])
 
     # max_concentration
     xpath = "strat_limits.max_concentration"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="max_concentration", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["max_concentration"])
 
     # limit_up_down_volume_participation_rate
     xpath = "strat_limits.limit_up_down_volume_participation_rate"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="limit_up_down_volume_participation_rate",
-                                       layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath,layout=layout)
     assert value == str(strat_limits["limit_up_down_volume_participation_rate"])
 
     # max_cancel_rate
     xpath = "strat_limits.cancel_rate.max_cancel_rate"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="max_cancel_rate", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["cancel_rate"]["max_cancel_rate"])
 
-    # applicable_period_seconds
+     # applicable_period_seconds
     # xpath = "strat_limits.cancel_rate.applicable_period_seconds"
     # value = get_value_from_input_field(widget=widget, xpath=xpath, name="applicable_period_seconds", layout=layout)
 
     # waived_min_orders
     xpath = "strat_limits.cancel_rate.waived_min_orders"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="waived_min_orders", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["cancel_rate"]["waived_min_orders"])
 
     # max_participation_rate
     xpath = "strat_limits.market_trade_volume_participation.max_participation_rate"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="max_participation_rate", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["market_trade_volume_participation"]["max_participation_rate"])
 
     # applicable_period_seconds
@@ -533,24 +573,25 @@ def validate_strat_limits(widget: WebElement, strat_limits: Dict, layout: Layout
 
     # participation_rate
     xpath = "strat_limits.market_depth.participation_rate"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="participation_rate", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["market_depth"]["participation_rate"])
 
     # depth_levels
     xpath = "strat_limits.market_depth.depth_levels"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="depth_levels", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["market_depth"]["depth_levels"])
 
     # max_residual
     xpath = "strat_limits.residual_restriction.max_residual"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="max_residual", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     value = value.replace(",", "")
     assert value == str(strat_limits["residual_restriction"]["max_residual"])
 
     # residual_mark_seconds
     xpath = "strat_limits.residual_restriction.residual_mark_seconds"
-    value = get_value_from_input_field(widget=widget, xpath=xpath, name="residual_mark_seconds", layout=layout)
+    value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["residual_restriction"]["residual_mark_seconds"])
+    time.sleep(short_delay)
 
 
 def set_table_view_input(widget: webdriver, xpath: str, value: str,
@@ -567,6 +608,7 @@ def set_table_view_input(widget: webdriver, xpath: str, value: str,
     set_input.send_keys(value)
 
 
+
 def test_update_strat_n_activate_using_table_view(config_dict: Dict, pair_strat: Dict, strat_limits: Dict) -> None:
     driver_type: DriverType = DriverType.CHROME
     driver: webdriver.Chrome = get_driver(config_dict=config_dict, driver_type=driver_type)
@@ -574,13 +616,13 @@ def test_update_strat_n_activate_using_table_view(config_dict: Dict, pair_strat:
 
     # strat_limits_widget
     strat_limits_widget = driver.find_element(By.ID, "strat_limits")
-    time.sleep(short_delay)
 
-    # strat_collection_widget
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
 
     # edit_btn
-    strat_collection_widget.find_element(By.NAME, "Edit").click()
+    edit_btn = strat_collection_widget.find_element(By.NAME, "Edit")
+    edit_btn.click()
+    time.sleep(short_delay)
 
     # max_open_per_orders_side
     xpath = "strat_limits.max_open_orders_per_side"
@@ -650,89 +692,149 @@ def test_update_strat_n_activate_using_table_view(config_dict: Dict, pair_strat:
     # max_residual
     xpath = "strat_limits.residual_restriction.max_residual"
     value = strat_limits["residual_restriction"]["max_residual"]
-    # value = value.replace(",", "")
     set_table_view_input(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # residual_mark_seconds
     xpath = "strat_limits.residual_restriction.residual_mark_seconds"
     value = strat_limits["residual_restriction"]["residual_mark_seconds"]
     set_table_view_input(widget=strat_limits_widget, xpath=xpath, value=value)
+    time.sleep(short_delay)
 
     # activate_n_confirm_btn
-    activate_strat(driver)
+    activate_strat(driver=driver)
     # edit_btn
-    strat_collection_widget.find_element(By.NAME, "Edit").click()
+    edit_btn.click()
 
-    strat_limits_widget = driver.find_element(By.ID, "strat_limits")
 
     # validating the values
-    validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TABLE)
+    validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout= Layout.TABLE)
 
 def open_setting(widget: WebElement, widget_name: str) -> None:
     xpath: str = f"//div[@id='{widget_name}']//button[@name='Settings']"
-    setting_xpath = widget.find_element(By.XPATH, xpath)
-    setting_xpath.click()
-
-
-def select_checkbox(widget: WebElement, xpath: str, use_type: str) -> WebElement:
-    open_setting(widget=widget, widget_name="pair_strat_params")
-    xpath: str = f"//li[{xpath}]"
-    xpath_element = widget.find_element(By.XPATH, xpath)
-    input_element = xpath_element.find_element(By.TAG_NAME, "input")
-    if use_type == "validate":
-        return input_element
-    input_element.click()
+    setting_element = widget.find_element(By.XPATH, xpath)
+    setting_element.click()
     time.sleep(short_delay)
 
 
-def test_field_hide_n_show_in_common_key(config_dict: Dict, pair_strat: Dict, strat_limits: Dict):
+def get_common_keys(widget: WebElement) -> List[str]:
+    name: str = "span[class^='CommonKeyWidget_key']"
+    common_key_elements: List[WebElement] = widget.find_elements(By.CSS_SELECTOR,name)
+    key_element: WebElement
+    common_keys: List[str] = [
+        key_element.text.replace("common premium", "common_premium").replace("hedge ratio", "hedge_ratio")
+        .replace(":", "")for key_element in common_key_elements]
+    return common_keys
+
+
+def select_n_unselect_checkbox(widget: webdriver, inner_text: str, partial_class_name: str) -> None:
+    settings_dropdown: WebElement = widget.find_element(By.XPATH, "//ul[@role='listbox']")
+    dropdown_labels: List[WebElement] = settings_dropdown.find_elements(By.CSS_SELECTOR,f"span[{partial_class_name}]")
+    span_element: WebElement
+    for span_element in dropdown_labels:
+        if span_element.text == inner_text:
+            span_element.click()
+            time.sleep(delay)
+            break
+
+
+
+def test_field_hide_n_show_in_common_key(config_dict: Dict, pair_strat: Dict):
     driver_type: DriverType = DriverType.CHROME
     driver: webdriver.Chrome = get_driver(config_dict=config_dict, driver_type=driver_type)
     create_pair_strat(driver=driver, pair_strat=pair_strat)
-
     pair_strat_widget = driver.find_element(By.ID, "pair_strat_params")
     switch_layout(widget=pair_strat_widget, widget_name="pair_strat_params", layout=Layout.TABLE)
 
 
-    # strat_leg1.sec.sec_id
-    xpath = "3"
-    select_checkbox(widget=pair_strat_widget, xpath=xpath, use_type="")
-
-    # muilist = pair_strat_widget.find_element(By.XPATH, "//ul[@role='listbox']")
-    # sec_id = muilist.find_element(By.TAG_NAME, "input")
-    # sec_id.click()
-    # time.sleep(short_delay)
+    common_keys: List[str] = get_common_keys(widget=pair_strat_widget)
+    # select a random value
+    inner_text: str = random.choice(common_keys)
 
 
-    # strat_leg1.side
-    xpath = "5"
-    select_checkbox(widget=pair_strat_widget, xpath=xpath, use_type="")
-
-    # strat_leg2.sec.sec_id
-    xpath = "8"
-    select_checkbox(widget=pair_strat_widget, xpath=xpath, use_type="")
-
-    # strat_leg2.side
-    xpath = "10"
-    select_checkbox(widget=pair_strat_widget, xpath=xpath, use_type="")
-
-    # common premium
-    xpath = "13"
-    select_checkbox(widget=pair_strat_widget, xpath=xpath, use_type="")
-
-    # hedge ratio
-    xpath = "14"
-    select_checkbox(widget=pair_strat_widget, xpath=xpath, use_type="")
-    # verifying
-    validate_pair_strat_table_view_checkbox(driver=driver)
+    # searching the random key in setting and unselecting checkbox
+    open_setting(widget=pair_strat_widget, widget_name="pair_strat_params")
+    partial_class_name = "class^='MuiTypography-root'"
+    select_n_unselect_checkbox(widget=pair_strat_widget, inner_text=inner_text, partial_class_name=partial_class_name)
 
 
-def validate_pair_strat_table_view_checkbox(driver: WebDriver):
-    pair_strat_widget = driver.find_element(By.ID, "pair_strat_params")
+     # validating that unselected key is not visible on table view
+    common_keys: List[str] = get_common_keys(widget=pair_strat_widget)
+    assert inner_text not in common_keys, f"{inner_text} field is visible in common keys, expected to be hidden"
 
-    xpath = "3"
-    input_element = select_checkbox(widget=pair_strat_widget, xpath=xpath, use_type="validate")
-    assert not input_element.is_selected()
+
+    #  searching the random key in setting and selecting checkbox
+    open_setting(widget=pair_strat_widget, widget_name="pair_strat_params")
+    partial_class_name = "class^='MuiTypography-root'"
+    select_n_unselect_checkbox(widget=pair_strat_widget, inner_text=inner_text, partial_class_name=partial_class_name)
+
+
+    # validating that selected checkbox is visible on table view
+    common_keys = get_common_keys(widget=pair_strat_widget)
+    assert inner_text in common_keys, f"{inner_text} field is not visible in common keys, expected to be visible"
+
+
+
+def get_table_headers(widget: WebElement) -> list:
+    name: str = "span[class^='MuiButtonBase-root']"
+    span_elements: List[WebElement] = widget.find_elements(By.CSS_SELECTOR, name)
+    table_headers: List[str] = [span_element.text.replace(" ", "_") for span_element in span_elements]
+    return table_headers
+
+
+
+def test_hide_n_show_in_table_view(config_dict: Dict, pair_strat: Dict):
+    driver_type: DriverType = DriverType.CHROME
+    driver: webdriver.Chrome = get_driver(config_dict=config_dict, driver_type=driver_type)
+    create_pair_strat(driver=driver, pair_strat=pair_strat)
+    activate_strat(driver=driver)
+
+    symbol_side_snapshot_widget = driver.find_element(By.ID, "symbol_side_snapshot")
+    driver.execute_script('arguments[0].scrollIntoView(true)', symbol_side_snapshot_widget)
+
+
+    # selecting random table text from table view
+    table_headers = get_table_headers(widget=symbol_side_snapshot_widget)
+    inner_text = random.choice(table_headers)
+
+
+    #  searching the selected random table text in setting and unselecting checkbox
+    open_setting(widget=symbol_side_snapshot_widget, widget_name="symbol_side_snapshot")
+    partial_class_name = "class^='MuiTypography-root'"
+    select_n_unselect_checkbox(widget=symbol_side_snapshot_widget, inner_text=inner_text, partial_class_name=partial_class_name)
+
+
+    # validating that unselected text is not visible on table view
+    table_headers: List[str] = get_table_headers(widget=symbol_side_snapshot_widget)
+    assert inner_text not in table_headers
+
+    # searching the random table text in setting and selecting checkbox
+    open_setting(widget=symbol_side_snapshot_widget, widget_name="symbol_side_snapshot")
+    partial_class_name = "class^='MuiTypography-root'"
+    select_n_unselect_checkbox(widget=symbol_side_snapshot_widget, inner_text=inner_text, partial_class_name=partial_class_name)
+
+
+    # validating that selected check is visible on table view
+    table_headers: List[str] = get_table_headers(widget=symbol_side_snapshot_widget)
+    assert inner_text in table_headers
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

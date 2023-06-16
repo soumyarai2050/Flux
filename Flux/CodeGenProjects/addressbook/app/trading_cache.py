@@ -1,62 +1,15 @@
 from typing import Tuple
-
-from Flux.CodeGenProjects.addressbook.app.strat_cache import StratCache
-from Flux.CodeGenProjects.addressbook.app.ws_helper import *
 from pendulum import DateTime
 
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.generated.StratExecutor.strat_manager_service_base_trading_cache import \
+    StratManagerServiceBaseTradingCache
+from Flux.CodeGenProjects.market_data.generated.StratExecutor.market_data_service_base_trading_cache import \
+    MarketDataServiceBaseTradingCache
 
-class TradingCache:
 
-    def get_portfolio_status(self, date_time: DateTime | None = None
-                             ) -> Tuple[PortfolioStatusBaseModel, DateTime] | None:
-        if date_time is None or date_time < self._portfolio_status_update_date_time:
-            if self._portfolio_status is not None:
-                return self._portfolio_status, self._portfolio_status_update_date_time
-            else:
-                return None
-        else:
-            return None
-
-    def set_portfolio_status(self, portfolio_status: PortfolioStatusBaseModel) -> DateTime:
-        self._portfolio_status = portfolio_status
-        self._portfolio_status_update_date_time = DateTime.utcnow()
-        return self._portfolio_status_update_date_time
-
-    def get_portfolio_limits(self, date_time: DateTime | None = None
-                             ) -> Tuple[PortfolioLimitsBaseModel, DateTime] | None:
-        if date_time is None or date_time < self._portfolio_limits_update_date_time:
-            if self._portfolio_limits is not None:
-                return self._portfolio_limits, self._portfolio_limits_update_date_time
-            else:
-                return None
-        else:
-            return None
-
-    def set_portfolio_limits(self, portfolio_limits: PortfolioLimitsBaseModel) -> DateTime:
-        self._portfolio_limits = portfolio_limits
-        self._portfolio_limits_update_date_time = DateTime.utcnow()
-        return self._portfolio_limits_update_date_time
-
-    def get_order_limits(self, date_time: DateTime | None = None) -> Tuple[OrderLimitsBaseModel, DateTime] | None:
-        if date_time is None or date_time < self._order_limits_update_date_time:
-            if self._order_limits is not None:
-                return self._order_limits, self._order_limits_update_date_time
-            else:
-                return None
-        else:
-            return None
-
-    def set_order_limits(self, order_limits: OrderLimitsBaseModel) -> DateTime:
-        self._order_limits = order_limits
-        self._order_limits_update_date_time = DateTime.utcnow()
-        return self._order_limits_update_date_time
+class TradingCache(StratManagerServiceBaseTradingCache, MarketDataServiceBaseTradingCache):
 
     def __init__(self):
-        self._portfolio_status: PortfolioStatusBaseModel | None = None
-        self._portfolio_status_update_date_time: DateTime = DateTime.utcnow()
-
-        self._portfolio_limits: PortfolioLimitsBaseModel | None = None
-        self._portfolio_limits_update_date_time: DateTime = DateTime.utcnow()
-
-        self._order_limits: OrderLimitsBaseModel | None = None
-        self._order_limits_update_date_time: DateTime = DateTime.utcnow()
+        StratManagerServiceBaseTradingCache.__init__(self)
+        MarketDataServiceBaseTradingCache.__init__(self)

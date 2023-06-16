@@ -25,24 +25,21 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     query_aggregate_var_name_key: ClassVar[str] = "query_agg_var_name"
     query_params_key: ClassVar[str] = "query_params"
     query_params_data_types_key: ClassVar[str] = "query_params_data_types"
+    query_type_key: ClassVar[str] = "query_type"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.insertion_point_key_to_callable_list: List[Callable] = [
-            self.handle_fastapi_class_gen
-        ]
         if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
             self.response_field_case_style: str = response_field_case_style
         else:
-            err_str = f"Env var 'OUTPUT_FILE_NAME_SUFFIX' received as {response_field_case_style}"
+            err_str = f"Env var 'RESPONSE_FIELD_CASE_STYLE' received as {response_field_case_style}"
             logging.exception(err_str)
             raise Exception(err_str)
-        # Since output file name for this plugin will be created at runtime
-        self.output_file_name_suffix = ""
         self.root_message_list: List[protogen.Message] = []
         self.message_to_query_option_list_dict: Dict[protogen.Message, List[Dict]] = {}
         self.non_root_message_list: List[protogen.Message] = []
         self.enum_list: List[protogen.Enum] = []
+        self.model_dir_name: str = "Pydentic"
         self.fastapi_app_name: str = ""
         self.proto_file_name: str = ""
         self.proto_file_package: str = ""
@@ -94,9 +91,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         for message in message_list:
             if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root):
                 json_root_msg_option_val_dict = \
-                    self.get_complex_option_values_as_list_of_dict(message, BaseFastapiPlugin.flux_msg_json_root)
-                # taking first obj since json root is of non-repeated option
-                if (is_reentrant_required := json_root_msg_option_val_dict[0].get(
+                    self.get_complex_option_set_values(message, BaseFastapiPlugin.flux_msg_json_root)
+                if (is_reentrant_required := json_root_msg_option_val_dict.get(
                         BaseFastapiPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
                     if not is_reentrant_required:
                         self.reentrant_lock_non_required_msg.append(message)
@@ -105,7 +101,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 # else not required: If json root option don't have reentrant field then considering it requires
                 # reentrant lock as default and avoiding its append to reentrant lock non-required list
 
-                if (is_reentrant_on_top := json_root_msg_option_val_dict[0].get(
+                if (is_reentrant_on_top := json_root_msg_option_val_dict.get(
                         BaseFastapiPlugin.flux_json_root_set_reentrant_lock_to_top_field)) is not None:
                     if not is_reentrant_required:
                         err_str = "Field SetReentrantLock is set to true, avoiding adding model's reentrant lock " \
@@ -145,34 +141,37 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     def get_query_option_message_values(self, message: protogen.Message) -> List[Dict]:
         list_of_agg_value_dict = []
         options_list_of_dict = \
-            self.get_complex_option_values_as_list_of_dict(message, BaseFastapiPlugin.flux_msg_json_query)
+            self.get_complex_option_set_values(message, BaseFastapiPlugin.flux_msg_json_query, is_option_repeated=True)
         for option_dict in options_list_of_dict:
             agg_value_dict = {}
             agg_value_dict[BaseFastapiPlugin.query_name_key] = \
                 option_dict[BaseFastapiPlugin.flux_json_query_name_field]
             agg_value_dict[BaseFastapiPlugin.query_aggregate_var_name_key] = \
                 option_dict.get(BaseFastapiPlugin.flux_json_query_aggregate_var_name_field)
-            if (aggregate_params := option_dict.get(
+            query_type = option_dict.get(BaseFastapiPlugin.flux_json_query_type_field)
+            if (query_params := option_dict.get(
                     BaseFastapiPlugin.flux_json_query_params_field)) is not None:
-                aggregate_params_data_types = \
+                query_params_data_types = \
                     option_dict.get(BaseFastapiPlugin.flux_json_query_params_data_type_field)
-                # if only one element exists in aggregate_params then it is received as single object so making it list
-                # same for aggregate_params_data_types
-                aggregate_params = aggregate_params if isinstance(aggregate_params, list) else [aggregate_params]
-                aggregate_params_data_types = aggregate_params_data_types \
-                    if isinstance(aggregate_params_data_types, list) else [aggregate_params_data_types]
-                if len(aggregate_params) != len(aggregate_params_data_types):
+                # if only one element exists in query_params then it is received as single object so making it list
+                # same for query_params_data_types
+                query_params = query_params if isinstance(query_params, list) else [query_params]
+                query_params_data_types = query_params_data_types \
+                    if isinstance(query_params_data_types, list) else [query_params_data_types]
+                if len(query_params) != len(query_params_data_types):
                     err_str = f"{BaseFastapiPlugin.flux_msg_json_query} option should have equal numbers of" \
                               f"{BaseFastapiPlugin.flux_json_query_params_field} and " \
                               f"{BaseFastapiPlugin.flux_json_query_params_data_type_field}"
                     logging.exception(err_str)
                     raise Exception(err_str)
                 else:
-                    agg_value_dict[BaseFastapiPlugin.query_params_key] = aggregate_params
-                    agg_value_dict[BaseFastapiPlugin.query_params_data_types_key] = aggregate_params_data_types
+                    agg_value_dict[BaseFastapiPlugin.query_params_key] = query_params
+                    agg_value_dict[BaseFastapiPlugin.query_params_data_types_key] = query_params_data_types
             else:
                 agg_value_dict[BaseFastapiPlugin.query_params_key] = []
                 agg_value_dict[BaseFastapiPlugin.query_params_data_types_key] = []
+            agg_value_dict[BaseFastapiPlugin.query_type_key] = query_type
+
             list_of_agg_value_dict.append(agg_value_dict)
         return list_of_agg_value_dict
 
@@ -223,7 +222,3 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.routes_callback_class_name_override = f"{self.proto_file_name}_routes_callback_override"
         self.callback_override_set_instance_file_name = f"{self.proto_file_name}_callback_override_set_instance"
 
-    @abstractmethod
-    def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
-        """Main method: returns dictionary of filename and file's content as key-value pair"""
-        raise NotImplementedError

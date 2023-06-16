@@ -3,8 +3,9 @@ import os
 from typing import Tuple
 
 os.environ["DBType"] = "beanie"
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.generated.strat_manager_service_beanie_database import get_mongo_server_uri
+from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_beanie_database import \
+    get_mongo_server_uri
 from FluxPythonUtils.scripts.utility_functions import get_version_from_mongodb_uri
 
 cum_price_size_aggregate_json = {"aggregate": [

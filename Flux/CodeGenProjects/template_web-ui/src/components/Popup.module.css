@@ -1,0 +1,18 @@
+.backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.dialog_title {
+    background-color: #0097a7;
+    color: white;
+    padding: 8px !important;
+}
+
+.dialog_body {
+    padding: 12px !important;
+}
+
+.dialog_text {
+    font-weight: bold;
+    margin-bottom: 8px;
+}

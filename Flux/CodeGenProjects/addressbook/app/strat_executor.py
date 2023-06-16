@@ -7,6 +7,7 @@ from pathlib import PurePath
 from threading import Thread
 import math
 import traceback
+from fastapi.encoders import jsonable_encoder
 
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 
@@ -16,9 +17,9 @@ from Flux.CodeGenProjects.addressbook.app.trading_data_manager import TradingDat
 from Flux.CodeGenProjects.addressbook.app.strat_cache import *
 from Flux.CodeGenProjects.addressbook.app.trading_link import get_trading_link, TradingLinkBase, config_dict
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import \
-    get_consumable_participation_qty_http, create_alert, get_pair_strat_key, get_portfolio_limits, get_symbol_side_key, \
-    get_strat_brief_key
-from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import *
+    get_consumable_participation_qty_http, create_alert, get_pair_strat_log_key, get_portfolio_limits, get_symbol_side_key, \
+    get_strat_brief_log_key
+from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import *
 
 
 class StratExecutor:
@@ -142,11 +143,11 @@ class StratExecutor:
         leg1_tob, leg2_tob = self.extract_legs_from_tobs(pair_strat, top_of_books)
         if leg1_tob is not None and self.strat_cache.leg1_trading_symbol is None:
             logging.debug(f"ignoring ticker: {leg1_tob.symbol} not found in strat_cache, "
-                          f"pair_strat_key: {get_pair_strat_key(pair_strat)}")
+                          f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
             leg1_tob = None
         if leg2_tob is not None and self.strat_cache.leg2_trading_symbol is None:
             logging.debug(f"ignoring ticker: {leg2_tob.symbol} not found in strat_cache, "
-                          f"pair_strat_key: {get_pair_strat_key(pair_strat)}")
+                          f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
             leg2_tob = None
         return leg1_tob, leg2_tob
 
@@ -162,7 +163,7 @@ class StratExecutor:
                 else:
                     logging.error(f"unexpected security found in top_of_books[1]: {top_of_books[1].symbol}, "
                                   f"expected: {pair_strat.pair_strat_params.strat_leg2.sec.sec_id}, pair_strat_key: "
-                                  f" {get_pair_strat_key(pair_strat)};;;top_of_books[1]: {top_of_books[1]}")
+                                  f" {get_pair_strat_log_key(pair_strat)};;;top_of_books[1]: {top_of_books[1]}")
                     error = True
         elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[0].symbol:
             leg2_tob = top_of_books[0]
@@ -172,13 +173,13 @@ class StratExecutor:
                 else:
                     logging.error(f"unexpected security found in top_of_books[1]: {top_of_books[1].symbol}, "
                                   f"expected: {pair_strat.pair_strat_params.strat_leg1.sec.sec_id} pair_strat_key: "
-                                  f"{get_pair_strat_key(pair_strat)};;;top_of_books[1]: {top_of_books[1]}")
+                                  f"{get_pair_strat_log_key(pair_strat)};;;top_of_books[1]: {top_of_books[1]}")
                     error = True
         else:
             logging.error(f"unexpected security found in top_of_books[0]: {top_of_books[0].symbol}, expected either: "
                           f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id} or "
                           f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id} in pair_strat_key: "
-                          f"{get_pair_strat_key(pair_strat)};;;top_of_books[1]: {top_of_books[1]}")
+                          f"{get_pair_strat_log_key(pair_strat)};;;top_of_books[1]: {top_of_books[1]}")
             error = True
         if error:
             return None, None
@@ -209,7 +210,7 @@ class StratExecutor:
         else:
             logging.error(f"check_unack: unknown symbol: {symbol}, check ignored for strat_cache: "
                           f"{self.strat_cache.get_key()}, "
-                          f"pair_strat_key_key: {get_pair_strat_key(self.strat_cache.get_pair_strat_())}")
+                          f"pair_strat_key_key: {get_pair_strat_log_key(self.strat_cache.get_pair_strat_())}")
 
         return False
 
@@ -257,19 +258,19 @@ class StratExecutor:
                     logging.error(f"blocked generated SELL order, symbol_overview missing for symbol: "
                                   f"{strat_brief.pair_sell_side_trading_brief.security.sec_id}, for strat_cache: "
                                   f"{self.strat_cache.get_key()}, limit up/down check can't be applied, "
-                                  f"strat_brief_key: {get_strat_brief_key(strat_brief)}")
+                                  f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
                     return False
             else:
                 logging.error(f"blocked generated SELL order, symbol_overview_tuple missing for symbol: "
                               f"{strat_brief.pair_sell_side_trading_brief.security.sec_id}, for strat_cache: "
                               f"{self.strat_cache.get_key()}, limit down check can't be applied "
-                              f"strat_brief_key: {get_strat_brief_key(strat_brief)}")
+                              f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
                 return False
             # max_open_orders_per_side check
             if strat_brief.pair_sell_side_trading_brief.consumable_open_orders < 0:
                 logging.error(f"blocked generated SELL order, not enough consumable_open_orders: "
                               f"{strat_brief.pair_sell_side_trading_brief.consumable_open_orders} for strat_cache: "
-                              f"{self.strat_cache.get_key()}, strat_brief_key: {get_strat_brief_key(strat_brief)}")
+                              f"{self.strat_cache.get_key()}, strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
 
             # covers: max cb notional, max open cb notional & max net filled notional ( TODO Urgent: validate and add this description to log detail section ;;;)
@@ -278,14 +279,14 @@ class StratExecutor:
                               f"than: {strat_brief.pair_sell_side_trading_brief.consumable_notional}, order needs: "
                               f"{order_usd_notional} - the check covers: max cb notional, max open cb notional, "
                               f"max net filled notional, for start_cache: {self.strat_cache.get_key()}, "
-                              f"strat_brief_key: {get_strat_brief_key(strat_brief)}")
+                              f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
 
             if strat_brief.pair_sell_side_trading_brief.consumable_concentration - qty < 0:
                 logging.error(f"blocked generated SELL order, not enough consumable_concentration: "
                               f"{strat_brief.pair_sell_side_trading_brief.consumable_concentration} needed: {qty}, "
                               f"for start_cache: {self.strat_cache.get_key()}, strat_brief_key: "
-                              f"{get_strat_brief_key(strat_brief)}")
+                              f"{get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
 
             # limit down - TODO : Important : Upgrade this to support trading at Limit Dn within the limit Dn limit
@@ -293,7 +294,7 @@ class StratExecutor:
                 logging.error(f"blocked generated SELL order, limit down trading not allowed on day-1, px "
                               f"expected higher than limit-dn px: {symbol_overview.limit_dn_px}, found {px} for "
                               f"strat_cache: {self.strat_cache.get_key()}, strat_brief: "
-                              f"{get_strat_brief_key(strat_brief)}")
+                              f"{get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
 
         elif side == Side.BUY:
@@ -305,38 +306,38 @@ class StratExecutor:
                     logging.error(f"blocked generated BUY order, symbol_overview missing for symbol: "
                                   f"{strat_brief.pair_buy_side_trading_brief.security.sec_id}, for strat_cache: "
                                   f"{self.strat_cache.get_key()}, limit up/down check can't be applied, strat_brief: "
-                                  f"{get_strat_brief_key(strat_brief)}")
+                                  f"{get_strat_brief_log_key(strat_brief)}")
                     return False
             else:
                 logging.error(f"blocked generated BUY order, symbol_overview_tuple missing for symbol "
                               f"{strat_brief.pair_buy_side_trading_brief.security.sec_id}, for strat_cache: "
                               f"{self.strat_cache.get_key()}, limit up/down check can't be applied, strat_brief: "
-                              f"{get_strat_brief_key(strat_brief)}")
+                              f"{get_strat_brief_log_key(strat_brief)}")
                 return False
             # max_open_orders_per_side check
             if strat_brief.pair_buy_side_trading_brief.consumable_open_orders < 0:
                 logging.error(f"blocked generated BUY order, not enough consumable_open_orders: "
                               f"{strat_brief.pair_buy_side_trading_brief.consumable_open_orders} for strat_cache: "
-                              f"{self.strat_cache.get_key()}, strat_brief: {get_strat_brief_key(strat_brief)}")
+                              f"{self.strat_cache.get_key()}, strat_brief: {get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
             if order_usd_notional > strat_brief.pair_buy_side_trading_brief.consumable_notional:
                 logging.error(f"blocked generated BUY order, breaches available consumable notional, expected less "
                               f"than: {strat_brief.pair_buy_side_trading_brief.consumable_notional}, order needs: "
                               f"{order_usd_notional} for strat_cache: {self.strat_cache.get_key()}, strat_brief: "
-                              f"{get_strat_brief_key(strat_brief)}")
+                              f"{get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
             if strat_brief.pair_buy_side_trading_brief.consumable_concentration - qty < 0:
                 logging.error(f"blocked generated BUY order, not enough consumable_concentration: "
                               f"{strat_brief.pair_buy_side_trading_brief.consumable_concentration} needed: {qty}, "
                               f"for start_cache: {self.strat_cache.get_key()}, strat_brief: "
-                              f"{get_strat_brief_key(strat_brief)}")
+                              f"{get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
             # limit up - TODO : Important : Upgrade this to support trading at Limit Up within the limit Up limit
             if px > symbol_overview.limit_up_px:
                 logging.error(f"blocked generated BUY order, limit up trading not allowed on day-1, px "
                               f"expected lower than limit-up px: {symbol_overview.limit_up_px}, found {px} for "
                               f"strat_cache: {self.strat_cache.get_key()}, strat_brief: "
-                              f"{get_strat_brief_key(strat_brief)}")
+                              f"{get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
 
         consumable_participation_qty: int = get_consumable_participation_qty_http \
@@ -347,12 +348,12 @@ class StratExecutor:
                 logging.error(f"blocked generated order, not enough consumable_participation_qty available, "
                               f"expected higher than order qty: {qty}, found {consumable_participation_qty} for "
                               f"strat_cache: {self.strat_cache.get_key()}, strat_brief: "
-                              f"{get_strat_brief_key(strat_brief)}")
+                              f"{get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
             # else check passed - no action
         else:
             logging.error(f"Received consumable_participation_qty as None from get_consumable_participation_qty_http, "
-                          f"strat_brief_key: {get_strat_brief_key(strat_brief)}, could not check "
+                          f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}, could not check "
                           f"available consumable_participation_qty")
             check_passed = False
 
@@ -529,12 +530,12 @@ class StratExecutor:
             done = True  # done is left unchanged (True) implies all required data checks succeeded
             try:
                 if not self.pair_strat_id:
-                    self.pair_strat_id = get_pair_strat_key(self.strat_cache.get_pair_strat_())
+                    self.pair_strat_id = get_pair_strat_log_key(self.strat_cache.get_pair_strat_())
                     done = False
-                if not self.strat_cache.symbol_overviews:
+                if not self.strat_cache.get_symbol_overviews:
                     self.update_symbol_overviews_from_http()
                     done = False
-                if not self.strat_cache.get_top_of_books():
+                if not self.strat_cache.get_top_of_book():
                     self.update_tobs_from_http()
                     done = False
                 if not self.leg1_fx:
@@ -550,7 +551,8 @@ class StratExecutor:
                     return
             except Exception as e:
                 logging.error(f"strat retry-init failed! unable to proceed with strat: {self.pair_strat_id}, retrying!"
-                              f";;;exception: {e}, strat_cache: {self.strat_cache}")
+                              f";;;exception: {e}, strat_cache: {self.strat_cache}, "
+                              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
 
     def run(self):
         ret_val: int = -5000
@@ -571,7 +573,7 @@ class StratExecutor:
                 else:
                     pair_strat, _ = self.strat_cache.get_pair_strat()
                     alert_brief: str = f"graceful shut down processing for strat: {self.pair_strat_id} " \
-                                       f"{get_pair_strat_key(pair_strat)}"
+                                       f"{get_pair_strat_log_key(pair_strat)}"
                     alert_details: str = f"strat details: {self.strat_cache.get_pair_strat()}"
                     alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
                     if pair_strat.strat_status.strat_state != StratState.StratState_DONE:
@@ -579,13 +581,13 @@ class StratExecutor:
                         pair_strat_basemodel.strat_status = pair_strat.strat_status
                         pair_strat_basemodel.strat_status.strat_state = StratState.StratState_DONE
                         pair_strat_basemodel.strat_status.strat_alerts = [alert]
-                        self.trading_link.strat_manager_service_web_client.patch_pair_strat_client(pair_strat_basemodel)
+                        self.trading_link.strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat_basemodel, by_alias=True, exclude_none=True))
                         logging.debug(f"Pair Strat with id: {self.pair_strat_id} Marked Done, "
-                                      f"pair_strat_key: {get_pair_strat_key(pair_strat)}")
+                                      f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
                         ret_val = 0
                     else:
                         logging.error(f"unexpected, pair_strat: {self.pair_strat_id} was already Marked Done, "
-                                      f"pair_strat_key: {get_pair_strat_key(pair_strat)}")
+                                      f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
                         ret_val = -4000  # helps find the error location
                     break
 
@@ -613,7 +615,7 @@ class StratExecutor:
 
         if trade_tob is None:
             err_str_ = f"unable to send new_order: no matching leg in this strat: {new_order} " \
-                       f"pair_strat_key: {get_pair_strat_key(pair_strat)};;;" \
+                       f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;;" \
                        f"strat: {self.strat_cache}, pair_strat: {pair_strat}"
             logging.error(err_str_)
             return False
@@ -653,7 +655,7 @@ class StratExecutor:
                     else:
                         logging.error(
                             f"0 value found in ask TOB - ignoring: px{leg1_tob.ask_quote.px}, "
-                            f"qty: {leg1_tob.ask_quote.qty}, pair_strat_key: {get_pair_strat_key(pair_strat)}")
+                            f"qty: {leg1_tob.ask_quote.qty}, pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
                         return False
                 else:  # execute aggressive sell
                     if not (leg1_tob.bid_quote.qty == 0 or math.isclose(leg1_tob.bid_quote.px, 0)):
@@ -666,7 +668,7 @@ class StratExecutor:
                     else:
                         logging.error(f"0 value found in TOB - ignoring: px {leg1_tob.bid_quote.px}"
                                       f", qty: {leg1_tob.bid_quote.qty}, pair_strat_key: "
-                                      f"{get_pair_strat_key(pair_strat)}")
+                                      f"{get_pair_strat_log_key(pair_strat)}")
                         return False
 
         if leg2_tob is not None and self.strat_cache.leg2_trading_symbol is not None:
@@ -683,7 +685,7 @@ class StratExecutor:
                     else:
                         logging.error(
                             f"0 value found in ask TOB - ignoring: px{leg2_tob.ask_quote.px}, "
-                            f"qty: {leg2_tob.ask_quote.qty}, pair_strat_key: {get_pair_strat_key(pair_strat)}")
+                            f"qty: {leg2_tob.ask_quote.qty}, pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
                         return False
                 else:  # execute aggressive sell
                     if not (leg2_tob.bid_quote.qty == 0 or math.isclose(leg2_tob.bid_quote.px, 0)):
@@ -696,13 +698,13 @@ class StratExecutor:
                     else:
                         logging.error(
                             f"0 value found in TOB - ignoring: px {leg2_tob.bid_quote.px}"
-                            f", qty: {leg2_tob.bid_quote.qty}, pair_strat_key: {get_pair_strat_key(pair_strat)}")
+                            f", qty: {leg2_tob.bid_quote.qty}, pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
                         return False
         if order_placed:
             self.last_order_timestamp = DateTime.now()
             self.leg1_notional += posted_leg1_notional
             self.leg2_notional += posted_leg2_notional
-            logging.debug(f"strat-matched ToB for pair_strat_key {get_pair_strat_key(pair_strat)}: "
+            logging.debug(f"strat-matched ToB for pair_strat_key {get_pair_strat_log_key(pair_strat)}: "
                           f"{[str(tob) for tob in top_of_books]}")
         return order_placed
 
@@ -715,7 +717,7 @@ class StratExecutor:
         sell_symbol_prefix = "EQT_Sec"
         order_placed: bool = False
 
-        top_of_book_and_date_tuple = self.strat_cache.get_top_of_books(self._top_of_books_update_date_time)
+        top_of_book_and_date_tuple = self.strat_cache.get_top_of_book(self._top_of_books_update_date_time)
 
         if top_of_book_and_date_tuple is not None:
             top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
@@ -732,7 +734,7 @@ class StratExecutor:
                                 buy_top_of_book = None
                             else:
                                 err_str_ = f"top_of_book with unsupported test symbol received, tob: {top_of_book}, " \
-                                           f"strat_brief_key: {get_strat_brief_key(strat_brief)}"
+                                           f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}"
                                 logging.error(err_str_)
                                 raise Exception(err_str_)
                             latest_update_date_time = top_of_book.last_update_date_time
@@ -746,7 +748,7 @@ class StratExecutor:
                                     buy_top_of_book = None
                                 else:
                                     err_str_ = f"top_of_book with unsupported test symbol received, tob: {top_of_book}, " \
-                                               f"strat_brief_key: {get_strat_brief_key(strat_brief)}"
+                                               f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}"
                                     logging.error(err_str_)
                                     raise Exception(err_str_)
                                 latest_update_date_time = top_of_book.last_update_date_time
@@ -771,12 +773,12 @@ class StratExecutor:
                                                                     Side.SELL, sell_top_of_book.symbol)
                     else:
                         err_str_ = "TOB updates could not find any updated buy or sell tob, " \
-                                   f"strat_brief_key: {get_strat_brief_key(strat_brief)}"
+                                   f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}"
                         logging.debug(err_str_)
                     return order_placed
                 else:
                     logging.error(f"strats need both sides of TOB to be present, found  0 or 1 - triggering "
-                                  f"force update, strat_brief_key: {get_strat_brief_key(strat_brief)};;;"
+                                  f"force update, strat_brief_key: {get_strat_brief_log_key(strat_brief)};;;"
                                   f"tob found: {top_of_books[0]}, {top_of_books[1]}")
                     self.update_tobs_from_http()
         return False
@@ -798,7 +800,7 @@ class StratExecutor:
                 return None
 
     def process_cxl_request(self):
-        cancel_orders_and_date_tuple = self.strat_cache.get_cancel_orders(self._cancel_orders_update_date_time)
+        cancel_orders_and_date_tuple = self.strat_cache.get_cancel_order(self._cancel_orders_update_date_time)
         if cancel_orders_and_date_tuple is not None:
             cancel_orders, self._cancel_orders_update_date_time = cancel_orders_and_date_tuple
             if cancel_orders is not None:
@@ -889,7 +891,7 @@ class StratExecutor:
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
                 # 4. get top_of_book (new or old to be checked by respective strat based on strat requirement)
-                top_of_book_and_date_tuple = self.strat_cache.get_top_of_books()
+                top_of_book_and_date_tuple = self.strat_cache.get_top_of_book()
 
                 if top_of_book_and_date_tuple is not None:
                     top_of_books: List[TopOfBookBaseModel]
@@ -923,7 +925,7 @@ class StratExecutor:
                     continue
 
                 # 6. If any manual new_order requested: apply risk checks (maybe no strat param checks?) & send out
-                new_orders_and_date_tuple = self.strat_cache.get_new_orders(self._new_orders_update_date_time)
+                new_orders_and_date_tuple = self.strat_cache.get_new_order(self._new_orders_update_date_time)
                 if new_orders_and_date_tuple is not None:
                     new_orders, self._new_orders_update_date_time = new_orders_and_date_tuple
                     if new_orders is not None:

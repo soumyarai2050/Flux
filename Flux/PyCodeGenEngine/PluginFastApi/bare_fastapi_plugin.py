@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 from typing import Dict
-from pathlib import PurePath
-import os
-import logging
 
 # third-party modules
 import protogen
@@ -30,9 +27,9 @@ class BareFastapiPlugin(FastapiCallbackFileHandler,
 
     def handle_fastapi_initialize_file_gen(self):
         output_str = "from fastapi import FastAPI\n"
-        routes_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.routes_file_name)
+        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_file_name)
         output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_file_path} import *\n"
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n"
         output_str += f'{self.fastapi_app_name}.include_router({self.api_router_app_name}, ' \
@@ -44,7 +41,7 @@ class BareFastapiPlugin(FastapiCallbackFileHandler,
         super().set_req_data_members(file)
         self.fastapi_file_name = f"{self.proto_file_name}_bare_fastapi"
 
-    def handle_fastapi_class_gen(self, file: protogen.File) -> Dict[str, str]:
+    def output_file_generate_handler(self, file: protogen.File):
         # Pre-code generation initializations
         self.load_root_and_non_root_messages_in_dicts(file.messages)
         self.set_req_data_members(file)

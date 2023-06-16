@@ -7,8 +7,9 @@ import os
 os.environ["DBType"] = "beanie"
 
 # project imports
-from Flux.CodeGenProjects.market_data.generated.market_data_service_model_imports import *
-from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client import MarketDataServiceWebClient
+from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import *
+from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import \
+    MarketDataServiceWebClient
 
 market_data_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient()
 

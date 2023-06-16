@@ -30,10 +30,12 @@ class CodeGenEngineEnvManager:
         self.cpp_code_gen_core_path: PurePath = self.cpp_code_gen_engine_path / "FluxCodeGenCore"
         self.py_code_gen_engine_path: PurePath = self.code_gen_root / "PyCodeGenEngine"
         self.py_code_gen_core_path: PurePath = self.py_code_gen_engine_path / "FluxCodeGenCore"
-        self.output_dir: PurePath = self.code_gen_projects_path
+        self.base_output_dir: PurePath = self.code_gen_projects_path
         self.project_dir: PurePath | None = None
         self.config_path_with_file_name: PurePath | None = None
         self.plugin_dir: PurePath | None = None
+        self.proto_output_dir: PurePath | None = None
+        self.plugin_output_dir: PurePath | None = None
         self.python_path: str = os.getenv("PYTHONPATH") if os.getenv("PYTHONPATH") is not None else ""
 
         if self.code_gen_root.name != "Flux":
@@ -70,17 +72,23 @@ class CodeGenEngineEnvManager:
         os.environ["PLUGIN_DIR"] = str(self.plugin_dir)
 
         # update output dir to be within project output dir
-        self.output_dir = self.project_dir / "generated"
-        os.environ["OUTPUT_DIR"] = str(self.output_dir)
+        self.base_output_dir = self.project_dir / "generated"
+        os.environ["OUTPUT_DIR"] = str(self.base_output_dir)
+
+        # Adding output dir for proto generated classes and generated outputs
+        self.plugin_output_dir = self.base_output_dir / plugin_name[len("PLUGIN"):]
+        os.environ["PLUGIN_OUTPUT_DIR"] = str(self.plugin_output_dir)
 
         # Add required path to sys.path & export them
         sys.path.append(str(self.py_code_gen_core_path))
-        sys.path.append(str(self.output_dir))
+        sys.path.append(str(self.base_output_dir))
+        sys.path.append(str(self.plugin_output_dir))
         sys.path.append(str(self.plugin_dir))
         sys.path.append(str(self.code_gen_root.parent))
 
         # prepare & export PYTHONPATH
-        self.python_path += ":" + str(self.py_code_gen_core_path) + ":" + str(self.output_dir) + ":" + \
+        self.python_path += ":" + str(self.py_code_gen_core_path) + ":" + str(self.base_output_dir) + \
+                            ":" + str(self.plugin_output_dir) + ":" + \
                             str(self.plugin_dir / "PluginFastApi") + ":" + str(self.code_gen_root.parent)
         os.environ["PYTHONPATH"] = str(self.python_path)
 

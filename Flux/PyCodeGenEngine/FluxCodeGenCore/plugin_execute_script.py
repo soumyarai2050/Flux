@@ -45,12 +45,8 @@ class PluginExecuteScript:
 
     def compile_protoc_models(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str],
                               out_dir: str):
-        execute_success = Execute.compile_proto_file(proto_file_path_list, proto_files_dir_paths_list, out_dir)
-
-        if execute_success:
-            logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
-        else:
-            logging.exception(f"Something went wrong while executing protoc plugin {self.plugin_path}")
+        Execute.compile_proto_file(proto_file_path_list, proto_files_dir_paths_list, out_dir)
+        logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
 
     def import_pb2_scripts(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str], out_dir: str):
         if (py_code_gen_core_dir_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None:
@@ -59,24 +55,16 @@ class PluginExecuteScript:
             err_str = f"Env var 'PY_CODE_GEN_CORE_PATH' received as None"
             logging.exception(err_str)
             raise Exception(err_str)
-        execute_success = Execute.run_plugin_proto(proto_file_path_list, proto_files_dir_paths_list,
-                                                   pb2_import_generator_path, out_dir)
-
-        if execute_success:
-            logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
-        else:
-            logging.exception(f"Something went wrong while executing protoc plugin {self.plugin_path}")
+        Execute.run_plugin_proto(proto_file_path_list, proto_files_dir_paths_list,
+                                 pb2_import_generator_path, out_dir)
+        logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
 
     def execute_plugin_cmd(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str], out_dir: str):
-        execute_success = Execute.run_plugin_proto(proto_file_path_list, proto_files_dir_paths_list,
-                                                   self.plugin_path, out_dir)
+        Execute.run_plugin_proto(proto_file_path_list, proto_files_dir_paths_list,
+                                 self.plugin_path, out_dir)
+        logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
 
-        if execute_success:
-            logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
-        else:
-            logging.exception(f"Something went wrong while executing protoc plugin {self.plugin_path}")
-
-    def remove_insertion_point_from_output(self, out_dir: str):
+    def remove_insertion_points_from_generated_output(self, out_dir: str):
         for file_name in os.listdir(out_dir):
             file_path = os.path.join(out_dir, file_name)
             if (not file_name.startswith(".")) and \
@@ -128,17 +116,22 @@ class PluginExecuteScript:
             logging.exception(err_str)
             raise Exception(err_str)
         # else not required: output_dir is present, continue further
+        if (plugin_output_dir := os.getenv("PLUGIN_OUTPUT_DIR")) is None:
+            err_str = "Env Var 'PLUGIN_OUTPUT_DIR' received as None"
+            logging.exception(err_str)
+            raise Exception(err_str)
+        # else not required: plugin_output_dir is present, continue further
         proto_files_dir_paths_list: List[str] = [
             os.path.join(self.base_dir_path, "model"),
             os.path.abspath(os.path.join(self.base_dir_path, "..", ".."))
         ]
         insertion_imports_dir_path = self.current_script_dir_path
 
-        return all_proto_file_path_list, proto_file_path_list, output_dir, proto_files_dir_paths_list, \
-               insertion_imports_dir_path
+        return all_proto_file_path_list, proto_file_path_list, output_dir, plugin_output_dir, \
+            proto_files_dir_paths_list, insertion_imports_dir_path
 
     def execute(self):
-        all_proto_file_path_list, proto_file_path_list, out_dir, proto_files_dir_paths_list, \
+        all_proto_file_path_list, proto_file_path_list, out_dir, plugin_out_dir, proto_files_dir_paths_list, \
             insertion_imports_dir_path = self.get_required_param_values()
 
         # Creating pb2 files of all proto models
@@ -147,11 +140,11 @@ class PluginExecuteScript:
         # Adding import of pb2 file in insertion_imports.py
         self.import_pb2_scripts(proto_file_path_list, proto_files_dir_paths_list, insertion_imports_dir_path)
 
-        # Running the plugin to create output file
-        self.execute_plugin_cmd(proto_file_path_list, proto_files_dir_paths_list, out_dir)
+        # Running the plugin to generate output files
+        self.execute_plugin_cmd(proto_file_path_list, proto_files_dir_paths_list, plugin_out_dir)
 
-        # Removing plugin comment from output json files if present
-        self.remove_insertion_point_from_output(out_dir)
+        # Removing plugin comment from output generated files if present
+        self.remove_insertion_points_from_generated_output(plugin_out_dir)
 
         # Removing used imports from insertion_imports file
         self.clear_used_imports_from_file()

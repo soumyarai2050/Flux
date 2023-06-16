@@ -31,9 +31,6 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        self.insertion_point_key_to_callable_list: List[Callable] = [
-            self.handle_output_gen
-        ]
         response_field_case_style = None
         if (enum_type := os.getenv("ENUM_TYPE")) is not None and \
                 (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
@@ -45,8 +42,6 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             logging.exception(err_str)
             raise Exception(err_str)
         self.default_id_field_type: str | None = None
-        # Since output file name for this plugin will be created at runtime
-        self.output_file_name_suffix: str = ""
         self.root_message_list: List[protogen.Message] = []
         self.non_root_message_list: List[protogen.Message] = []
         self.query_message_list: List[protogen.Message] = []
@@ -110,9 +105,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         for message in message_list:
             if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root):
                 json_root_msg_option_val_dict = \
-                    self.get_complex_option_values_as_list_of_dict(message, BasePydanticModelPlugin.flux_msg_json_root)
+                    self.get_complex_option_set_values(message, BasePydanticModelPlugin.flux_msg_json_root)
                 # taking first obj since json root is of non-repeated option
-                if (is_reentrant_required := json_root_msg_option_val_dict[0].get(
+                if (is_reentrant_required := json_root_msg_option_val_dict.get(
                         BasePydanticModelPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
                     if not is_reentrant_required:
                         self.reentrant_lock_non_required_msg.append(message)
@@ -259,11 +254,10 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def _handle_ws_connection_manager_data_members_override(self, message: protogen.Message) -> str:
         output_str = "    read_ws_path_ws_connection_manager: " \
                      "ClassVar[PathWSConnectionManager] = PathWSConnectionManager()\n"
-        options_list_of_dict = \
-            self.get_complex_option_values_as_list_of_dict(message,
-                                                           BasePydanticModelPlugin.flux_msg_json_root)
-        if options_list_of_dict and \
-                BasePydanticModelPlugin.flux_json_root_read_websocket_field in options_list_of_dict[0]:
+        options_value_dict = \
+            self.get_complex_option_set_values(message,
+                                               BasePydanticModelPlugin.flux_msg_json_root)
+        if BasePydanticModelPlugin.flux_json_root_read_websocket_field in options_value_dict:
             output_str += "    read_ws_path_with_id_ws_connection_manager: " \
                           "ClassVar[PathWithIdWSConnectionManager] = PathWithIdWSConnectionManager()\n"
         # else not required: Avoid if websocket field in json root option not present
@@ -369,12 +363,12 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         return output_str
 
     def _import_current_models(self) -> str:
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", self.model_file_name)
+        model_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.model_file_name)
         output_str = f"from {model_file_path} import *\n"
         return output_str
 
     def handle_model_import_file_gen(self) -> str:
-        if (output_dir_path := os.getenv("OUTPUT_DIR")) is not None:
+        if (output_dir_path := os.getenv("PLUGIN_OUTPUT_DIR")) is not None:
             model_import_file_name = self.model_import_file_name + ".py"
             model_import_file_path = PurePath(output_dir_path) / model_import_file_name
             current_import_statement = self._import_current_models()
@@ -419,7 +413,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
                 return "".join(imports_file_content)
         else:
-            err_str = "Env var 'OUTPUT_DIR' received as None"
+            err_str = "Env var 'PLUGIN_OUTPUT_DIR' received as None"
             logging.exception(err_str)
             raise Exception(err_str)
 
@@ -428,8 +422,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.proto_package_name = str(file.proto.package)
         self.model_import_file_name = f'{self.proto_file_name}_model_imports'
 
-    @final
-    def handle_output_gen(self, file: protogen.File) -> Dict[str, str]:
+    def output_file_generate_handler(self, file: protogen.File):
         self.assign_required_data_members(file)
         self.load_root_and_non_root_messages_in_dicts(file.messages)
         self.sort_message_order()

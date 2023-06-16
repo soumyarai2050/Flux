@@ -20,12 +20,12 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_callback_override_set_instance_import(self) -> str:
         callback_override_set_instance_file_path = \
-            self.import_path_from_os_path("OUTPUT_DIR", self.callback_override_set_instance_file_name)
+            self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.callback_override_set_instance_file_name)
         output_str = "# below import is to set derived callback's instance if implemented in the script\n"
         callback_override_set_instance_file_path = ".".join(callback_override_set_instance_file_path.split(".")[:-1])
         output_str += f"from {callback_override_set_instance_file_path} import " \
                       f"{self.callback_override_set_instance_file_name}\n"
-        callback_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.routes_callback_class_name}")
+        callback_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", f"{self.routes_callback_class_name}")
         routes_callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += f"from {callback_file_path} import {routes_callback_class_name_camel_cased}\n\n\n"
 
@@ -79,7 +79,7 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'    uvicorn.run(reload=reload_status, \n'
         output_str += f'                host=host, \n'
         output_str += f'                port=port, \n'
-        output_str += '                app=f"{fastapi_file_name}'+f':{self.fastapi_app_name}", \n'
+        output_str += '                app=f"FastApi.{fastapi_file_name}'+f':{self.fastapi_app_name}", \n'
         output_str += f'                log_level=20)\n'
         output_str += f'    callback_instance.app_launch_post()\n'
         return output_str

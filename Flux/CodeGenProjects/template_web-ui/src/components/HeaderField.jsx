@@ -24,7 +24,7 @@ const HeaderField = (props) => {
     return (
         <Box className={classes.container} data-xpath={props.data.xpath}>
             <Typography variant="subtitle1" >
-                <div className={classes.header} data-xpath={props.data.xpath} onDoubleClick={() => props.data.onNodeDblClick(props.name)} >
+                <div className={classes.header} data-xpath={props.data.xpath}>
                     <span className={classes.icon}>
                         {props.isOpen ? <IndeterminateCheckBox data-close={props.data.xpath} onClick={props.onClick} /> :
                             <AddBox data-open={props.data.xpath} onClick={props.onClick} />}
