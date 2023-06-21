@@ -38,6 +38,108 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     if field_name not in self.field:
                         self.field.append(field_name)
 
+    @staticmethod
+    def headers_generate_handler(file_name):
+        output_content: str = ""
+        output_content += "#pragma once\n\n"
+        output_content += "#include <unordered_map>\n\n"
+        output_content += f'#include "../CppDBHandler/{file_name}_db_handler.h"\n'
+        output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
+        return output_content
+
+    @staticmethod
+    def generate_public_members_handler(class_name: str, message_name: str, package_name: str,
+                                        message_name_snake_cased: str):
+        output_content: str = ""
+        output_content += f"class {class_name}{message_name}Codec "
+        output_content += "{\n\npublic:\n\t"
+        output_content += f'explicit {class_name}{message_name}Codec({package_name}_handler::' \
+                          f'{class_name}_MongoDBHandler &mongo_db_) : mongo_db(mongo_db_)'
+        output_content += "{}\n\n"
+
+        output_content += f"\tstatic inline std::string get_key(const {package_name}::{message_name} " \
+                          f"&{message_name_snake_cased}_data) "
+        output_content += "{\n\t\t"
+        output_content += 'return "Not Implemented";\n\t}\n\n'
+
+        output_content += f"\tvoid insert_or_update_{message_name_snake_cased}({package_name}::" \
+                          f"{message_name} &{message_name_snake_cased}_data) "
+        output_content += "{\n\t\t"
+        output_content += f"if (!{message_name_snake_cased}_data.IsInitialized() && has_required_fields" \
+                          f"({message_name_snake_cased}_data))\n\t\t\treturn;\n\t\t"
+        output_content += f"bsoncxx::builder::basic::document {message_name_snake_cased}_document"
+        output_content += "{};\n\t\t"
+        output_content += f"\n\t\tprepare_{message_name_snake_cased}_doc({message_name_snake_cased}_data, " \
+                          f"{message_name_snake_cased}_document);"
+        output_content += f'\n\t\tauto found = {message_name_snake_cased}_key_to_db_id.find' \
+                          f'(get_key({message_name_snake_cased}_data));\n\t\t'
+        output_content += f'if (found == {message_name_snake_cased}_key_to_db_id.end()) '
+        output_content += '{\n\t\t\t'
+        output_content += f'insert_{message_name_snake_cased}({message_name_snake_cased}_document, ' \
+                          f'get_key({message_name_snake_cased}_data));\n\t\t'
+        output_content += '} else {\n\t\t\t'
+        output_content += f"update_or_patch_{message_name_snake_cased}(found->second, " \
+                          f"{message_name_snake_cased}_document);\n\t\t"
+        output_content += "}\n\t}\n"
+
+        output_content += f"\tvoid patch_{message_name_snake_cased}({package_name}::{message_name} " \
+                          f"&{message_name_snake_cased}_data)"
+        output_content += "{\n\t\t"
+        output_content += f"if (!{message_name_snake_cased}_data.IsInitialized())\n\t\t\treturn;\n\t\t"
+        output_content += f"bsoncxx::builder::basic::document {message_name_snake_cased}_document"
+        output_content += "{};\n\t\t"
+        output_content += f'\n\t\tauto found = {message_name_snake_cased}_key_to_db_id.find' \
+                          f'(get_key({message_name_snake_cased}_data));\n\t\t'
+        output_content += f'if (found == {message_name_snake_cased}_key_to_db_id.end()) '
+        output_content += '\n\t\t\tthrow '
+        output_content += f'std::runtime_error("{message_name_snake_cased} not found");'
+        output_content += f"\n\t\tprepare_{message_name_snake_cased}_doc({message_name_snake_cased}_data, " \
+                          f"{message_name_snake_cased}_document);"
+        output_content += f"\n\t\tupdate_or_patch_{message_name_snake_cased}(found->second, " \
+                          f"{message_name_snake_cased}_document);\n\t"
+        output_content += "}\n\n"
+
+        output_content += f"\tvoid update_or_patch_{message_name_snake_cased}(bsoncxx::types::bson_value::view " \
+                          f"&{message_name_snake_cased}_id, bsoncxx::builder::basic::document " \
+                          f"&{message_name_snake_cased}_document)"
+        output_content += "{\n\t\t"
+        output_content += f'auto update_filter = {package_name}_handler::make_document({package_name}' \
+                          f'_handler::kvp("_id", {message_name_snake_cased}_id));\n\t\t'
+        output_content += f'auto update_document = {package_name}_handler::make_document({package_name}' \
+                          f'_handler::kvp("$set", {message_name_snake_cased}_document.view()));\n\t\t'
+        output_content += f'{message_name_snake_cased}_collection.update_one(update_filter.view(), ' \
+                          f'update_document.view());\n\t'
+        output_content += "}\n\n"
+
+        output_content += f"\tbool insert_{message_name_snake_cased} (bsoncxx::builder::basic::document " \
+                          f"&{message_name_snake_cased}_document, const std::string &{message_name_snake_cased}_key) "
+        output_content += "{\n\t\t"
+        output_content += f"auto {message_name_snake_cased}_insert_result = {message_name_snake_cased}" \
+                          f"_collection.insert_one({message_name_snake_cased}_document.view());\n\t\t"
+        output_content += f"auto {message_name_snake_cased}_id = {message_name_snake_cased}" \
+                          f"_insert_result->inserted_id();\n\t\t{message_name_snake_cased}_key_to_db_id" \
+                          f"[{message_name_snake_cased}_key] = {message_name_snake_cased}_id;" \
+                          f"\n\t\treturn true;"
+        output_content += "\n\t}\n\n"
+
+        output_content += f"\tbool has_required_fields({package_name}::{message_name} " \
+                          f"&{message_name_snake_cased}_data) "
+        output_content += "{\n\t\t"
+        output_content += f"if ({message_name_snake_cased}_data.IsInitialized()) "
+        output_content += "\n\t\t\treturn true;\n\t\treturn false;\n\t}"
+        return output_content
+
+    @staticmethod
+    def generate_private_members_handler(class_name: str, package_name: str, message_name_snake_cased: str, file_name: str):
+        output_content: str = ""
+        output_content += f"\n\nprivate:\n\n\t{package_name}_handler::{class_name}_MongoDBHandler &mongo_db;\n"
+        output_content += f"\tmongocxx::collection {message_name_snake_cased}_collection = " \
+                          f"mongo_db.{file_name}_db[{package_name}_handler::{message_name_snake_cased}];\n\n"
+
+        output_content += f"\tstd::unordered_map <std::string, bsoncxx::types::bson_value::view> " \
+                          f"{message_name_snake_cased}_key_to_db_id;\n\n"
+        return output_content
+
     def output_file_generate_handler(self, file: protogen.File):
         # pre-requisite calls
         self.get_all_root_message(file.messages)
@@ -50,98 +152,18 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         for i in class_name_list:
             class_name = class_name + i.capitalize()
 
-        output_content += "#pragma once\n\n"
-        output_content += "#include <unordered_map>\n\n"
-        output_content += f'#include "../CppDBHandler/{file_name}_db_handler.h"\n'
-        output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
+        output_content += self.headers_generate_handler(file_name)
 
         for message in self.root_message_list:
             if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
                 message_name = message.proto.name
                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                output_content += f"class {class_name}{message_name}Codec "
-                output_content += "{\n\npublic:\n\t"
-                output_content += f'explicit {class_name}{message_name}Codec({package_name}_handler::' \
-                                  f'{class_name}_MongoDBHandler &mongo_db_) : mongo_db(std::move(mongo_db_))'
-                output_content += "{}\n\n"
 
-                output_content += f"\tstatic inline std::string get_key(const {package_name}::{message_name} " \
-                                  f"&{message_name_snake_cased}_data) "
-                output_content += "{\n\t\t"
-                output_content += 'return "Not Implemented";\n\t}\n\n'
+                output_content += self.generate_public_members_handler(class_name, message_name, package_name,
+                                                                       message_name_snake_cased)
 
-                output_content += f"\tvoid insert_or_update_{message_name_snake_cased}({package_name}::" \
-                                  f"{message_name} &{message_name_snake_cased}_data) "
-                output_content += "{\n\t\t"
-                output_content += f"if (!{message_name_snake_cased}_data.IsInitialized() && has_required_fields" \
-                                  f"({message_name_snake_cased}_data))\n\t\t\treturn;\n\t\t"
-                output_content += f"bsoncxx::builder::basic::document {message_name_snake_cased}_document"
-                output_content += "{};\n\t\t"
-                output_content += f"\n\t\tprepare_{message_name_snake_cased}_doc({message_name_snake_cased}_data, " \
-                                  f"{message_name_snake_cased}_document);"
-                output_content += f'\n\t\tauto found = {message_name_snake_cased}_key_to_db_id.find' \
-                                  f'(get_key({message_name_snake_cased}_data));\n\t\t'
-                output_content += f'if (found == {message_name_snake_cased}_key_to_db_id.end()) '
-                output_content += '{\n\t\t\t'
-                output_content += f'insert_{message_name_snake_cased}({message_name_snake_cased}_document, ' \
-                                  f'get_key({message_name_snake_cased}_data));\n\t\t'
-                output_content += '} else {\n\t\t\t'
-                output_content += f"update_or_patch_{message_name_snake_cased}(found->second, " \
-                                  f"{message_name_snake_cased}_document);\n\t\t"
-                output_content += "}\n\t}\n"
-
-                output_content += f"\tvoid patch_{message_name_snake_cased}({package_name}::{message_name} " \
-                                  f"&{message_name_snake_cased}_data)"
-                output_content += "{\n\t\t"
-                output_content += f"if (!{message_name_snake_cased}_data.IsInitialized())\n\t\t\treturn;\n\t\t"
-                output_content += f"bsoncxx::builder::basic::document {message_name_snake_cased}_document"
-                output_content += "{};\n\t\t"
-                output_content += f'\n\t\tauto found = {message_name_snake_cased}_key_to_db_id.find' \
-                                  f'(get_key({message_name_snake_cased}_data));\n\t\t'
-                output_content += f'if (found == {message_name_snake_cased}_key_to_db_id.end()) '
-                output_content += '\n\t\t\tthrow '
-                output_content += f'std::runtime_error("{message_name_snake_cased} not found");'
-                output_content += f"\n\t\tprepare_{message_name_snake_cased}_doc({message_name_snake_cased}_data, " \
-                                  f"{message_name_snake_cased}_document);"
-                output_content += f"\n\t\tupdate_or_patch_{message_name_snake_cased}(found->second, " \
-                                  f"{message_name_snake_cased}_document);\n\t"
-                output_content += "}\n\n"
-
-                output_content += f"\tvoid update_or_patch_{message_name_snake_cased}(bsoncxx::types::bson_value::view " \
-                                  f"&{message_name_snake_cased}_id, bsoncxx::builder::basic::document " \
-                                  f"&{message_name_snake_cased}_document)"
-                output_content += "{\n\t\t"
-                output_content += f'auto update_filter = {package_name}_handler::make_document({package_name}' \
-                                  f'_handler::kvp("_id", {message_name_snake_cased}_id));\n\t\t'
-                output_content += f'auto update_document = {package_name}_handler::make_document({package_name}' \
-                                  f'_handler::kvp("$set", {message_name_snake_cased}_document.view()));\n\t\t'
-                output_content += f'{message_name_snake_cased}_collection.update_one(update_filter.view(), ' \
-                                  f'update_document.view());\n\t'
-                output_content += "}\n\n"
-
-                output_content += f"\tbool insert_{message_name_snake_cased} (bsoncxx::builder::basic::document " \
-                                  f"&{message_name_snake_cased}_document, const std::string &{message_name_snake_cased}_key) "
-                output_content += "{\n\t\t"
-                output_content += f"auto {message_name_snake_cased}_insert_result = {message_name_snake_cased}" \
-                                  f"_collection.insert_one({message_name_snake_cased}_document.view());\n\t\t"
-                output_content += f"auto {message_name_snake_cased}_id = {message_name_snake_cased}" \
-                                  f"_insert_result->inserted_id();\n\t\t{message_name_snake_cased}_key_to_db_id" \
-                                  f"[{message_name_snake_cased}_key] = {message_name_snake_cased}_id;" \
-                                  f"\n\t\treturn true;"
-                output_content += "\n\t}\n\n"
-
-                output_content += f"\tbool has_required_fields({package_name}::{message_name} " \
-                                  f"&{message_name_snake_cased}_data) "
-                output_content += "{\n\t\t"
-                output_content += f"if ({message_name_snake_cased}_data.IsInitialized()) "
-                output_content += "\n\t\t\treturn true;\n\t\treturn false;\n\t}"
-
-                output_content += f"\n\nprivate:\n\n\t{package_name}_handler::{class_name}_MongoDBHandler mongo_db;\n"
-                output_content += f"\tmongocxx::collection {message_name_snake_cased}_collection = " \
-                                  f"mongo_db.{file_name}_db[{package_name}_handler::{message_name_snake_cased}];\n\n"
-
-                output_content += f"\tstd::unordered_map <std::string, bsoncxx::types::bson_value::view> " \
-                                  f"{message_name_snake_cased}_key_to_db_id;\n\n"
+                output_content += self.generate_private_members_handler(class_name, package_name,
+                                                                        message_name_snake_cased, file_name)
 
                 output_content += "protected:\n\n"
                 output_content += f"\tvoid prepare_{message_name_snake_cased}_doc({package_name}::{message_name} " \
@@ -175,21 +197,58 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                               f"{field_name}_array));"
                             output_content += "\n\t\t}"
 
-                    # elif field_type_message is not None:
-                    #     if field_type != "repeated":
-                    #         output_content += f"\n\t\tbsoncxx::builder::basic::document {field_name};\n"
-                    #         output_content += f"\t\tif ({message_name_snake_cased}_data.has_{field_name}()) "
-                    #         output_content += "{\n\t\t\t"
-                    #         for message_field in field_type_message.fields:
-                    #             message_field_name = message_field.proto.name
-                    #
-                    #             output_content += f"if ({message_name_snake_cased}_data.{field_name}().has_{message_field_name}()) "
-                    #             output_content += f'\n\t\t\t\t{field_name}.append({package_name}_handler'
-                    #             output_content += f'::kvp("{message_field_name}", {message_name_snake_cased}_data.' \
-                    #                               f'{field_name}().{message_field_name}()));\n\t\t\t'
-                    #
-                    #         output_content += f"{field_name}.append({package_name}_handler::kvp({package_name}_handler::{field_name}_key, {field_name}));"
-                    #         output_content += "\n\t\t}"
+                    elif field_type_message is not None:
+                        if field_type != "repeated":
+                            output_content += f"\n\t\tbsoncxx::builder::basic::document {field_name};\n"
+                            output_content += f"\t\tif ({message_name_snake_cased}_data.has_{field_name}()) "
+                            output_content += "{\n\t\t\t"
+                            for message_field in field_type_message.fields:
+                                message_field_cardinality = message_field.cardinality.name.lower()
+                                message_field_name = message_field.proto.name
+                                message_field_type: protogen.Message | None = message_field.message
+                                if message_field_type is None and message_field_cardinality != "repeated":
+                                    output_content += f"if ({message_name_snake_cased}_data.{field_name}().has_{message_field_name}()) "
+                                    output_content += f'\n\t\t\t\t{field_name}.append({package_name}_handler'
+                                    output_content += f'::kvp("{message_field_name}", {message_name_snake_cased}_data.' \
+                                                      f'{field_name}().{message_field_name}()));\n\t\t\t'
+                                elif message_field_type is not None and message_field_cardinality != "repeated":
+                                    output_content += f"\n\t\t\tif ({message_name_snake_cased}_data.{field_name}()." \
+                                                      f"has_{message_field_name}())"
+                                    output_content += " {"
+                                    output_content += f"\n\t\t\t\tbsoncxx::builder::basic::document {message_field_name};\n"
+                                    for f in message_field_type.fields:
+                                        if f.message is None:
+                                            output_content += f"\n\t\t\t\tif ({message_name_snake_cased}_data." \
+                                                              f"{field_name}().{message_field_name}().has_{f.proto.name}())\n"
+                                            output_content += f'\t\t\t\t\t{message_field_name}.append({package_name}' \
+                                                              f'_handler::kvp("{f.proto.name}", ' \
+                                                              f'{message_name_snake_cased}_data.{field_name}().' \
+                                                              f'{message_field_name}().{f.proto.name}()));'
+                                        else:
+                                            output_content += f"\n\t\t\t\t\tbsoncxx::builder::basic::document {f.proto.name};\n"
+                                            output_content += f"\n\t\t\t\tif ({message_name_snake_cased}_data." \
+                                                              f"{field_name}().{message_field_name}().has_{f.proto.name}())"
+                                            output_content += " {"
+                                            for i in f.message.fields:
+                                                output_content += f"\n\t\t\t\t\tif ({message_name_snake_cased}_data." \
+                                                                  f"{field_name}().{message_field_name}()." \
+                                                                  f"{f.proto.name}().has_{i.proto.name}())\n"
+                                                output_content += f'\t\t\t\t\t\t{message_field_name}.append({package_name}' \
+                                                                  f'_handler::kvp("{i.proto.name}", ' \
+                                                                  f'{message_name_snake_cased}_data.{field_name}().' \
+                                                                  f'{message_field_name}().{f.proto.name}().{i.proto.name}()));'
+                                            output_content += f'\n\t\t\t\t\t{message_field_name}.append({package_name}' \
+                                                              f'_handler::kvp("{f.proto.name}", {f.proto.name}));'
+                                            output_content += "\n\t\t\t\t}"
+
+                                    output_content += f'\n\t\t\t\t{field_name}.append({package_name}_handler::kvp("' \
+                                                      f'{message_field_name}", {message_field_name}));\n\t\t\t'
+                                    output_content += "}\n\t\t\t"
+
+
+                            output_content += f"{field_name}.append({package_name}_handler::kvp({package_name}_" \
+                                              f"handler::{field_name}_key, {field_name}));"
+                            output_content += "\n\t\t}"
 
                         # else:
                         #     output_content += f"\n\t\tif ({message_name_snake_cased}_data.{field_name}_size() > 0) "

@@ -27,21 +27,9 @@ class BaseProtoPlugin(ABC):
     -----------
     base_dir_path: str
         path of directory containing derived plugin implementation
-    config_file_path: str
-        path of yaml config file
-    config_yaml:
-        Dictionary converted from content inside yaml config file
-    template_file_path: str
-        path of template file to be used to generate output file
-    output_file_name: str
-        name of output file to be generated
-    main_proto_msg_class_name: str
-        name of proto main message class from proto schema, gets assigned at run-time
-    insertion_point_key_to_callable_list: List[Callable]
-        List of respective insertion point's handler methods to be assigned by derived class
-    insertion_points_to_content_dict: Dict[str, str]
-        Dictionary containing insertion point keys with respective contents as value. Gets
-        assigned by `__process` method at run-time
+    output_file_name_to_template_file_path_dict: Dict[str, str]
+        will be populated by derived implementation based on output generation
+        depending on insert points based template
     """
     msg_options_standard_prefix = "FluxMsg"
     fld_options_standard_prefix = "FluxFld"
@@ -115,6 +103,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_display_type: str = "FluxFldDisplayType"
     flux_fld_display_zero: str = "FluxFldDisplayZero"
     flux_fld_text_align: str = "FluxFldTextAlign"
+    flux_fld_micro_separator: str = "FluxFldMicroSeparator"
     flux_msg_ui_get_all_limit: str = "FluxMsgUIGetAllLimit"
     flux_fld_abbreviated_link: str = "FluxFldAbbreviatedLink"
     flux_msg_executor_options: str = "FluxMsgExecutorOptions"
@@ -148,13 +137,20 @@ class BaseProtoPlugin(ABC):
 
     def __init__(self, base_dir_path: str):
         self.base_dir_path: str = base_dir_path
-
+        # output_file_name_to_template_file_path_dict will be populated by derived implementation based
+        # on output generation depending on insert points based template
         self.output_file_name_to_template_file_path_dict: Dict[str, str] = {}
-        # Below data member will override on the run time
         self.insertion_points_to_content_dict: Dict[str, str] | Dict[str, Dict[str, str]] = {}
 
     @abstractmethod
     def output_file_generate_handler(self, file: protogen.File):
+        """
+            Abstract method which is responsible for generating outputs from derived plugin class.
+            Must return dict having:
+            1. output_file_name to output_content key-value pair - for non-insertion point based template output
+            2. output_file_name to output_content_dict key-value pair, where output_content_dict must have
+            insertion_point to replacing_content key-value pair - for non-insertion point based template output
+        """
         raise NotImplementedError("Derived implementation must return dict of "
                                   "output file name-respective content key-value pair or "
                                   "output file name-dict of insertion points-respective content key-value pair ")

@@ -3,7 +3,7 @@
 }
 
 .table {
-    min-width: 400px;
+    min-width: 200px;
 }
 
 .row:nth-of-type(even) {

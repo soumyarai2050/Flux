@@ -47,7 +47,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_number_format,
         BaseProtoPlugin.flux_fld_display_type,
         BaseProtoPlugin.flux_fld_display_zero,
-        BaseProtoPlugin.flux_fld_text_align
+        BaseProtoPlugin.flux_fld_text_align,
+        BaseProtoPlugin.flux_fld_micro_separator
     ]
     # Used to be added as property
     flx_fld_complex_attribute_options: List[str] = [
@@ -112,7 +113,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     self.__enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if self.is_option_enabled(field, JsonSchemaConvertPlugin.flux_msg_widget_ui_data):
+                if self.is_option_enabled(field.message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data):
                     widget_ui_data_option_value_dict = \
                         self.get_complex_option_set_values(field.message,
                                                            JsonSchemaConvertPlugin.flux_msg_widget_ui_data)
@@ -264,6 +265,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             return float(value)
         # else str
         else:
+            if value.isspace():
+                return '"' + ' '*len(value) + '"'
             return '"' + value.strip() + '"'
 
     def __underlying_handle_options_value_having_msg_fld_name(self, option_val: str) -> str:
@@ -303,7 +306,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         if type(option_value).__name__ == "str" and \
                 (("-" in option_value or "." in option_value) and any(char.isalpha() for char in option_value)):
 
-            option_value_dollar_separated = option_value[1:-1].split("$")
+            option_value_dollar_separated = option_value[1:-1].split("^")
             temp_list_1 = []
 
             for option_val in option_value_dollar_separated:
@@ -318,7 +321,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 else:
                     temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val)
                     temp_list_1.append(temp_str)
-            return '"' + "$".join(temp_list_1) + '"'
+            return '"' + "^".join(temp_list_1) + '"'
 
         else:
             return option_value
@@ -342,7 +345,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             if self.is_option_enabled(field_or_message_obj, option):
                 option_value = self.get_non_repeated_valued_custom_option_value(field_or_message_obj,
                                                                                 option)
-
                 if option == JsonSchemaConvertPlugin.flux_fld_help:
                     if "'" in option_value:
                         err_str = "FluxFldHelp must have string without singe quotation mark ('), found in " \

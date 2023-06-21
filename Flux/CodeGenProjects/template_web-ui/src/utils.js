@@ -10,6 +10,14 @@ import HeaderField from './components/HeaderField';
 const treeState = {};
 const primitiveDataTypes = [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM, DataTypes.DATE_TIME];
 
+export const FLOAT_POINT_PRECISION = 2;
+export const Message = {
+    REQUIRED_FIELD: 'required field cannot be null',
+    UNSPECIFIED_FIELD: 'enum field cannot be unset / UNSPECIFIED',
+    MAX: 'field value exceeds the max limit',
+    MIN: 'field value exceeds the min limit'
+}
+
 // complex field properties that are to be passed to the child components
 const complexFieldProps = [
     { propertyName: "server_populate", usageName: "serverPopulate" },
@@ -17,7 +25,7 @@ const complexFieldProps = [
     { propertyName: "orm_no_update", usageName: "ormNoUpdate" },
     { propertyName: "auto_complete", usageName: "autocomplete" },
     { propertyName: "elaborate_title", usageName: "elaborateTitle" },
-    { propertyName: "filter_enable", usageName: "filterEnable" },
+    { propertyName: "filter_enable", usageName: "filterEnable" }
 ]
 
 const fieldProps = [
@@ -47,7 +55,8 @@ const fieldProps = [
     { propertyName: "no_common_key", usageName: "noCommonKey" },
     { propertyName: "display_type", usageName: "displayType" },
     { propertyName: "text_align", usageName: "textAlign" },
-    { propertyName: "display_zero", usageName: "displayZero" }
+    { propertyName: "display_zero", usageName: "displayZero" },
+    { propertyName: "micro_separator", usageName: "microSeparator" }
 ]
 
 // properties supported explicitly on the array types
@@ -86,9 +95,12 @@ function setAutocompleteValue(schema, object, autocompleteDict, propname, usageN
             if (autocomplete === 'server_populate') {
                 object.serverPopulate = true;
                 delete object[usageName];
-            } else {
-                object.options = [autocomplete];
             }
+            //  else {
+            //     // set enum with default value and prevent reducing the enum options
+            //     // object.options = [autocomplete];
+            //     object.value = autocomplete;
+            // }
         }
     }
 }
@@ -287,7 +299,19 @@ export function createCollections(schema, currentSchema, callerProps, collection
     return collections;
 }
 
-export function generateObjectFromSchema(schema, currentSchema) {
+export function generateObjectFromSchema(schema, currentSchema, additionalProps) {
+    if (additionalProps && additionalProps instanceof Object) {
+        for (const key in additionalProps) {
+            const prop = complexFieldProps.find(({ _, usageName }) => usageName === key);
+            console.log(prop);
+            if (prop) {
+                currentSchema[prop.propertyName] = additionalProps[key]
+            } else {
+                delete additionalProps[key];
+            }
+        }
+    }
+
     let object = {};
     Object.keys(currentSchema.properties).map((propname) => {
         let metadata = currentSchema.properties[propname];
@@ -352,13 +376,19 @@ export function generateObjectFromSchema(schema, currentSchema) {
             let ref = metadata.items.$ref.split('/');
             let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
             childSchema = cloneDeep(childSchema);
+            const required = currentSchema.required.filter(prop => prop === propname).length > 0 ? true : false;
 
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 childSchema.auto_complete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
             }
 
             if (!(childSchema.server_populate || childSchema.ui_update_only)) {
-                object[propname] = generateObjectFromSchema(schema, childSchema);
+                if (required) {
+                    object[propname] = generateObjectFromSchema(schema, childSchema);
+                } else {
+                    object[propname] = null;
+                }
+
             }
         }
     });
@@ -430,7 +460,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     const originalData = callerProps.originalData;
 
     // do not add field if not present in both modified data and original data.
-    if ((Object.keys(data).length === 0 && Object.keys(originalData).length === 0) || (dataxpath && !_.get(data, dataxpath) && !_.get(originalData, xpath))) return;
+    if ((Object.keys(data).length === 0 && Object.keys(originalData).length === 0) || (dataxpath && _.get(data, dataxpath) === undefined && _.get(originalData, xpath) === undefined)) return;
 
     let attributes = currentSchema.properties[propname];
     if (attributes.hasOwnProperty('type') && primitiveDataTypes.includes(attributes.type)) {
@@ -452,7 +482,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
             }
         })
 
-        node.value = dataxpath ? hasxpath(data, node.dataxpath) ? _.get(data, dataxpath)[propname] : undefined : data[propname];
+        node.value = dataxpath ? hasxpath(data, dataxpath) ? _.get(data, dataxpath)[propname] : undefined : data[propname];
 
         if (attributes.type === DataTypes.BOOLEAN) {
             node.onCheckboxChange = callerProps.onCheckboxChange;
@@ -503,7 +533,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     }
 }
 
-function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpath, xpath, ref) {
+function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpath, xpath, ref, objectState) {
     let headerNode = {};
     headerNode.id = Math.random();
     headerNode.key = propname;
@@ -515,10 +545,33 @@ function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpa
     headerNode.mode = callerProps.mode;
     headerNode.customComponent = HeaderField;
     headerNode.xpath = xpath;
+    fieldProps.map(({ propertyName, usageName }) => {
+        if (currentSchema.hasOwnProperty(propertyName)) {
+            headerNode[usageName] = currentSchema[propertyName];
+        }
+    })
+
+    complexFieldProps.map(({ propertyName, usageName }) => {
+        if (currentSchema.hasOwnProperty(propertyName)) {
+            headerNode[usageName] = currentSchema[propertyName];
+        }
+    })
+
+    headerNode.required = !ref ? true : currentSchema.required ? currentSchema.required.some(prop => prop === propname) : true;
     headerNode.uiUpdateOnly = currentSchema.ui_update_only;
 
     if (!dataxpath) {
         headerNode['data-remove'] = true;
+    }
+
+    if (objectState) {
+        const { add, remove } = objectState;
+        if (add) {
+            headerNode['object-add'] = true;
+        }
+        if (remove) {
+            headerNode['object-remove'] = true;
+        }
     }
 
     if (treeState.hasOwnProperty(xpath)) {
@@ -592,9 +645,33 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
     let currentSchemaType = type ? type : currentSchema.type;
 
     if (currentSchema.hasOwnProperty('items') && currentSchemaType === DataTypes.OBJECT) {
-        if (!_.get(data, dataxpath) && !_.get(originalData, xpath)) return;
+        if (_.get(data, dataxpath) === undefined && _.get(originalData, xpath) === undefined) return;
+        let headerState = {};
+        if (_.get(originalData, xpath) === undefined) {
+            if (_.get(data, xpath) === null) {
+                headerState.add = true;
+                headerState.remove = false;
+            } else {
+                headerState.add = false;
+                headerState.remove = true;
+            }
+        } else if (currentSchema.hasOwnProperty('orm_no_update')) {
+            if (_.get(originalData, xpath) !== undefined) {
+                headerState.add = false;
+                headerState.remove = false;
+            }   
+        } else if (!currentSchema.hasOwnProperty('orm_no_update')) {
+            if (_.get(data, dataxpath) === null) {
+                headerState.add = true;
+                headerState.remove = false;
+            } else {
+                headerState.add = false;
+                headerState.remove = true;
+            }
+        }
 
-        let childNode = addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, dataxpath, xpath, currentSchema.items.$ref);
+        let childNode = addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, dataxpath, xpath, currentSchema.items.$ref, headerState);
+        if (_.get(data, dataxpath) === null && _.get(originalData, xpath) === null) return;
         let ref = currentSchema.items.$ref.split('/');
         let metadata = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
         metadata = cloneDeep(metadata);
@@ -1012,7 +1089,7 @@ export function compareObjects(updated, original, current, xpath, diff = []) {
 }
 
 export function getNewItem(collections, abbreviated) {
-    const abbreviatedKeyPath = abbreviated.split('$')[0].split(':').pop();
+    const abbreviatedKeyPath = abbreviated.split('^')[0].split(':').pop();
     const fields = abbreviatedKeyPath.split('-');
     let newItem = '';
     fields.forEach(field => {
@@ -1208,7 +1285,7 @@ export function hasxpath(data, xpath) {
     if (_.get(data, xpath)) return true;
     else {
         let value = _.get(data, xpath);
-        if (value === 0 || value === false || value === '' || value === null) return true;
+        if (value === 0 || value === false || value === '') return true;
     }
     return false;
 }
@@ -1529,12 +1606,25 @@ export function applyFilter(arr, filter) {
     return [];
 }
 
-export function floatToInt(number) {
-    if (number > 0) {
-        return Math.floor(number);
-    } else {
-        return Math.ceil(number);
+export function floatToInt(value) {
+    /* 
+    Function to convert floating point numbers to integer.
+    value: integer or floating point number
+    */
+    if (typeof value === DataTypes.NUMBER) {
+        if (Number.isInteger(value)) {
+            return value;
+        } else {
+            // floating point number
+            if (value > 0) {
+                return Math.floor(value);
+            } else {
+                return Math.ceil(value);
+            }
+        }
     }
+
+    return value;
 }
 
 export function groupCommonKeys(commonKeys) {
@@ -1609,100 +1699,231 @@ function mergeArrays(arr1, arr2) {
     return mergedArr;
 }
 
-export function compareJSONObjects(obj1, obj2) {
-    const differences = getJSONDifferences(obj1, obj2);
-    if (_.keys(differences).length > 0) {
-        if (DB_ID in obj1) {
-            differences[DB_ID] = obj1[DB_ID];
+export function roundNumber(value, precision = FLOAT_POINT_PRECISION) {
+    /* 
+    Function to round floating point numbers.
+    value: floating point number
+    precision: decimal digits to round off to. default 2 (FLOAT_POINT_PRECISION)
+    */
+    if (typeof value === DataTypes.NUMBER) {
+        if (Number.isInteger(value)) {
+            return value;
+        } else {
+            return +value.toFixed(precision);
         }
     }
-    return differences;
+    return value;
 }
 
-function getJSONDifferences(obj1, obj2) {
-    const differences = {};
+export function getLocalizedValueAndSuffix(metadata, value) {
+    /* 
+    Function to normalize numbers and return adornments if any
+    metadata: contains all properties of the field
+    value: field value
+    */
+    let adornment = '';
 
-    function compareNestedArrays(arr1, arr2, parentKey) {
-        const arrDifferences = [];
+    if (typeof value !== DataTypes.NUMBER) {
+        return [adornment, value];
+    }
+    if (metadata.numberFormat && metadata.numberFormat.includes('%')) {
+        adornment = '%';
+    }
+    if (metadata.displayType === DataTypes.INTEGER) {
+        return [adornment, floatToInt(value)]
+    }
+    if (metadata.numberFormat && metadata.numberFormat.includes('.')) {
+        let precision = metadata.numberFormat.split(".").pop();
+        precision *= 1;
+        value = roundNumber(value, precision);
+    } else {
+        value = roundNumber(value);
+    }
 
-        arr1.forEach(element1 => {
-            let found = false;
+    return [adornment, value];
+}
 
-            if (element1 instanceof Object && DB_ID in element1) {
-                found = arr2.some(element2 => element2 instanceof Object && DB_ID in element2 && element2[DB_ID] === element1[DB_ID]);
-            }
-
-            if (!found) {
-                arrDifferences.push({ [DB_ID]: element1[DB_ID] });
-            } else {
-                let element2 = arr2.find(element2 => element2 instanceof Object && DB_ID in element2 && element2[DB_ID] === element1[DB_ID]);
-                let nestedDifferences = compareJSONObjects(element1, element2);
-                if (Object.keys(nestedDifferences).length > 0) {
-                    arrDifferences.push({ [DB_ID]: element1[DB_ID], ...nestedDifferences });
+export function excludeNullFromObject(obj) {
+    /* 
+    Function to remove null values from mutable object inplace.
+    obj: mutable object
+    */
+    if (_.isObject(obj)) {
+        for (const key in obj) {
+            if (obj[key] === null) {
+                // delete key with null values
+                delete obj[key];
+            } else if (_.isObject(obj[key])) {
+                excludeNullFromObject(obj[key]);
+            } else if (Array.isArray(obj[key])) {
+                for (let i = 0; i < obj[key].length; i++) {
+                    excludeNullFromObject(obj[key][i]);
                 }
             }
+            // else not required
+        }
+    }
+    // else not required
+}
+
+export function compareJSONObjects(obj1, obj2) {
+    /* 
+    Function to compare two objects and clear null fields from diff
+    obj1: initial / original object
+    obj2: currrent object
+    */
+    let diff = {};
+    if (_.isObject(obj1) && _.isObject(obj2)) {
+        diff = getObjectsDiff(obj1, obj2);
+    } else if (_.isObject(obj2)) {
+        diff = obj2;
+    }
+    if (_.keys(diff).length > 0) {
+        // add the object ID if diff found and ID exists on initial object
+        if (DB_ID in obj1) {
+            diff[DB_ID] = obj1[DB_ID];
+        } else {
+            // removing null fields from diff if no ID exists on initial object
+            excludeNullFromObject(diff);
+        }
+    }
+    return diff;
+}
+
+export function getObjectsDiff(obj1, obj2) {
+    /* 
+    Function to get difference between two objects.
+    obj1: initial object
+    obj2: current object
+    */
+
+    function compareArrays(arr1, arr2, parentKey) {
+        /* 
+        Function to compare two arrays containing items of type object.
+        arr1: array of initial object
+        arr2: array of current object
+        */
+        const arrDiff = [];
+
+        arr1.forEach(element1 => {
+            if (element1 instanceof Object && DB_ID in element1) {
+                const found = arr2.some(element2 => element2 instanceof Object && DB_ID in element2 && element2[DB_ID] === element1[DB_ID]);
+                if (!found) {
+                    // deleted item in array. store the array object ID in the diff
+                    arrDiff.push({ [DB_ID]: element1[DB_ID] });
+                } else {
+                    // array object found with matching object ID. compare the nested object
+                    let element2 = arr2.find(element2 => element2 instanceof Object && DB_ID in element2 && element2[DB_ID] === element1[DB_ID]);
+                    let nestedDiff = getObjectsDiff(element1, element2);
+                    if (!_.isEmpty(nestedDiff)) {
+                        // store the diff along with the nested object ID
+                        arrDiff.push({ [DB_ID]: element1[DB_ID], ...nestedDiff });
+                    }
+                }
+            }
+            // TODO: compare arrays of primitive data types
         });
 
         arr2.forEach(element2 => {
             if (element2 instanceof Object && !(DB_ID in element2)) {
-                arrDifferences.push(element2);
+                // new item in the array. store the entire item in diff
+                arrDiff.push(element2);
             }
+            // TODO: compare arrays of primitive data types 
         })
 
-        return arrDifferences;
+        return arrDiff;
     }
 
-    for (const key in obj1) {
-        if (obj1.hasOwnProperty(key) && obj2.hasOwnProperty(key)) {
-            if (Array.isArray(obj1[key]) && Array.isArray(obj2[key])) {
-                const nestedDifferences = compareNestedArrays(obj1[key], obj2[key], key);
-                if (nestedDifferences.length > 0) {
-                    differences[key] = nestedDifferences;
+    const diff = {};
+
+    if (obj1 instanceof Object) {
+        for (const key in obj1) {
+            if (obj2 instanceof Object && obj2.hasOwnProperty(key)) {
+                if (obj1[key] instanceof Array) {
+                    if (obj2[key] instanceof Array) {
+                        const arrDiff = compareArrays(obj1[key], obj2[key]);
+                        if (!_.isEmpty(arrDiff)) {
+                            diff[key] = arrDiff;
+                        }
+                        // else not required: no difference found
+                    } else {
+                        diff[key] = obj2[key];
+                    }
+                } else if (obj1[key] instanceof Object) {
+                    if (obj2[key] instanceof Object) {
+                        const nestedDiff = getObjectsDiff(obj1[key], obj2[key]);
+                        if (!_.isEmpty(nestedDiff)) {
+                            diff[key] = nestedDiff;
+                        }
+                        // else not required: no difference found
+                    } else {
+                        diff[key] = obj2[key];
+                    }
+                } else if (obj1[key] !== obj2[key]) {
+                    diff[key] = obj2[key];
                 }
-            } else if (typeof obj1[key] === DataTypes.OBJECT && typeof obj2[key] === DataTypes.OBJECT) {
-                const nestedDifferences = compareJSONObjects(obj1[key], obj2[key]);
-                if (Object.keys(nestedDifferences).length > 0) {
-                    differences[key] = nestedDifferences;
-                }
-            } else if (obj1[key] !== obj2[key]) {
-                differences[key] = obj2[key];
+            } else {
+                diff = obj2;
             }
         }
     }
 
-    for (const key in obj2) {
-        if (obj2.hasOwnProperty(key) && !obj1.hasOwnProperty(key)) {
-            if (!differences.hasOwnProperty(key)) {
-                differences[key] = obj2[key];
+    if (obj2 instanceof Object) {
+        for (const key in obj2) {
+            if (obj1 instanceof Object && !obj1.hasOwnProperty(key)) {
+                if (!diff.hasOwnProperty(key)) {
+                    diff[key] = obj2[key];
+                }
             }
         }
     }
-    return differences;
+
+    return diff;
 }
 
-export function validateConstraints(collection, value, min, max) {
-    if (collection.serverPopulate) {
-        return null;
-    }
+export function validateConstraints(metadata, value, min, max) {
+    /* 
+    Function to check if value violates any contraints on the field.
+    metadata: contains all properties (and constaints) of the field
+    value: field value
+    min: min limit if any
+    max: max limit if any
+    */
+    const errors = [];
+
+    // disabled ignoring constraint checks on serverPopulate field
+    // if (metadata.serverPopulate) {
+    //     // if field is populated from server, ignore constaint checks
+    //     return null;
+    // }
     if (value === '') {
+        // empty strings are treated as null or unset
         value = null;
     }
-    const errors = [];
-    if (collection.required && (value === null || value === undefined)) {
-        errors.push("required field cannot be None");
+    if (metadata.required) {
+        if (value === undefined || value === null) {
+            errors.push(Message.REQUIRED_FIELD);
+        }
+        // else not required: value is set
     }
-    if (collection.type === DataTypes.ENUM && value && value.includes('UNSPECIFIED')) {
-        errors.push('enum field cannot be UNSPECIFIED');
+    if (metadata.type === DataTypes.ENUM) {
+        if (value && value.includes('UNSPECIFIED')) {
+            errors.push(Message.UNSPECIFIED_FIELD);
+        }
+        // else not required: value is set
     }
-    if (min) {
-        if (value && value < min) {
-            errors.push("field value is less than min value: " + min);
+    if (typeof min === DataTypes.NUMBER) {
+        if (value !== undefined && value !== null && value < min) {
+            errors.push(Message.MIN + ': ' + min);
         }
     }
-    if (max) {
-        if (value && value > max) {
-            errors.push("field value is greater than max value: " + max);
+    if (typeof max === DataTypes.NUMBER) {
+        if (value !== undefined && value !== null && value > max) {
+            errors.push(Message.MAX + ': ' + max);
         }
     }
-    return errors.length > 0 ? errors.join(", ") : null;
+
+    // return null if no constaints are voilated
+    return errors.length ? errors.join(', ') : null;
 }

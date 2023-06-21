@@ -38,17 +38,10 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     if field_name not in self.field:
                         self.field.append(field_name)
 
-    def output_file_generate_handler(self, file: protogen.File):
-        # pre-requisite calls
-        self.get_all_root_message(file.messages)
-        self.get_field_names(self.root_message_list)
-        package_name = str(file.proto.package)
-        class_name_list = package_name.split("_")
-        class_name: str = ""
-        for i in class_name_list:
-            class_name = class_name + i.capitalize()
-
-        output_content = "#pragma once\n\n"
+    @staticmethod
+    def header_generate_handler():
+        output_content: str = ""
+        output_content += "#pragma once\n\n"
         output_content += "#include <iostream>\n"
         output_content += "#include <sstream>\n"
         output_content += "#include <unordered_map>\n\n"
@@ -56,12 +49,35 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "#include <bsoncxx/json.hpp>\n"
         output_content += "#include <mongocxx/client.hpp>\n"
         output_content += "#include <mongocxx/instance.hpp>\n"
-        output_content += "#include <mongocxx/pool.hpp>\n"
-        output_content += "#include <Poco/Net/HTTPClientSession.h>\n"
-        output_content += "#include <Poco/Net/HTTPRequest.h>\n"
-        output_content += "#include <Poco/Net/HTTPResponse.h>\n"
-        output_content += "#include <Poco/StreamCopier.h>\n\n"
+        output_content += "#include <mongocxx/pool.hpp>\n\n"
+        return output_content
 
+    def const_string_generate_handler(self, file: protogen.File):
+        output_content: str = ""
+        for message in file.messages:
+            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+                output_content += f'\tconst std::string {message_name_snake_cased} = "{message_name}";\n'
+
+        output_content += "\n\n"
+        for field_name in self.field:
+            output_content += f'\tconst std::string {field_name}_key = "{field_name}";\n'
+        return output_content
+
+    def output_file_generate_handler(self, file: protogen.File):
+        # pre-requisite calls
+        self.get_all_root_message(file.messages)
+        self.get_field_names(self.root_message_list)
+        package_name = str(file.proto.package)
+        class_name_list = package_name.split("_")
+        class_name: str = ""
+        output_content: str = ""
+
+        for i in class_name_list:
+            class_name = class_name + i.capitalize()
+
+        output_content += self.header_generate_handler()
         output_content += f"namespace {package_name}_handler "
         output_content += "{\n\n"
         output_content += "    using bsoncxx::builder::basic::make_array;\n"
@@ -71,16 +87,10 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                           '"mongodb://localhost:27017";\n'
         file_name = str(file.proto.name).split(".")[0]
         output_content += f'    const std::string {file_name}_db_name = "{file_name}";\n'
-        for message in file.messages:
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
-                message_name = message.proto.name
-                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                output_content += f'\tconst std::string {message_name_snake_cased} = "{message_name}";\n'
 
         output_content += "\n\t// key constants used across classes via constants for consistency\n"
 
-        for field_name in self.field:
-            output_content += f'\tconst std::string {field_name}_key = "{field_name}";\n'
+        output_content += self.const_string_generate_handler(file)
 
         output_content += "\n\n"
         output_content += "\tinline auto get_symbol_side_query(const std::string &symbol, const std::string &side){\n"
@@ -94,8 +104,11 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "{\n\t\t\t"
         output_content += 'std::cout << "Mongo URI: " << str_uri << std::endl;\n\t\t}\n\n'
 
-        output_content += "\t\tstatic mongocxx::instance inst;\n\t\tstatic std::string str_uri;\n\t\t" \
-                          "static mongocxx::uri uri;\n\t\tstatic mongocxx::pool pool;\n\t\t" \
+        output_content += "\t\tmongocxx::instance inst{};\n\t\tstd::string str_uri = "
+        output_content += 'db_uri + "/?minPoolSize=2&maxPoolSize=2";'
+
+        output_content += "\n\t\t" \
+                          "mongocxx::uri uri{str_uri};\n\t\tmongocxx::pool pool{uri};\n\t\t" \
                           f"mongocxx::pool::entry client;\n\t\tmongocxx::database {file_name}_db;\n\t\t\n\t"
         output_content += "};\n}"
 

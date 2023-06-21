@@ -1,79 +1,89 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import _, { cloneDeep } from 'lodash';
 import {
-    getAllUILayout, getUILayout, createUILayout, updateUILayout,
-    setUILayoutArray, setUILayout, resetUILayout, setModifiedUILayout, setSelectedUILayoutId, resetSelectedUILayoutId, resetError
+    createUILayout, updateUILayout,
+    setUILayoutArrayWs, setUILayout, setSelectedUILayoutId
 } from '../features/uiLayoutSlice';
-import { getLayout } from '../projectSpecificUtils';
 import { Responsive, WidthProvider } from "react-grid-layout";
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
-import { Paper, Box } from '@mui/material';
+import { HashLoader } from 'react-spinners';
+import { DashboardCustomize, SaveAs } from '@mui/icons-material';
+import { Dialog, DialogContent, DialogActions, DialogContentText, TextField, Button, DialogTitle, Autocomplete, Paper, Box } from '@mui/material';
+import { DB_ID, API_ROOT_URL, COOKIE_NAME } from '../constants';
+import { getIconText } from '../utils';
+import { getLayout } from '../projectSpecificUtils';
 # @@protoc_insertion_point(add_imports)
 import SideDrawer from './SideDrawer';
-import { DB_ID, API_ROOT_URL, COOKIE_NAME } from '../constants';
-import { Dialog, DialogContent, DialogActions, DialogContentText, TextField, Button, DialogTitle, Autocomplete } from '@mui/material';
 import { Icon, ToggleIcon } from './Icon';
-import { DashboardCustomize, SaveAs } from '@mui/icons-material';
-import { getIconText } from '../utils';
 import classes from './Layout.module.css';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
+const defaultProps = {
+    layouts: {
+        lg: getLayout()
+    },
+    breakpoints: { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 },
+    cols: { lg: 18, md: 12, sm: 6, xs: 4, xxs: 2 },
+    className: 'layout',
+    rowHeight: 25,
+    margin: { lg: [8, 8], md: [5, 5] },
+    preventCollision: false,
+    allowOverlap: false,
+    autoSize: false,
+    isBounded: false,
+    compactType: null,
+    useCSSTransforms: true,
+    resizeHandles: ['ne', 'se']
+}
+
 const Layout = (props) => {
-    const { uiLayoutArray, uiLayout, modifiedUILayout, selectedUILayoutId, loading, error } = useSelector(state => state.uiLayout);
-    const [layouts, setLayouts] = useState(getLayout());
+    const { uiLayoutArray, uiLayout } = useSelector(state => state.uiLayout);
+    const [layouts, setLayouts] = useState(() => getLayout());
     const [draggable, setDraggable] = useState(false);
     const [openSaveLayout, setOpenSaveLayout] = useState(false);
     const [openLoadLayout, setOpenLoadLayout] = useState(false);
     const [searchValue, setSearchValue] = useState('');
     const [profileId, setProfileId] = useState('');
-    const [websocket, setWebsocket] = useState();
     const [show, setShow] = useState({
         # @@protoc_insertion_point(add_widget_list)
     });
+    const getAllWsDict = useRef({});
     const dispatch = useDispatch();
 
-    const defaultProps = {
-        layouts: {
-            lg: getLayout()
-        },
-        breakpoints: { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 },
-        cols: { lg: 18, md: 12, sm: 6, xs: 4, xxs: 2 },
-        className: 'layout',
-        rowHeight: 25,
-        margin: { lg: [8, 8], md: [5, 5] },
-        preventCollision: false,
-        allowOverlap: false,
-        autoSize: false,
-        isBounded: false,
-        compactType: null,
-        useCSSTransforms: true,
-        resizeHandles: ['ne', 'se']
-    }
+    const flushGetAllWs = useCallback(() => {
+        /* apply get-all websocket changes */
+        if (_.keys(getAllWsDict.current).length > 0) {
+            dispatch(setUILayoutArrayWs(cloneDeep(getAllWsDict.current)));
+            getAllWsDict.current = {};
+        }
+    }, [])
 
     useEffect(() => {
+        /* get-all websocket. create a websocket client to listen to get-all interface */
         let socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/get-all-ui_layout-ws`);
-        setWebsocket(socket);
-        // close the websocket on re-render
+        socket.onmessage = (event) => {
+            let updatedData = JSON.parse(event.data);
+            if (Array.isArray(updatedData)) {
+                updatedData.forEach(o => {
+                    getAllWsDict.current[o[DB_ID]] = o;
+                })
+            } else if (_.isObject(updatedData)) {
+                getAllWsDict.current[updatedData[DB_ID]] = updatedData;
+            }
+        }
+        /* close the websocket on cleanup */
         return () => socket.close();
     }, [])
 
     useEffect(() => {
-        if (websocket) {
-            websocket.onmessage = (event) => {
-                let updatedData = JSON.parse(event.data);
-                if (Array.isArray(updatedData)) {
-                    dispatch(setUILayoutArray(updatedData));
-                } else {
-                    let id = updatedData[DB_ID];
-                    let updatedArray = uiLayoutArray.filter(layout => layout[DB_ID] !== id);
-                    dispatch(setUILayoutArray([...updatedArray, updatedData]));
-                }
-            }
+        const intervalId = setInterval(flushGetAllWs, 250);
+        return () => {
+            clearInterval(intervalId);
         }
-    }, [websocket, uiLayoutArray])
+    }, [])
 
     useEffect(() => {
         let cookie = sessionStorage.getItem(COOKIE_NAME);
@@ -219,6 +229,15 @@ const Layout = (props) => {
             return widgetLayout
         });
         setLayouts(updatedLayouts);
+    }
+
+    const storedCookie = sessionStorage.getItem(COOKIE_NAME);
+    if (storedCookie && !uiLayout.widget_ui_data) {
+        return (
+            <Box className="app">
+                <HashLoader />
+            </Box>
+        )
     }
 
     return (

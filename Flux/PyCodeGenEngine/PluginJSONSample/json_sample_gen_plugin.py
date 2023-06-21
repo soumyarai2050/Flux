@@ -225,6 +225,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         for index, option_field in enumerate(option_fields):
             if ":" in option_field:
                 field_name, list_name = option_field.strip().split(":")
+                list_name = list_name.replace('"', '').strip()
 
                 if list_name in self.auto_complete_data["autocomplete"]:
                     list_name_data: List[str] = self.auto_complete_data["autocomplete"][list_name]

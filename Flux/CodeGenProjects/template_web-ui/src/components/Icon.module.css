@@ -1,6 +1,7 @@
 .icon {
     background-color: #ccc !important;
-    margin-right: 5px !important;
+    margin-right: 2px !important;
+    margin-left: 2px !important;
 }
 
 .icon:hover {

@@ -451,10 +451,12 @@ class StratExecutorPlugin(BaseProtoPlugin):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         if is_msg_top_lvl:
             extra_str = ""
+            output_str = f"\tdef get_{message_name_snake_cased}(self, date_time: DateTime | None = None) -> " \
+                         f"Tuple[{message_name}BaseModel, DateTime] | None:\n"
         else:
             extra_str = "s"
-        output_str = f"\tdef get_{message_name_snake_cased}(self, date_time: DateTime | None = None) -> " \
-                      f"Tuple[List[{message_name}BaseModel], DateTime] | None:\n"
+            output_str = f"\tdef get_{message_name_snake_cased}(self, date_time: DateTime | None = None) -> " \
+                          f"Tuple[List[{message_name}BaseModel], DateTime] | None:\n"
         output_str += f"\t\tif date_time is None or date_time < " \
                       f"self._{message_name_snake_cased}{extra_str}_update_date_time:\n"
         output_str += f"\t\t\tif self._{message_name_snake_cased}{extra_str} is not None:\n"
@@ -584,7 +586,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
                 if message in self.ws_manager_required_top_lvl_messages:
                     message_name = message.proto.name
                     message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                    output_str += f"\t\tself._{message_name_snake_cased}: List[{message_name}BaseModel] | None = None\n"
+                    output_str += f"\t\tself._{message_name_snake_cased}: {message_name}BaseModel | None = None\n"
                     output_str += f"\t\tself._{message_name_snake_cased}_update_date_time: DateTime = DateTime.utcnow()\n\n"
 
             for message in self.ws_manager_required_messages:

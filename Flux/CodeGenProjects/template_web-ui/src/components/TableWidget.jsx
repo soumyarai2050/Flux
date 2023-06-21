@@ -59,6 +59,23 @@ const TableWidget = (props) => {
         setCommonkeys(commonKeyCollections);
     }, [rows, headCells, props.mode, hide])
 
+    useEffect(() => {
+        if (rows.length === 0)  {
+            let updatedData = cloneDeep(props.formValidation);
+            if(props.xpath) {
+                for (const key in updatedData) {
+                    if (key.startsWith(props.xpath)) {
+                        props.onFormUpdate(key, null);
+                    }
+                }
+            } else {
+                for (const key in updatedData) {
+                    props.onFormUpdate(key, null);
+                }
+            }
+        }
+    }, [rows, props.xpath])
+
     function getFilteredCells() {
         let updatedCells = cloneDeep(headCells);
         if (hide) {
@@ -223,7 +240,7 @@ const TableWidget = (props) => {
         setShowSettings(false);
     }
 
-    const onTextChange = useCallback((e, type, xpath, value, dataxpath) => {
+    const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes) => {
         if (value === '') {
             value = null;
         }
@@ -232,13 +249,13 @@ const TableWidget = (props) => {
                 value = value * 1;
             }
         }
-        if (e) {
-            dataxpath = e.target.getAttribute('dataxpath');
-        }
         let updatedData = cloneDeep(data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
         props.onUserChange(xpath, value);
+        if (props.onFormUpdate) {
+            props.onFormUpdate(xpath, validationRes);
+        }
     }, [data, props.onUpdate, props.onUserChange])
 
     const onSelectItemChange = useCallback((e, dataxpath, xpath) => {

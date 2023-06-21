@@ -103,43 +103,56 @@ const TreeWidget = (props) => {
             let updatedData = cloneDeep(props.data);
             let xpath = e.currentTarget.attributes['data-remove'].value;
             xpath = getDataxpath(updatedData, xpath);
-            let index = parseInt(xpath.substring(xpath.lastIndexOf('[') + 1, xpath.lastIndexOf(']')));
-            let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
-            let parentObject = _.get(updatedData, parentxpath);
-            let changesDict = getXpathKeyValuePairFromObject(_.get(updatedData, xpath));
-            props.onUserChange(undefined, undefined, true, changesDict);
-            parentObject.splice(index, 1);
+            const isArray = xpath.endsWith(']');
+            if (isArray) {
+                let index = parseInt(xpath.substring(xpath.lastIndexOf('[') + 1, xpath.lastIndexOf(']')));
+                let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
+                let parentObject = _.get(updatedData, parentxpath);
+                parentObject.splice(index, 1);
+            } else {
+                _.set(updatedData, xpath, null);
+            }
+            // let changesDict = getXpathKeyValuePairFromObject(_.get(updatedData, xpath));
+            // props.onUserChange(undefined, undefined, true, changesDict);
             console.log({ updatedData });
             props.onUpdate(updatedData, 'remove');
         } else if (e.currentTarget.attributes['data-add']) {
             let updatedData = cloneDeep(props.data);
             let xpath = e.currentTarget.attributes['data-add'].value;
             xpath = getDataxpath(updatedData, xpath);
-            let index = parseInt(xpath.substring(xpath.lastIndexOf('[') + 1, xpath.lastIndexOf(']')));
-            let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
-            let originalindex = _.get(props.originalData, parentxpath) ? _.get(props.originalData, parentxpath).length : 0;
-            let parentObject = _.get(updatedData, parentxpath);
-            if (!parentObject) {
-                _.set(updatedData, parentxpath, []);
-                parentObject = _.get(updatedData, parentxpath);
-            }
-            let parentindex = 0;
-            if (parentObject.length > 0) {
-                let propname = _.keys(parentObject[parentObject.length - 1]).filter(key => key.startsWith('xpath_'))[0];
-                let propxpath = parentObject[parentObject.length - 1][propname];
-                parentindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'))) + 1;
-            }
-            let max = originalindex > parentindex ? originalindex : parentindex;
             let ref = e.currentTarget.attributes['data-ref'].value;
             if (ref) {
                 ref = ref.split('/');
             }
             let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
-            let emptyObject = generateObjectFromSchema(props.schema, currentSchema);
-            emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
-            let changesDict = getXpathKeyValuePairFromObject(emptyObject);
-            props.onUserChange(undefined, undefined, false, changesDict);
-            parentObject.push(emptyObject);
+            const isArray = xpath.endsWith(']');
+            let emptyObject = {};
+            if (isArray) {
+                let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
+                let originalindex = _.get(props.originalData, parentxpath) ? _.get(props.originalData, parentxpath).length : 0;
+                let parentObject = _.get(updatedData, parentxpath);
+                if (!parentObject) {
+                    _.set(updatedData, parentxpath, []);
+                    parentObject = _.get(updatedData, parentxpath);
+                }
+                let parentindex = 0;
+                if (parentObject.length > 0) {
+                    let propname = _.keys(parentObject[parentObject.length - 1]).filter(key => key.startsWith('xpath_'))[0];
+                    let propxpath = parentObject[parentObject.length - 1][propname];
+                    parentindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'))) + 1;
+                }
+                let max = originalindex > parentindex ? originalindex : parentindex;
+                emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema));
+                emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
+                parentObject.push(emptyObject);
+            } else {
+                let additionalProps = JSON.parse(e.currentTarget.attributes['data-prop'].value);
+                emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema), additionalProps);
+                emptyObject = addxpath(emptyObject, xpath);
+                _.set(updatedData, xpath, emptyObject);
+            }
+            // let changesDict = getXpathKeyValuePairFromObject(emptyObject);
+            // props.onUserChange(undefined, undefined, false, changesDict);
             console.log({ updatedData });
             props.onUpdate(updatedData, 'add');
         } else {

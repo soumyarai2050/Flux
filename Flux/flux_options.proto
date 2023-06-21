@@ -224,13 +224,14 @@ extend google.protobuf.FieldOptions
   optional string FluxFldUIPlaceholder = 55263; //placeholder for UI to display in grayed out font as user action hint
   optional string FluxFldTitle = 55264; //Set this value to override default title value in schema
   optional string FluxFldNameColor = 55265; // One of the color class supported: [CRITICAL, ERROR, WARNING, INFO, DEBUG, UNSPECIFIED]
-  optional bool FluxFldElaborateTitle = 55266; //Set this value to override default title value of all sub-types with parents '.' seperated prefixed to child names
+  optional bool FluxFldElaborateTitle = 55266; //Set this value to override default title value of all sub-types with parents '.' separated prefixed to child names
   optional bool FluxFldFilterEnable = 55267;
   optional bool FluxFldNoCommonKey = 55268;
-  optional string FluxFldNumberFormat = 55269; // currently only symbol `%` is supported , in future we can add precision etc.
+  optional string FluxFldNumberFormat = 55269; // currently only symbol `%.2` is supported , in future we can add precision etc.
   optional string FluxFldDisplayType = 55270; // Use this to set display data type for field
   optional bool FluxFldDisplayZero = 55271;  // Use this to show field even if its value is 0
   optional string FluxFldTextAlign = 55272;  // Use this to set text alignment
+  optional string FluxFldMicroSeparator = 55273;  // Use this to replace field separator
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

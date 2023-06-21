@@ -38,6 +38,7 @@
 .text_field {
     flex: 1;
     background-color: white;
+    min-width: 100px !important;
 }
 
 .text_field :global .Mui-disabled {

@@ -33,16 +33,6 @@ enum ReferencePxType{
   FILL_PX = 6;
 }
 
-// , ERROR, WARNING, INFO, DEBUG, UNSPECIFIED
-enum Severity{
-  Severity_UNSPECIFIED = 0;  // GRAY
-  Severity_CRITICAL = 1; // RED FLASHING
-  Severity_ERROR = 2; // RED
-  Severity_WARNING = 3; // AMBER
-  Severity_INFO = 4; // BLUE
-  Severity_DEBUG = 5; // BLACK
-}
-
 enum StratState{
   //set this state for strats just created by user
   StratState_UNSPECIFIED = 0;

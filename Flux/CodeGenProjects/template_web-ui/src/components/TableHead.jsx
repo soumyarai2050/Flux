@@ -49,7 +49,7 @@ const CustomHeadCell = (props) => {
                             className={`${classes.cell} ${tableCellColorClass}`}
                             align='center'
                             padding='normal'
-                            sortDirection={orderBy === cell.key ? order : false}>
+                            sortDirection={orderBy === cell.tableTitle ? order : false}>
                             {props.copyColumnHandler && (
                                 <Tooltip title="Click to copy column">
                                     <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cell.tableTitle)}><ContentCopy fontSize='small' /></IconButton>

@@ -1218,7 +1218,8 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
 
     def _set_derived_side(self, pair_strat_obj: PairStrat):
         raise_error = False
-        if pair_strat_obj.pair_strat_params.strat_leg2.side is None:
+        if pair_strat_obj.pair_strat_params.strat_leg2.side is None or \
+                pair_strat_obj.pair_strat_params.strat_leg2.side == Side.SIDE_UNSPECIFIED:
             if pair_strat_obj.pair_strat_params.strat_leg1.side == Side.BUY:
                 pair_strat_obj.pair_strat_params.strat_leg2.side = Side.SELL
             elif pair_strat_obj.pair_strat_params.strat_leg1.side == Side.SELL:
@@ -1286,12 +1287,18 @@ class StratManagerServiceRoutesCallbackOverride(StratManagerServiceRoutesCallbac
             err_str_ = f"error: create_pair_strat_pre called with pre-set strat_status, pair_strat_key: " \
                        f"{get_pair_strat_log_key(pair_strat_obj)};;; pair_strat_obj: {pair_strat_obj}"
             logging.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=400, detail=err_str_)
         if pair_strat_obj.strat_limits is not None:
             err_str_ = f"error: create_pair_strat_pre called with pre-set strat_limits, pair_strat_key: " \
                        f"{get_pair_strat_log_key(pair_strat_obj)};;; pair_strat_obj{pair_strat_obj}"
             logging.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=400, detail=err_str_)
+        # expectation: strat_leg2 is not None
+        if pair_strat_obj.pair_strat_params.strat_leg2 is None:
+            err_str_ = f"error: create_pair_strat_pre called with unset strat_leg2, pair_strat_key: " \
+                       f"{get_pair_strat_log_key(pair_strat_obj)};;; pair_strat_obj: {pair_strat_obj}"
+            logging.error(err_str_)
+            raise HTTPException(status_code=400, detail=err_str_)
         self._set_new_strat_limit(pair_strat_obj)
         self._add_pair_strat_status(pair_strat_obj)
         self._set_derived_side(pair_strat_obj)

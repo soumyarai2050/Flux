@@ -120,12 +120,12 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
                                     f"{get_strat_brief_log_key(strat_brief_)};;; strat_brief: {strat_brief_}")
                 # else not required - strat does not need this update notification
                 logging.debug(f"Updated strat_brief cache for key: {key1} {key2}, strat_brief_key: "
-                                    f"{get_strat_brief_log_key(strat_brief_)};;; strat_brief: {strat_brief_}")
+                              f"{get_strat_brief_log_key(strat_brief_)};;; strat_brief: {strat_brief_}")
             else:
                 logging.debug("either a non-ongoing strat-brief or one before corresponding active pair_strat: "
                               "we discard this and expect algo to get snapshot with explicit web query - maybe we wire "
                               f"explicit web query in ongoing pair-strat notification, strat_brief_key: "
-                                    f"{get_strat_brief_log_key(strat_brief_)};;;strat_brief: {strat_brief_}")
+                              f"{get_strat_brief_log_key(strat_brief_)};;;strat_brief: {strat_brief_}")
         else:
             logging.error(f"ignoring strat brief update - missing required pair_buy_side_trading_brief or pair_sell_"
                           f"side_trading_brief, strat_brief_key: "

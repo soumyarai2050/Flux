@@ -83,6 +83,7 @@ const Row = (props) => {
                         dataAdd={dataAdd}
                         dataRemove={dataRemove}
                         disabled={disabled}
+                        buttonDisable={false}
                         onUpdate={onUpdate}
                         onDoubleClick={onRowClick}
                         onButtonClick={onButtonClick}

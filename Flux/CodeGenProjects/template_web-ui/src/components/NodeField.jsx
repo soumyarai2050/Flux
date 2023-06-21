@@ -63,7 +63,7 @@ const NodeField = (props) => {
                 forcePopupIcon={false}
                 variant='outlined'
                 size='small'
-                sx={{ minWidth: 160 }}
+                sx={{ minWidth: '150px !important' }}
                 className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                 required={props.data.required}
                 value={value}
@@ -100,9 +100,8 @@ const NodeField = (props) => {
                 required={props.data.required}
                 checked={value}
                 disabled={disabled}
-                error={validationError.current !== null}
+                error={validationError.current}
                 onChange={(e) => props.data.onCheckboxChange(e, props.data.dataxpath, props.data.xpath)}
-                InputProps={inputProps}
             />
         )
     } else if (props.data.type === DataTypes.ENUM) {
@@ -135,6 +134,10 @@ const NodeField = (props) => {
         let decimalScale = 2;
         if (props.data.underlyingtype === DataTypes.INT32 || props.data.underlyingtype === DataTypes.INT64) {
             decimalScale = 0;
+        }
+        if (props.data.numberFormat && props.data.numberFormat.includes(".")) {
+            decimalScale = props.data.numberFormat.split(".").pop();
+            decimalScale = decimalScale * 1;
         }
 
         // min constrainsts for numeric field if set.

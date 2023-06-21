@@ -119,11 +119,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str = "/* redux and third-party library imports */\n"
         output_str += "import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';\n"
         output_str += "import axios from 'axios';\n"
-        if message.proto.name in self.dependent_to_abbreviated_relation_msg_name_dict:
-            output_str += "import _, { cloneDeep, create } from 'lodash';\n"
-            output_str += "import { async } from 'q';\n"
-        else:
-            output_str += "import _, { cloneDeep } from 'lodash';\n"
+        output_str += "import _, { cloneDeep } from 'lodash';\n"
         output_str += "/* project constants */\n"
         output_str += "import { DB_ID, API_ROOT_URL, Modes } from '../constants';\n"
         output_str += "/* common util imports */\n"
@@ -165,12 +161,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         if message_name not in self.dependent_to_abbreviated_relation_msg_name_dict.values():
             output_str = "/* CRUD async actions */\n"
-            if message_name in self.repeated_layout_msg_name_list:
-                output_str += f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
-                             " (payload, { rejectWithValue }) => " + "{\n"
-            else:
-                output_str += f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
-                              " async (payload, { rejectWithValue }) => " + "{\n"
+            output_str += f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
+                          " async (payload, { rejectWithValue }) => " + "{\n"
             output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
             output_str += "        .then(res => res.data)\n"
             output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
@@ -222,7 +214,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/" \
                              f"create', async (payload, "+"{ dispatch, getState, rejectWithValue }) => " + "{\n"
                 output_str += "    let { data, abbreviated, loadedKeyName } = payload;\n"
-                output_str += "    abbreviated = abbreviated.split('$')[0];\n"
+                output_str += "    abbreviated = abbreviated.split('^')[0].split(':').pop();\n"
                 output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + \
                               "`, data)\n"
                 output_str += "        .then(res => {\n"
@@ -597,6 +589,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        },\n"
             output_str += f"        resetSelected{message_name}Id: (state) => "+"{\n"
             output_str += f"            state.selected{message_name}Id = initialState.selected{message_name}Id;\n"
+            if self.current_message_is_dependent:
+                output_str += f"            state.{message_name_camel_cased} = initialState.{message_name_camel_cased};\n"
+                output_str += f"            state.modified{message_name} = initialState.modified{message_name};\n"
             output_str += "        },\n"
         else:
             output_str += f"        set{message_name}Ws: (state, action) => "+"{\n"

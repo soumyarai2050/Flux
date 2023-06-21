@@ -1,0 +1,6 @@
+Sample Template file to be used in generated outputs from plugin.
+- Below insertion points will be replaced by content from plugin in output file.
+# @@protoc_insertion_point(insert_point_1)
+- insertion points can be placed anywhere in file
+This insertion point will be replaced by another text - # @@protoc_insertion_point(insert_point_2)
+EOF

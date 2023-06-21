@@ -2,6 +2,16 @@ syntax = "proto2";
 
 import "flux_options.proto";
 
+// , ERROR, WARNING, INFO, DEBUG, UNSPECIFIED
+enum Severity{
+  Severity_UNSPECIFIED = 0;  // GRAY
+  Severity_CRITICAL = 1; // RED FLASHING
+  Severity_ERROR = 2; // RED
+  Severity_WARNING = 3; // AMBER
+  Severity_INFO = 4; // BLUE
+  Severity_DEBUG = 5; // BLACK
+}
+
 enum SecurityType{
   SEC_TYPE_UNSPECIFIED = 0;
   RIC = 1;
@@ -22,6 +32,21 @@ enum PositionType{
   PTH = 1; // Pay to hold driven
   LOCATE = 2; // Borrow driven
   SOD = 3; // past trades driven
+}
+
+enum SortType {
+  SORT_TYPE_UNSPECIFIED = 0;
+  ASCENDING = 1;
+  DESCENDING = 2;
+}
+
+message SortCriteria {
+  optional string level1 = 1;
+  optional SortType level1_order = 2 [default = ASCENDING];
+  optional string level2 = 3;
+  optional SortType level2_order = 4 [default = ASCENDING];
+  optional string level3 = 5;
+  optional SortType level3_order = 6 [default = ASCENDING];
 }
 
 // stores all position types from all sources for optimal selection, usage and clearance

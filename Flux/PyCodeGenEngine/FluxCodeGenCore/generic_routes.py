@@ -8,13 +8,17 @@ import logging
 import websockets
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError, WebSocketException, ConnectionClosed
 from copy import deepcopy
-from beanie import WriteRules, DeleteRules, PydanticObjectId
 
 # other package imports
 from pydantic import ValidationError
 from beanie.odm.bulk import BulkWriter
 from fastapi.encoders import jsonable_encoder
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
+from beanie import WriteRules, DeleteRules, PydanticObjectId
+from pydantic.fields import SHAPE_LIST
+from pydantic.main import ModelMetaclass
+from FluxPythonUtils.scripts.utility_functions import perf_benchmark
+
 # project specific imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
@@ -36,7 +40,7 @@ port_env_var: Final[int] = 8000 if (env_port := os.getenv("PORT")) is None else 
 
 async def publish_ws(pydantic_class_type, stored_obj, stored_obj_id=None):
     if pydantic_class_type.read_ws_path_ws_connection_manager is not None:
-        json_data = jsonable_encoder(stored_obj, by_alias=True, exclude_unset=True, exclude_none=True)
+        json_data = jsonable_encoder(stored_obj, by_alias=True)
         json_str = json.dumps(json_data)
         tasks_list: List[asyncio.Task] = []
         await pydantic_class_type.read_ws_path_ws_connection_manager.broadcast(json_str, tasks_list)
@@ -129,12 +133,36 @@ async def generic_put_http(pydantic_class_type, stored_pydantic_obj, pydantic_ob
                                          update_agg_pipeline, has_links)
 
 
+def assign_missing_ids(pydantic_class_type, pydantic_obj_update_json: Dict, ignore_root_id_check: bool | None = True):
+    for key, value in pydantic_obj_update_json.items():
+        if value is not None:
+            if ignore_root_id_check:
+                if key == "_id":
+                    continue
+            if (field_model := pydantic_class_type.__fields__.get(key)) is not None:
+                field_model_type = field_model.type_
+                if isinstance(field_model_type, ModelMetaclass):
+                    if field_model.shape == SHAPE_LIST:
+                        for val in value:
+                            assign_missing_ids(field_model_type, val, ignore_root_id_check=False)
+                    else:
+                        assign_missing_ids(field_model_type, value, ignore_root_id_check=False)
+                    if field_model_type.__fields__.get("id") is not None:
+                        if field_model.shape == SHAPE_LIST:
+                            for obj in value:
+                                if obj.get("_id") is None:
+                                    obj["_id"] = field_model_type.__fields__.get("id").default_factory()
+                        else:
+                            if value.get("_id") is None:
+                                value["_id"] = field_model_type.__fields__.get("id").default_factory()
+
+
 @http_except_n_log_error(status_code=500)
 async def generic_patch_http(pydantic_class_type, stored_pydantic_obj, pydantic_obj_update_json,
                              filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None, has_links: bool = False):
+    assign_missing_ids(pydantic_class_type, pydantic_obj_update_json)
     updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(by_alias=True),
                                                      pydantic_obj_update_json)
-
     return await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
                                          pydantic_obj_update_json, updated_pydantic_obj_dict, filter_agg_pipeline,
                                          update_agg_pipeline, has_links)

@@ -38,101 +38,114 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     if field_name not in self.field:
                         self.field.append(field_name)
 
+    @staticmethod
+    def header_generate_handler(file_name: str):
+        output_content: str = ""
+        output_content += f'#pragma once\n\n#include <iostream>\n\n#include "../ProtoGenCc/{file_name}.pb.h"\n' \
+                          f'#include <google/protobuf/util/json_util.h>\n\n'
+        return output_content
+
+    @staticmethod
+    def encode_and_decode_options_generate_handler():
+        output_content: str = ""
+        output_content += "\tinline auto encode_options(bool whitespace = false) {\n\t\t" \
+                          "google::protobuf::util::JsonPrintOptions options;\n\t\toptions.add_whitespace = whitespace;" \
+                          "\n\t\toptions.always_print_primitive_fields = true;\n\t\t" \
+                          "options.preserve_proto_field_names = true;\n\t\treturn options;\n\t}\n\n\t"
+        output_content += "inline auto decode_options() {\n\t\t" \
+                          "google::protobuf::util::JsonParseOptions options;\n\t\toptions.ignore_unknown_fields = " \
+                          "true;\n\t\treturn options;\n\t}\n\n"
+
+        return output_content
+
+    @staticmethod
+    def encode_generate_handler(message: protogen.Message, package_name: str):
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+        output_content : str = ""
+
+        output_content += f"\tinline std::string encode_{message_name_snake_cased} " \
+                          f"({package_name}::{message_name} &{message_name_snake_cased}, bool whitespace = false)"
+        output_content += " {\n\t\t"
+        output_content += "\n\t\tstd::string json_string;\n\t\t"
+        output_content += f"google::protobuf::util::MessageToJsonString(" \
+                          f"{message_name_snake_cased}, &json_string, encode_options(whitespace));\n\t\t"
+        output_content += "return json_string;\n\t}\n\n"
+
+        output_content += f"\tinline std::vector<std::string> encode_" \
+                          f"{message_name_snake_cased}_list (std::vector<{package_name}::{message_name}>" \
+                          f" &{message_name_snake_cased}_list, bool whitespace = false)"
+        output_content += "{\n\t\t"
+        output_content += f'std::vector<std::string> {message_name_snake_cased}_json_list;\n\t\t'
+        output_content += f"for (auto& {message_name_snake_cased} : {message_name_snake_cased}_list) "
+        output_content += "{\n\t\t\tstd::string json_string;\n\t\t\t"
+        output_content += f"google::protobuf::util::MessageToJsonString(" \
+                          f"{message_name_snake_cased}, &json_string, encode_options(whitespace));\n\t\t\t"
+        output_content += f"{message_name_snake_cased}_json_list.push_back(json_string);\n\t\t"
+        output_content += "}"
+        output_content += f"\n\t\treturn {message_name_snake_cased}_json_list;\n\t"
+        output_content += "}\n\n"
+
+        return output_content
+
+    @staticmethod
+    def decode_generate_handler(message: protogen.Message, package_name: str):
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+        output_content: str = ""
+
+        output_content += f"\tinline {package_name}::{message_name} decode_" \
+                          f"{message_name_snake_cased}(const std::string &{message_name_snake_cased}" \
+                          f"_json_string)"
+
+        output_content += "{\n\t\t"
+        output_content += f"{package_name}::{message_name} {message_name_snake_cased};\n\t\t"
+        output_content += f"google::protobuf::util::JsonStringToMessage({message_name_snake_cased}" \
+                          f"_json_string, &{message_name_snake_cased}, decode_options());\n\t\t"
+        output_content += f"return {message_name_snake_cased};"
+        output_content += "\n\t}\n\n"
+
+        output_content += f"\tinline std::vector <{package_name}::{message_name}> decode_" \
+                          f"{message_name_snake_cased}_list(std::vector <std::string> &{message_name_snake_cased}" \
+                          f"_json_list)"
+
+        output_content += "{\n\t\t"
+        output_content += f"std::vector <{package_name}::{message_name}> {message_name_snake_cased}_list;\n\t\t"
+        output_content += f"for (auto& {message_name_snake_cased}_data: {message_name_snake_cased}_json_list) "
+        output_content += "{\n\t\t\t"
+        output_content += f"{package_name}::{message_name} {message_name_snake_cased};\n\t\t\t"
+        output_content += f"google::protobuf::util::JsonStringToMessage({message_name_snake_cased}_data, " \
+                          f"&{message_name_snake_cased}, decode_options());\n\t\t\t"
+        output_content += f'{message_name_snake_cased}_list.push_back({message_name_snake_cased});\n\t\t'
+        output_content += "}\n\t\t"
+        output_content += f"return {message_name_snake_cased}_list;"
+        output_content += "\n\t}\n\n"
+
+        return output_content
+
     def output_file_generate_handler(self, file: protogen.File):
         # pre-requisite calls
         self.get_all_root_message(file.messages)
         self.get_field_names(self.root_message_list)
         file_name = str(file.proto.name).split(".")[0]
         package_name = str(file.proto.package)
-        output_content = ""
 
-        output_content += f'#pragma once\n\n#include <iostream>\n\n#include "../ProtoGenCc/{file_name}.pb.h"\n' \
-                          f'#include <google/protobuf/util/json_util.h>\n\n'
+        output_content: str = ""
+
+        output_content += self.header_generate_handler(file_name)
 
         output_content += "class JSONCodec {\npublic:\n\n"
 
-        output_content += "\tinline auto encode_options(bool whitespace = false) {\n\t\t" \
-                          "google::protobuf::util::JsonPrintOptions options;\n\t\toptions.add_whitespace = whitespace;" \
-                          "\n\t\toptions.always_print_primitive_fields = true;\n\t\t" \
-                          "options.preserve_proto_field_names = true;\n\t\treturn options;\n\t}\n\n\t"
+        output_content += self.encode_and_decode_options_generate_handler()
 
-        output_content += "// All model encoders\n\n"
-
-        output_content += "\tinline auto decode_options() {\n\t\t" \
-                          "google::protobuf::util::JsonParseOptions options;\n\t\toptions.ignore_unknown_fields = " \
-                          "true;\n\t\treturn options;\n\t}\n\n"
+        output_content += "\t// All model encoders and decoders\n\n"
 
         for message in self.root_message_list:
             if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
-                message_name = message.proto.name
-                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                output_content += f"\tinline std::string encode_{message_name_snake_cased} " \
-                                  f"({package_name}::{message_name} &{message_name_snake_cased}, bool whitespace = false)"
-                output_content += " {\n\t\t"
-                output_content += "\n\t\tstd::string json_string;\n\t\t"
-                output_content += f"google::protobuf::util::MessageToJsonString(" \
-                                  f"{message_name_snake_cased}, &json_string, encode_options(whitespace));\n\t\t"
-                output_content += "return json_string;\n\t}\n\n"
-
-        output_content += "\n\t// All model list encoders\n"
-
-        for message in self.root_message_list:
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
-                message_name = message.proto.name
-                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                output_content += f"\tinline std::vector<std::string> encode_" \
-                                  f"{message_name_snake_cased}_list (std::vector<{package_name}::{message_name}>" \
-                                  f" &{message_name_snake_cased}_list, bool whitespace = false)"
-                output_content += "{\n\t\t"
-                output_content += f'std::vector<std::string> {message_name_snake_cased}_json_list;\n\t\t'
-                output_content += f"for (auto& {message_name_snake_cased} : {message_name_snake_cased}_list) "
-                output_content += "{\n\t\t\tstd::string json_string;\n\t\t\t"
-                output_content += f"google::protobuf::util::MessageToJsonString(" \
-                                  f"{message_name_snake_cased}, &json_string, encode_options(whitespace));\n\t\t\t"
-                output_content += f"{message_name_snake_cased}_json_list.push_back(json_string);\n\t\t"
-                output_content += "}"
-                output_content += f"\n\t\treturn {message_name_snake_cased}_json_list;\n\t"
-                output_content += "}\n\n"
-
-        output_content += "\n\t// All model decoders\n"
-
-        for message in self.root_message_list:
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
-                message_name = message.proto.name
-                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-
-                output_content += f"\tinline {package_name}::{message_name} decode_" \
-                                  f"{message_name_snake_cased}(const std::string &{message_name_snake_cased}" \
-                                  f"_json_string)"
-
-                output_content += "{\n\t\t"
-                output_content += f"{package_name}::{message_name} {message_name_snake_cased};\n\t\t"
-                output_content += f"google::protobuf::util::JsonStringToMessage({message_name_snake_cased}" \
-                                  f"_json_string, &{message_name_snake_cased}, decode_options());\n\t\t"
-                output_content += f"return {message_name_snake_cased};"
-                output_content += "\n\t}\n\n"
-
-        output_content += "\n\t// All model list decoders\n"
-
-        for message in self.root_message_list:
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
-                message_name = message.proto.name
-                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                output_content += f"\tinline std::vector <{package_name}::{message_name}> decode_" \
-                                  f"{message_name_snake_cased}_list(std::vector <std::string> &{message_name_snake_cased}" \
-                                  f"_json_list)"
-
-                output_content += "{\n\t\t"
-                output_content += f"std::vector <{package_name}::{message_name}> {message_name_snake_cased}_list;\n\t\t"
-                output_content += f"for (auto& {message_name_snake_cased}_data: {message_name_snake_cased}_json_list) "
-                output_content += "{\n\t\t\t"
-                output_content += f"{package_name}::{message_name} {message_name_snake_cased};\n\t\t\t"
-                output_content += f"google::protobuf::util::JsonStringToMessage({message_name_snake_cased}_data, " \
-                                  f"&{message_name_snake_cased}, decode_options());\n\t\t\t"
-                output_content += f'{message_name_snake_cased}_list.push_back({message_name_snake_cased});\n\t\t'
-                output_content += "}\n\t\t"
-                output_content += f"return {message_name_snake_cased}_list;"
-                output_content += "\n\t}\n\n"
+                output_content += self.encode_generate_handler(message, package_name)
+                output_content += self.decode_generate_handler(message, package_name)
 
         output_content += "};\n\n"
 

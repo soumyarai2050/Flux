@@ -9,7 +9,7 @@ import { Error } from '@mui/icons-material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
-    getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints
+    getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getLocalizedValueAndSuffix
 } from '../utils';
 import { DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
@@ -28,6 +28,7 @@ const Cell = (props) => {
         dataRemove,
         currentValue,
         previousValue,
+        buttonDisable
     } = props;
 
     const state = useSelector(state => state);
@@ -37,7 +38,7 @@ const Cell = (props) => {
     const [newUpdateClass, setNewUpdateClass] = useState("");
     const timeoutRef = useRef(null);
     const validationError = useRef(null);
-    
+
     useEffect(() => {
         if (props.onFormUpdate && xpath) {
             props.onFormUpdate(xpath, validationError.current);
@@ -103,14 +104,30 @@ const Cell = (props) => {
                 }
             }
         } else if (type === DataTypes.DATE_TIME) {
-            value = value ? new Date(value) : null;
+            value = value ? value : null;
         } else if (type === DataTypes.STRING) {
             value = value ? value : '';
         }
     }
+    let color = getColorTypeFromValue(collection, currentValue);
+    let tableCellColorClass = classes[color];
+    let tableCellRemove = dataRemove ? classes.remove : '';
+    let disabledClass = disabled ? classes.disabled : '';
+    if (props.ignoreDisable) {
+        disabledClass = "";
+    }
+    let textAlign = collection.textAlign ? collection.textAlign : 'center';
 
     if (disabled) {
-        return <TableCell className={`${classes.cell} ${classes.disabled}`} />
+        if (value === null) {
+            value = '';
+        }
+        let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, value);
+        value = v;
+        if (typeof value === DataTypes.NUMBER) {
+            value = value.toLocaleString();
+        }
+        return <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`} align={textAlign} size='medium' data-xpath={xpath} data-dataxpath={dataxpath}>{value}{numberSuffix}</TableCell>
     }
 
     if (mode === Modes.EDIT_MODE && active && !disabled) {
@@ -136,7 +153,7 @@ const Cell = (props) => {
                         forcePopupIcon={false}
                         variant='outlined'
                         size='small'
-                        sx={{ minWidth: 160 }}
+                        sx={{ minWidth: '120px !important' }}
                         className={classes.text_field}
                         required={required}
                         // clearOnBlur={false}
@@ -177,7 +194,7 @@ const Cell = (props) => {
                         required={required}
                         checked={value}
                         disabled={disabled}
-                        error={validationError.current !== null}
+                        error={validationError.current}
                         // ref={inputRef}
                         onChange={(e) => props.onCheckboxChange(e, dataxpath, xpath)}
                         // InputProps={inputProps}
@@ -224,6 +241,10 @@ const Cell = (props) => {
             let decimalScale = 2;
             if (collection.underlyingtype === DataTypes.INT32 || collection.underlyingtype === DataTypes.INT64) {
                 decimalScale = 0;
+            }
+            if (collection.numberFormat && collection.numberFormat.includes(".")) {
+                decimalScale = collection.numberFormat.split(".").pop();
+                decimalScale = decimalScale * 1;
             }
 
             // min constrainsts for numeric field if set.
@@ -407,7 +428,7 @@ const Cell = (props) => {
                     value={value}
                     caption={caption}
                     xpath={dataxpath}
-                    disabled={dataRemove || disabled || isDisabledValue ? true : false}
+                    disabled={dataRemove || disabled || buttonDisable || isDisabledValue ? true : false}
                     action={collection.button.action}
                     onClick={props.onButtonClick}
                 />
@@ -502,21 +523,6 @@ const Cell = (props) => {
         }
     }
 
-    let color = getColorTypeFromValue(collection, currentValue);
-    let tableCellColorClass = classes[color];
-
-    let dataModified = previousValue !== currentValue;
-    let tableCellRemove = dataRemove ? classes.remove : '';
-    let disabledClass = disabled ? classes.disabled : '';
-    if (props.ignoreDisable) {
-        disabledClass = "";
-    }
-
-
-    // let value = currentValue !== undefined && currentValue !== null ? currentValue : '';
-    // if (collection.displayType === DataTypes.INTEGER && typeof (value) === DataTypes.NUMBER) {
-    //     value = floatToInt(value);
-    // }
     let min = collection.min;
     if (typeof (min) === DataTypes.STRING) {
         min = getValueFromReduxStoreFromXpath(state, min);
@@ -531,15 +537,12 @@ const Cell = (props) => {
     if (value === null) {
         value = '';
     }
-    value = value.toLocaleString();
-    let numberSuffix = ""
-    if (collection.numberFormat) {
-        if (collection.numberFormat === "%") {
-            numberSuffix = " %"
-        }
+    let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, value);
+    value = v;
+    if (typeof value === DataTypes.NUMBER) {
+        value = value.toLocaleString();
     }
-
-    let textAlign = collection.textAlign ? collection.textAlign : 'center';
+    let dataModified = previousValue !== currentValue;
 
     if (mode === Modes.EDIT_MODE && dataModified) {
         let originalValue = previousValue !== undefined && previousValue !== null ? previousValue : '';

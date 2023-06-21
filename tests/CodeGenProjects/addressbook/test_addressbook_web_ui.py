@@ -3,6 +3,7 @@ import random
 import pytest
 from selenium import webdriver
 from selenium.common import NoSuchElementException
+from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC  # noqa
@@ -38,6 +39,7 @@ class SearchType(StrEnum):
 class Layout(StrEnum):
     TABLE = auto()
     TREE = auto()
+    NESTED = auto()
 
 
 @pytest.fixture(scope="session")
@@ -145,6 +147,7 @@ def load_web_project(driver: WebDriver) -> None:
     assert kill_switch_btn.is_displayed(), "failed to load web project, kill switch button not found"
 
 
+
 def set_input_field(widget: WebElement, xpath: str, name: str, value: str,search_type: SearchType = SearchType.NAME,
                     autocomplete: bool = False) -> None:
     if not hasattr(By, search_type):  # ..
@@ -185,9 +188,8 @@ def confirm_save(driver: WebDriver) -> None:
 
 
 def create_pair_strat(driver: WebDriver, pair_strat: Dict) -> None:
-    load_web_project(driver=driver)
+    load_web_project(driver)
 
-    # create a new strat from strat collection
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
     driver.execute_script('arguments[0].scrollIntoView(true)', strat_collection_widget)
     create_strat_btn = strat_collection_widget.find_element(By.XPATH, "//button[@name='Create']")
@@ -204,6 +206,11 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict) -> None:
     value = pair_strat["pair_strat_params"]["strat_leg1"]["sec"]["sec_id"]
     set_autocomplete_field(widget=pair_strat_params_widget, xpath=xpath, name="sec_id", search_type=SearchType.NAME,
                            value=value)
+
+    more_options_btn = pair_strat_params_widget.find_element(By.XPATH, "//button[@aria-label='options']")
+    more_options_btn.click()
+    plus_icon = pair_strat_params_widget.find_element(By.CSS_SELECTOR, "div[class^='HeaderField_menu']")
+    plus_icon.click()
 
     # select strat_leg1.side
     xpath = "pair_strat_params.strat_leg1.side"
@@ -328,28 +335,25 @@ def update_max_value_field_strats_limits(widget: WebElement, xpath: str, name: s
     input_element.send_keys(input_value)
 
 
-
-
-def test_update_strat_n_activate_using_tree_view(config_dict: Dict, pair_strat: Dict, pair_strat_edit: Dict,
-                                                 strat_limits: Dict) -> None:
+def test_update_pair_strat_create_n_activate_strat_limits_using_tree_view(config_dict: Dict, pair_strat_edit: Dict, pair_strat: Dict,
+                                                      strat_limits:Dict):
 
     driver_type: DriverType = DriverType.CHROME
     driver: webdriver.Chrome = get_driver(config_dict=config_dict, driver_type=driver_type)
     create_pair_strat(driver=driver, pair_strat=pair_strat)
 
-
+    pair_strat_params_widget = driver.find_element(By.ID, "pair_strat_params")
+    strat_limits_widget = driver.find_element(By.ID, "strat_limits")
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
     edit_btn = strat_collection_widget.find_element(By.NAME, "Edit")
     edit_btn.click()
     time.sleep(short_delay)
 
-    pair_strat_params_widget = driver.find_element(By.ID, "pair_strat_params")
-
     # pair_strat_params.common_premium
     xpath = "pair_strat_params.common_premium"
     value = pair_strat_edit["pair_strat_params"]["common_premium"]
     name = "common_premium"
-    set_input_field(widget=pair_strat_params_widget, xpath=xpath, name= name, value=value,
+    set_input_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value,
                     search_type=SearchType.ID)
 
     # pair_strat_params.hedge_ratio
@@ -358,40 +362,46 @@ def test_update_strat_n_activate_using_tree_view(config_dict: Dict, pair_strat: 
     set_input_field(widget=pair_strat_params_widget, xpath=xpath, name="hedge_ratio", value=value,
                     search_type=SearchType.ID)
 
-    # strat_limits_widget
-    strat_limits_widget = driver.find_element(By.ID, "strat_limits")
-    switch_layout(widget=strat_limits_widget, widget_name="strat_limits", layout=Layout.TREE)
-
-
     # scroll into view
     driver.execute_script('arguments[0].scrollIntoView(true)', strat_limits_widget)
     time.sleep(short_delay)
+
+    switch_layout(widget=strat_limits_widget, widget_name="strat_limits", layout=Layout.TREE)
+
 
     #
     xpath: str = "strat_limits.cancel_rate.max_cancel_rate"
     input_value: int = 20
     name: str = "max_cancel_rate"
-    update_max_value_field_strats_limits(widget=strat_limits_widget, xpath=xpath,name=name, input_value=input_value)
+    update_max_value_field_strats_limits(widget=strat_limits_widget, xpath=xpath, name=name, input_value=input_value)
 
-    max_partipation_rate_input_field = driver.find_element(By.ID, "max_participation_rate")
-
-    driver.execute_script('arguments[0].scrollIntoView(true)',max_partipation_rate_input_field)
-    time.sleep(short_delay)
 
     xpath: str = "strat_limits.market_trade_volume_participation.max_participation_rate"
     input_value: int = 30
     name: str = "max_participation_rate"
     update_max_value_field_strats_limits(widget=strat_limits_widget, xpath=xpath, name=name, input_value=input_value)
 
-
     # save
     save_btn = strat_collection_widget.find_element(By.NAME, "Save")
     save_btn.click()
     time.sleep(short_delay)
     confirm_save(driver=driver)
-
     edit_btn.click()
+    create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.TREE)
 
+    # activate_strat
+    activate_strat(driver=driver)
+
+    # validate_strat_limits
+    validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
+    driver.quit()
+
+
+
+def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, layout: Layout) -> None:
+
+
+    strat_limits_widget = driver.find_element(By.ID, "strat_limits")
     # creating_strat_of_strat_limits_in_tree_view
     # strat_limits.max_open_orders_per_side
     xpath = "strat_limits.max_open_orders_per_side"
@@ -436,13 +446,23 @@ def test_update_strat_n_activate_using_tree_view(config_dict: Dict, pair_strat: 
     name = "max_cancel_rate"
     set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
+
+
     # applicable_period_seconds
     # xpath = "strat_limits.cancel_rate.applicable_period_seconds"
     # value = strat_limits["cancel_rate"]["applicable_period_seconds"]
+    if layout == Layout.NESTED:
+        nested_tree_dialog = driver.find_element(By.XPATH, "//div[contains(@role,'dialog')]")
+        input_residual_mark_second_element = nested_tree_dialog.find_element(By.ID, "residual_mark_seconds")
+        driver.execute_script('arguments[0].scrollIntoView(true)', input_residual_mark_second_element)
+        time.sleep(short_delay)
 
-    input_residual_mark_second_element = strat_limits_widget.find_element(By.ID, "residual_mark_seconds")
-    driver.execute_script('arguments[0].scrollIntoView(true)', input_residual_mark_second_element)
-    time.sleep(short_delay)
+    else:
+        strats_limits_widget = driver.find_element(By.ID, "strat_limits")
+        input_residual_mark_second_element = strats_limits_widget.find_element(By.ID, "residual_mark_seconds")
+        driver.execute_script('arguments[0].scrollIntoView(true)', input_residual_mark_second_element)
+        time.sleep(short_delay)
+
 
     # strat_limits.cancel_rate.waived_min_orders
     xpath = "strat_limits.cancel_rate.waived_min_orders"
@@ -490,13 +510,7 @@ def test_update_strat_n_activate_using_tree_view(config_dict: Dict, pair_strat: 
     name = "residual_mark_seconds"
     set_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
-    # activate_strat
-    activate_strat(driver=driver)
-    # edit_btn.click()
 
-    # validate_strat_limits
-    validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
-    driver.quit()
 
 
 def get_value_from_input_field(widget: WebElement, xpath: str, layout: Layout):
@@ -705,9 +719,10 @@ def test_update_strat_n_activate_using_table_view(config_dict: Dict, pair_strat:
     # edit_btn
     edit_btn.click()
 
-
     # validating the values
     validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout= Layout.TABLE)
+
+
 
 def open_setting(widget: WebElement, widget_name: str) -> None:
     xpath: str = f"//div[@id='{widget_name}']//button[@name='Settings']"
@@ -816,6 +831,88 @@ def test_hide_n_show_in_table_view(config_dict: Dict, pair_strat: Dict):
     # validating that selected check is visible on table view
     table_headers: List[str] = get_table_headers(widget=symbol_side_snapshot_widget)
     assert inner_text in table_headers
+
+
+def verify_whether_field_is_enabled_or_not_in_table_layout(widget: WebElement, parital_class_name: str)-> None:
+    partial_css_selector: str = f"td[class^='{parital_class_name}']"
+    td_elements = widget.find_elements(By.CSS_SELECTOR, partial_css_selector)
+    for td_element in td_elements:
+        td_element = td_element.is_enabled()
+        assert td_element == True, "NOT ENABLED"
+
+
+
+
+def test_nested_pair_strat_n_strats_limits(config_dict: Dict, pair_strat: Dict, pair_strat_edit: Dict, strat_limits: Dict):
+    driver_type: DriverType = DriverType.CHROME
+    driver: webdriver.Chrome = get_driver(config_dict=config_dict, driver_type=driver_type)
+
+
+    create_pair_strat(driver=driver, pair_strat=pair_strat)
+
+
+    strat_limits_widget = driver.find_element(By.ID, "strat_limits")
+    strat_collection_widget = driver.find_element(By.ID, "strat_collection")
+    pair_strat_params_widget = driver.find_element(By.ID, "pair_strat_params")
+    switch_layout(widget=pair_strat_params_widget, widget_name="pair_strat_params", layout=Layout.TABLE)
+
+    edit_btn = strat_collection_widget.find_element(By.NAME, "Edit")
+    edit_btn.click()
+
+    # check_whether_input_field_is_enabled_or_not_in_pair_strat_params
+    pair_strat_td_elements = pair_strat_params_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
+    verify_whether_field_is_enabled_or_not_in_table_layout(widget=pair_strat_params_widget, parital_class_name="MuiTableCell-root")
+
+
+    # perform_double_click
+    actions = ActionChains(driver)
+    actions.double_click(pair_strat_td_elements[9]).perform()
+
+    # dialog
+    nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
+
+    # update_value_in_nested_tree_layout
+    # select pair_strat_params.common_premium
+    xpath = "pair_strat_params.common_premium"
+    value = pair_strat["pair_strat_params"]["common_premium"]
+    set_input_field(widget=nested_tree_dialog, xpath=xpath, name="common_premium", value=value,search_type=SearchType.ID)
+    # pair_strat_params.hedge_ratio
+    xpath = "pair_strat_params.hedge_ratio"
+    value = pair_strat_edit["pair_strat_params"]["hedge_ratio"]
+    set_input_field(widget=nested_tree_dialog, xpath=xpath, name="hedge_ratio", value=value,search_type=SearchType.ID)
+
+    # save strat
+    save_strat = nested_tree_dialog.find_element(By.NAME, "Save")
+    save_strat.click()
+
+    strat_limits_td_elements = strat_limits_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
+    # perform_double_click
+    actions.double_click(strat_limits_td_elements[0]).perform()
+
+    create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.NESTED)
+
+    # save_nested_strat
+    nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
+    save_strat = nested_tree_dialog.find_element(By.NAME, "Save")
+    save_strat.click()
+
+    # perform_double_click
+    actions.double_click(strat_limits_td_elements[0]).perform()
+
+    validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

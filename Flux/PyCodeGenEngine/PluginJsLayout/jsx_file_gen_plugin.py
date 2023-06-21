@@ -24,7 +24,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
     ----- 4. Non-Root Type and Layout as table or tree in repeated view
     ----- 5. Layout as Simple Abbreviated Type
     ----- 6. Layout as Parent Abbreviated Type (for nested abbreviated types)
-    ----- 6. Abbreviated dependent type
+    ----- 7. Abbreviated dependent type
     """
     root_type: str = 'RootType'
     repeated_root_type: str = 'RepeatedRootType'
@@ -119,8 +119,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           "compareJSONObjects,\n"
             output_str += "    getNewItem, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId, createCollections\n"
         output_str += "} from '../utils';\n"
-        if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-            output_str += "import { usePrevious } from '../hooks';\n"
         output_str += "/* custom components */\n"
         output_str += "import WidgetContainer from '../components/WidgetContainer';\n"
         output_str += "import SkeletonField from '../components/SkeletonField';\n"
@@ -234,6 +232,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    disableOverride={props.disableOverride}\n"
         output_str += "                    onOverrideChange={props.onOverrideChange}\n"
         output_str += "                    onFormUpdate={onFormUpdate}\n"
+        output_str += "                    formValidation={formValidation}\n"
         output_str += "                />\n"
         output_str += "            ) : props.layout === Layouts.TREE_LAYOUT ? (\n"
         output_str += "                <TreeWidget\n"
@@ -372,6 +371,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        userChanges, discardedChanges, activeChanges, openWsPopup, mode, createMode, " \
                               "openConfirmSavePopup, formValidation, openFormValidationPopup\n"
                 output_str += "    } = useSelector(state => " + f"state.{dependent_message_camel_cased});\n"
+                if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
+                    dependent_abb_msg = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
+                    dependent_abb_msg_camel_cased = convert_to_camel_case(dependent_abb_msg)
+                    output_str += "    const { " + f"{dependent_abb_msg_camel_cased}Array" + " } = useSelector(" + \
+                                  "state => " + f"state.{dependent_abb_msg_camel_cased});\n"
                 output_str += "    const { schema, schemaCollections } = useSelector((state) => state.schema);\n"
                 output_str += "    /* local react states */\n"
                 output_str += "    const [searchValue, setSearchValue] = useState('');\n"
@@ -385,7 +389,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"    const getAll{dependent_message}Dict = useRef(" + "{});\n"
         return output_str
 
-    def handle_abbreviated_return(self, message_name: str, message_name_camel_cased: str) -> str:
+    def handle_abbreviated_return(self, message_name: str, message_name_camel_cased: str, layout_type: str) -> str:
         dependent_msg_name = self.abbreviated_dependent_message_name
         dependent_msg_name_camel_cased = convert_to_camel_case(dependent_msg_name)
         output_str = "    let createMenu = '';\n"
@@ -400,9 +404,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                       "'alertBubbleSource'))[0].alertBubbleSource;\n"
         output_str += "        alertBubbleColorSource = collections.filter(col => col.hasOwnProperty(" \
                       "'alertBubbleSource'))[0].alertBubbleColor;\n"
-        output_str += "        if (dependentName === alertBubbleSource.split('.')[0]) {\n"
-        output_str += "            alertBubbleSource = alertBubbleSource.substring(alertBubbleSource.indexOf('.') + " \
-                      "1);\n"
+        output_str += "        alertBubbleSource = alertBubbleSource.substring(alertBubbleSource.indexOf('.') + 1);\n"
+        output_str += "        if (alertBubbleColorSource) {\n"
         output_str += "            alertBubbleColorSource = alertBubbleColorSource.substring(" \
                       "alertBubbleColorSource.indexOf('.') + 1);\n"
         output_str += "        }\n\n"
@@ -446,6 +449,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    name={props.name}\n"
         output_str += "                    mode={mode}\n"
         output_str += "                    schema={schema}\n"
+        output_str += "                    collections={collections}\n"
         output_str += "                    bufferedKeyName={bufferedKeyName}\n"
         output_str += "                    bufferedLabel={collections.filter(col => " \
                       "col.key === bufferedKeyName)[0].title}\n"
@@ -470,6 +474,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    itemsMetadata={"f"{dependent_msg_name_camel_cased}" + "Array}\n"
         output_str += "                    itemSchema={dependentSchema}\n"
         output_str += "                    itemCollections={dependentCollections}\n"
+        if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
+            dependent_msg_name = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
+            dependent_msg_name_camel_cased = convert_to_camel_case(dependent_msg_name)
+            output_str += "                    linkedItemsMetadata={" + f"{dependent_msg_name_camel_cased}Array" + "}\n"
         output_str += "                    dependentName={dependentName}\n"
         output_str += "                    alertBubbleSource={alertBubbleSource}\n"
         output_str += "                    alertBubbleColorSource={alertBubbleColorSource}\n"
@@ -581,7 +589,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    useEffect(() => {\n"
             output_str += "        /* fetch all objects. to be triggered only once when the component loads */\n"
             output_str += f"        dispatch(getAll{message_name}());\n"
-            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.abbreviated_dependent_type]:
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 dependent_message = self.abbreviated_dependent_message_name
                 output_str += f"        dispatch(getAll{dependent_message}());\n"
             output_str += "    }, []);\n\n"
@@ -739,9 +747,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            /* close the websocket on cleanup */\n"
             output_str += "            return () => socket.close();\n"
             output_str += "        }\n"
-            if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
-                dependent_message = self.abbreviated_dependent_message_name
-                output_str += f"        dispatch(setSelected{dependent_message}Id(selected{message_name}Id));\n"
             output_str += "    }" + f", [selected{message_name}Id])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += "        const intervalId = setInterval(flushGetWs, 250);\n"
@@ -1130,7 +1135,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        dispatch(setSelected{dependent_message}Id(id));\n"
             if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                 dependent_abb_msg = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
-                output_str += f"        setSelected{dependent_abb_msg}Id(id);\n"
+                output_str += f"        dispatch(setSelected{dependent_abb_msg}Id(id));\n"
             output_str += "    }\n\n"
             output_str += "    const setSelectedItem = (id) => {\n"
             output_str += "        if (id === null) {\n"
@@ -1176,7 +1181,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }\n\n"
 
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
-            output_str += self.handle_abbreviated_return(message_name, message_name_camel_cased)
+            output_str += self.handle_abbreviated_return(message_name, message_name_camel_cased, layout_type)
         else:
             output_str += self.handle_non_abbreviated_return(message_name, message_name_camel_cased, layout_type)
         output_str += f"export default memo({message_name}, isEqual);\n\n"

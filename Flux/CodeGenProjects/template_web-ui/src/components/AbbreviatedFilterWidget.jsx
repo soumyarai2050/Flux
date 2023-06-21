@@ -7,7 +7,7 @@ import { Icon } from './Icon';
 import _ from 'lodash';
 import { DB_ID, Modes, DataTypes, ColorTypes } from '../constants';
 import {
-    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getComparator, stableSort, getAbbreviatedKeyFromId, applyFilter
+    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getComparator, stableSort, getAbbreviatedKeyFromId, applyFilter, getLocalizedValueAndSuffix
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { AlertErrorMessage } from './Alert';
@@ -45,6 +45,14 @@ const AbbreviatedFilterWidget = (props) => {
         // return empty array if no metadata found
         return [];
     }, [props.items, props.abbreviated, itemsMetadata, getAbbreviatedKeyFromId])
+
+    let bufferCollection = useMemo(() => {
+        return props.collections.filter(col => col.key === props.bufferedKeyName)[0];
+    }, [props.collections, props.bufferedKeyName])
+
+    let loadedCollection = useMemo(() => {
+        return props.collections.filter(col => col.key === props.loadedKeyName)[0];
+    }, [props.collections, props.loadedKeyName])
 
     useEffect(() => {
         if (items.length === 0) {
@@ -88,7 +96,7 @@ const AbbreviatedFilterWidget = (props) => {
     const collections = useMemo(() => {
         let collections = [];
         if (props.abbreviated && props.itemCollections.length > 0) {
-            props.abbreviated.split('$').forEach(field => {
+            props.abbreviated.split('^').forEach(field => {
                 let title;
                 let source = field;
                 if (source.indexOf(":") !== -1) {
@@ -97,11 +105,20 @@ const AbbreviatedFilterWidget = (props) => {
                 }
                 let xpath = source.split("-").map(path => path = path.substring(path.indexOf(".") + 1));
                 xpath = xpath.join("-");
+                let subCollections = xpath.split("-").map(path => {
+                    return props.itemCollections.map(col =>  Object.assign({}, col))
+                                                .filter(col => col.tableTitle === path)[0];
+                })
                 source = xpath.split("-")[0];
                 let collection = props.itemCollections.map(col => Object.assign({}, col)).filter(col => col.tableTitle === source)[0];
                 collection.xpath = xpath;
                 collection.tableTitle = xpath;
                 collection.elaborateTitle = false;
+                collection.hide = false;
+                collection.subCollections = subCollections;
+                if (xpath.indexOf('-') !== -1) {
+                    collection.type = DataTypes.STRING;
+                }
                 if (title) {
                     collection.title = title;
                 }
@@ -122,14 +139,30 @@ const AbbreviatedFilterWidget = (props) => {
                 let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
                 row['data-id'] = id;
                 collections.forEach(c => {
-                    let value = "";
+                    let value = null;
                     if (c.xpath.indexOf("-") !== -1) {
                         value = c.xpath.split("-").map(xpath => {
-                            return _.get(metadata, xpath);
+                            let collection = c.subCollections.filter(col => col.tableTitle === xpath)[0];
+                            let val = _.get(metadata, xpath);
+                            if (val === undefined || val === null) {
+                                val = "";
+                            }
+                            let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, val);
+                            val = v + numberSuffix;
+                            return val;
                         })
-                        value = value.join("-");
+                        if (loadedCollection.microSeparator) {
+                            value = value.join(loadedCollection.microSeparator);
+                        } else {
+                            value = value.join("-");
+                        }
                     } else {
                         value = _.get(metadata, c.xpath);
+                        if (value === undefined || value === null) {
+                            value = "";
+                        }
+                        let [numberSuffix, v] = getLocalizedValueAndSuffix(c, value);
+                        value = v;
                     }
                     row[c.xpath] = value;
                 })
@@ -173,27 +206,29 @@ const AbbreviatedFilterWidget = (props) => {
             onChangeMode={props.headerProps.onChangeMode}
             onSave={props.headerProps.onSave}
             onReload={props.headerProps.onReload}>
-            <Box className={classes.dropdown_container}>
-                <Autocomplete
-                    className={classes.autocomplete_dropdown}
-                    disableClearable
-                    getOptionLabel={(option) => option}
-                    options={props.options}
-                    size='small'
-                    variant='outlined'
-                    value={props.searchValue ? props.searchValue : null}
-                    onChange={props.onChange}
-                    renderInput={(params) => <TextField {...params} label={props.bufferedLabel} />}
-                />
-                <Button
-                    className={classes.button}
-                    disabled={props.searchValue ? false : true}
-                    disableElevation
-                    variant='contained'
-                    onClick={props.onLoad}>
-                    <Download fontSize='small' />
-                </Button>
-            </Box>
+            {!bufferCollection.hide && (
+                <Box className={classes.dropdown_container}>
+                    <Autocomplete
+                        className={classes.autocomplete_dropdown}
+                        disableClearable
+                        getOptionLabel={(option) => option}
+                        options={props.options}
+                        size='small'
+                        variant='outlined'
+                        value={props.searchValue ? props.searchValue : null}
+                        onChange={props.onChange}
+                        renderInput={(params) => <TextField {...params} label={props.bufferedLabel} />}
+                    />
+                    <Button
+                        className={classes.button}
+                        disabled={props.searchValue ? false : true}
+                        disableElevation
+                        variant='contained'
+                        onClick={props.onLoad}>
+                        <Download fontSize='small' />
+                    </Button>
+                </Box>
+            )}
             <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
             {rows && rows.length > 0 && (
                 <>
@@ -203,7 +238,7 @@ const AbbreviatedFilterWidget = (props) => {
                             size='medium'>
                             <TableHead
                                 prefixCells={1}
-                                suffixCells={1}
+                                suffixCells={bufferCollection.hide ? 0 : 1}
                                 headCells={headCells}
                                 mode={Modes.READ_MODE}
                                 order={order}
@@ -218,10 +253,17 @@ const AbbreviatedFilterWidget = (props) => {
                                         let alertBubbleCount = 0;
                                         let alertBubbleColor = ColorTypes.INFO;
                                         if (props.alertBubbleSource) {
-                                            alertBubbleCount = getAlertBubbleCount(metadata, props.alertBubbleSource);
-                                            alertBubbleColor = getAlertBubbleColor(metadata, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                                            let alertBubbleData = metadata;
+                                            if (props.linkedItemsMetadata) {
+                                                alertBubbleData = props.linkedItemsMetadata.filter(o => _.get(o, DB_ID) === row["data-id"])[0];
+                                            }
+                                            alertBubbleCount = getAlertBubbleCount(alertBubbleData, props.alertBubbleSource);
+                                            if (props.alertBubbleColorSource) {
+                                                alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                                            }
                                         }
-                                        let disabled = props.selected !== row["data-id"] ? true : false;
+                                        let disabled = false;
+                                        const buttonDisable = row["data-id"] === props.selected ? false : true;
 
                                         return (
                                             <Fragment key={index}>
@@ -234,7 +276,7 @@ const AbbreviatedFilterWidget = (props) => {
                                                     {headCells.map((cell, i) => {
                                                         let mode = Modes.READ_MODE;
                                                         let rowindex = row["data-id"];
-                                                        let collection = collections.filter(c => c.key === cell.key)[0];
+                                                        let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
                                                         if (collection.type === "progressBar") {
                                                             collection = _.cloneDeep(collection);
                                                             let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
@@ -267,6 +309,7 @@ const AbbreviatedFilterWidget = (props) => {
                                                                 dataAdd={false}
                                                                 dataRemove={false}
                                                                 disabled={disabled}
+                                                                buttonDisable={buttonDisable}
                                                                 ignoreDisable={true}
                                                                 onUpdate={() => { }}
                                                                 onDoubleClick={() => { }}
@@ -279,12 +322,13 @@ const AbbreviatedFilterWidget = (props) => {
                                                             />
                                                         )
                                                     })}
-
-                                                    <TableCell className={classes.cell} sx={{ width: 10 }}>
-                                                        <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
-                                                            <Delete fontSize='small' />
-                                                        </Icon>
-                                                    </TableCell>
+                                                    {!bufferCollection.hide && (
+                                                        <TableCell className={classes.cell} sx={{ width: 10 }}>
+                                                            <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
+                                                                <Delete fontSize='small' />
+                                                            </Icon>
+                                                        </TableCell>
+                                                    )}
                                                 </TableRow>
                                             </Fragment>
                                         )
