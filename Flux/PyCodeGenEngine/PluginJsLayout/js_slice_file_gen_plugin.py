@@ -5,9 +5,11 @@ import re
 from typing import List, Callable, Dict
 import time
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -24,6 +26,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     ----- 2. Dependent Case - Json Root message and layout as option set to any of the field type of it
     ----- 3. Abbreviated Case - Json Root message and having relationship as field contains abbreviated option
                                 having message name which is dependent on current message
+                                - dependent_to_abbreviated_relation_msg_name_dict is used to differ between
+                                abbreviated type message and msg depending on it
     """
 
     def __init__(self, base_dir_path: str):
@@ -34,10 +38,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         self.independent_message_list: List[protogen.Message] = []
         self.repeated_layout_msg_name_list: List[str] = []
         self.current_message_is_dependent: bool | None = None  # True if dependent else false
-        if (ui_layout_msg_name := os.getenv("UILAYOUT_MESSAGE_NAME")) is not None:
+        if (ui_layout_msg_name := os.getenv("UILAYOUT_MESSAGE_NAME")) is not None and len(ui_layout_msg_name):
             self.__ui_layout_msg_name = ui_layout_msg_name
         else:
-            err_str = f"Env var 'UILAYOUT_MESSAGE_NAME' received as None"
+            err_str = f"Env var 'UILAYOUT_MESSAGE_NAME' received as {ui_layout_msg_name}"
             logging.exception(err_str)
             raise Exception(err_str)
 
@@ -121,7 +125,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "import axios from 'axios';\n"
         output_str += "import _, { cloneDeep } from 'lodash';\n"
         output_str += "/* project constants */\n"
-        output_str += "import { DB_ID, API_ROOT_URL, Modes } from '../constants';\n"
+        output_str += "import { DB_ID, API_ROOT_URL, API_ROOT_CACHE_URL, Modes } from '../constants';\n"
         output_str += "/* common util imports */\n"
         if not self.current_message_is_dependent:
             if message.proto.name not in self.dependent_to_abbreviated_relation_msg_name_dict.values():
@@ -201,7 +205,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if not self.current_message_is_dependent:
             output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', " \
                          "async (payload, { rejectWithValue }) => " + "{\n"
-            output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + \
+            output_str += "    return axios.post(`${API_ROOT_CACHE_URL}/create-" + f"{message_name_snake_cased}" + \
                           "`, payload)\n"
             output_str += "        .then(res => res.data)\n"
             output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
@@ -215,7 +219,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                              f"create', async (payload, "+"{ dispatch, getState, rejectWithValue }) => " + "{\n"
                 output_str += "    let { data, abbreviated, loadedKeyName } = payload;\n"
                 output_str += "    abbreviated = abbreviated.split('^')[0].split(':').pop();\n"
-                output_str += "    return axios.post(`${API_ROOT_URL}/create-" + f"{message_name_snake_cased}" + \
+                output_str += "    return axios.post(`${API_ROOT_CACHE_URL}/create-" + f"{message_name_snake_cased}" + \
                               "`, data)\n"
                 output_str += "        .then(res => {\n"
                 output_str += "            let state = getState();\n"
@@ -242,9 +246,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         option_val_dict = self.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_json_root)
 
         if JsSliceFileGenPlugin.flux_json_root_patch_field in option_val_dict:
-            output_str += "    return axios.patch(`${API_ROOT_URL}/patch-"+f"{message_name_snake_cased}"+"`, payload)\n"
+            output_str += "    return axios.patch(`${API_ROOT_CACHE_URL}/patch-"+f"{message_name_snake_cased}"+"`, payload)\n"
         else:
-            output_str += "    return axios.put(`${API_ROOT_URL}/put-"+f"{message_name_snake_cased}"+"`, payload)\n"
+            output_str += "    return axios.put(`${API_ROOT_CACHE_URL}/put-"+f"{message_name_snake_cased}"+"`, payload)\n"
         output_str += "        .then(res => res.data)\n"
         output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
         output_str += "})\n\n"
@@ -481,48 +485,43 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        },\n"
             else:
                 output_str += f"        set{message_name}ArrayWs: (state, action) => " + "{\n"
-                output_str += "            const { dict, mode, collections } = action.payload;\n"
-                output_str += f"            let updatedArray = state.{message_name_camel_cased}Array;\n"
-                output_str += "            _.entries(dict).map(([k, v]) => {\n"
-                output_str += "                k *= 1;\n"
-                output_str += "                let updatedObj = v;\n"
-                output_str += "                updatedArray = applyGetAllWebsocketUpdate(updatedArray, updatedObj);\n"
-                output_str += f"                state.{message_name_camel_cased}Array = updatedArray;\n"
-                output_str += f"                if (k === state.selected{message_name}Id) " + "{\n"
-                output_str += "                    let diff = compareObjects(updatedObj, " \
+                output_str += "            const { data, collections } = action.payload;\n"
+                output_str += f"            state.{message_name_camel_cased}Array = data;\n"
+                output_str += f"            const updatedObj = data.find(o => o[DB_ID] === " \
+                              f"state.selected{message_name}Id);\n"
+                output_str += "            if (updatedObj) {\n"
+                output_str += "                let diff = compareObjects(updatedObj, " \
                               f"state.{message_name_camel_cased}, state.{message_name_camel_cased});\n"
-                output_str += "                    if (_.keys(updatedObj).length === 1) {\n"
-                output_str += f"                        state.selected{message_name}Id = " \
+                output_str += "                if (_.keys(updatedObj).length === 1) {\n"
+                output_str += f"                    state.selected{message_name}Id = " \
                               f"initialState.selected{message_name}Id;\n"
-                output_str += f"                        state.{message_name_camel_cased} = " \
+                output_str += f"                    state.{message_name_camel_cased} = " \
                               f"initialState.{message_name_camel_cased};\n"
-                output_str += "                    } else {\n"
-                output_str += f"                        state.{message_name_camel_cased} = updatedObj;\n"
-                output_str += "                    }\n"
-                output_str += "                    let trees = generateRowTrees(cloneDeep(updatedObj), collections);\n"
-                output_str += "                    let modifiedTrees = generateRowTrees(cloneDeep(" \
-                              f"state.modified{message_name}), collections);\n"
-                output_str += "                    if (trees.length !== modifiedTrees.length) {\n"
-                output_str += "                        if (mode === Modes.EDIT_MODE) {\n"
-                output_str += "                            state.openWsPopup = true;\n"
-                output_str += "                        } else {\n"
-                output_str += "                            let modifiedObj = addxpath(cloneDeep(updatedObj));\n"
-                output_str += f"                            state.modified{message_name} = modifiedObj;\n"
-                output_str += "                        }\n"
-                output_str += "                    } else {\n"
-                output_str += "                        _.keys(state.userChanges).map(xpath => {\n"
-                output_str += "                            if (diff.includes(xpath) && !diff.includes(DB_ID)) {\n"
-                output_str += "                                state.discardedChanges[xpath] = " \
-                              "state.userChanges[xpath];\n"
-                output_str += "                                delete state.userChanges[xpath];\n"
-                output_str += "                                state.openWsPopup = true;\n"
-                output_str += "                            }\n"
-                output_str += "                            return;\n"
-                output_str += "                        })\n"
-                output_str += "                    }\n"
+                output_str += "                } else {\n"
+                output_str += f"                    state.{message_name_camel_cased} = updatedObj;\n"
                 output_str += "                }\n"
-                output_str += "                return;\n"
-                output_str += "            })\n"
+                output_str += "                let trees = generateRowTrees(cloneDeep(updatedObj), collections);\n"
+                output_str += "                let modifiedTrees = generateRowTrees(cloneDeep(" \
+                              f"state.modified{message_name}), collections);\n"
+                output_str += "                if (trees.length !== modifiedTrees.length) {\n"
+                output_str += "                    if (state.mode === Modes.EDIT_MODE) {\n"
+                output_str += "                        state.openWsPopup = true;\n"
+                output_str += "                    } else {\n"
+                output_str += "                        let modifiedObj = addxpath(cloneDeep(updatedObj));\n"
+                output_str += f"                        state.modified{message_name} = modifiedObj;\n"
+                output_str += "                    }\n"
+                output_str += "                } else {\n"
+                output_str += "                    _.keys(state.userChanges).map(xpath => {\n"
+                output_str += "                        if (diff.includes(xpath) && !diff.includes(DB_ID)) {\n"
+                output_str += "                            state.discardedChanges[xpath] = " \
+                              "state.userChanges[xpath];\n"
+                output_str += "                            delete state.userChanges[xpath];\n"
+                output_str += "                            state.openWsPopup = true;\n"
+                output_str += "                        }\n"
+                output_str += "                        return;\n"
+                output_str += "                    })\n"
+                output_str += "                }\n"
+                output_str += "            }\n"
                 output_str += "        },\n"
 
             output_str += f"        set{message_name}: (state, action) => " + "{\n"

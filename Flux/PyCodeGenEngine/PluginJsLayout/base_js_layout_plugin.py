@@ -28,7 +28,8 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
         self.parent_abbreviated_filter_layout_msg_list: List[protogen.Message] = []
         self.abbreviated_msg_name_to_dependent_msg_name_dict: Dict[str, str] = {}
         self.parent_abb_msg_name_to_linked_abb_msg_name_dict: Dict[str, str] = {}
-        if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
+        if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and \
+                len(response_field_case_style):
             self.response_field_case_style: str = response_field_case_style
         else:
             err_str = f"Env var 'RESPONSE_FIELD_CASE_STYLE' " \

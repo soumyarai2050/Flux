@@ -1,13 +1,13 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell, TablePagination } from '@mui/material';
+import { Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell, TablePagination, Select, MenuItem, FormControlLabel, Checkbox } from '@mui/material';
 import WidgetContainer from './WidgetContainer';
-import { Download, Delete } from '@mui/icons-material';
+import { Download, Delete, Settings, FileDownload, LiveHelp } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { Icon } from './Icon';
-import _ from 'lodash';
-import { DB_ID, Modes, DataTypes, ColorTypes } from '../constants';
+import _, { cloneDeep } from 'lodash';
+import { DB_ID, Modes, DataTypes, ColorTypes, Layouts } from '../constants';
 import {
-    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getComparator, stableSort, getAbbreviatedKeyFromId, applyFilter, getLocalizedValueAndSuffix
+    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId, applyFilter
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { AlertErrorMessage } from './Alert';
@@ -15,44 +15,112 @@ import AlertBubble from './AlertBubble';
 import TableHead from './TableHead';
 import DynamicMenu from './DynamicMenu';
 import Cell from './Cell';
+import PivotTable from './PivotTable';
 import classes from './AbbreviatedFilterWidget.module.css';
+import { utils, writeFileXLSX } from 'xlsx';
 
-const AbbreviatedFilterWidget = (props) => {
+
+function AbbreviatedFilterWidget(props) {
+    const worker = useMemo(() => new Worker(new URL("../workers/abbreviatedRowsHandler.js", import.meta.url)), []);
     const [order, setOrder] = useState('asc');
     const [orderBy, setOrderBy] = useState('');
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const [page, setPage] = useState(0);
     const [filter, setFilter] = useState({});
-
-    const itemsMetadata = useMemo(() => {
-        if (props.itemsMetadata && props.itemsMetadata.length > 0) {
-            return applyFilter(props.itemsMetadata, filter);
-        }
-        // return empty array if not set or no metadata found
-        return [];
-    }, [applyFilter, props.itemsMetadata, filter]);
+    const [rows, setRows] = useState([]);
+    const [activeRows, setActiveRows] = useState([]);
+    const [showSettings, setShowSettings] = useState(false);
+    const [selectAll, setSelectAll] = useState(false);
+    const [headCells, setHeadCells] = useState([]);
 
     const items = useMemo(() => {
-        if (itemsMetadata.length > 0) {
-            let items = props.items.filter(item => {
-                let id = getIdFromAbbreviatedKey(props.abbreviated, item);
-                let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
-                if (metadata) return true;
-                return false;
-            })
-            return items;
-        }
-        // return empty array if no metadata found
-        return [];
-    }, [props.items, props.abbreviated, itemsMetadata, getAbbreviatedKeyFromId])
+        return props.items.filter(item => {
+            const itemId = getIdFromAbbreviatedKey(props.abbreviated, item);
+            const metadata = props.itemsMetadata.find(metadata => _.get(metadata, DB_ID) === itemId);
+            if (metadata) {
+                if (applyFilter([metadata], filter).length > 0) {
+                    return true;
+                }
+            } else {
+                return true;
+            }
+            return false;
+        })
+    }, [props.items, props.abbreviated, props.itemsMetadata, getIdFromAbbreviatedKey, applyFilter, filter])
 
-    let bufferCollection = useMemo(() => {
+    const bufferCollection = useMemo(() => {
         return props.collections.filter(col => col.key === props.bufferedKeyName)[0];
     }, [props.collections, props.bufferedKeyName])
 
-    let loadedCollection = useMemo(() => {
+    const loadedCollection = useMemo(() => {
         return props.collections.filter(col => col.key === props.loadedKeyName)[0];
     }, [props.collections, props.loadedKeyName])
+
+    const collections = useMemo(() => {
+        let collections = [];
+        if (props.abbreviated && props.itemCollections.length > 0) {
+            props.abbreviated.split('^').forEach(field => {
+                let title;
+                let source = field;
+                if (source.indexOf(":") !== -1) {
+                    title = field.split(":")[0];
+                    source = field.split(":")[1];
+                }
+                let xpath = source.split("-").map(path => path = path.substring(path.indexOf(".") + 1));
+                xpath = xpath.join("-");
+                let subCollections = xpath.split("-").map(path => {
+                    return props.itemCollections.map(col => Object.assign({}, col))
+                        .filter(col => col.tableTitle === path)[0];
+                })
+                source = xpath.split("-")[0];
+                let collection = props.itemCollections.map(col => Object.assign({}, col)).filter(col => col.tableTitle === source)[0];
+                collection.xpath = xpath;
+                collection.tableTitle = xpath;
+                collection.elaborateTitle = false;
+                collection.hide = false;
+                collection.subCollections = subCollections;
+                if (xpath.indexOf('-') !== -1) {
+                    collection.type = DataTypes.STRING;
+                }
+                if (title) {
+                    collection.title = title;
+                }
+                collections.push(collection);
+            })
+        }
+        return collections
+    }, [props.abbreviated, props.itemCollections])
+
+    useEffect(() => {
+        if (window.Worker) {
+            worker.postMessage({ items, itemsData: props.itemsMetadata, itemProps: collections, abbreviation: props.abbreviated, loadedProps: loadedCollection, page, pageSize: rowsPerPage, order, orderBy });
+        }
+    }, [items, props.itemsMetadata, page, rowsPerPage, order, orderBy])
+
+    useEffect(() => {
+        if (window.Worker) {
+            worker.onmessage = (e) => {
+                const [updatedRows, updatedActiveRows] = e.data;
+                setRows(updatedRows);
+                setActiveRows(updatedActiveRows);
+            }
+        }
+        return () => {
+            worker.terminate();
+        }
+    }, [worker])
+
+    useEffect(() => {
+        setHeadCells(collections);
+    }, [])
+
+    useEffect(() => {
+        let activeItems = activeRows.map(row => getAbbreviatedKeyFromId(items, props.abbreviated, row['data-id']));
+        if (!_.isEqual(activeItems, props.activeItems)) {
+            props.setOldActiveItems(props.activeItems);
+            props.setActiveItems(activeItems);
+        }
+    }, [activeRows, items, props.abbreviated])
 
     useEffect(() => {
         if (items.length === 0) {
@@ -76,6 +144,7 @@ const AbbreviatedFilterWidget = (props) => {
         const isAsc = orderBy === property && order === 'asc';
         setOrder(isAsc ? 'desc' : 'asc');
         setOrderBy(property);
+        setPage(0);
     }
 
     const onRowSelect = (id) => {
@@ -93,264 +162,276 @@ const AbbreviatedFilterWidget = (props) => {
         setPage(0);
     };
 
-    const collections = useMemo(() => {
-        let collections = [];
-        if (props.abbreviated && props.itemCollections.length > 0) {
-            props.abbreviated.split('^').forEach(field => {
-                let title;
-                let source = field;
-                if (source.indexOf(":") !== -1) {
-                    title = field.split(":")[0];
-                    source = field.split(":")[1];
-                }
-                let xpath = source.split("-").map(path => path = path.substring(path.indexOf(".") + 1));
-                xpath = xpath.join("-");
-                let subCollections = xpath.split("-").map(path => {
-                    return props.itemCollections.map(col =>  Object.assign({}, col))
-                                                .filter(col => col.tableTitle === path)[0];
-                })
-                source = xpath.split("-")[0];
-                let collection = props.itemCollections.map(col => Object.assign({}, col)).filter(col => col.tableTitle === source)[0];
-                collection.xpath = xpath;
-                collection.tableTitle = xpath;
-                collection.elaborateTitle = false;
-                collection.hide = false;
-                collection.subCollections = subCollections;
-                if (xpath.indexOf('-') !== -1) {
-                    collection.type = DataTypes.STRING;
-                }
-                if (title) {
-                    collection.title = title;
-                }
-                collections.push(collection);
+    const onSettingsOpen = () => {
+        setShowSettings(true);
+    }
+
+    const onSettingsClose = () => {
+        setShowSettings(false);
+    }
+
+    const exportToExcel = () => {
+        const updatedRows = cloneDeep(rows);
+        updatedRows.forEach(row => {
+            delete row['data-id'];
+        })
+        const ws = utils.json_to_sheet(updatedRows);
+        const wb = utils.book_new();
+        utils.book_append_sheet(wb, ws, "Sheet1");
+        writeFileXLSX(wb, `${props.name}.xlsx`);
+    }
+
+    const onSettingsItemChange = (e, key) => {
+        let hide = !e.target.checked;
+        if (hide) {
+            setSelectAll(false);
+        }
+        let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: hide } : cell)
+        setHeadCells(updatedHeadCells);
+    }
+
+    const onSelectAll = (e) => {
+        let updatedHeadCells = cloneDeep(headCells);
+        if (e.target.checked) {
+            updatedHeadCells = updatedHeadCells.map(cell => {
+                cell.hide = false;
+                return cell;
+            })
+        } else {
+            updatedHeadCells = updatedHeadCells.map(cell => {
+                cell.hide = true;
+                return cell;
             })
         }
-        return collections
-    }, [props.abbreviated, props.itemCollections])
-
-    const headCells = _.cloneDeep(collections);
-
-    const rows = useMemo(() => {
-        let rows = [];
-        if (items) {
-            items.map((item, i) => {
-                let row = {};
-                let id = getIdFromAbbreviatedKey(props.abbreviated, item);
-                let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === id)[0];
-                row['data-id'] = id;
-                collections.forEach(c => {
-                    let value = null;
-                    if (c.xpath.indexOf("-") !== -1) {
-                        value = c.xpath.split("-").map(xpath => {
-                            let collection = c.subCollections.filter(col => col.tableTitle === xpath)[0];
-                            let val = _.get(metadata, xpath);
-                            if (val === undefined || val === null) {
-                                val = "";
-                            }
-                            let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, val);
-                            val = v + numberSuffix;
-                            return val;
-                        })
-                        if (loadedCollection.microSeparator) {
-                            value = value.join(loadedCollection.microSeparator);
-                        } else {
-                            value = value.join("-");
-                        }
-                    } else {
-                        value = _.get(metadata, c.xpath);
-                        if (value === undefined || value === null) {
-                            value = "";
-                        }
-                        let [numberSuffix, v] = getLocalizedValueAndSuffix(c, value);
-                        value = v;
-                    }
-                    row[c.xpath] = value;
-                })
-                rows.push(row);
-            })
-        }
-        return rows;
-    }, [items, props.abbreviated, itemsMetadata, collections])
-
-    const activeRows = useMemo(() => {
-        return stableSort(rows, getComparator(order, orderBy))
-            .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-    }, [rows, order, orderBy, page, rowsPerPage])
-
-    useEffect(() => {
-        let activeItems = activeRows.map(row => getAbbreviatedKeyFromId(items, props.abbreviated, row['data-id']));
-        if (!_.isEqual(activeItems, props.activeItems)) {
-            props.setOldActiveItems(props.activeItems);
-            props.setActiveItems(activeItems);
-        }
-    }, [activeRows, items, props.abbreviated])
+        setSelectAll(e.target.checked);
+        setHeadCells(updatedHeadCells);
+    }
 
     let menu = (
         <>
             <DynamicMenu
                 collections={props.itemCollections}
                 currentSchema={props.itemSchema}
-                data={itemsMetadata}
+                data={props.itemsMetadata}
                 filter={filter}
                 onFilterChange={setFilter}
             />
+            <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
+            <Icon className={classes.icon} name="Export" title="Export" onClick={exportToExcel}><FileDownload fontSize='small' /></Icon>
+            <Select
+                style={{display: showSettings ? 'inherit' : 'none'}}
+                className={classes.dropdown}
+                open={showSettings}
+                onOpen={onSettingsOpen}
+                onClose={onSettingsClose}
+                value=''
+                onChange={() => { }}
+                size='small'>
+                <MenuItem dense={true}>
+                    <FormControlLabel size='small'
+                        label='Select All'
+                        control={
+                            <Checkbox
+                                size='small'
+                                checked={selectAll}
+                                onChange={onSelectAll}
+                            />
+                        }
+                    />
+                </MenuItem>
+                {headCells.map((cell, index) => {
+                    return (
+                        <MenuItem key={index} dense={true}>
+                            <FormControlLabel size='small'
+                                label={cell.elaborateTitle ? cell.tableTitle : cell.key}
+                                control={
+                                    <Checkbox
+                                        size='small'
+                                        checked={cell.hide ? false : true}
+                                        onChange={(e) => onSettingsItemChange(e, cell.tableTitle)}
+                                    />
+                                }
+                            />
+                            {cell.help &&
+                                <Icon title={cell.help}>
+                                    <LiveHelp color='primary' />
+                                </Icon>
+                            }
+                        </MenuItem>
+                    )
+                })}
+            </Select>
             {props.headerProps.menu}
         </>
     )
 
     return (
         <WidgetContainer
+            name={props.headerProps.name}
             title={props.headerProps.title}
             mode={props.headerProps.mode}
             menu={menu}
             onChangeMode={props.headerProps.onChangeMode}
             onSave={props.headerProps.onSave}
-            onReload={props.headerProps.onReload}>
-            {!bufferCollection.hide && (
-                <Box className={classes.dropdown_container}>
-                    <Autocomplete
-                        className={classes.autocomplete_dropdown}
-                        disableClearable
-                        getOptionLabel={(option) => option}
-                        options={props.options}
-                        size='small'
-                        variant='outlined'
-                        value={props.searchValue ? props.searchValue : null}
-                        onChange={props.onChange}
-                        renderInput={(params) => <TextField {...params} label={props.bufferedLabel} />}
-                    />
-                    <Button
-                        className={classes.button}
-                        disabled={props.searchValue ? false : true}
-                        disableElevation
-                        variant='contained'
-                        onClick={props.onLoad}>
-                        <Download fontSize='small' />
-                    </Button>
-                </Box>
-            )}
-            <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
-            {rows && rows.length > 0 && (
-                <>
-                    <TableContainer className={classes.container}>
-                        <Table
-                            className={classes.table}
-                            size='medium'>
-                            <TableHead
-                                prefixCells={1}
-                                suffixCells={bufferCollection.hide ? 0 : 1}
-                                headCells={headCells}
-                                mode={Modes.READ_MODE}
-                                order={order}
-                                orderBy={orderBy}
-                                onRequestSort={handleRequestSort}
+            onReload={props.headerProps.onReload}
+            layout={props.headerProps.layout}
+            supportedLayouts={props.headerProps.supportedLayouts}
+            onChangeLayout={props.headerProps.onChangeLayout}>
+            {props.headerProps.layout === Layouts.ABBREVIATED_FILTER_LAYOUT ? (
+                <Fragment>
+                    {!bufferCollection.hide && (
+                        <Box className={classes.dropdown_container}>
+                            <Autocomplete
+                                className={classes.autocomplete_dropdown}
+                                disableClearable
+                                getOptionLabel={(option) => option}
+                                options={props.options}
+                                size='small'
+                                variant='outlined'
+                                value={props.searchValue ? props.searchValue : null}
+                                onChange={props.onChange}
+                                renderInput={(params) => <TextField {...params} label={props.bufferedLabel} />}
                             />
-                            <TableBody>
-                                {
-                                    activeRows.map((row, index) => {
-                                        let selected = row["data-id"] === props.selected;
-                                        let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
-                                        let alertBubbleCount = 0;
-                                        let alertBubbleColor = ColorTypes.INFO;
-                                        if (props.alertBubbleSource) {
-                                            let alertBubbleData = metadata;
-                                            if (props.linkedItemsMetadata) {
-                                                alertBubbleData = props.linkedItemsMetadata.filter(o => _.get(o, DB_ID) === row["data-id"])[0];
-                                            }
-                                            alertBubbleCount = getAlertBubbleCount(alertBubbleData, props.alertBubbleSource);
-                                            if (props.alertBubbleColorSource) {
-                                                alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
-                                            }
+                            <Button
+                                className={classes.button}
+                                disabled={props.searchValue ? false : true}
+                                disableElevation
+                                variant='contained'
+                                onClick={props.onLoad}>
+                                <Download fontSize='small' />
+                            </Button>
+                        </Box>
+                    )}
+                    <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
+                    {rows && rows.length > 0 && (
+                        <>
+                            <TableContainer className={classes.container}>
+                                <Table
+                                    className={classes.table}
+                                    size='medium'>
+                                    <TableHead
+                                        prefixCells={1}
+                                        suffixCells={bufferCollection.hide ? 0 : 1}
+                                        headCells={headCells}
+                                        mode={Modes.READ_MODE}
+                                        order={order}
+                                        orderBy={orderBy}
+                                        onRequestSort={handleRequestSort}
+                                    />
+                                    <TableBody>
+                                        {
+                                            activeRows.map((row, index) => {
+                                                let selected = row["data-id"] === props.selected;
+                                                let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
+                                                let alertBubbleCount = 0;
+                                                let alertBubbleColor = ColorTypes.INFO;
+                                                if (props.alertBubbleSource) {
+                                                    let alertBubbleData = metadata;
+                                                    if (props.linkedItemsMetadata) {
+                                                        alertBubbleData = props.linkedItemsMetadata.filter(o => _.get(o, DB_ID) === row["data-id"])[0];
+                                                    }
+                                                    alertBubbleCount = getAlertBubbleCount(alertBubbleData, props.alertBubbleSource);
+                                                    if (props.alertBubbleColorSource) {
+                                                        alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                                                    }
+                                                }
+                                                let disabled = false;
+                                                const buttonDisable = props.selected !== row["data-id"];
+
+                                                return (
+                                                    <Fragment key={index}>
+                                                        <TableRow
+                                                            selected={selected}
+                                                            onClick={() => onRowSelect(row["data-id"])}>
+                                                            <TableCell className={classes.cell} sx={{ width: 10 }}>
+                                                                {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
+                                                            </TableCell>
+                                                            {headCells.map((cell, i) => {
+
+                                                                if (cell.hide) return;
+                                                                let mode = Modes.READ_MODE;
+                                                                let rowindex = row["data-id"];
+                                                                let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
+                                                                if (collection.type === "progressBar") {
+                                                                    collection = _.cloneDeep(collection);
+                                                                    let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
+                                                                    if (typeof (collection.min) === DataTypes.STRING) {
+                                                                        let min = collection.min;
+                                                                        collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
+                                                                    }
+                                                                    if (typeof (collection.max) === DataTypes.STRING) {
+                                                                        let max = collection.max;
+                                                                        collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
+                                                                        collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1))
+                                                                    }
+
+                                                                }
+                                                                let xpath = collection.xpath;
+                                                                let value = row[collection.xpath];
+
+                                                                return (
+                                                                    <Cell
+                                                                        key={i}
+                                                                        mode={mode}
+                                                                        rowindex={rowindex}
+                                                                        name={cell.key}
+                                                                        elaborateTitle={cell.tableTitle}
+                                                                        currentValue={value}
+                                                                        previousValue={value}
+                                                                        collection={collection}
+                                                                        xpath={xpath}
+                                                                        dataxpath={xpath}
+                                                                        dataAdd={false}
+                                                                        dataRemove={false}
+                                                                        disabled={disabled}
+                                                                        buttonDisable={buttonDisable}
+                                                                        ignoreDisable={true}
+                                                                        onUpdate={() => { }}
+                                                                        onDoubleClick={() => { }}
+                                                                        onButtonClick={onButtonClick}
+                                                                        onCheckboxChange={() => { }}
+                                                                        onTextChange={() => { }}
+                                                                        onSelectItemChange={() => { }}
+                                                                        onAutocompleteOptionChange={() => { }}
+                                                                        onDateTimeChange={() => { }}
+                                                                    />
+                                                                )
+                                                            })}
+                                                            {!bufferCollection.hide && (
+                                                                <TableCell className={classes.cell} sx={{ width: 10 }}>
+                                                                    <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
+                                                                        <Delete fontSize='small' />
+                                                                    </Icon>
+                                                                </TableCell>
+                                                            )}
+                                                        </TableRow>
+                                                    </Fragment>
+                                                )
+                                            })
                                         }
-                                        let disabled = false;
-                                        const buttonDisable = row["data-id"] === props.selected ? false : true;
-
-                                        return (
-                                            <Fragment key={index}>
-                                                <TableRow
-                                                    selected={selected}
-                                                    onClick={() => onRowSelect(row["data-id"])}>
-                                                    <TableCell className={classes.cell} sx={{ width: 10 }}>
-                                                        {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
-                                                    </TableCell>
-                                                    {headCells.map((cell, i) => {
-                                                        let mode = Modes.READ_MODE;
-                                                        let rowindex = row["data-id"];
-                                                        let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
-                                                        if (collection.type === "progressBar") {
-                                                            collection = _.cloneDeep(collection);
-                                                            let metadata = itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
-                                                            if (typeof (collection.min) === DataTypes.STRING) {
-                                                                let min = collection.min;
-                                                                collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
-                                                            }
-                                                            if (typeof (collection.max) === DataTypes.STRING) {
-                                                                let max = collection.max;
-                                                                collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
-                                                                collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1))
-                                                            }
-
-                                                        }
-                                                        let xpath = collection.xpath;
-                                                        let value = row[collection.xpath];
-
-                                                        return (
-                                                            <Cell
-                                                                key={i}
-                                                                mode={mode}
-                                                                rowindex={rowindex}
-                                                                name={cell.key}
-                                                                elaborateTitle={cell.tableTitle}
-                                                                currentValue={value}
-                                                                previousValue={value}
-                                                                collection={collection}
-                                                                xpath={xpath}
-                                                                dataxpath={xpath}
-                                                                dataAdd={false}
-                                                                dataRemove={false}
-                                                                disabled={disabled}
-                                                                buttonDisable={buttonDisable}
-                                                                ignoreDisable={true}
-                                                                onUpdate={() => { }}
-                                                                onDoubleClick={() => { }}
-                                                                onButtonClick={onButtonClick}
-                                                                onCheckboxChange={() => { }}
-                                                                onTextChange={() => { }}
-                                                                onSelectItemChange={() => { }}
-                                                                onAutocompleteOptionChange={() => { }}
-                                                                onDateTimeChange={() => { }}
-                                                            />
-                                                        )
-                                                    })}
-                                                    {!bufferCollection.hide && (
-                                                        <TableCell className={classes.cell} sx={{ width: 10 }}>
-                                                            <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
-                                                                <Delete fontSize='small' />
-                                                            </Icon>
-                                                        </TableCell>
-                                                    )}
-                                                </TableRow>
-                                            </Fragment>
-                                        )
-                                    })
-                                }
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                    {rows.length > 6 &&
-                        <TablePagination
-                            rowsPerPageOptions={[25, 50]}
-                            component="div"
-                            count={rows.length}
-                            rowsPerPage={rowsPerPage}
-                            page={page}
-                            onPageChange={handleChangePage}
-                            onRowsPerPageChange={handleChangeRowsPerPage}
-                        />
-                    }
-                </>
-            )}
-            {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                            {rows.length > 6 &&
+                                <TablePagination
+                                    rowsPerPageOptions={[25, 50]}
+                                    component="div"
+                                    count={rows.length}
+                                    rowsPerPage={rowsPerPage}
+                                    page={page}
+                                    onPageChange={handleChangePage}
+                                    onRowsPerPageChange={handleChangeRowsPerPage}
+                                />
+                            }
+                        </>
+                    )}
+                    {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
+                </Fragment>
+            ) : props.headerProps.layout === Layouts.PIVOT_TABLE ? (
+                <Fragment>
+                    {rows.length > 0 && <PivotTable pivotData={rows} />}
+                </Fragment>
+            ) : <h1>Unsupported Layout</h1>}
         </WidgetContainer>
     )
 }
@@ -368,4 +449,4 @@ AbbreviatedFilterWidget.propTypes = {
     onUnload: PropTypes.func
 }
 
-export default AbbreviatedFilterWidget;
+export default AbbreviatedFilterWidget = React.memo(AbbreviatedFilterWidget);

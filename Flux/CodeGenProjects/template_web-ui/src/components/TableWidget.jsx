@@ -120,6 +120,7 @@ const TableWidget = (props) => {
         const isAsc = orderBy === property && order === 'asc';
         setOrder(isAsc ? 'desc' : 'asc');
         setOrderBy(property);
+        setPage(0);
     };
 
     const onSave = () => {
@@ -316,7 +317,7 @@ const TableWidget = (props) => {
             values.push(row[xpath]);
         })
         const text = values.join('\n');
-        if (navigator) {
+        if (navigator.clipboard) {
             navigator.clipboard.writeText(text);
         } else {
             setClipboardText(text);
@@ -340,6 +341,7 @@ const TableWidget = (props) => {
             <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
             <Icon className={classes.icon} name="Export" title="Export" onClick={exportToExcel}><FileDownload fontSize='small' /></Icon>
             <Select
+                style={{display: showSettings ? 'inherit' : 'none'}}
                 className={classes.dropdown}
                 open={showSettings}
                 onOpen={onSettingsOpen}
@@ -401,7 +403,8 @@ const TableWidget = (props) => {
             onChangeLayout={props.headerProps.onChangeLayout}
             onReload={props.headerProps.onReload}
             onSave={props.headerProps.onSave}
-            commonkeys={commonkeys}>
+            commonkeys={commonkeys}
+            supportedLayouts={props.headerProps.supportedLayouts}>
 
             {getFilteredCells().length > 0 && rows.length > 0 &&
                 <Fragment>

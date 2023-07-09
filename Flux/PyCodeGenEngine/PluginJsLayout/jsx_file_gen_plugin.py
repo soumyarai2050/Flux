@@ -4,9 +4,11 @@ import os
 from typing import List, Callable, Dict, Final, ClassVar
 import time
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -44,7 +46,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.non_root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
             output_str += "import React, { Fragment, memo } from 'react';\n"
         else:
-            output_str += "import React, { Fragment, useState, useEffect, useCallback, useRef, memo } from 'react';\n"
+            output_str += "import React, { Fragment, useState, useEffect, useCallback, useRef, memo, useMemo } " \
+                          "from 'react';\n"
         output_str += "import { useSelector, useDispatch } from 'react-redux';\n"
         output_str += "import _, { cloneDeep, isEqual } from 'lodash';\n"
         if layout_type == JsxFileGenPlugin.root_type:
@@ -81,7 +84,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import {\n"
             output_str += f"    getAll{dependent_message_name}, create{dependent_message_name}, " \
                           f"update{dependent_message_name},\n"
-            output_str += f"    set{dependent_message_name}Array, set{dependent_message_name}ArrayWs," \
+            output_str += f"    set{dependent_message_name}Array, set{dependent_message_name}ArrayWs, " \
                           f"setModified{dependent_message_name}, setSelected{dependent_message_name}Id,\n"
             output_str += "    setUserChanges, setDiscardedChanges, setActiveChanges, setOpenWsPopup,\n"
             output_str += f"    setMode, setCreateMode, setOpenConfirmSavePopup, set{dependent_message_name}, " \
@@ -106,7 +109,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "/* common util imports */\n"
         output_str += "import {\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
-            output_str += "    addxpath, getTableColumns, getTableRows, getCommonKeyCollections, applyFilter\n"
+            output_str += "    addxpath, getTableColumns, getTableRows, getCommonKeyCollections, applyFilter, " \
+                          "removeRedundantFieldsFromRows\n"
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str += "    generateObjectFromSchema, addxpath, clearxpath, getObjectWithLeastId,\n"
             output_str += "    getTableColumns, getTableRows, getCommonKeyCollections, compareJSONObjects\n"
@@ -125,15 +129,22 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "import AbbreviatedFilterWidget from '../components/AbbreviatedFilterWidget';\n"
         else:
-            output_str += "import TreeWidget from '../components/TreeWidget';\n"
             output_str += "import TableWidget from '../components/TableWidget';\n"
             output_str += "import DynamicMenu from '../components/DynamicMenu';\n"
+            if layout_type == JsxFileGenPlugin.repeated_root_type:
+                output_str += "import PivotTable from '../components/PivotTable';\n"
+            else:
+                output_str += "import TreeWidget from '../components/TreeWidget';\n"
         if layout_type == JsxFileGenPlugin.root_type or \
                 layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "import { Icon } from '../components/Icon';\n"
         if layout_type != JsxFileGenPlugin.non_root_type and layout_type != JsxFileGenPlugin.abbreviated_dependent_type:
-            output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation } from '../components/Popup';\n"
-        output_str += "\n\n"
+            output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation } from '../components/Popup';\n\n"
+        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+            output_str += "const getAllWsWorker = new Worker(new URL('../workers/getAllWsHandler.js', " \
+                          "import.meta.url));\n\n"
+        else:
+            output_str += "\n\n"
         return output_str
 
     def handle_non_abbreviated_return(self, message_name: str, message_name_camel_cased: str, layout_type: str) -> str:
@@ -150,6 +161,22 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += '            onButtonToggle={onButtonToggle}\n'
             output_str += '        />\n'
             output_str += '    )\n\n'
+            output_str += "    let cleanedRows = [];\n"
+            output_str += "    if (props.layout === Layouts.PIVOT_TABLE) {\n"
+            output_str += "        cleanedRows = removeRedundantFieldsFromRows(rows);\n"
+            output_str += "    }\n"
+            output_str += "    const pivotTable = (\n"
+            output_str += "        <WidgetContainer\n"
+            output_str += "            name={props.name}\n"
+            output_str += "            title={title}\n"
+            output_str += "            menu={menu}\n"
+            output_str += "            layout={props.layout}\n"
+            output_str += "            onReload={onReload}\n"
+            output_str += "            onChangeLayout={props.onChangeLayout}\n"
+            output_str += "            supportedLayouts={[Layouts.TABLE_LAYOUT, Layouts.PIVOT_TABLE]}>\n"
+            output_str += "            {cleanedRows.length > 0 && <PivotTable pivotData={cleanedRows} />}\n"
+            output_str += "        </WidgetContainer>\n"
+            output_str += "    )\n\n"
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str = "    let menu = (\n"
             output_str += "        <DynamicMenu collections={collections} currentSchema={currentSchema} " \
@@ -181,14 +208,17 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    headerProps={{\n"
         output_str += "                        name: props.name,\n"
         output_str += "                        title: title,\n"
+        output_str += "                        layout: props.layout,\n"
+        output_str += "                        menu: menu,\n"
+        output_str += "                        onChangeLayout: props.onChangeLayout,\n"
         if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                        mode: mode,\n"
-            output_str += "                        layout: props.layout,\n"
-        output_str += "                        menu: menu,\n"
+            output_str += "                        supportedLayouts: [Layouts.TABLE_LAYOUT, Layouts.TREE_LAYOUT],\n"
+        else:
+            output_str += "                        supportedLayouts: [Layouts.TABLE_LAYOUT, Layouts.PIVOT_TABLE],\n"
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type:
             if layout_type != JsxFileGenPlugin.repeated_root_type:
                 output_str += "                        onChangeMode: onChangeMode,\n"
-                output_str += "                        onChangeLayout: props.onChangeLayout,\n"
             output_str += "                        onSave: onSave,\n"
             output_str += "                        onReload: onReload\n"
             output_str += "                    }}\n"
@@ -203,7 +233,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         else:
             root_msg_name = self.root_message.proto.name
             root_message_name_camel_cased = convert_to_camel_case(root_msg_name)
-            output_str += "                        onChangeLayout: props.onChangeLayout\n"
             output_str += "                    }}\n"
             if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
                 output_str += "                    name={props.name}\n"
@@ -234,56 +263,54 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onFormUpdate={onFormUpdate}\n"
         output_str += "                    formValidation={formValidation}\n"
         output_str += "                />\n"
-        output_str += "            ) : props.layout === Layouts.TREE_LAYOUT ? (\n"
-        output_str += "                <TreeWidget\n"
-        output_str += "                    headerProps={{\n"
-        output_str += "                        name: props.name,\n"
-        output_str += "                        title: title,\n"
-        if layout_type != JsxFileGenPlugin.repeated_root_type and layout_type != JsxFileGenPlugin.repeated_non_root_type:
-            output_str += "                        mode: mode,\n"
-        output_str += "                        layout: props.layout,\n"
-        output_str += "                        menu: menu,\n"
-        if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type:
-            if layout_type != JsxFileGenPlugin.repeated_root_type:
-                output_str += "                        onChangeMode: onChangeMode,\n"
-            output_str += "                        onChangeLayout: props.onChangeLayout,\n"
-            output_str += "                        onSave: onSave,\n"
-            output_str += "                        onReload: onReload\n"
-            output_str += "                    }}\n"
-            output_str += "                    name={props.name}\n"
-            output_str += "                    schema={schema}\n"
-            if layout_type == JsxFileGenPlugin.repeated_root_type:
-                output_str += "                    data={modifiedData}\n"
-                output_str += "                    originalData={originalData}\n"
-            else:
-                output_str += "                    data={modified" + f"{message_name}" + "}\n"
-                output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "            ) : props.layout === Layouts.PIVOT_TABLE ? (\n"
+            output_str += "                pivotTable\n"
         else:
-            root_msg_name = self.root_message.proto.name
-            root_message_name_camel_cased = convert_to_camel_case(root_msg_name)
-            output_str += "                        onChangeLayout: props.onChangeLayout\n"
-            output_str += "                    }}\n"
-            if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+            output_str += "            ) : props.layout === Layouts.TREE_LAYOUT ? (\n"
+            output_str += "                <TreeWidget\n"
+            output_str += "                    headerProps={{\n"
+            output_str += "                        name: props.name,\n"
+            output_str += "                        title: title,\n"
+            output_str += "                        mode: mode,\n"
+            output_str += "                        layout: props.layout,\n"
+            output_str += "                        menu: menu,\n"
+            output_str += "                        onChangeLayout: props.onChangeLayout,\n"
+            output_str += "                        supportedLayouts: [Layouts.TABLE_LAYOUT, Layouts.TREE_LAYOUT],\n"
+            if layout_type == JsxFileGenPlugin.root_type:
+                output_str += "                        onChangeMode: onChangeMode,\n"
+                output_str += "                        onSave: onSave,\n"
+                output_str += "                        onReload: onReload,\n"
+                output_str += "                    }}\n"
                 output_str += "                    name={props.name}\n"
-            else:
-                output_str += "                    name={parentSchemaName}\n"
-            output_str += "                    schema={schema}\n"
-            if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += "                    schema={schema}\n"
                 output_str += "                    data={modified" + f"{message_name}" + "}\n"
                 output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
             else:
-                output_str += "                    data={modified" + f"{root_msg_name}" + "}\n"
-                output_str += "                    originalData={" + f"{root_message_name_camel_cased}" + "}\n"
-        output_str += "                    mode={mode}\n"
-        output_str += "                    onUpdate={onUpdate}\n"
-        output_str += "                    error={error}\n"
-        output_str += "                    onResetError={onResetError}\n"
-        if layout_type == self.non_root_type:
-            output_str += "                    xpath={currentSchemaXpath}\n"
-        output_str += "                    onUserChange={onUserChange}\n"
-        output_str += "                    onButtonToggle={onButtonToggle}\n"
-        output_str += "                    onFormUpdate={onFormUpdate}\n"
-        output_str += "                />\n"
+                root_msg_name = self.root_message.proto.name
+                root_message_name_camel_cased = convert_to_camel_case(root_msg_name)
+                output_str += "                    }}\n"
+                if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                    output_str += "                    name={props.name}\n"
+                else:
+                    output_str += "                    name={parentSchemaName}\n"
+                output_str += "                    schema={schema}\n"
+                if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                    output_str += "                    data={modified" + f"{message_name}" + "}\n"
+                    output_str += "                    originalData={" + f"{message_name_camel_cased}" + "}\n"
+                else:
+                    output_str += "                    data={modified" + f"{root_msg_name}" + "}\n"
+                    output_str += "                    originalData={" + f"{root_message_name_camel_cased}" + "}\n"
+            output_str += "                    mode={mode}\n"
+            output_str += "                    onUpdate={onUpdate}\n"
+            output_str += "                    error={error}\n"
+            output_str += "                    onResetError={onResetError}\n"
+            if layout_type == self.non_root_type:
+                output_str += "                    xpath={currentSchemaXpath}\n"
+            output_str += "                    onUserChange={onUserChange}\n"
+            output_str += "                    onButtonToggle={onButtonToggle}\n"
+            output_str += "                    onFormUpdate={onFormUpdate}\n"
+            output_str += "                />\n"
         output_str += "            ) : (\n"
         output_str += "                <h1>Unsupported Layout</h1>\n"
         output_str += "            )}\n"
@@ -387,6 +414,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const getWsDict = useRef({});\n"
                 output_str += "    const socketDict = useRef({});\n"
                 output_str += f"    const getAll{dependent_message}Dict = useRef(" + "{});\n"
+                output_str += f"    const {dependent_message_camel_cased}ArrayRef = useRef([]);\n"
+                output_str += f"    const runFlush = useRef(false);\n"
         return output_str
 
     def handle_abbreviated_return(self, message_name: str, message_name_camel_cased: str, layout_type: str) -> str:
@@ -440,11 +469,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                <AbbreviatedFilterWidget\n"
         output_str += "                    headerProps={{\n"
         output_str += "                        title: title,\n"
+        output_str += "                        name: props.name,\n"
         output_str += "                        mode: mode,\n"
         output_str += "                        menu: createMenu,\n"
         output_str += "                        onChangeMode: onChangeMode,\n"
         output_str += "                        onSave: onSave,\n"
-        output_str += "                        onReload: onReload\n"
+        output_str += "                        onReload: onReload,\n"
+        output_str += "                        layout: props.layout,\n"
+        output_str += "                        onChangeLayout: props.onChangeLayout,\n"
+        output_str += "                        supportedLayouts: [Layouts.ABBREVIATED_FILTER_LAYOUT, Layouts.PIVOT_TABLE]\n"
         output_str += "                    }}\n"
         output_str += "                    name={props.name}\n"
         output_str += "                    mode={mode}\n"
@@ -471,6 +504,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onSelect={onSelect}\n"
         output_str += "                    onUnload={onUnload}\n"
         output_str += "                    abbreviated={abbreviated}\n"
+        output_str += "                    enableOverride={props.enableOverride}\n"
+        output_str += "                    disableOverride={props.disableOverride}\n"
+        output_str += "                    onOverrideChange={props.onOverrideChange}\n"
         output_str += "                    itemsMetadata={"f"{dependent_msg_name_camel_cased}" + "Array}\n"
         output_str += "                    itemSchema={dependentSchema}\n"
         output_str += "                    itemCollections={dependentCollections}\n"
@@ -578,7 +614,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    if (!dependentSchema) {\n"
                 output_str += "        dependentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, dependentName]);\n"
                 output_str += "    }\n"
-                output_str += "    let dependentCollections = " \
+                output_str += "    const dependentCollections = " \
                               "createCollections(schema, dependentSchema, { mode: Modes.READ_MODE });\n\n"
         if layout_type not in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "    let tableColumns = getTableColumns(collections, mode, props.enableOverride, " \
@@ -644,6 +680,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }" + f", [{message_name_camel_cased}])\n\n"
 
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+            output_str += "    useEffect(() => {\n"
+            output_str += f"        {dependent_message_camel_cased}ArrayRef.current = " \
+                          f"{dependent_message_camel_cased}Array;\n"
+            output_str += "     }, " + f"[{dependent_message_camel_cased}Array])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += f"        let loadedKeys = _.get(modified{message_name}, loadedKeyName);\n"
             output_str += "        if (loadedKeys && loadedKeys.length === 0) {\n"
@@ -734,7 +774,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                                                          ", mode, collections }));\n"
             output_str += "            getWsDict.current = {};\n"
             output_str += "        }\n"
-            output_str += "    }, [mode, collections])\n\n"
+            output_str += "    }, [mode])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += "        /* get websocket. create a websocket client to listen to selected obj interface */\n"
             output_str += f"        if (selected{message_name}Id) " + "{\n"
@@ -758,58 +798,84 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             abbreviated_dependent_msg_snake_cased = \
                 convert_camel_case_to_specific_case(self.abbreviated_dependent_message_name)
+            abbreviated_dependent_msg_camel_cased = convert_to_camel_case(self.abbreviated_dependent_message_name)
             output_str += f"    const flush{dependent_message}GetAllWs = useCallback(() => " + "{\n"
             output_str += "        /* apply get-all websocket changes */\n"
-            output_str += f"        if (_.keys(getAll{dependent_message}Dict.current).length > 0) " + "{\n"
-            output_str += f"            dispatch(set{dependent_message}ArrayWs("
-            output_str += "{" + f" dict: cloneDeep(getAll{dependent_message}Dict.current), mode, collections: " \
-                                "dependentCollections }));\n"
-            output_str += f"            getAll{dependent_message}Dict.current = " + "{};\n"
+            output_str += f"        if (_.keys(getAll{dependent_message}Dict.current).length > 0 && " \
+                          f"runFlush.current === true) " + "{\n"
+            output_str += "            if (window.Worker) {\n"
+            output_str += "                getAllWsWorker.postMessage({ getAllDict: " + \
+                          f"cloneDeep(getAll{dependent_message}Dict.current), storedArray: " \
+                          f"{abbreviated_dependent_msg_camel_cased}ArrayRef.current" + " });\n"
+            output_str += f"                getAll{dependent_message}Dict.current = " + "{};\n"
+            output_str += "            }\n"
             output_str += "        }\n"
-            output_str += "    }, [mode, dependentCollections])\n\n"
+            output_str += "    }, " + f"[])\n\n"
             output_str += "    useEffect(() => {\n"
-            output_str += f"        if (active{dependent_message}List && !_.isEqual(active{dependent_message}List, " \
-                          f"oldActive{dependent_message}List)) " + "{\n"
-            output_str += f"            active{dependent_message}List.forEach(key => " + "{\n"
-            output_str += "                let id = getIdFromAbbreviatedKey(abbreviated, key);\n"
-            output_str += "                let socket = socketDict.current.hasOwnProperty(id) ? " \
-                          "socketDict.current[id] : null;\n"
-            output_str += "                if (!socket || (socket.readyState === WebSocket.CLOSING || " \
-                          "socket.readyState === WebSocket.CLOSED)) {\n"
-            output_str += "                    if (socket) socket.close();\n"
-            output_str += "                    socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}" \
-                          f"/get-{abbreviated_dependent_msg_snake_cased}-ws/$" + "{id}`);\n"
-            output_str += "                    socket.onmessage = (event) => {\n"
-            output_str += "                        let updatedObj = JSON.parse(event.data);\n"
-            output_str += f"                        getAll{dependent_message}Dict.current[updatedObj[DB_ID]] = " \
-                          f"updatedObj;\n"
-            output_str += "                    }\n"
-            output_str += "                    socket.onclose = () => {\n"
-            output_str += "                        delete socketDict.current[id];\n"
-            output_str += "                    }\n"
-            output_str += "                    socketDict.current = { ...socketDict.current, [id]: socket };\n"
-            output_str += "                }\n"
-            output_str += "                /* close the websocket on cleanup */\n"
-            output_str += "                return () => socket.close();\n"
-            output_str += "            })\n"
+            output_str += "        if (window.Worker) {\n"
+            output_str += "            getAllWsWorker.onmessage = (e) => {\n"
+            output_str += "                const [updatedArray] = e.data;\n"
+            output_str += f"                dispatch(set{dependent_message}" + \
+                          "ArrayWs({ data: updatedArray, collections: dependentCollections }));\n"
+            output_str += "            }\n"
             output_str += "        }\n"
+            output_str += "        return () => {\n"
+            output_str += "            getAllWsWorker.terminate();\n"
+            output_str += "        }\n"
+            output_str += "    }, [getAllWsWorker])\n\n"
+            output_str += "    useEffect(() => {\n"
             output_str += f"        if (active{dependent_message}List) " + "{\n"
-            output_str += f"            let loadedIds = active{dependent_message}List.map(key => " \
+            output_str += f"            if (!_.isEqual(active{dependent_message}List, " \
+                          f"oldActive{dependent_message}List)) " + "{\n"
+            output_str += f"                runFlush.current = false;\n"
+            output_str += f"                const loadedIds = active{dependent_message}List.map(key => " \
                           f"getIdFromAbbreviatedKey(abbreviated, key));\n"
-            output_str += "            _.keys(socketDict.current).forEach(id => {\n"
-            output_str += "                id *= 1;\n"
-            output_str += "                if (!loadedIds.includes(id)) {\n"
-            output_str += "                    let socket = socketDict.current[id];\n"
-            output_str += "                    /* close the websocket on cleanup */\n"
-            output_str += "                    if (socket) {\n"
-            output_str += "                        socket.close();\n"
-            output_str += "                    }\n"
-            output_str += "                    delete socketDict.current[id];\n"
+            output_str += "                const createSocket = async (id) => {\n"
+            output_str += "                    return new Promise((resolve, reject) => {\n"
+            output_str += "                        let socket = socketDict.current.hasOwnProperty(id) ? " \
+                          "socketDict.current[id] : null;\n"
+            output_str += "                        if (!socket || (socket.readyState === WebSocket.CLOSING || " \
+                          "socket.readyState === WebSocket.CLOSED)) {\n"
+            output_str += "                            if (socket) socket.close();\n"
+            output_str += "                            socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
+                          "'ws')}/get-"+f"{abbreviated_dependent_msg_snake_cased}"+"-ws/${id}`);\n"
+            output_str += "                            socketDict.current = { ...socketDict.current, [id]: socket };\n"
+            output_str += "                            socket.onmessage = (event) => {\n"
+            output_str += "                                let updatedObj = JSON.parse(event.data);\n"
+            output_str += f"                                getAll{dependent_message}Dict.current[updatedObj[DB_ID]] " \
+                          f"= updatedObj;\n"
+            output_str += "                                resolve();\n"
+            output_str += "                            }\n"
+            output_str += "                            socket.onclose = () => {\n"
+            output_str += "                                delete socketDict.current[id];\n"
+            output_str += "                            }\n"
+            output_str += "                        } else {\n"
+            output_str += "                            resolve();\n"
+            output_str += "                        }\n"
+            output_str += "                        /* close the websocket on cleanup */\n"
+            output_str += "                        return () => socket.close();\n"
+            output_str += "                    })\n"
+            output_str += "                }\n\n"
+            output_str += "                const createAllSockets = async () => {\n"
+            output_str += "                    const socketPromises = loadedIds.map(id => createSocket(id));\n"
+            output_str += "                    await Promise.all(socketPromises);\n"
+            output_str += "                    _.keys(socketDict.current).forEach(id => {\n"
+            output_str += "                        id *= 1;\n"
+            output_str += "                        if (!loadedIds.includes(id)) {\n"
+            output_str += "                            let socket = socketDict.current[id];\n"
+            output_str += "                            /* close the websocket on cleanup */\n"
+            output_str += "                            if (socket) {\n"
+            output_str += "                                socket.close();\n"
+            output_str += "                            }\n"
+            output_str += "                            delete socketDict.current[id];\n"
+            output_str += "                        }\n"
+            output_str += "                    })\n"
+            output_str += "                    runFlush.current = true;\n"
             output_str += "                }\n"
-            output_str += "            })\n"
+            output_str += "                createAllSockets();\n"
+            output_str += "            }\n"
             output_str += "        }\n"
-            output_str += "    }" + f", [{message_name_camel_cased}, active{dependent_message}List, " \
-                                    f"oldActive{dependent_message}List])\n\n"
+            output_str += "    }" + f", [active{dependent_message}List, oldActive{dependent_message}List])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += f"        const intervalId = setInterval(flush{dependent_message}GetAllWs, 250);\n"
             output_str += "        return () => {\n"

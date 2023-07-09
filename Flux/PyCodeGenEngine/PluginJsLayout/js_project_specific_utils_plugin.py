@@ -4,9 +4,11 @@ from typing import List, Callable
 import time
 import logging
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -26,8 +28,7 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
 
-        output_str = "export function getLayout() {\n"
-        output_str += "    const layout = [\n"
+        output_str = "export const defaultLayouts = [\n"
         for index, message in enumerate(self.layout_msg_list):
             if self.is_option_enabled(message, JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data):
                 widget_ui_data_option_value_dict = \
@@ -36,16 +37,14 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
 
                 title_val = widget_ui_data_option_value_dict["i"] \
                     if "i" in widget_ui_data_option_value_dict else convert_camel_case_to_specific_case(message.proto.name)
-                output_str += '        {' + f' i: "{title_val}", ' \
+                output_str += '    {' + f' i: "{title_val}", ' \
                                             f'x: {widget_ui_data_option_value_dict["x"].strip()}, ' \
                                             f'y: {widget_ui_data_option_value_dict["y"].strip()}, ' \
                                             f'w: {widget_ui_data_option_value_dict["w"].strip()}, ' \
                                             f'h: {widget_ui_data_option_value_dict["h"].strip()}, ' \
                                             f'layout: "{widget_ui_data_option_value_dict["layout"].strip()}", ' \
                                             f'enable_override: [], disable_override: [] ' + '},\n'
-        output_str += "    ]\n"
-        output_str += "    return layout;\n"
-        output_str += "}\n\n"
+        output_str += "]\n\n"
         output_str += "export function flux_toggle(value) {\n"
         output_str += "    return !value;\n"
         output_str += "}\n\n"

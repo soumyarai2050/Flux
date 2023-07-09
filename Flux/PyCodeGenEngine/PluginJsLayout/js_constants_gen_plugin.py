@@ -5,9 +5,11 @@ import time
 from pathlib import PurePath
 import logging
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -38,7 +40,10 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
 
     def handle_api_root_url(self, file: protogen.File) -> str:
         port = 8000 + self.port_offset
-        output_str = f"export const API_ROOT_URL = 'http://{self.host}:{port}/{self.proto_package_name}';"
+        cache_offset = 10
+        output_str = f"export const API_ROOT_URL = 'http://{self.host}:{port}/{self.proto_package_name}';\n"
+        output_str += f"export const API_ROOT_CACHE_URL = 'http://{self.host}:{port + cache_offset}/" \
+                      f"{self.proto_package_name}';"
         return output_str
 
     def handle_api_public_url(self, file: protogen.File) -> str:
@@ -57,8 +62,9 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
 
         output_file_name = "constants.js"
         py_code_gen_engine_path = None
-        if (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and \
-                (py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None:
+        if ((template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and len(template_file_name)) and \
+                ((py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None and \
+                 len(py_code_gen_engine_path)):
             template_file_path = PurePath(py_code_gen_engine_path) / PurePath(__file__).parent / template_file_name
         else:
             err_str = f"Env var 'TEMPLATE_FILE_NAME' and 'PY_CODE_GEN_ENGINE_PATH'" \

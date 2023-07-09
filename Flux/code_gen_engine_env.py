@@ -36,7 +36,8 @@ class CodeGenEngineEnvManager:
         self.plugin_dir: PurePath | None = None
         self.proto_output_dir: PurePath | None = None
         self.plugin_output_dir: PurePath | None = None
-        self.python_path: str = os.getenv("PYTHONPATH") if os.getenv("PYTHONPATH") is not None else ""
+        self.python_path: str = \
+            python_path if ((python_path := os.getenv("PYTHONPATH")) is not None and len(python_path)) else ""
 
         if self.code_gen_root.name != "Flux":
             raise Exception(f"Code Gen Env Constraint failed! Unable to proceed. "

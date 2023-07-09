@@ -51,14 +51,16 @@ message UsageParamNameOption{
 
 message MessageJsonRoot{
   optional AggregateType CreateDesc = 1;
-  optional AggregateType ReadDesc = 2;
-  optional AggregateType UpdateDesc = 3;
-  optional AggregateType PatchDesc = 4;
-  optional AggregateType DeleteDesc = 5;
-  optional AggregateType ReadWebSocketDesc = 6;
-  optional AggregateType UpdateWebSocketDesc = 7;
-  optional bool SetReentrantLock = 8 [default=true];
-  optional bool SetReentrantLockToTop = 9 [default=false];
+  optional AggregateType CreateAllDesc = 2;
+  optional AggregateType ReadDesc = 3;
+  optional AggregateType UpdateDesc = 4;
+  optional AggregateType UpdateAllDesc = 5;
+  optional AggregateType PatchDesc = 6;
+  optional AggregateType DeleteDesc = 7;
+  optional AggregateType ReadWebSocketDesc = 8;
+  optional AggregateType UpdateWebSocketDesc = 9;
+  optional bool SetReentrantLock = 10 [default=true];
+  optional bool SetReentrantLockToTop = 11 [default=false];
 }
 
 enum QueryTypeEnum{

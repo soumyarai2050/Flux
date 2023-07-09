@@ -73,7 +73,7 @@ const HeaderField = (props) => {
                     </Box>
                 )
             }
-        </Box >
+        </Box>
     )
 }
 

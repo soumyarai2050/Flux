@@ -89,3 +89,15 @@
         opacity: 1
     }
 }
+
+.menu {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 5px;
+    border-radius: 5px;
+    background-color: #ccc;
+    /* box-shadow: 0px 0px 1px 0px black; */
+    margin: 1px 0px;
+    margin-left: 2px;
+}

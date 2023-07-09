@@ -31,3 +31,17 @@
     display: inline-flex;
     align-items: center;
 }
+
+.toggle_button_group {
+    background-color: #ccc;
+    margin: 0 2px;
+}
+
+.toggle_button_group :global .Mui-selected {
+    background-color: #aaa !important;
+}
+
+.toggle_button {
+    padding: 2px !important;
+}
+

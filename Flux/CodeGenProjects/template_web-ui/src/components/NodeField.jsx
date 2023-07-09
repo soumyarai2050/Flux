@@ -18,6 +18,11 @@ const NodeField = (props) => {
         if (props.data.onFormUpdate) {
             props.data.onFormUpdate(props.data.xpath, validationError.current);
         }
+        return () => {
+            if (props.data.onFormUpdate) {
+                props.data.onFormUpdate(props.data.xpath, null);
+            }
+        }
     }, [props.data.onFormUpdate])
 
     let disabled = true;

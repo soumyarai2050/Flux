@@ -67,16 +67,18 @@ message Position{
   required int64 available_size = 4;
   // position committed but not consumed (portfolio to strat; day-2: maybe strat to open order)
   required int64 allocated_size = 5;
-  // actual position consumption
+  // external position consumption
   required int64 consumed_size = 6;
+  // internal position consumption
+  optional int64 strat_consumed_size = 7;
   // cost of using this position type
-  optional float acquire_cost = 7;
+  optional float acquire_cost = 8;
   // un-avoidable charge due to this position type (irrespective of use / no-use)
-  optional float incurred_cost = 8;
+  optional float incurred_cost = 9;
   // T+1 and onwards recurring daily cost
-  optional float carry_cost = 9;
-  optional int32 priority = 10 [default = 10, (FluxFldHelp) = "default priority: 10,  orders to respect specified priority (lower value is higher priority), duplicates allowed"];
-  optional float premium_percentage = 11 [default = 2, (FluxFldNumberFormat) = "%"];
+  optional float carry_cost = 10;
+  optional int32 priority = 11 [default = 10, (FluxFldHelp) = "default priority: 10,  orders to respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional float premium_percentage = 12 [default = 2, (FluxFldNumberFormat) = "%"];
 }
 
 message SecPosition{

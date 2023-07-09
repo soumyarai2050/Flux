@@ -121,31 +121,43 @@ const TreeWidget = (props) => {
             let xpath = e.currentTarget.attributes['data-add'].value;
             xpath = getDataxpath(updatedData, xpath);
             let ref = e.currentTarget.attributes['data-ref'].value;
-            if (ref) {
-                ref = ref.split('/');
-            }
-            let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
             const isArray = xpath.endsWith(']');
             let emptyObject = {};
             if (isArray) {
-                let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
-                let originalindex = _.get(props.originalData, parentxpath) ? _.get(props.originalData, parentxpath).length : 0;
-                let parentObject = _.get(updatedData, parentxpath);
-                if (!parentObject) {
-                    _.set(updatedData, parentxpath, []);
-                    parentObject = _.get(updatedData, parentxpath);
+                if ([DataTypes.NUMBER, DataTypes.STRING].includes(ref)) {
+                    let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
+                    let parentObject = _.get(updatedData, parentxpath);
+                    parentObject.push(null)
+                } else {
+                    ref = ref.split('/');
+                    let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
+                    if (currentSchema.hasOwnProperty('enum') && _.keys(currentSchema).length === 1) {
+                        let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
+                        let parentObject = _.get(updatedData, parentxpath);
+                        parentObject.push(currentSchema.enum[0]);
+                    } else {
+                        let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
+                        let originalindex = _.get(props.originalData, parentxpath) ? _.get(props.originalData, parentxpath).length : 0;
+                        let parentObject = _.get(updatedData, parentxpath);
+                        if (!parentObject) {
+                            _.set(updatedData, parentxpath, []);
+                            parentObject = _.get(updatedData, parentxpath);
+                        }
+                        let parentindex = 0;
+                        if (parentObject.length > 0) {
+                            let propname = _.keys(parentObject[parentObject.length - 1]).filter(key => key.startsWith('xpath_'))[0];
+                            let propxpath = parentObject[parentObject.length - 1][propname];
+                            parentindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'))) + 1;
+                        }
+                        let max = originalindex > parentindex ? originalindex : parentindex;
+                        emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema));
+                        emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
+                        parentObject.push(emptyObject);
+                    }
                 }
-                let parentindex = 0;
-                if (parentObject.length > 0) {
-                    let propname = _.keys(parentObject[parentObject.length - 1]).filter(key => key.startsWith('xpath_'))[0];
-                    let propxpath = parentObject[parentObject.length - 1][propname];
-                    parentindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'))) + 1;
-                }
-                let max = originalindex > parentindex ? originalindex : parentindex;
-                emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema));
-                emptyObject = addxpath(emptyObject, parentxpath + '[' + max + ']');
-                parentObject.push(emptyObject);
             } else {
+                ref = ref.split('/');
+                let currentSchema = ref.length === 2 ? props.schema[ref[1]] : props.schema[ref[1]][ref[2]];
                 let additionalProps = JSON.parse(e.currentTarget.attributes['data-prop'].value);
                 emptyObject = generateObjectFromSchema(props.schema, cloneDeep(currentSchema), additionalProps);
                 emptyObject = addxpath(emptyObject, xpath);
@@ -169,6 +181,17 @@ const TreeWidget = (props) => {
         }
     }
 
+    const onLeafMouseClick = (event, leaf) => {
+        const dataxpath = leaf.dataxpath;
+        const parentxpath = dataxpath.substring(0, dataxpath.lastIndexOf('['));
+        const index = parseInt(dataxpath.substring(dataxpath.lastIndexOf('[') + 1, dataxpath.lastIndexOf(']')));
+        let updatedData = cloneDeep(props.data);
+        const parent = _.get(updatedData, parentxpath);
+        parent.splice(index, 1);
+        _.set(updatedData, parentxpath, parent);
+        props.onUpdate(updatedData, 'remove');
+    }
+
     let menu = (
         <>
             {props.headerProps.menu}
@@ -179,6 +202,7 @@ const TreeWidget = (props) => {
             )}
             <Icon className={classes.icon} name="Show" title='Show' onClick={() => setOpenShowDropdown(true)}><Visibility fontSize='small' /></Icon>
             <Select
+                style={{display: openShowDropdown ? 'inherit' : 'none'}}
                 className={classes.dropdown}
                 size='small'
                 open={openShowDropdown}
@@ -229,11 +253,13 @@ const TreeWidget = (props) => {
             onReload={props.headerProps.onReload}
             onSave={props.headerProps.onSave}
             menu={menu}
-            menuRight={props.headerProps.menuRight}>
+            menuRight={props.headerProps.menuRight}
+            supportedLayouts={props.headerProps.supportedLayouts}>
             <InfinityMenu
                 tree={treeStructure}
                 disableDefaultHeaderContent={true}
                 onNodeMouseClick={onNodeMouseClick}
+                onLeafMouseClick={onLeafMouseClick}
             />
             {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
         </WidgetContainer>

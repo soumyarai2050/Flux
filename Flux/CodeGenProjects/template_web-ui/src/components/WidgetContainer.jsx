@@ -1,7 +1,7 @@
-import React, { Fragment, useRef } from 'react';
+import React, { Fragment, useRef, useState } from 'react';
 import _ from 'lodash';
-import { Typography, Box } from '@mui/material';
-import { Save, Cached, Edit, AccountTree, TableView } from '@mui/icons-material';
+import { Typography, Box, ToggleButtonGroup, ToggleButton, ClickAwayListener, Tooltip } from '@mui/material';
+import { Save, Cached, Edit, AccountTree, GridView, TableChartSharp, PivotTableChartSharp, FormatListNumberedSharp } from '@mui/icons-material';
 import { Icon } from './Icon';
 import { Modes, Layouts } from '../constants';
 import PropTypes from 'prop-types';
@@ -10,6 +10,7 @@ import classes from './WidgetContainer.module.css';
 
 const WidgetContainer = (props) => {
     const commonkeyRef = useRef(null);
+    const [showLayoutOptions, setShowLayoutOptions] = useState(false);
 
     let modeMenu = '';
     if (props.onSave && props.mode === Modes.EDIT_MODE) {
@@ -18,12 +19,37 @@ const WidgetContainer = (props) => {
         modeMenu = <Icon className={classes.icon} name="Edit" title="Edit" onClick={props.onChangeMode}><Edit fontSize='small' /></Icon>
     }
 
-    let layoutMenu = '';
-    if (props.layout === Layouts.TABLE_LAYOUT) {
-        layoutMenu = <Icon className={classes.icon} name="Tree" title="Tree View" onClick={() => props.onChangeLayout(props.name, Layouts.TREE_LAYOUT)} ><AccountTree fontSize='small' /></Icon>
-    } else if (props.layout === Layouts.TREE_LAYOUT) {
-        layoutMenu = <Icon className={classes.icon} name="Table" title="Table View" onClick={() => props.onChangeLayout(props.name, Layouts.TABLE_LAYOUT)} ><TableView fontSize='small' /></Icon>
+    const onChangeLayout = (layout) => {
+        onToggleShowLayoutOptions();
+        props.onChangeLayout(props.name, layout);
     }
+
+    const onToggleShowLayoutOptions = () => {
+        setShowLayoutOptions(prevState => !prevState);
+    }
+
+    const layoutMenu = showLayoutOptions ? (
+        <ClickAwayListener onClickAway={onToggleShowLayoutOptions}>
+            <ToggleButtonGroup className={classes.toggle_button_group} value={props.layout ? props.layout : Layouts.TABLE_LAYOUT} size='small'>
+                {props.supportedLayouts?.map(layout => {
+                    return (
+                        <ToggleButton key={layout} className={classes.toggle_button} name={layout} value={layout} onClick={() => onChangeLayout(layout)}>
+                            <Tooltip title={layout}>
+                                <span>
+                                    {layout === Layouts.TABLE_LAYOUT && <TableChartSharp fontSize='medium' />}
+                                    {layout === Layouts.TREE_LAYOUT && <AccountTree fontSize='medium' />}
+                                    {layout === Layouts.PIVOT_TABLE && <PivotTableChartSharp fontSize='medium' />}
+                                    {layout === Layouts.ABBREVIATED_FILTER_LAYOUT && <FormatListNumberedSharp fontSize='medium' />}
+                                </span>
+                            </Tooltip>
+                        </ToggleButton>
+                    )
+                })}
+            </ToggleButtonGroup>
+        </ClickAwayListener >
+    ) : (
+        <Icon className={classes.icon} name="Layout" title={`Layout: ${props.layout}`} onClick={onToggleShowLayoutOptions}><GridView fontSize='small' /></Icon>
+    )
 
     let commonkeys = props.commonkeys ? props.commonkeys.filter(commonkey => {
         if (commonkey.value === null || commonkey.value === undefined) return false;

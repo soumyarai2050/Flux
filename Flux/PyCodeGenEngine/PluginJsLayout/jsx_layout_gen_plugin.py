@@ -5,9 +5,10 @@ import time
 from pathlib import PurePath
 import logging
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -77,14 +78,15 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             message_name_case_styled = self.case_style_convert_method(message_name)
             output_str += "{"+f"show.{message_name_case_styled} &&\n"
             output_str += "    <Paper key='"+f"{message_name_case_styled}' id='{message_name_case_styled}'" + \
-                          " className={classes.widget} data-grid={getLayoutById("+f"'{message_name_case_styled}'"+")}>\n"
+                          " className={classes.widget} data-grid={layoutByIdDict.current." + \
+                          f"{message_name_case_styled}" + "}>\n"
             output_str += f'        <{message.proto.name}\n'
             output_str += f'            name="{message_name_case_styled}"\n'
-            output_str += "            layout={"+f"getLayoutById('{message_name_case_styled}').layout"+"}\n"
+            output_str += "            layout={"+f"layoutByIdDict.current.{message_name_case_styled}.layout"+"}\n"
             output_str += "            onChangeLayout={onWidgetLayoutChange}\n"
-            output_str += "            enableOverride={getLayoutById('"+f"{message_name_case_styled}"+"')." \
+            output_str += "            enableOverride={layoutByIdDict.current."+f"{message_name_case_styled}"+"." \
                           "enable_override}\n"
-            output_str += "            disableOverride={getLayoutById('"+f"{message_name_case_styled}"+"')." \
+            output_str += "            disableOverride={layoutByIdDict.current."+f"{message_name_case_styled}"+"." \
                           "disable_override}\n"
             output_str += '            onOverrideChange={onWidgetOverrideChange}\n'
             output_str += f'        />\n'
@@ -98,8 +100,9 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
 
         output_file_name = "Layout.jsx"
         py_code_gen_engine_path = None
-        if (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and \
-                (py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None:
+        if (template_file_name := os.getenv("TEMPLATE_FILE_NAME")) is not None and len(template_file_name) and \
+                (py_code_gen_engine_path := os.getenv("PY_CODE_GEN_ENGINE_PATH")) is not None and \
+                len(py_code_gen_engine_path):
             template_file_path = PurePath(py_code_gen_engine_path) / PurePath(__file__).parent / template_file_name
         else:
             err_str = f"Env var 'TEMPLATE_FILE_NAME' and 'PY_CODE_GEN_ENGINE_PATH'" \

@@ -11,7 +11,7 @@ import { DashboardCustomize, SaveAs } from '@mui/icons-material';
 import { Dialog, DialogContent, DialogActions, DialogContentText, TextField, Button, DialogTitle, Autocomplete, Paper, Box } from '@mui/material';
 import { DB_ID, API_ROOT_URL, COOKIE_NAME } from '../constants';
 import { getIconText } from '../utils';
-import { getLayout } from '../projectSpecificUtils';
+import { defaultLayouts } from '../projectSpecificUtils';
 # @@protoc_insertion_point(add_imports)
 import SideDrawer from './SideDrawer';
 import { Icon, ToggleIcon } from './Icon';
@@ -23,7 +23,7 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
 
 const defaultProps = {
     layouts: {
-        lg: getLayout()
+        lg: defaultLayouts
     },
     breakpoints: { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 },
     cols: { lg: 18, md: 12, sm: 6, xs: 4, xxs: 2 },
@@ -39,9 +39,15 @@ const defaultProps = {
     resizeHandles: ['ne', 'se']
 }
 
-const Layout = (props) => {
+const defaultLayoutByIdDict = defaultLayouts.reduce((dict, obj) => {
+    const { i } = obj;
+    dict[i] = obj;
+    return dict;
+}, {});
+
+function Layout() {
     const { uiLayoutArray, uiLayout } = useSelector(state => state.uiLayout);
-    const [layouts, setLayouts] = useState(() => getLayout());
+    const [layouts, setLayouts] = useState(defaultLayouts);
     const [draggable, setDraggable] = useState(false);
     const [openSaveLayout, setOpenSaveLayout] = useState(false);
     const [openLoadLayout, setOpenLoadLayout] = useState(false);
@@ -51,6 +57,7 @@ const Layout = (props) => {
         # @@protoc_insertion_point(add_widget_list)
     });
     const getAllWsDict = useRef({});
+    const layoutByIdDict = useRef(defaultLayoutByIdDict);
     const dispatch = useDispatch();
 
     const flushGetAllWs = useCallback(() => {
@@ -84,6 +91,21 @@ const Layout = (props) => {
             clearInterval(intervalId);
         }
     }, [])
+
+    useEffect(() => {
+        const updatedLayoutByIdDict = {};
+        defaultLayouts.forEach(defaultLayout => {
+            const layoutId = defaultLayout.i;
+            let layout = layouts.find(l => l.i === layoutId);
+            if (!layout) {
+                const xMax = Math.max(...layouts.map(l => l.x + l.w));
+                const yMax = Math.max(...layouts.map(l => l.y + l.h));
+                layout = { ...defaultLayout, x: xMax, y: yMax };
+            }
+            updatedLayoutByIdDict[layoutId] = layout;
+        })
+        layoutByIdDict.current = updatedLayoutByIdDict;
+    }, [layouts, uiLayout])
 
     useEffect(() => {
         let cookie = sessionStorage.getItem(COOKIE_NAME);
@@ -145,7 +167,7 @@ const Layout = (props) => {
         updatedData[name] = !updatedData[name];
         # @@protoc_insertion_point(handle_update_data)
         if (!show[name]) {
-            let layout = getLayoutById(name);
+            let layout = layoutByIdDict.current[name];
             setLayouts([...layouts, layout]);
         }
         setShow(updatedData);
@@ -180,7 +202,6 @@ const Layout = (props) => {
     }
 
     const onResetLayout = () => {
-        let defaultLayouts = getLayout();
         setLayouts(defaultLayouts);
         sessionStorage.removeItem(COOKIE_NAME);
         setProfileId('');
@@ -197,18 +218,8 @@ const Layout = (props) => {
         setShow(updatedShow);
     }
 
-    const getLayoutById = (id) => {
-        let layout = layouts.filter(layout => layout.i === id)[0];
-        let defaultLayout = getLayout().filter(widgetLayout => widgetLayout.i === id)[0];
-        if (!layout) {
-            layout = uiLayout.widget_ui_data ? uiLayout.widget_ui_data.filter(widgetLayout => widgetLayout.i === id)[0] : defaultLayout;
-        }
-        let xMax = Math.max(...layouts.map(widgetLayout => widgetLayout.x + widgetLayout.w));
-        let yMax = Math.max(...layouts.map(widgetLayout => widgetLayout.y + widgetLayout.h));
-        return layout ? layout : { i: id, x: xMax, y: yMax, w: defaultLayout.w, h: defaultLayout.h, layout: defaultLayout.layout, enable_override: defaultLayout.enable_override, disable_override: defaultLayout.disable_override };
-    }
 
-    const onWidgetLayoutChange = (name, layoutType) => {
+    const onWidgetLayoutChange = useCallback((name, layoutType) => {
         let updatedData = cloneDeep(layouts);
         let updatedLayouts = updatedData.map(widgetLayout => {
             if (widgetLayout.i === name) {
@@ -217,9 +228,9 @@ const Layout = (props) => {
             return widgetLayout
         });
         setLayouts(updatedLayouts);
-    }
+    }, [layouts])
 
-    const onWidgetOverrideChange = (name, enableOverride, disableOverride) => {
+    const onWidgetOverrideChange = useCallback((name, enableOverride, disableOverride) => {
         let updatedData = cloneDeep(layouts);
         let updatedLayouts = updatedData.map(widgetLayout => {
             if (widgetLayout.i === name) {
@@ -229,7 +240,7 @@ const Layout = (props) => {
             return widgetLayout
         });
         setLayouts(updatedLayouts);
-    }
+    }, [layouts])
 
     const storedCookie = sessionStorage.getItem(COOKIE_NAME);
     if (storedCookie && !uiLayout.widget_ui_data) {

@@ -33,6 +33,7 @@ enum UILayouts{
   UI_TREE = 2;
   UI_GRAPH = 3;
   UI_TABBED_TABLE = 4;
+  UI_PIVOT_TABLE = 5;
 }
 
 message WebPageUIData{

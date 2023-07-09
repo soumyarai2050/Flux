@@ -8,7 +8,7 @@ import HeaderField from './components/HeaderField';
 
 // stores the tree expand/collapse states
 const treeState = {};
-const primitiveDataTypes = [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM, DataTypes.DATE_TIME];
+const primitiveDataTypes = [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER, DataTypes.ENUM, DataTypes.DATE_TIME, DataTypes.INT64, DataTypes.FLOAT];
 
 export const FLOAT_POINT_PRECISION = 2;
 export const Message = {
@@ -64,6 +64,19 @@ const arrayFieldProps = [
     { propertyName: "alert_bubble_source", usageName: "alertBubbleSource" },
     { propertyName: "alert_bubble_color", usageName: "alertBubbleColor" }
 ]
+
+const timeIt = (target, property, descriptor) => {
+    const callback = descriptor.value;
+
+    descriptor.value = function (...args) {
+        console.time(property);
+        const res = callback.apply(this, args);
+        console.timeEnd(property);
+        return res;
+    };
+
+    return descriptor;
+}
 
 export function setTreeState(xpath, state) {
     treeState[xpath] = state;
@@ -217,7 +230,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             })
 
             // for array of primitive data types
-            if (!v.hasOwnProperty('items')) {
+            if (!v.hasOwnProperty('items') || (v.hasOwnProperty('items') && primitiveDataTypes.includes(collection.underlyingtype))) {
                 collections.push(collection);
                 return;
             }
@@ -302,8 +315,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
 export function generateObjectFromSchema(schema, currentSchema, additionalProps) {
     if (additionalProps && additionalProps instanceof Object) {
         for (const key in additionalProps) {
-            const prop = complexFieldProps.find(({ _, usageName }) => usageName === key);
-            console.log(prop);
+            const prop = complexFieldProps.find(({ usageName }) => usageName === key);
             if (prop) {
                 currentSchema[prop.propertyName] = additionalProps[key]
             } else {
@@ -360,7 +372,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps)
             }
         } else if (metadata.type === DataTypes.ARRAY) {
             // for arrays of primitive data types
-            if (!metadata.hasOwnProperty('items')) {
+            if (!metadata.hasOwnProperty('items') || (metadata.hasOwnProperty('items') && primitiveDataTypes.includes(metadata.underlying_type))) {
                 object[propname] = [];
             } else {
                 let ref = metadata.items.$ref.split('/');
@@ -454,13 +466,36 @@ function compareNodes(originalData, data, dataxpath, propname, xpath) {
     return object;
 }
 
-function addSimpleNode(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath) {
+function addSimpleNode(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath, additionalProps) {
     let node = {};
     const data = callerProps.data;
     const originalData = callerProps.originalData;
 
     // do not add field if not present in both modified data and original data.
     if ((Object.keys(data).length === 0 && Object.keys(originalData).length === 0) || (dataxpath && _.get(data, dataxpath) === undefined && _.get(originalData, xpath) === undefined)) return;
+
+    if (primitiveDataTypes.includes(currentSchema)) {
+        node.id = dataxpath;
+        node.required = true;
+        node.xpath = xpath;
+        node.dataxpath = dataxpath;
+        node.customComponent = Node;
+        node.onTextChange = callerProps.onTextChange;
+        node.onFormUpdate = callerProps.onFormUpdate;
+        node.mode = callerProps.mode;
+        node.showDataType = callerProps.showDataType;
+        node.type = currentSchema;
+        node.underlyingtype = additionalProps.underlyingtype;
+
+        if (node.type === DataTypes.ENUM) {
+            node.dropdowndataset = additionalProps.options;
+            node.onSelectItemChange = callerProps.onSelectItemChange;
+        }
+
+        node.value = dataxpath ? _.get(data, dataxpath) : undefined;
+        tree.push(node);
+        return;
+    }
 
     let attributes = currentSchema.properties[propname];
     if (attributes.hasOwnProperty('type') && primitiveDataTypes.includes(attributes.type)) {
@@ -659,7 +694,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
             if (_.get(originalData, xpath) !== undefined) {
                 headerState.add = false;
                 headerState.remove = false;
-            }   
+            }
         } else if (!currentSchema.hasOwnProperty('orm_no_update')) {
             if (_.get(data, dataxpath) === null) {
                 headerState.add = true;
@@ -669,9 +704,9 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
                 headerState.remove = true;
             }
         }
-
+        if (callerProps.mode === Modes.EDIT_MODE && currentSchema.hasOwnProperty('server_populate')) return;
         let childNode = addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, dataxpath, xpath, currentSchema.items.$ref, headerState);
-        if (_.get(data, dataxpath) === null && _.get(originalData, xpath) === null) return;
+        if (_.get(data, dataxpath) === null && (_.get(originalData, xpath) === undefined || _.get(originalData, xpath) === null)) return;
         let ref = currentSchema.items.$ref.split('/');
         let metadata = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
         metadata = cloneDeep(metadata);
@@ -734,7 +769,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
                 }
             });
         }
-    } else if (currentSchema.hasOwnProperty('items') && currentSchema.type === DataTypes.ARRAY) {
+    } else if (currentSchema.hasOwnProperty('items') && currentSchema.type === DataTypes.ARRAY && !primitiveDataTypes.includes(currentSchema.underlying_type)) {
         if (((_.get(data, dataxpath) && _.get(data, dataxpath).length === 0) || (_.keys(data).length > 0 && !_.get(data, dataxpath))) &&
             ((_.get(originalData, xpath) && _.get(originalData, xpath).length === 0) || !_.get(originalData, xpath))) {
             let childxpath = dataxpath + '[-1]';
@@ -770,7 +805,32 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
             }
         }
     } else if (currentSchema.type === DataTypes.ARRAY) {
-        // TODO: add support for array for primitive data types
+        // array of simple data types
+        if ((_.get(originalData, xpath) === undefined) && _.get(data, dataxpath) === undefined) return;
+        let arrayDataType = currentSchema.underlying_type;
+        if ([DataTypes.INT32, DataTypes.INT64, DataTypes.INTEGER, DataTypes.FLOAT].includes(arrayDataType)) {
+            arrayDataType = DataTypes.NUMBER;
+        }
+        let ref = arrayDataType;
+        const additionalProps = {};
+        additionalProps.underlyingtype = currentSchema.underlying_type;
+        if (currentSchema.underlying_type === DataTypes.ENUM) {
+            ref = currentSchema.items.$ref;
+            let refSplit = ref.split('/');
+            let metadata = refSplit.length === 2 ? schema[refSplit[1]] : schema[refSplit[1]][refSplit[2]];
+            additionalProps.options = metadata.enum;
+        }
+        let childxpath = dataxpath + '[-1]';
+        let updatedxpath = xpath + '[-1]';
+        const objectState = { add: true, remove: false };
+        const childNode = addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, childxpath, updatedxpath, ref, objectState);
+        if (_.get(data, dataxpath)) {
+            _.get(data, dataxpath).forEach((value, i) => {
+                let childxpath = dataxpath + '[' + i + ']';
+                let updatedxpath = xpath + '[' + i + ']';
+                addSimpleNode(childNode, schema, arrayDataType, null, callerProps, childxpath, updatedxpath, additionalProps);
+            })
+        }
     }
 }
 
@@ -907,15 +967,19 @@ function createTree(tree, currentjson, propname, count, collections) {
         if (collections.filter((c) => c.key === propname && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON").length > 0) {
             tree[propname] = currentjson;
         } else {
-            let node = {};
-            tree[propname].push(node);
-            let xpath = currentjson[0][_.keys(currentjson[0]).filter(k => k.startsWith('xpath_'))[0]];
-            xpath = xpath ? xpath.substring(0, xpath.lastIndexOf('.')) : xpath;
-            node['data-id'] = xpath;
-            createTree(tree[propname], currentjson[0], 0, count, collections)
-            if (currentjson.length > 1 && count.delete > 0) {
-                count.delete -= 1;
-                currentjson.splice(0, 1);
+            if (currentjson[0] === null || primitiveDataTypes.includes(typeof currentjson[0])) {
+                return;
+            } else {
+                let node = {};
+                tree[propname].push(node);
+                let xpath = currentjson[0][_.keys(currentjson[0]).filter(k => k.startsWith('xpath_'))[0]];
+                xpath = xpath ? xpath.substring(0, xpath.lastIndexOf('.')) : xpath;
+                node['data-id'] = xpath;
+                createTree(tree[propname], currentjson[0], 0, count, collections);
+                if (currentjson.length > 1 && count.delete > 0) {
+                    count.delete -= 1;
+                    currentjson.splice(0, 1);
+                }
             }
         }
     } else if (_.isNull(currentjson)) {
@@ -1599,7 +1663,7 @@ export function applyFilter(arr, filter) {
         let updatedArr = cloneDeep(arr);
         Object.keys(filter).forEach(key => {
             let values = filter[key].split(",").map(val => val.trim()).filter(val => val !== "");
-            updatedArr = updatedArr.filter(data => values.includes(_.get(data, key)));
+            updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
         })
         return updatedArr;
     }
@@ -1706,7 +1770,7 @@ export function roundNumber(value, precision = FLOAT_POINT_PRECISION) {
     precision: decimal digits to round off to. default 2 (FLOAT_POINT_PRECISION)
     */
     if (typeof value === DataTypes.NUMBER) {
-        if (Number.isInteger(value)) {
+        if (Number.isInteger(value) || precision === 0) {
             return value;
         } else {
             return +value.toFixed(precision);
@@ -1762,6 +1826,10 @@ export function excludeNullFromObject(obj) {
             }
             // else not required
         }
+    } else if (_.isArray(obj)) {
+        obj.forEach(o => {
+            excludeNullFromObject(o);
+        })
     }
     // else not required
 }
@@ -1803,7 +1871,7 @@ export function getObjectsDiff(obj1, obj2) {
         arr1: array of initial object
         arr2: array of current object
         */
-        const arrDiff = [];
+        let arrDiff = [];
 
         arr1.forEach(element1 => {
             if (element1 instanceof Object && DB_ID in element1) {
@@ -1821,21 +1889,25 @@ export function getObjectsDiff(obj1, obj2) {
                     }
                 }
             }
-            // TODO: compare arrays of primitive data types
         });
 
         arr2.forEach(element2 => {
             if (element2 instanceof Object && !(DB_ID in element2)) {
                 // new item in the array. store the entire item in diff
                 arrDiff.push(element2);
+            } else {
+                // compare arrays of primitive data types
+                if (!_.isEqual(arr1, arr2)) {
+                    arrDiff = arr2;
+                }
+
             }
-            // TODO: compare arrays of primitive data types 
         })
 
         return arrDiff;
     }
 
-    const diff = {};
+    let diff = {};
 
     if (obj1 instanceof Object) {
         for (const key in obj1) {
@@ -1884,8 +1956,8 @@ export function getObjectsDiff(obj1, obj2) {
 
 export function validateConstraints(metadata, value, min, max) {
     /* 
-    Function to check if value violates any contraints on the field.
-    metadata: contains all properties (and constaints) of the field
+    Function to check if value violates any constraints on the field.
+    metadata: contains all properties (and constraints) of the field
     value: field value
     min: min limit if any
     max: max limit if any
@@ -1897,33 +1969,103 @@ export function validateConstraints(metadata, value, min, max) {
     //     // if field is populated from server, ignore constaint checks
     //     return null;
     // }
+
+    // Treat empty strings as null or unset
     if (value === '') {
-        // empty strings are treated as null or unset
         value = null;
     }
+    // Check if required field is missing
     if (metadata.required) {
         if (value === undefined || value === null) {
             errors.push(Message.REQUIRED_FIELD);
         }
         // else not required: value is set
     }
+    // Check if enum field has "UNSPECIFIED" value
     if (metadata.type === DataTypes.ENUM) {
         if (value && value.includes('UNSPECIFIED')) {
             errors.push(Message.UNSPECIFIED_FIELD);
         }
         // else not required: value is set
     }
+    // Check if field violates minimum requirement    
     if (typeof min === DataTypes.NUMBER) {
         if (value !== undefined && value !== null && value < min) {
             errors.push(Message.MIN + ': ' + min);
         }
     }
+    // Check if field violates maximum requirement
     if (typeof max === DataTypes.NUMBER) {
         if (value !== undefined && value !== null && value > max) {
             errors.push(Message.MAX + ': ' + max);
         }
     }
 
-    // return null if no constaints are voilated
+    // If no constraints are violated, return null
     return errors.length ? errors.join(', ') : null;
+}
+
+export function removeRedundantFieldsFromRows(rows) {
+    rows = rows.map(row => {
+        _.keys(row).forEach(key => {
+            if (key.includes('xpath')) {
+                delete row[key];
+            }
+            if (key === 'data-id') {
+                delete row[key];
+            }
+        })
+        return row;
+    })
+    return rows;
+}
+
+export function getRowsFromAbbreviatedItems(items, itemsData, itemFieldProperties, abbreviation, loadedProps) {
+    const rows = [];
+    if (items) {
+        items.map((item, i) => {
+            let row = {};
+            let id = getIdFromAbbreviatedKey(abbreviation, item);
+            let metadata = itemsData.filter(metadata => _.get(metadata, DB_ID) === id)[0];
+            row['data-id'] = id;
+            itemFieldProperties.forEach(c => {
+                let value = null;
+                if (c.xpath.indexOf("-") !== -1) {
+                    value = c.xpath.split("-").map(xpath => {
+                        let collection = c.subCollections.filter(col => col.tableTitle === xpath)[0];
+                        let val = _.get(metadata, xpath);
+                        if (val === undefined || val === null) {
+                            val = "";
+                        }
+                        let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, val);
+                        if (typeof v === DataTypes.NUMBER && collection.type === DataTypes.NUMBER) {
+                            v = v.toLocaleString();
+                        }
+                        val = v + numberSuffix;
+                        return val;
+                    })
+                    if (loadedProps.microSeparator) {
+                        value = value.join(loadedProps.microSeparator);
+                    } else {
+                        value = value.join("-");
+                    }
+                } else {
+                    value = _.get(metadata, c.xpath);
+                    if (value === undefined || value === null) {
+                        value = null;
+                    }
+                    let [, v] = getLocalizedValueAndSuffix(c, value);
+                    value = v;
+                }
+                row[c.xpath] = value;
+            })
+            rows.push(row);
+        })
+    }
+    return rows;
+}
+
+export function getActiveRows(rows, page, pageSize, order, orderBy) {
+    return stableSort(rows, getComparator(order, orderBy))
+        .slice(page * pageSize, page * pageSize + pageSize);
 }

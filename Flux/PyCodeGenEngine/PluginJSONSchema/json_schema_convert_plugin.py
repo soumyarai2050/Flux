@@ -6,9 +6,11 @@ from typing import List, Callable, Dict, Tuple
 import time
 import re
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -71,7 +73,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
+        if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and \
+                len(response_field_case_style):
             self.__response_field_case_style: str = response_field_case_style
         else:
             err_str = f"Env var 'RESPONSE_FIELD_CASE_STYLE' received as {response_field_case_style}"
@@ -712,7 +715,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         # Handling autocomplete json list
         if self.__add_autocomplete_dict:
-            if (autocomplete_file_path := os.getenv("AUTOCOMPLETE_FILE_PATH")) is not None:
+            if (autocomplete_file_path := os.getenv("AUTOCOMPLETE_FILE_PATH")) is not None and \
+                    len(autocomplete_file_path):
                 json_msg_str += '  },\n'
 
                 with open(autocomplete_file_path) as json_fl:
@@ -720,7 +724,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
                 json_msg_str += self.__handle_auto_complete_output(json_content)
             else:
-                err_str = "Env var AUTOCOMPLETE_FILE_PATH received as None"
+                err_str = f"Env var AUTOCOMPLETE_FILE_PATH received as {autocomplete_file_path}"
                 logging.exception(err_str)
                 raise Exception(err_str)
         else:
