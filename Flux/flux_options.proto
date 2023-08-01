@@ -56,11 +56,11 @@ message MessageJsonRoot{
   optional AggregateType UpdateDesc = 4;
   optional AggregateType UpdateAllDesc = 5;
   optional AggregateType PatchDesc = 6;
-  optional AggregateType DeleteDesc = 7;
-  optional AggregateType ReadWebSocketDesc = 8;
-  optional AggregateType UpdateWebSocketDesc = 9;
-  optional bool SetReentrantLock = 10 [default=true];
-  optional bool SetReentrantLockToTop = 11 [default=false];
+  optional AggregateType PatchAllDesc = 7;
+  optional AggregateType DeleteDesc = 8;
+  optional AggregateType ReadWebSocketDesc = 9;
+  optional AggregateType UpdateWebSocketDesc = 10;
+  optional bool SetReentrantLock = 11 [default=true];
 }
 
 enum QueryTypeEnum{
@@ -69,12 +69,19 @@ enum QueryTypeEnum{
   BOTH = 2;
 }
 
+enum QueryRouteTypeEnum{
+  GET = 0;
+  PATCH = 1;
+}
+
 message MessageJsonQuery{
   required string QueryName = 1;
   optional string AggregateVarName = 2; // name of variable from file to be used
   repeated string QueryParams = 3;  // list of params required for aggregation
   repeated string QueryParamsDataType = 4;  // list of data types of respective params in AggregateParams field
   optional QueryTypeEnum QueryType = 5 [default=HTTP];
+  optional QueryRouteTypeEnum QueryRouteType = 6 [default=GET];
+  optional bool RequireJsSliceChanges = 7 [default=false];
 }
 
 
@@ -167,7 +174,7 @@ extend google.protobuf.MessageOptions
   // UI may use Abbreviated representation of msg to show msg as single value
   optional string FluxMsgAbbreviated = 55252;
   optional bool FluxMsgServerPopulate = 55253; // Use this to signal msg not to populate from UI, populate from server
-  optional WidgetUIData FluxMsgWidgetUIData = 55254; // Use this to populate ui widget data for layout messages
+  optional WidgetUIDataElement FluxMsgWidgetUIDataElement = 55254; // Use this to populate ui widget data for layout messages
   optional string FluxMsgTitle = 55255; //Set this value to override default title value in schema
   repeated MessageJsonQuery FluxMsgJsonQuery = 55256;
   optional string FluxMsgCRUDSharedLock = 55257; // Name of shared lock to be used in multiple models in CRUD operations
@@ -205,6 +212,7 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldWebSocket = 52158;
   optional string FluxFldDateTimeFormat = 52159;
   optional bool FluxFldCollectionLink = 52160;
+  optional bool FluxFldDynamicAggUpdate = 52161;
 
   //ORM options - 551
   optional bool FluxFldOrmNoUpdate = 55151;  //The field that gets persisted in create to ORM and subsequently can't be updated has this option set

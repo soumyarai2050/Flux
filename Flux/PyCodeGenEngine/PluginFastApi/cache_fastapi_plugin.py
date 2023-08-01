@@ -5,9 +5,11 @@ from typing import List, Dict
 import time
 from pathlib import PurePath
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -58,8 +60,10 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
                         if "int" == self.proto_to_py_datatype(field):
                             self.int_id_message_list.append(message)
                             break
+                        elif "str" == self.proto_to_py_datatype(field):
+                            break
                         else:
-                            err_str = "Id field other than int not supported for cached pydantic model"
+                            err_str = "Id field other than int or str are not supported for cached pydantic model"
                             logging.exception(err_str)
                             raise Exception(err_str)
                 # else not required : If no id field exists then adding id field using int
@@ -89,28 +93,49 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
                 return CacheFastApiPlugin.proto_type_to_py_type_dict[field.kind.name.lower()]
 
     def handle_fastapi_initialize_file_gen(self):
-        output_str = "from fastapi import FastAPI\n"
+        output_str = "import os\n"
+        output_str += "from fastapi import FastAPI\n"
         routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_file_name)
         output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_file_path} import *\n"
+        # else not required: if no message with custom id is found then avoiding import statement
+        database_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.database_file_name)
+        output_str += f"from {database_file_path} import init_db\n\n\n"
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
-        output_str += f"async def init_max_id_handler(root_base_model):\n"
-        output_str += f'    root_base_model.init_max_id(0)\n\n\n'
+        output_str += f"async def init_max_id_handler(document):\n"
+        output_str += '    max_val = await document.find_all().max("_id")\n'
+        output_str += '    document.init_max_id(int(max_val) if max_val is not None else 0)\n'
+        output_str += '    document_list = await document.find_all().to_list()\n'
+        output_str += '    document._cache_obj_id_to_obj_dict = {document_obj.id: document_obj for document_obj in document_list}\n\n\n'
         output_str += f'@{self.fastapi_app_name}.on_event("startup")\n'
         output_str += f'async def connect():\n'
+        output_str += f'    await init_db()\n'
         for message in self.int_id_message_list:
             message_name = message.proto.name
             output_str += f"    await init_max_id_handler({message_name})\n"
-        output_str += "\n"
+        output_str += "\n\n"
+        output_str += "if os.getenv('DEBUG'):\n"
+        output_str += "    from fastapi.middleware.cors import CORSMiddleware\n\n"
+        output_str += "    origins = ['*']\n"
+        output_str += f"    {self.fastapi_app_name}.add_middleware(\n"
+        output_str += f"        CORSMiddleware,\n"
+        output_str += f"        allow_origins=origins,\n"
+        output_str += f"        allow_credentials=True,\n"
+        output_str += f"        allow_methods=['*'],\n"
+        output_str += f"        allow_headers=['*'],\n"
+        output_str += f"    )\n\n"
         output_str += f'{self.fastapi_app_name}.include_router({self.api_router_app_name}, ' \
                       f'prefix="/{self.proto_file_package}")\n'
-
+        output_str += f"from fastapi.staticfiles import StaticFiles\n\n"
+        output_str += f"{self.fastapi_app_name}.mount('/static', StaticFiles(directory='static'), name='static')\n\n"
         return output_str
+
 
     def set_req_data_members(self, file: protogen.File):
         super().set_req_data_members(file)
         self.fastapi_file_name = f"{self.proto_file_name}_cache_fastapi"
+        self.database_file_name = f"{self.proto_file_name}_beanie_database"
 
     def output_file_generate_handler(self, file: protogen.File):
         # Pre-code generation initializations
@@ -129,7 +154,7 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
                 self.handle_callback_override_set_instance_file_gen(),
 
             # Adding dummy callback override class file
-            "dummy_" + self.routes_callback_class_name_override + ".py": self.handle_callback_override_file_gen(),
+            "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py": self.handle_callback_override_file_gen(),
 
             # Adding project's routes.py
             self.routes_file_name + ".py": self.handle_routes_file_gen(),

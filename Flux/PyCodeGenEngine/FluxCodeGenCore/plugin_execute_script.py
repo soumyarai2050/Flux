@@ -34,8 +34,8 @@ class PluginExecuteScript:
         self.pb2_import_generator_plugin_name: str = "pb2_import_generator.py"
         self.current_script_dir_path = os.path.abspath(os.path.join(os.path.dirname(__file__)))
         plugin_file_name = None
-        if (plugin_dir := os.getenv("PLUGIN_DIR")) is not None and \
-                (plugin_file_name := os.getenv("PLUGIN_FILE_NAME")) is not None:
+        if ((plugin_dir := os.getenv("PLUGIN_DIR")) is not None and len(plugin_dir)) and \
+                ((plugin_file_name := os.getenv("PLUGIN_FILE_NAME")) is not None and len(plugin_file_name)):
             self.plugin_path = \
                 os.path.abspath(os.path.join(plugin_dir, plugin_file_name))
         else:
@@ -49,10 +49,11 @@ class PluginExecuteScript:
         logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
 
     def import_pb2_scripts(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str], out_dir: str):
-        if (py_code_gen_core_dir_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None:
+        if (py_code_gen_core_dir_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None and \
+                len(py_code_gen_core_dir_path):
             pb2_import_generator_path = os.path.join(py_code_gen_core_dir_path, self.pb2_import_generator_plugin_name)
         else:
-            err_str = f"Env var 'PY_CODE_GEN_CORE_PATH' received as None"
+            err_str = f"Env var 'PY_CODE_GEN_CORE_PATH' received as {py_code_gen_core_dir_path}"
             logging.exception(err_str)
             raise Exception(err_str)
         Execute.run_plugin_proto(proto_file_path_list, proto_files_dir_paths_list,
@@ -83,8 +84,10 @@ class PluginExecuteScript:
 
     def clear_used_imports_from_file(self):
         insertion_import_file_name = None
-        if (py_code_gen_core_dir_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None and \
-                (insertion_import_file_name := os.getenv("INSERTION_IMPORT_FILE_NAME")) is not None:
+        if ((py_code_gen_core_dir_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None and \
+                len(py_code_gen_core_dir_path)) and \
+                ((insertion_import_file_name := os.getenv("INSERTION_IMPORT_FILE_NAME")) is not None and \
+                len(insertion_import_file_name)):
             with open(os.path.join(py_code_gen_core_dir_path, insertion_import_file_name)) as fl:
                 line_sep_content = fl.readlines()
                 remove_line_index = []
@@ -111,13 +114,13 @@ class PluginExecuteScript:
         proto_file_path_list = [os.path.join(self.base_dir_path, "model", proto_file)
                                 for proto_file in os.listdir(os.path.join(self.base_dir_path, "model"))
                                 if "options" not in proto_file and proto_file.endswith(self.model_file_suffix)]
-        if (output_dir := os.getenv("OUTPUT_DIR")) is None:
-            err_str = "Env Var 'OUTPUT_DIR' received as None"
+        if (output_dir := os.getenv("OUTPUT_DIR")) is None or len(output_dir) == 0:
+            err_str = f"Env Var 'OUTPUT_DIR' received as {output_dir}"
             logging.exception(err_str)
             raise Exception(err_str)
         # else not required: output_dir is present, continue further
-        if (plugin_output_dir := os.getenv("PLUGIN_OUTPUT_DIR")) is None:
-            err_str = "Env Var 'PLUGIN_OUTPUT_DIR' received as None"
+        if (plugin_output_dir := os.getenv("PLUGIN_OUTPUT_DIR")) is None or len(plugin_output_dir) == 0:
+            err_str = f"Env Var 'PLUGIN_OUTPUT_DIR' received as {plugin_output_dir}"
             logging.exception(err_str)
             raise Exception(err_str)
         # else not required: plugin_output_dir is present, continue further

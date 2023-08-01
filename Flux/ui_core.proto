@@ -40,7 +40,7 @@ message WebPageUIData{
   optional Theme theme = 1;
 }
 
-message WidgetUIData{
+message WidgetUIDataElement {
   // key string connects Widget with Model - future better name via: [(FluxFldAlias) = 'i']
   optional string i = 1;
   // X coordinate magnitude (left most is 0)
@@ -51,14 +51,27 @@ message WidgetUIData{
   optional int32 w = 4;
   // height
   optional int32 h = 5;
-  // layout type
-  optional UILayouts layout = 6;
   optional bool is_repeated = 7 [default = false];
   optional string alert_bubble_source = 8;
   optional string alert_bubble_color = 9;
-  repeated string enable_override = 10;
-  repeated string disable_override = 11;
-  optional bool highlight_update = 12 [default = false];
+  optional bool disable_ws_on_edit = 10 [default = false];
+  // allows user-data-model identifier bound UI configuration - user can save different UI configs for each unique ID. Value to be MessageName.FieldName from the target model
+  optional string bind_id_fld = 11;
+  optional string dynamic_widget_title_fld = 12;
+  repeated WidgetUIData widget_ui_data = 13;
+
+}
+
+message WidgetUIData{
+  // layout type
+  optional UILayouts view_layout = 1;
+  repeated string enable_override = 2;
+  repeated string disable_override = 3;
+  optional bool highlight_update = 4 [default = false];
+  optional UILayouts edit_layout = 5;
+  optional bool truncate_date_time = 6 [default = false];
+  // for UI to store the bounded id value
+  optional string bind_id_val = 7;
 }
 
 message UIButton{

@@ -5,6 +5,9 @@ import {
 } from './constants';
 import Node from './components/Node';
 import HeaderField from './components/HeaderField';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+dayjs.extend(utc);
 
 // stores the tree expand/collapse states
 const treeState = {};
@@ -159,6 +162,10 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 collection.autocomplete_list = getEnumValues(schema, ref, v.type);
             }
 
+            if ((currentSchema.hasOwnProperty('abbreviated') && currentSchema.abbreviated === 'JSON') || currentSchema.noColumn) {
+                collection.noColumn = true;
+            }
+
             fieldProps.map(({ propertyName, usageName }) => {
                 if (v.hasOwnProperty(propertyName)) {
                     collection[usageName] = v[propertyName];
@@ -217,6 +224,10 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 collection.parentxpath = parentxpath;
             }
 
+            if ((currentSchema.hasOwnProperty('abbreviated') && currentSchema.abbreviated === 'JSON') || currentSchema.noColumn) {
+                collection.noColumn = true;
+            }
+
             fieldProps.map(({ propertyName, usageName }) => {
                 if (v.hasOwnProperty(propertyName)) {
                     collection[usageName] = v[propertyName];
@@ -248,7 +259,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
             let isRedundant = true;
             if (collections.filter(col => col.tableTitle === collection.tableTitle).length === 0) {
-                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE) && collection.abbreviated === "JSON") {
+                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
                     isRedundant = false;
                 }
             }
@@ -256,7 +267,10 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 collections.push(collection);
             }
 
-            if (collection.abbreviated !== "JSON") {
+            if (collection.abbreviated === 'JSON') {
+                const sc = createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
+                collection.subCollections = cloneDeep(sc);
+            } else {
                 createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
             }
         } else if (v.type === DataTypes.OBJECT) {
@@ -273,6 +287,10 @@ export function createCollections(schema, currentSchema, callerProps, collection
                     parentxpath = parentxpath.replace(callerProps.parent + '.', '');
                 }
                 collection.parentxpath = parentxpath;
+            }
+
+            if ((currentSchema.hasOwnProperty('abbreviated') && currentSchema.abbreviated === 'JSON') || currentSchema.noColumn) {
+                collection.noColumn = true;
             }
 
             fieldProps.map(({ propertyName, usageName }) => {
@@ -295,7 +313,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
             let isRedundant = true;
             if (collections.filter(col => col.tableTitle === collection.tableTitle).length === 0) {
-                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE) && collection.abbreviated === "JSON") {
+                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
                     isRedundant = false;
                 }
             }
@@ -303,8 +321,10 @@ export function createCollections(schema, currentSchema, callerProps, collection
             if (!isRedundant) {
                 collections.push(collection);
             }
-
-            if (collection.abbreviated !== "JSON") {
+            if (collection.abbreviated === 'JSON') {
+                const sc = createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
+                collection.subCollections = cloneDeep(sc);
+            } else {
                 createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
             }
         }
@@ -510,6 +530,8 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
         node.onFormUpdate = callerProps.onFormUpdate;
         node.mode = callerProps.mode;
         node.showDataType = callerProps.showDataType;
+        node.index = callerProps.index;
+        node.forceUpdate = callerProps.forceUpdate;
 
         fieldProps.map(({ propertyName, usageName }) => {
             if (attributes.hasOwnProperty(propertyName)) {
@@ -638,7 +660,7 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps) {
 
     let currentSchema = _.get(schema, currentSchemaName);
     let childNode;
-    if (currentSchema.widget_ui_data && currentSchema.widget_ui_data.is_repeated) {
+    if (currentSchema.widget_ui_data_element && currentSchema.widget_ui_data_element.is_repeated) {
         childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.ARRAY, callerProps, currentSchemaName, currentSchemaName);
         for (let i = 0; i < callerProps.data.length; i++) {
             let dataxpath = "[" + i + "]";
@@ -770,6 +792,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
             });
         }
     } else if (currentSchema.hasOwnProperty('items') && currentSchema.type === DataTypes.ARRAY && !primitiveDataTypes.includes(currentSchema.underlying_type)) {
+        if (callerProps.mode === Modes.EDIT_MODE && currentSchema.hasOwnProperty('server_populate')) return;
         if (((_.get(data, dataxpath) && _.get(data, dataxpath).length === 0) || (_.keys(data).length > 0 && !_.get(data, dataxpath))) &&
             ((_.get(originalData, xpath) && _.get(originalData, xpath).length === 0) || !_.get(originalData, xpath))) {
             let childxpath = dataxpath + '[-1]';
@@ -889,9 +912,14 @@ export function toCamelCase(text) {
 }
 
 export function generateRowTrees(jsondata, collections, xpath) {
-    let trees = [];
-    if (xpath) jsondata = _.get(jsondata, xpath);
-    if (!jsondata) return trees;
+    const trees = [];
+    // if xpath is present, jsondata is subset of data
+    if (xpath) {
+        jsondata = _.get(jsondata, xpath);
+    }
+    if (!jsondata) {
+        return trees;
+    }
 
     while (true) {
         if (_.isArray(jsondata)) {
@@ -901,7 +929,7 @@ export function generateRowTrees(jsondata, collections, xpath) {
 
                 if (Object.keys(tree).length === 0) break;
 
-                if (!hasArrayField(tree)) {
+                if (!constainsArray(tree)) {
                     tree['data-id'] = i;
                 }
 
@@ -929,10 +957,7 @@ export function generateRowTrees(jsondata, collections, xpath) {
 
             if (Object.keys(tree).length === 0) break;
 
-            if (!hasArrayField(tree)) {
-                tree['data-id'] = 0;
-            }
-            if (!tree.hasOwnProperty('data-id')) {
+            if (!constainsArray(tree)) {
                 tree['data-id'] = 0;
             }
 
@@ -945,17 +970,24 @@ export function generateRowTrees(jsondata, collections, xpath) {
     return trees;
 }
 
-function hasArrayField(obj, hasArray = false) {
-    Object.entries(obj).forEach(([k, v]) => {
-        if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) return;
-        else if (Array.isArray(v)) {
-            hasArray = true;
-            return;
-        } else if (_.isObject(v)) {
-            hasArrayField(obj[k], hasArray);
+function constainsArray(obj) {
+    if (isObject(obj)) {
+        for (const key in obj) {
+            if (Array.isArray(obj[key])) {
+                return true;
+            } else if (isObject(obj[key])) {
+                const hasArray = constainsArray(obj[key]);
+                if (hasArray) {
+                    return true;
+                }
+            }
         }
-    })
-    return hasArray;
+    } else if (obj === null) {
+        return false;
+    } else {
+        throw new Error('constainsArray function failed. unsupported obj type: ' + typeof obj + ', expected object type.')
+    }
+    return false;
 }
 
 
@@ -1128,7 +1160,7 @@ export function generateRowsFromTree(trees, collections, xpath) {
 
 export function compareObjects(updated, original, current, xpath, diff = []) {
     Object.entries(current).map(([k, v]) => {
-        if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+        if (primitiveDataTypes.includes(typeof (v))) {
             let updatedxpath = xpath ? xpath + '.' + k : k;
             if ((!_.get(original, updatedxpath) && _.get(original, updatedxpath) !== false && _.get(original, updatedxpath) !== 0) || !_.isEqual(_.get(updated, updatedxpath), _.get(original, updatedxpath))) {
                 if (!diff.includes(updatedxpath)) diff.push(updatedxpath);
@@ -1136,7 +1168,7 @@ export function compareObjects(updated, original, current, xpath, diff = []) {
         } else if (Array.isArray(v)) {
             for (let i = 0; i < v.length; i++) {
                 let updatedxpath = xpath ? xpath + '.' + k + '[' + i + ']' : k + '[' + i + ']';
-                if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v[0]))) {
+                if (primitiveDataTypes.includes(typeof (v[0]))) {
                     if ((!_.get(original, updatedxpath) && _.get(original, updatedxpath) !== false && _.get(original, updatedxpath) !== 0) || !_.isEqual(_.get(updated, updatedxpath), _.get(original, updatedxpath))) {
                         if (!diff.includes(updatedxpath)) diff.push(updatedxpath);
                     }
@@ -1383,7 +1415,7 @@ export function getTableColumns(collections, mode, enableOverride = [], disableO
     return columns;
 }
 
-export function getCommonKeyCollections(rows, tableColumns, hide = true) {
+export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false) {
     if (rows.length > 1) {
         tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKey);
     }
@@ -1391,11 +1423,31 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true) {
     if (rows.length > 0) {
         tableColumns.map((column) => {
             if (hide && column.hide) return;
+            if (collectionView) {
+                if (column.type === 'button' || column.type === 'progressBar') {
+                    return;
+                }
+            }
 
             let found = true;
             for (let i = 0; i < rows.length - 1; i++) {
                 if (!_.isEqual(rows[i][column.tableTitle], rows[i + 1][column.tableTitle])) {
-                    found = false;
+                    const values = [rows[i][column.tableTitle], rows[i + 1][column.tableTitle]];
+                    for (let i = 0; i < values.length; i++) {
+                        let val = values[i];
+                        if (val) {
+                            if (typeof val === DataTypes.STRING) {
+                                val = val.trim();
+                            }
+                        }
+                        if (![null, undefined, ''].includes(val)) {
+                            found = false;
+                            break;
+                        }
+                    }
+                }
+                if (!found) {
+                    break;
                 }
             }
             if (found) {
@@ -1538,6 +1590,12 @@ export function getComparator(order, orderBy) {
 }
 
 export function descendingComparator(a, b, orderBy) {
+    if (a[orderBy] === undefined || a[orderBy] === null) {
+        return -1;
+    }
+    if (b[orderBy] === undefined || b[orderBy] === null) {
+        return 1;
+    }
     if (b[orderBy] < a[orderBy]) {
         return -1;
     }
@@ -1895,13 +1953,14 @@ export function getObjectsDiff(obj1, obj2) {
             if (element2 instanceof Object && !(DB_ID in element2)) {
                 // new item in the array. store the entire item in diff
                 arrDiff.push(element2);
-            } else {
-                // compare arrays of primitive data types
-                if (!_.isEqual(arr1, arr2)) {
-                    arrDiff = arr2;
-                }
-
             }
+            // else {
+            //    // compare arrays of primitive data types
+            //    if (!_.isEqual(arr1, arr2)) {
+            //        arrDiff = arr2;
+            //    }
+            //
+            //}
         })
 
         return arrDiff;
@@ -1976,7 +2035,7 @@ export function validateConstraints(metadata, value, min, max) {
     }
     // Check if required field is missing
     if (metadata.required) {
-        if (value === undefined || value === null) {
+        if (value === null) {
             errors.push(Message.REQUIRED_FIELD);
         }
         // else not required: value is set
@@ -2068,4 +2127,114 @@ export function getRowsFromAbbreviatedItems(items, itemsData, itemFieldPropertie
 export function getActiveRows(rows, page, pageSize, order, orderBy) {
     return stableSort(rows, getComparator(order, orderBy))
         .slice(page * pageSize, page * pageSize + pageSize);
+}
+
+export function compareNCheckNewArrayItem(obj1, obj2) {
+    for (const key in obj1) {
+        if (obj1[key] instanceof Array && obj2[key] instanceof Array) {
+            if (obj1[key].length !== obj2.length) {
+                return true;
+            }
+            for (let i = 0; obj1[key].length; i++) {
+                if (obj1[key] instanceof Object) {
+                    compareNCheckNewArrayItem(obj1[key], obj2[key]);
+                }
+            }
+        } else if (obj1[key] instanceof Object && obj2[key] instanceof Object) {
+            compareNCheckNewArrayItem(obj1[key], obj2[key]);
+        }
+    }
+    return false;
+}
+
+export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = false) {
+
+    function formatJSONArray(arr, fieldProps, truncateDateTime) {
+        for (let i = 0; i < arr.length; i++) {
+            if (arr[i] instanceof Object) {
+                formatJSONObjectOrArray(arr[i], fieldProps, truncateDateTime);
+            }
+        }
+    }
+
+    if (json instanceof Array) {
+        formatJSONArray(json, fieldProps, truncateDateTime);
+    } else if (json instanceof Object) {
+        for (const key in json) {
+            if (key.includes('xpath')) {
+                continue;
+            }
+            const prop = fieldProps.find(p => p.key === key);
+            if (prop) {
+                if (json[key] instanceof Array) {
+                    formatJSONArray(json[key], fieldProps, truncateDateTime);
+                } else if (json[key] instanceof Object) {
+                    formatJSONObjectOrArray(json[key], fieldProps, truncateDateTime);
+                } else if (typeof json[key] === DataTypes.NUMBER) {
+                    const [suffix, v] = getLocalizedValueAndSuffix(prop, json[key]);
+                    json[key] = v.toLocaleString() + suffix;
+                } else if (prop.type === DataTypes.DATE_TIME && truncateDateTime) {
+                    if (json[key]) {
+                        json[key] = dayjs.utc(json[key]).format('YYYY-MM-DD HH:mm');
+                    }
+                }
+                if (prop.hide) {
+                    delete json[key];
+                }
+            }
+        }
+    }
+}
+
+export function isObject(value) {
+    return value !== null && typeof value === DataTypes.OBJECT;
+}
+
+export function getWidgetOptionById(widgetOptions, id, isIdBound = false) {
+    let widgetOption = widgetOptions[0];
+    if (isIdBound) {
+        const dataElement = widgetOptions.find(data => data.hasOwnProperty('bind_id_val') && data.bind_id_val === String(id));
+        if (dataElement) {
+            widgetOption = dataElement;
+        }
+    }
+    widgetOption = cloneDeep(widgetOption);
+    if (!widgetOption.enable_override) {
+        widgetOption.enable_override = [];
+    }
+    if (!widgetOption.disable_override) {
+        widgetOption.disable_override = [];
+    }
+    for (const key in widgetOption) {
+        if (widgetOption[key] === null) {
+            delete widgetOption[key];
+        }
+    }
+    return widgetOption;
+}
+
+export function getWidgetTitle(widgetOption, widgetSchema, widgetName, data) {
+    if (widgetSchema.widget_ui_data_element.hasOwnProperty('dynamic_widget_title_fld')) {
+        const dynamicWidgetTitleField = widgetSchema.widget_ui_data_element.dynamic_widget_title_fld;
+        const name = dynamicWidgetTitleField.split('.')[0];
+        if (name === widgetName) {
+            const fieldxpath = dynamicWidgetTitleField.substring(dynamicWidgetTitleField.indexOf('.') + 1);
+            const value = _.get(data, fieldxpath);
+            if (value) {
+                return value;
+            }
+        }
+        // TODO: fetching dynamic name for other widget fields
+    }
+    return widgetSchema.hasOwnProperty('title') ? widgetSchema.title : widgetName;
+}
+
+export function hasOwnProperty(obj, property) {
+    /* extended hasOwnProperty check with check for null values */
+    if (obj.hasOwnProperty(property)) {
+        if (obj[property] !== null && obj[property] !== undefined) {
+            return true;
+        }
+    }
+    return false;
 }

@@ -32,6 +32,7 @@ enum PositionType{
   PTH = 1; // Pay to hold driven
   LOCATE = 2; // Borrow driven
   SOD = 3; // past trades driven
+  INDICATIVE = 4; // potential availability, needs additional steps to become tradable (converts to Locate or PTH)
 }
 
 enum SortType {
@@ -116,7 +117,7 @@ message Quote{
   optional float px = 1;
   optional int64 qty = 2 [(FluxFldNoCommonKey) = true];
   optional float premium = 3;
-  optional int64 last_update_date_time = 4[(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  optional string last_update_date_time = 4[(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
 }
 
 

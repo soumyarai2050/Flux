@@ -1,17 +1,24 @@
 import asyncio
 from typing import Tuple
 import sys
+from pathlib import PurePath
 
-from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env, perf_benchmark
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 from Flux.CodeGenProjects.addressbook.generated.StratExecutor.strat_manager_service_key_handler import \
     StratManagerServiceKeyHandler
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, parse_to_int, \
+    get_native_host_n_port_from_config_dict
 
-host, port = get_host_port_from_env()
-strat_manager_service_web_client_internal = StratManagerServiceWebClient(host, port)
+
+config_yaml_path = PurePath(__file__).parent.parent / "data" / "config.yaml"
+config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
+
+host, port = get_native_host_n_port_from_config_dict(config_yaml_dict)
+strat_manager_service_web_client_internal = \
+    StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
 
 update_portfolio_status_lock: asyncio.Lock = asyncio.Lock()
 update_strat_status_lock: asyncio.Lock = asyncio.Lock()
@@ -231,7 +238,7 @@ def is_service_up(ignore_error: bool = False):
         return True
     except Exception as e:
         if not ignore_error:
-            logging.error("service_up test failed - tried get_all_portfolio_status_client (and maybe create);;;"
+            logging.exception("service_up test failed - tried get_all_portfolio_status_client (and maybe create);;;"
                           f"exception: {e}", exc_info=True)
         # else not required - silently ignore error is true
         return False
@@ -275,8 +282,9 @@ def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
         #          portfolio_limits = portfolio_limits_entry
         # logging.debug(f"portfolio_limit_list: {portfolio_limits_list}, selected portfolio_limits: {portfolio_limits}")
         # return portfolio limits
-        raise Exception(f"multiple: ({len(portfolio_limits_list)}) portfolio_limits entries not supported at this time!"
-                        f" use swagger UI to delete redundant entries: {portfolio_limits_list} from DB and retry")
+        err_str_ = f"multiple: ({len(portfolio_limits_list)}) portfolio_limits entries not supported at this time!" \
+                   f" use swagger UI to delete redundant entries: {portfolio_limits_list} from DB and retry"
+        raise Exception(err_str_)
     else:
         return portfolio_limits_list[0]
 
@@ -393,7 +401,6 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
     return strat_limits
 
 
-@perf_benchmark
 def get_consumable_participation_qty(
         executor_check_snapshot_obj_list: List[ExecutorCheckSnapshot],
         max_participation_rate: float) -> int | None:
@@ -410,7 +417,6 @@ def get_consumable_participation_qty(
         return None
 
 
-@perf_benchmark
 def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_period_seconds: int,
                                           max_participation_rate: float) -> int | None:
     executor_check_snapshot_list: List[ExecutorCheckSnapshot] = \

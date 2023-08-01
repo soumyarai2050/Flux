@@ -4,6 +4,7 @@ from threading import Lock
 from re import sub
 from pydantic import BaseModel
 from pendulum import DateTime
+from beanie import PydanticObjectId
 import os
 
 
@@ -150,7 +151,7 @@ class UniqueStrIdBaseModel(BaseModel):
     @classmethod
     def next_id(cls) -> str:
         with cls._mutex:
-            return f"{DateTime.utcnow()}-{os.getpid()}"
+            return f"{PydanticObjectId()}"
 
 
 class UniqueStrIdCamelBaseModel(UniqueStrIdBaseModel, CamelBaseModel):

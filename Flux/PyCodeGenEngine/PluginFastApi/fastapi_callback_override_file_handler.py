@@ -6,9 +6,11 @@ from abc import ABC
 import logging
 from pathlib import PurePath
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -284,50 +286,69 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                 query_params = aggregate_value[FastapiCallbackOverrideFileHandler.query_params_key]
                 query_params_data_types = aggregate_value[
                     FastapiCallbackOverrideFileHandler.query_params_data_types_key]
+                query_route_path = aggregate_value.get(FastapiCallbackOverrideFileHandler.query_route_type_key)
+                if query_route_path is None:
+                    query_route_path = "GET"
 
                 routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_file_name)
                 aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
 
-                if query_params:
-                    agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
-                                                          for param, param_type in zip(query_params,
-                                                                                       query_params_data_types)])
-                    agg_params_str = ", ".join(query_params)
+                if query_route_path == FastapiCallbackOverrideFileHandler.flux_json_query_route_get_type_field_val:
+                    if query_params:
+                        agg_params_with_type_str = ", ".join([f"{param}: {param_type}"
+                                                              for param, param_type in zip(query_params,
+                                                                                           query_params_data_types)])
+                        agg_params_str = ", ".join(query_params)
 
-                    output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
-                                  f"Type[{msg_name}], {agg_params_with_type_str}):\n"
-                    if aggregate_var_name is not None:
-                        output_str += f"        from {routes_import_path} import " \
-                                      f"underlying_read_{msg_name_snake_cased}_http\n"
-                        output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
-                        output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
-                                      f"{aggregate_var_name}({agg_params_str}))\n"
+                        output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
+                                      f"Type[{msg_name}], {agg_params_with_type_str}):\n"
+                        if aggregate_var_name is not None:
+                            output_str += f"        from {routes_import_path} import " \
+                                          f"underlying_read_{msg_name_snake_cased}_http\n"
+                            output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
+                            output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
+                                          f"{aggregate_var_name}({agg_params_str}))\n"
+                        else:
+                            output_str += f"        # To be implemented in main callback override file\n"
+                            output_str += f"        return []\n"
+
+                        output_str += "\n\n"
                     else:
-                        output_str += f"        # To be implemented in main callback override file\n"
-                        output_str += f"        pass\n"
-
-                    output_str += "\n\n"
+                        output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
+                                      f"Type[{msg_name}]):\n"
+                        if aggregate_var_name is not None:
+                            output_str += f"        from {routes_import_path} import " \
+                                          f"underlying_read_{msg_name_snake_cased}_http\n"
+                            output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
+                            output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
+                                          f"{aggregate_var_name})\n"
+                        else:
+                            output_str += f"        # To be implemented in main callback override file\n"
+                            output_str += f"        return []\n"
+                        output_str += "\n"
                 else:
-                    output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
-                                  f"Type[{msg_name}]):\n"
-                    if aggregate_var_name is not None:
-                        output_str += f"        from {routes_import_path} import " \
-                                      f"underlying_read_{msg_name_snake_cased}_http\n"
-                        output_str += f"        from {aggregate_file_path} import {aggregate_var_name}\n"
-                        output_str += f"        return await underlying_read_{msg_name_snake_cased}_http(" \
-                                      f"{aggregate_var_name})\n"
-                    else:
+                    if query_params:
+                        output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
+                                      f"Type[{msg_name}], payload_dict: Dict[str, Any]):\n"
                         output_str += f"        # To be implemented in main callback override file\n"
-                        output_str += f"        pass\n"
-                    output_str += "\n"
+                        output_str += f"        # payload_dict will contain all whole payload with key as set in " \
+                                      f"proto model\n"
+                        output_str += f"        return []\n"
+                        output_str += "\n\n"
+                    else:
+                        err_str = f"patch query can't be generated without payload query_param, query {query_name} in " \
+                                  f"message {message.proto.name} found without query params"
+                        logging.exception(err_str)
+                        raise Exception(err_str)
 
         return output_str
 
     def handle_callback_override_file_gen(self) -> str:
-        if (output_dir_path := os.getenv("OUTPUT_DIR")) is not None:
-            json_sample_file_path = PurePath(output_dir_path) / "JSONSample" / f"{self.proto_file_name}_json_sample.json"
+        if (output_dir_path := os.getenv("OUTPUT_DIR")) is not None and len(output_dir_path):
+            json_sample_file_path = \
+                PurePath(output_dir_path) / "JSONSample" / f"{self.proto_file_name}_json_sample.json"
         else:
-            err_str = "Env var 'PLUGIN_OUTPUT_DIR' received as None"
+            err_str = f"Env var 'PLUGIN_OUTPUT_DIR' received as {output_dir_path}"
             logging.exception(err_str)
             raise Exception(err_str)
         with open(json_sample_file_path) as json_sample:
@@ -346,7 +367,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
 
         callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         callback_override_class_name_camel_cased = \
-            convert_to_capitalized_camel_case(self.routes_callback_class_name_override)
+            convert_to_capitalized_camel_case(self.beanie_native_override_routes_callback_class_name)
         # example 0 of 5
         output_str += self._handle_callback_example_0(callback_class_name_camel_cased,
                                                       callback_override_class_name_camel_cased)

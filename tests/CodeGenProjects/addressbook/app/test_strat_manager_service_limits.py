@@ -1,6 +1,6 @@
 from pathlib import PurePath
 
-from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations, configure_logger
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 from tests.CodeGenProjects.addressbook.app.test_strat_manager_service_routes_callback_override import *
 from Flux.CodeGenProjects.addressbook.app.log_trade_simulator import LogTradeSimulator
 
@@ -130,11 +130,11 @@ def test_log_trade_simulator_trigger_kill_switch_and_resume_trading():
     time.sleep(5)
 
     portfolio_status_id = 1
-    portfolio_status = strat_manager_service_web_client.get_portfolio_status_client(portfolio_status_id)
+    portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(portfolio_status_id)
     assert portfolio_status.kill_switch
 
     LogTradeSimulator.revoke_kill_switch_n_resume_trading()
     time.sleep(5)
 
-    portfolio_status = strat_manager_service_web_client.get_portfolio_status_client(portfolio_status_id)
+    portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(portfolio_status_id)
     assert not portfolio_status.kill_switch

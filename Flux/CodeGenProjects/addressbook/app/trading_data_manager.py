@@ -2,7 +2,6 @@ import logging
 from threading import Thread
 from typing import Callable
 
-from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env, perf_benchmark
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from trading_cache import *
 from Flux.CodeGenProjects.addressbook.app.strat_cache import StratCache
@@ -19,16 +18,22 @@ from Flux.CodeGenProjects.addressbook.generated.StratExecutor.strat_manager_serv
 
 trading_link: TradingLinkBase = get_trading_link()
 
-host, port = get_host_port_from_env()
-market_data_int_port: int = 8040 if (port_env := (os.getenv("MARKET_DATA_PORT"))) is None or len(port_env) == 0 else \
-    int(port_env)
+ps_config_yaml_path = PurePath(__file__).parent.parent / "data" / "config.yaml"
+ps_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ps_config_yaml_path))
+ps_beanie_host, ps_beanie_port = \
+    ps_config_yaml_dict.get("beanie_host"), parse_to_int(ps_config_yaml_dict.get("beanie_port"))
+
+md_config_yaml_path = PurePath(__file__).parent.parent.parent / "market_data" / "data" / "config.yaml"
+md_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(md_config_yaml_path))
+md_beanie_host, md_beanie_port = \
+    md_config_yaml_dict.get("beanie_host"), parse_to_int(md_config_yaml_dict.get("beanie_port"))
 
 
 class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataManager):
     def __init__(self, executor_trigger_method: Callable):
-        StratManagerServiceDataManager.__init__(self, host, port)
-        MarketDataServiceDataManager.__init__(self, host, market_data_int_port)
-        cpp_ws_url: str = f"ws://{host}:8083/"
+        StratManagerServiceDataManager.__init__(self, ps_beanie_host, ps_beanie_port)
+        MarketDataServiceDataManager.__init__(self, md_beanie_host, md_beanie_port)
+        cpp_ws_url: str = f"ws://{ps_beanie_host}:8083/"
         self.strat_cache_type: StratCache = StratCache()
         self.trading_cache: TradingCache = TradingCache()
 
@@ -55,7 +60,6 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
             err_str_ = "Received portfolio_status object from caller as None"
             logging.exception(err_str_)
 
-    @perf_benchmark
     def handle_pair_strat_ws(self, pair_strat_: PairStratBaseModel):
         key_leg_1, key_leg_2 = StratManagerServiceKeyHandler.get_key_from_pair_strat(pair_strat_)
         if is_ongoing_pair_strat(pair_strat_):
@@ -102,7 +106,6 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
                                 f"pair_strat: {pair_strat_}")
             # else not required - non-ongoing pair strat is not to exist in cache
 
-    @perf_benchmark
     def handle_strat_brief_ws(self, strat_brief_: StratBriefBaseModel):
         if strat_brief_.pair_buy_side_trading_brief and strat_brief_.pair_sell_side_trading_brief:
             key1, key2 = StratManagerServiceKeyHandler.get_key_from_strat_brief(strat_brief_)
@@ -154,7 +157,6 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
                           f"with key: {key}, fill journal symbol: {symbol}, fill_journal_key: "
                           f"{get_fills_journal_log_key(fills_journal_)}")
 
-    @perf_benchmark
     def handle_fills_journal_ws(self, fills_journal_: FillsJournalBaseModel):
         cached_pair_strat_none_cmnt = f"error: no ongoing pair strat matches this fill_journal_key: " \
                                       f"{get_fills_journal_log_key(fills_journal_)};;; fill_journal_: {fills_journal_}"
@@ -185,9 +187,9 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
             strat_cache.set_has_unack_leg2(is_unack)
         else:
             logging.error(f"unexpected: order general with non-matching symbol found in pre-matched strat-cache "
-                          f"with key: {order_journal_key}, order_journal_key: {get_order_journal_log_key(order_journal_)}")
+                          f"with key: {order_journal_key}, order_journal_key: "
+                          f"{get_order_journal_log_key(order_journal_)}")
 
-    @perf_benchmark
     def handle_order_journal_ws(self, order_journal_: OrderJournalBaseModel):
         key = StratManagerServiceKeyHandler.get_key_from_order_journal(order_journal_)
         cached_pair_strat_none_cmnt = f"error: no ongoing pair strat matches this order_journal_key: " \
@@ -197,7 +199,6 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
                                 f"order_journal: {order_journal_}"
         super().handle_order_journal_ws(order_journal_, cached_pair_strat_none_cmnt, strat_cache_none_cmnt)
 
-    @perf_benchmark
     def handle_cancel_order_ws(self, cancel_order_: CancelOrderBaseModel):
         key = StratManagerServiceKeyHandler.get_key_from_cancel_order(cancel_order_)
         strat_cache: StratCache = StratCache.get(key)
@@ -210,7 +211,6 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
                                 f"cancel_order: {cancel_order_}"
         super().handle_cancel_order_ws(cancel_order_, cached_pair_strat_none_cmnt, strat_cache_none_cmnt)
 
-    @perf_benchmark
     def handle_new_order_ws(self, new_order_: NewOrderBaseModel):
         key = StratManagerServiceKeyHandler.get_key_from_new_order(new_order_)
         strat_cache: StratCache = StratCache.get(key)
@@ -223,7 +223,6 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
                                 f";;;new_order_: {new_order_}, strat_cache: {strat_cache}"
         super().handle_new_order_ws(new_order_, cached_pair_strat_none_cmnt, strat_cache_none_cmnt)
 
-    @perf_benchmark
     def handle_symbol_overview_ws(self, symbol_overview_: SymbolOverviewBaseModel):
         if symbol_overview_.symbol in StratCache.fx_symbol_overview_dict:
             # fx_symbol_overview_dict is pre initialized with supported fx pair symbols and None objects
@@ -231,14 +230,12 @@ class TradingDataManager(StratManagerServiceDataManager, MarketDataServiceDataMa
             StratCache.notify_all()
         super().handle_symbol_overview_ws(symbol_overview_)
 
-    @perf_benchmark
     def handle_top_of_book_ws(self, top_of_book_: TopOfBookBaseModel):
         if top_of_book_.symbol in StratCache.fx_symbol_overview_dict:
             # if we need fx TOB: StratCache needs to collect reference here (like we do in symbol_overview)
             return  # No use-case for fx TOB at this time
         super().handle_top_of_book_ws(top_of_book_)
 
-    @perf_benchmark
     def handle_market_depth_ws(self, market_depth_: MarketDepthBaseModel):
         if market_depth_.symbol in StratCache.fx_symbol_overview_dict:
             # if we need fx Market Depth: StratCache needs to collect reference here (like we do in symbol_overview)

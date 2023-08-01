@@ -1,3 +1,5 @@
+from pendulum import DateTime
+
 # Market Depth cumulative average
 cum_px_qty_aggregate_query = {"aggregate": [
     {
@@ -136,7 +138,7 @@ def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
     ]}
 
 
-def get_top_of_book_from_symbol(symbol: str):
+def get_objs_from_symbol(symbol: str):
     return {"aggregate": [
         {
             "$match": {
@@ -144,6 +146,58 @@ def get_top_of_book_from_symbol(symbol: str):
             }
         }
     ]}
+
+
+def get_bar_data_from_symbol_n_start_n_end_datetime(symbol: str, start_datetime: DateTime | None = None,
+                                                    end_datetime: DateTime | None = None):
+    agg_pipline = {"aggregate": [
+        {
+            "$match": {
+                "symbol": symbol
+            }
+        },
+        {
+            "$match": {}
+        }
+    ]}
+
+    if start_datetime is not None and end_datetime is None:
+        agg_pipline["aggregate"][1]["$match"] = {
+            '$expr': {
+                '$gte': [
+                    '$datetime', start_datetime
+                ]
+            }
+        }
+    elif end_datetime is not None and start_datetime is None:
+        agg_pipline["aggregate"][1]["$match"] = {
+            '$expr': {
+                '$lte': [
+                    '$datetime', end_datetime
+                ]
+            }
+        }
+    elif start_datetime is not None and end_datetime is not None:
+        agg_pipline["aggregate"][1]["$match"] = {
+
+            "$and": [
+                {
+                    '$expr': {
+                        '$gte': [
+                            '$datetime', start_datetime
+                        ]
+                    }
+                },
+                {
+                    '$expr': {
+                        '$lte': [
+                            '$datetime', end_datetime
+                        ]
+                    }
+                }
+        ]}
+
+    return agg_pipline
 
 
 def get_symbol_overview_from_symbol(symbol: str):
@@ -176,6 +230,27 @@ def get_limited_objs(limit: int):
         return []
 
 
+def get_latest_bar_data_for_each_symbol():
+    return {"aggregate": [
+        {
+            '$group': {
+                '_id': '$symbol',
+                'doc': {
+                    '$max': {
+                        '_id': '$_id',
+                        'datetime': '$datetime',
+                        'symbol': '$symbol'
+                    }
+                }
+            }
+        }, {
+            '$replaceRoot': {
+                'newRoot': '$doc'
+            }
+        }
+    ]}
+
+
 # {
 #     "$merge": {
 #         "into": "MarketDepth",
@@ -190,3 +265,9 @@ def get_limited_objs(limit: int):
 #         "coll": "MarketDepth"
 #     }
 # }
+
+
+if __name__ == "__main__":
+    import pendulum
+
+    print(get_bar_data_from_symbol_n_start_n_end_datetime("1A0.SI", pendulum.parse("2020-11-13T16:00:00.000+00:00")))

@@ -3,10 +3,10 @@ import logging
 import os
 from typing import Tuple
 import time
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -138,7 +138,6 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         output_str = "from pydantic import Field, BaseModel, validator\n"
         output_str += "import pendulum\n"
         output_str += "from typing import Dict, List, ClassVar, Any\n"
-        output_str += "from threading import Lock, RLock\n"
         ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
                                                                    "ws_connection_manager")
         output_str += f"from {ws_connection_manager_path} import PathWSConnectionManager, " \
@@ -156,12 +155,13 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         output_str += f'from {incremental_id_base_model_path} import *\n'
         generic_utils_import_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_utils")
         output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime\n"
-        output_str += "from typing import List\n\n\n"
+        output_str += f"from FluxPythonUtils.scripts.async_rlock import AsyncRLock\n\n\n"
         return output_str
 
     def assign_required_data_members(self, file: protogen.File):
         super().assign_required_data_members(file)
-        self.model_file_name = f'{self.proto_file_name}_cache_model'
+        self.model_file_name = f'{self.proto_file_name}_beanie_model'
+        self.generic_routes_file_name = f'generic_cache_routes'
 
 
 if __name__ == "__main__":

@@ -1,0 +1,8 @@
+
+CXX=g++
+CXXFLAGS = -Wall -g
+
+INCLUDES = -I${CODE_GEN_ENGINE_HOME}/FluxCodeGenCore -I${CODE_GEN_ENGINE_HOME}/CodeGenEngine/include
+LFLAGS   =
+LIBS     = -lboost_serialization -lprotobuf -lprotoc -pthread ${CODE_GEN_ENGINE_HOME}/FluxCodeGenCore/FluxCodeGenCore.so
+

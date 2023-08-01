@@ -2,7 +2,7 @@
 import json
 import logging
 import os
-from typing import List, Callable, Dict, Tuple
+from typing import List, Callable, Dict, Tuple, Any
 import time
 import re
 
@@ -69,7 +69,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_msg_ui_get_all_limit
     ]
     # used to handle option fields having msg_n_field names in set value
-    flux_msg_widget_ui_data_fields_having_msg_n_fld_names_in_val = ["alert_bubble_source", "alert_bubble_color"]
+    flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val = ["alert_bubble_source", "alert_bubble_color", "bind_id_fld", "dynamic_widget_title_fld"]
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -96,7 +96,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
     def check_is_dependent_widget_field_name_snake_cased(self, field: protogen.Field) -> None:
         if field.message is not None:
-            if self.is_option_enabled(field, JsonSchemaConvertPlugin.flux_msg_widget_ui_data):
+            if self.is_option_enabled(field, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
                 if field.proto.name != convert_camel_case_to_specific_case(field.message.proto.name):
                     err_str = f"field {field.proto.name} is of dependent widget message type " \
                               f"{field.message.proto.name} but is not snake_case of dependent widget message," \
@@ -116,10 +116,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     self.__enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if self.is_option_enabled(field.message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data):
+                if self.is_option_enabled(field.message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
                     widget_ui_data_option_value_dict = \
                         self.get_complex_option_set_values(field.message,
-                                                           JsonSchemaConvertPlugin.flux_msg_widget_ui_data)
+                                                           JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
                     if "layout" in widget_ui_data_option_value_dict:
                         if field.message not in self.__json_layout_message_list:
                             self.__json_layout_message_list.append(field.message)
@@ -142,10 +142,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
     def __load_json_layout_and_non_layout_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data):
+            if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
                 widget_ui_data_option_value_dict = \
                     self.get_complex_option_set_values(message,
-                                                       JsonSchemaConvertPlugin.flux_msg_widget_ui_data)
+                                                       JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
                 if "layout" in widget_ui_data_option_value_dict:
                     if message not in self.__json_layout_message_list:
                         self.__json_layout_message_list.append(message)
@@ -272,6 +272,37 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 return '"' + ' '*len(value) + '"'
             return '"' + value.strip() + '"'
 
+    def _validate_if_msg_attrs_exist(self, msg_attr_str: str, option_name: str):
+        # cleaning msg_str containing full attribute path to be checked
+        if ":" in msg_attr_str:
+            msg_attr_str = msg_attr_str.split(":")[1]
+
+        message_list = self.__json_layout_message_list + self.__json_non_layout_message_list
+        msg_attr_dot_seperated_list = msg_attr_str.split(".")
+        for message in message_list:
+            if message.proto.name == msg_attr_dot_seperated_list[0]:
+                parent_attr = msg_attr_dot_seperated_list[0]
+                for attr in msg_attr_dot_seperated_list[1:]:
+                    for field in message.fields:
+                        if attr == field.proto.name:
+                            if attr != msg_attr_dot_seperated_list[-1]:
+                                message = field.message
+                            parent_attr = attr
+                            break
+                    else:
+                        err_str = f"Couldn't find attribute/field: {attr} in parent_attribute {parent_attr} of " \
+                                  f"type message: {message.proto.name}, while validating given fields " \
+                                  f"existence in message in {option_name} option"
+                        logging.exception(err_str)
+                        raise Exception(err_str)
+                else:
+                    break
+        else:
+            err_str = f"Couldn't find any message with name: {msg_attr_dot_seperated_list[0]}, while validating " \
+                      f"if all attributes exists mentioned in {option_name} options"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
     def __underlying_handle_options_value_having_msg_fld_name(self, option_val: str) -> str:
         temp_list = []
         option_value_dot_separated = option_val.split(".")
@@ -304,7 +335,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         temp_str = ".".join(temp_list)
         return temp_str
 
-    def __handle_options_value_case_having_msg_fld_name(self, option_value: str):
+    def __handle_options_value_case_having_msg_fld_name(self, option_value: str, option_name: str):
+        """
+        Converting all message names and field names to specific case style
+        """
         # checking if option_value is not float type and is relevant to be used here
         if type(option_value).__name__ == "str" and \
                 (("-" in option_value or "." in option_value) and any(char.isalpha() for char in option_value)):
@@ -317,11 +351,17 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     option_val_hyphen_separated = option_val.split('-')
                     temp_list_2 = []
                     for option_val in option_val_hyphen_separated:
+                        # Validating if attribute path that is dot seperated valid or not
+                        self._validate_if_msg_attrs_exist(option_val, option_name)
+
                         temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val)
                         temp_list_2.append(temp_str)
                     temp_str_dollar_joined = "-".join(temp_list_2)
                     temp_list_1.append(temp_str_dollar_joined)
                 else:
+                    # Validating if attribute path that is dot seperated valid or not
+                    self._validate_if_msg_attrs_exist(option_val, option_name)
+
                     temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val)
                     temp_list_1.append(temp_str)
             return '"' + "^".join(temp_list_1) + '"'
@@ -378,7 +418,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 # else not required: Avoiding if value is not of string type
 
                 if option in JsonSchemaConvertPlugin.options_having_msg_fld_names:
-                    option_value = self.__handle_options_value_case_having_msg_fld_name(option_value)
+                    option_value = self.__handle_options_value_case_having_msg_fld_name(option_value, option)
                 # else not required: if option is not in options_having_msg_fld_names then avoid
 
                 # converting flux_option into json attribute name
@@ -389,6 +429,15 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                 f'"{flux_prefix_removed_option_name_case_styled}": {option_value},\n'
 
         return json_msg_str
+
+    def _get_complex_field_value(self, value: str | bool | Dict):
+        if isinstance(value, str):
+            # stripping extra '"' in value
+            value = self.__parse_string_to_original_types(value)
+        elif isinstance(value, bool):
+            value = "true" if value else "false"
+        # else not required: Avoiding if value is not of string or bool type as other types can be
+        # used as usual
 
     def __handle_complex_proto_option_attributes(self, options_list: List[str],
                                                  field_or_message_obj: protogen.Field | protogen.Message,
@@ -402,28 +451,32 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
                 flux_prefix_removed_option_name_case_styled = \
                     self.__case_style_convert_method(flux_prefix_removed_option_name)
-                json_msg_str += ' ' * init_space_count + \
-                                f'"{flux_prefix_removed_option_name_case_styled}": ' + '{\n'
-                for key, value in option_value_dict.items():
-                    if isinstance(value, str):
-                        # stripping extra '"' in value
-                        value = self.__parse_string_to_original_types(value)
-                    elif isinstance(value, bool):
-                        value = "true" if value else "false"
-                    # else not required: Avoiding if value is not of string or bool type as other types can be
-                    # used as usual
 
-                    if option == JsonSchemaConvertPlugin.flux_fld_button and '"' not in value:
-                        value = f'"{value}"'
-                    # else not required: if option is not flux_fld_button then avoid as only this option
-                    # has dependency to keep every option field as str
-                    json_msg_str += ' ' * (init_space_count + 2) + \
-                                    f'"{key}": {value}'
-                    if key != list(option_value_dict)[-1]:
-                        json_msg_str += ',\n'
-                    else:
-                        json_msg_str += '\n'
-                json_msg_str += ' ' * init_space_count + '},\n'
+                json_msg_str += self._get_json_complex_key_value_str(flux_prefix_removed_option_name_case_styled,
+                                                                     option_value_dict, int(init_space_count/2))
+
+                if option == JsonSchemaConvertPlugin.flux_fld_button:
+                    json_msg_str_splited_list = json_msg_str.split("\n")
+                    for index, line in enumerate(json_msg_str_splited_list):
+                        if ':' in line and "{" not in line and "[" not in line:
+                            if '"' not in line[line.index(":")+1:]:
+                                # option_value_dict[k] = f"{v}"
+                                key_str: str
+                                val_str: str
+                                key_str, val_str = line.split(":")
+
+                                if val_str.endswith(","):
+                                    val_str = f' "{val_str[:-1].strip()}",'
+                                else:
+                                    val_str = f' "{val_str.strip()}"'
+
+                                json_msg_str_splited_list[index] = f"{key_str}:{val_str}"
+                    json_msg_str = "\n".join(json_msg_str_splited_list)
+                # else not required: if option is not flux_fld_button then avoid as only this option
+                # has dependency to keep every option field as str, more specifically it has some fields
+                # which needs to have value 'true' or 'false' as string form but since in plugin handling
+                # if andy field is found having value as string form of bool then it is type-cast to
+                # json bool, to avoid this explicitly value is turned into str bool
 
         return json_msg_str
 
@@ -571,35 +624,124 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         json_msg_str += self.__underlying_json_output_handler(message, indent_space_count)
         return json_msg_str
 
+    def _get_json_formatted_value_str_for_list_n_dict(self, option_value: List | Dict, indent_count: int,
+                                                      add_brackets: bool | None = None,
+                                                      add_dict_key: str | None = None) -> str:
+        output_str = ""
+        if isinstance(option_value, list):
+            if add_brackets:
+                output_str += " " * (indent_count * 2) + "[\n"
+                indent_count += 1
+            for value in option_value:
+                if isinstance(value, list) or isinstance(value, dict):
+                    output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count,
+                                                                                     True)
+                elif isinstance(value, str):
+                    output_str += " " * (indent_count*2) + self.__parse_string_to_original_types(value)
+                elif isinstance(value, bool):
+                    output_str += " " * (indent_count*2) + "true" if value else "false"
+                else:
+                    output_str += " " * (indent_count*2) + value
+
+                if value != option_value[-1]:
+                    output_str += ",\n"
+                else:
+                    output_str += "\n"
+
+            if add_brackets:
+                indent_count -= 1
+                output_str += " " * (indent_count * 2) + "]"
+
+            return output_str
+        elif isinstance(option_value, dict):
+            if add_brackets:
+                output_str += " " * (indent_count * 2) + "{\n"
+                indent_count += 1
+            if add_dict_key:
+                output_str += " " * (indent_count * 2) + f'"{add_dict_key}": ' + "{\n"
+                indent_count += 1
+
+            for key, value in option_value.items():
+                if isinstance(value, list):
+                    output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count,
+                                                                                     True)
+                elif isinstance(value, dict):
+                    output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count,
+                                                                                     add_dict_key=key)
+                elif isinstance(value, str):
+                    output_str += " " * (indent_count*2) + f'"{key}": {self.__parse_string_to_original_types(value)}'
+                elif isinstance(value, bool):
+                    output_str += " " * (indent_count*2) + f'"{key}": {"true" if value else "false"}'
+                else:
+                    output_str += " " * (indent_count*2) + f'"{key}": {value}'
+
+                if key != list(option_value.keys())[-1]:
+                    output_str += ",\n"
+                else:
+                    output_str += "\n"
+
+            if add_brackets or add_dict_key:
+                indent_count -= 1
+                output_str += " " * (indent_count * 2) + "}"
+
+            return output_str
+        else:
+            err_str = f"Unexpected option_value type: {type(option_value)}, expected dict or list"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
+    def _get_json_complex_key_value_str(self, option_name: str, option_value_dict: Dict,
+                                        indent_count: int | None = None) -> str:
+        if indent_count is None:
+            indent_count = 0
+        output_str = " " * (indent_count*2) + f'"{option_name}": ' + "{\n"
+        indent_count += 1
+        for key, value in option_value_dict.items():
+            if isinstance(value, list):
+                output_str += " " * (indent_count*2) + f'"{key}": [\n'
+                indent_count += 1
+                output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count)
+                indent_count -= 1
+                output_str += " " * (indent_count*2) + f']'
+            elif isinstance(value, dict):
+                output_str += " " * (indent_count * 2) + f'"{key}": ' + '{\n'
+                indent_count += 1
+                output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count)
+                indent_count -= 1
+                output_str += " " * (indent_count * 2) + '}'
+            elif isinstance(value, str):
+                output_str += " " * (indent_count * 2) + f'"{key}": {self.__parse_string_to_original_types(value)}'
+            elif isinstance(value, bool):
+                output_str += " " * (indent_count * 2) + f'"{key}": {"true" if value else "false"}'
+            else:
+                output_str += " " * (indent_count * 2) + f'"{key}": {value}'
+
+            if key != list(option_value_dict.keys())[-1]:
+                output_str += ",\n"
+            else:
+                indent_count -= 1
+                output_str += "\n"
+                output_str += " " * (indent_count*2) + "},\n"
+        return output_str
+
     def __handle_widget_ui_data_option_output(self, message: protogen.Message) -> str:
         widget_ui_data_prefix_stripped = \
-            JsonSchemaConvertPlugin.flux_msg_widget_ui_data.lstrip(JsonSchemaConvertPlugin.msg_options_standard_prefix)
-        json_msg_str = f'    "{self.__case_style_convert_method(widget_ui_data_prefix_stripped)}": '+'{\n'
+            JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element.lstrip(JsonSchemaConvertPlugin.msg_options_standard_prefix)
         widget_ui_data_option_value_dict = \
             self.get_complex_option_set_values(message,
-                                               JsonSchemaConvertPlugin.flux_msg_widget_ui_data)
-        if 'i' in widget_ui_data_option_value_dict:
-            json_msg_str += f'        "i": {widget_ui_data_option_value_dict["i"]},\n'
-        else:
-            json_msg_str += f'        "i": "{self.__case_style_convert_method(message.proto.name)}",\n'
+                                               JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
 
-        for option_fld in widget_ui_data_option_value_dict:
-            if option_fld not in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_fields_having_msg_n_fld_names_in_val:
-                if isinstance(widget_ui_data_option_value_dict[option_fld], bool):
-                    json_msg_str += f'        "{option_fld}": ' \
-                                    f'{"true" if widget_ui_data_option_value_dict[option_fld] else "false"}'
-                else:
-                    json_msg_str += f'        "{option_fld}": ' \
-                                    f'{self.__parse_string_to_original_types(widget_ui_data_option_value_dict[option_fld].strip())}'
-            else:
-                # handling option field value having msg name
-                json_msg_str += f'        "{option_fld}": ' \
-                                f'"{self.__underlying_handle_options_value_having_msg_fld_name(widget_ui_data_option_value_dict[option_fld])}"'
-            if option_fld != list(widget_ui_data_option_value_dict)[-1]:
-                json_msg_str += ", \n"
-            else:
-                json_msg_str += "\n    },\n"
-                break
+        widget_ui_data_key = self.__case_style_convert_method(widget_ui_data_prefix_stripped)
+
+        if "i" not in widget_ui_data_option_value_dict:
+            widget_ui_data_option_value_dict["i"] = f"{self.__case_style_convert_method(message.proto.name)}"
+        for option_fld in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val:
+            if option_fld in widget_ui_data_option_value_dict:
+                widget_ui_data_option_value_dict[option_fld] = \
+                    f"{self.__underlying_handle_options_value_having_msg_fld_name(widget_ui_data_option_value_dict[option_fld])}"
+
+        json_msg_str = self._get_json_complex_key_value_str(widget_ui_data_key, widget_ui_data_option_value_dict,
+                                                            2)
         return json_msg_str
 
     def __handle_json_layout_message_schema(self, message: protogen.Message) -> str:

@@ -1,2 +1,6 @@
 driver:
   chrome: "path-to/chromedriver.exe"
+mongo_server_uri: "mongodb://localhost:27017"
+ps_db_name: "addressbook"
+md_db_name: "market_data"
+web_project_url: "http://localhost:3020"

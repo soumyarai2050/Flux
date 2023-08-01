@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import os
 import time
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen

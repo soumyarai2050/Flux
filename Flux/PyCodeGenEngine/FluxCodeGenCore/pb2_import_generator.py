@@ -17,11 +17,11 @@ class Pb2ImportGenerator(BaseProtoPlugin):
 
     def output_file_generate_handler(self, file: protogen.File):
         proto_file_name = str(file.proto.name).split('/')[-1].split(".")[0]
-        if (py_code_gen_core_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None:
+        if (py_code_gen_core_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None and len(py_code_gen_core_path):
             template_file_path = os.path.join(py_code_gen_core_path, Pb2ImportGenerator.insertion_import_file_name)
             output_file_name = Pb2ImportGenerator.insertion_import_file_name
         else:
-            err_str = f"Env var 'PY_CODE_GEN_CORE_PATH' received as None"
+            err_str = f"Env var 'PY_CODE_GEN_CORE_PATH' received as {py_code_gen_core_path}"
             logging.exception(err_str)
             raise Exception(err_str)
 

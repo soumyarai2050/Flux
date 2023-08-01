@@ -23,12 +23,14 @@ message StratLeg{
 // Widget-2
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
 message PairStratParams{
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 12,
     w: 4,
     h: 19,
-    layout: UI_TREE
+    widget_ui_data: {
+      view_layout: UI_TREE
+    }
   };
 
   // server provided via security auto complete list (if available)
@@ -42,14 +44,16 @@ message PairStratParams{
 
 // Widget - 3
 message StratStatus{
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 4,
     y: 23,
     w: 7,
     h: 8,
-    layout: UI_TABLE,
     alert_bubble_source: "PairStrat.strat_status.strat_alerts",
-    alert_bubble_color: "PairStrat.strat_status.strat_alerts.severity"
+    alert_bubble_color: "PairStrat.strat_status.strat_alerts.severity",
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
 
   // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
@@ -94,13 +98,14 @@ message StratStatus{
 
   // these are specific to CB-EQT strat - move to derived later
   optional float average_premium = 26 [(FluxFldNumberFormat) = "%"];
-  optional Residual residual = 27;
-  optional float balance_notional = 28 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="PairStrat.strat_limits.max_cb_notional", (FluxFldProgressBar) = {
+  optional float market_premium = 27 [(FluxFldNumberFormat) = "%"];
+  optional Residual residual = 28;
+  optional float balance_notional = 29 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="PairStrat.strat_limits.max_cb_notional", (FluxFldProgressBar) = {
     value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // order of condition matching -> left to right (select first match)
     hover_text_type: HoverTextType_VALUE,
     is_reverse: true
   }];
-  repeated Alert strat_alerts = 29;
+  repeated Alert strat_alerts = 30;
 }
 
 // Widget - 4
@@ -112,13 +117,15 @@ message OrderJournal{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_FilterAggregate
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 39,
     w: 6,
     h: 7,
-    layout: UI_TABLE,
-    is_repeated: True
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_last_n_sec_orders_by_event",
@@ -161,16 +168,17 @@ message OrderSnapshot{
     UpdateDesc: AggregateType_FilterAggregate,
     PatchDesc: AggregateType_FilterAggregate,
     DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate,
-    SetReentrantLockToTop: true,
+    ReadWebSocketDesc: AggregateType_FilterAggregate
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 6,
     y: 39,
     w: 5,
     h: 7,
-    layout: UI_TABLE,
-    is_repeated: True
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "trigger_residual_check",
@@ -237,13 +245,15 @@ message SymbolSideSnapshot{
   option (FluxMsgExecutorOptions) = {
     LogKeySequence: "id"
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 8,
     y: 31,
     w: 10,
     h: 8,
-    layout: UI_TABLE,
-    is_repeated: True
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required Security security = 2;
@@ -271,13 +281,15 @@ message FillsJournal{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_FilterAggregate
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 11,
     y: 39,
     w: 7,
     h: 7,
-    layout: UI_TABLE,
-    is_repeated: True
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
@@ -319,12 +331,14 @@ message FillsJournal{
 
 //Widget - 6
 message StratLimits{
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 7,
     y: 0,
     w: 11,
     h: 12,
-    layout: UI_TABLE
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
 
   optional int32 max_open_orders_per_side = 1 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open orders allowed per side for this strat"];
@@ -345,18 +359,24 @@ message StratLimits{
 message OrderLimits{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
+    CreateAllDesc: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
     ReadDesc: AggregateType_UNSPECIFIED,
     UpdateDesc: AggregateType_UNSPECIFIED,
+    UpdateAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
     PatchDesc: AggregateType_UNSPECIFIED,
+    PatchAllDesc: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 4,
     y: 12,
     w: 3,
     h: 11,
-    layout: UI_TABLE
+    widget_ui_data: {
+      view_layout: UI_TABLE,
+      edit_layout: UI_TREE
+    }
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -378,18 +398,22 @@ message OrderLimits{
 message PortfolioLimits{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
+    CreateAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
     ReadDesc: AggregateType_UNSPECIFIED,
     UpdateDesc: AggregateType_UNSPECIFIED,
     PatchDesc: AggregateType_UNSPECIFIED,
+    PatchAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 7,
     y: 12,
     w: 11,
     h: 11,
-    layout: UI_TABLE
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -417,14 +441,16 @@ message PortfolioStatus{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_FilterAggregate
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 11,
     y: 23,
     w: 7,
     h: 8,
-    layout: UI_TABLE,
     alert_bubble_source: "PortfolioStatus.portfolio_alerts",
-    alert_bubble_color: "PortfolioStatus.portfolio_alerts.severity"
+    alert_bubble_color: "PortfolioStatus.portfolio_alerts.severity",
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
   option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_portfolio_alerts_obj", agg_params: ["-100"]};
@@ -464,8 +490,7 @@ message PairStrat{
     UpdateDesc: AggregateType_FilterAggregate,
     PatchDesc: AggregateType_FilterAggregate,
     DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate,
-    SetReentrantLockToTop: true,
+    ReadWebSocketDesc: AggregateType_FilterAggregate
   };
     option (FluxMsgJsonQuery) = {
       QueryName: "get_pair_strat_sec_filter_json",
@@ -530,18 +555,20 @@ message StratCollection{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 0,
     w: 7,
     h: 12,
-    layout: UI_ABBREVIATED_FILTER
+    widget_ui_data: {
+      view_layout: UI_ABBREVIATED_FILTER
+    }
   };
 
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
-  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id^Strat State:PairStrat.strat_status.strat_state^Strat Notional:PairStrat.strat_status.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium", (FluxFldAlertBubbleSource) = "PairStrat.strat_status.strat_alerts", (FluxFldAlertBubbleColor) = "PairStrat.strat_status.strat_alerts.severity"];
+  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_status.strat_state^Strat Notional:PairStrat.strat_status.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:PairStrat.strat_status.average_premium^Mkt Premium:PairStrat.strat_status.market_premium", (FluxFldAlertBubbleSource) = "PairStrat.strat_status.strat_alerts", (FluxFldAlertBubbleColor) = "PairStrat.strat_status.strat_alerts.severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
   repeated string buffered_strat_keys = 3;
@@ -560,7 +587,7 @@ message UILayout{
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     required string profile_id = 2 [(FluxFldIndex) = true];
-    repeated WidgetUIData widget_ui_data = 3;
+    repeated WidgetUIDataElement widget_ui_data_elements = 3;
     optional Theme theme = 4;
 }
 
@@ -573,13 +600,15 @@ message StratBrief{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgWidgetUIData) = {
+  option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 31,
     w: 8,
     h: 8,
-    layout: UI_TABLE,
-    is_repeated: true
+    is_repeated: true,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_strat_brief_from_symbol",
@@ -776,6 +805,53 @@ message ExecutorCheckSnapshot{
   optional int32 rolling_new_order_count = 3;
 }
 
+message CommandNControl {
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required CommandType command_type = 2;
+  optional string datetime = 3 [(FluxFldValIsDateTime) = true];
+}
+
+message RawPerformanceData{
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    CreateAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    PatchAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 32,
+    w: 8,
+    h: 8,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string callable_name = 2;
+  required string call_date_time = 3 [(FluxFldValIsDateTime) = true];
+  required float start_time_it_val = 4;
+  required float end_time_it_val = 5;
+  required float delta = 6;
+}
+
+message RawPerformanceDataOfCallable{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_raw_performance_data_of_callable",
+      QueryParams: "callable_name",
+      QueryParamsDataType: "str"
+  };
+  repeated RawPerformanceData raw_performance_data = 1;
+}
 
 // Link impl Example models
 

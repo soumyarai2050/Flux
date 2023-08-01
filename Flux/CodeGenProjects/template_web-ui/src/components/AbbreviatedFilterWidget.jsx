@@ -7,7 +7,7 @@ import { Icon } from './Icon';
 import _, { cloneDeep } from 'lodash';
 import { DB_ID, Modes, DataTypes, ColorTypes, Layouts } from '../constants';
 import {
-    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId, applyFilter
+    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId, applyFilter, getCommonKeyCollections, getTableColumns
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { AlertErrorMessage } from './Alert';
@@ -32,6 +32,7 @@ function AbbreviatedFilterWidget(props) {
     const [showSettings, setShowSettings] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const [headCells, setHeadCells] = useState([]);
+    const [commonKeys, setCommonKeys] = useState([]);
 
     const items = useMemo(() => {
         return props.items.filter(item => {
@@ -111,8 +112,14 @@ function AbbreviatedFilterWidget(props) {
     }, [worker])
 
     useEffect(() => {
-        setHeadCells(collections);
-    }, [])
+        const tableColumns = getTableColumns(collections, Modes.READ_MODE, props.enableOverride, props.disableOverride);
+        setHeadCells(tableColumns);
+    }, [props.enableOverride, props.disableOverride])
+
+    useEffect(() => {
+        const commonKeyCollections = getCommonKeyCollections(activeRows, headCells, false, true);
+        setCommonKeys(commonKeyCollections);
+    }, [activeRows, headCells])
 
     useEffect(() => {
         let activeItems = activeRows.map(row => getAbbreviatedKeyFromId(items, props.abbreviated, row['data-id']));
@@ -141,6 +148,7 @@ function AbbreviatedFilterWidget(props) {
     }
 
     const handleRequestSort = (event, property) => {
+        props.onRefreshItems();
         const isAsc = orderBy === property && order === 'asc';
         setOrder(isAsc ? 'desc' : 'asc');
         setOrderBy(property);
@@ -188,6 +196,31 @@ function AbbreviatedFilterWidget(props) {
         }
         let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: hide } : cell)
         setHeadCells(updatedHeadCells);
+        let collection = collections.filter(c => c.tableTitle === key)[0];
+        let enableOverride = cloneDeep(props.enableOverride);
+        let disableOverride = cloneDeep(props.disableOverride);
+        if (hide) {
+            if (collection.hide !== hide) {
+                if (!enableOverride.includes(key)) {
+                    enableOverride.push(key);
+                }
+            }
+            let index = disableOverride.indexOf(key);
+            if (index !== -1) {
+                disableOverride.splice(index, 1);
+            }
+        } else {
+            if (collection.hide !== undefined && collection.hide !== hide) {
+                if (!disableOverride.includes(key)) {
+                    disableOverride.push(key);
+                }
+            }
+            let index = enableOverride.indexOf(key);
+            if (index !== -1) {
+                enableOverride.splice(index, 1);
+            }
+        }
+        props.onOverrideChange(enableOverride, disableOverride);
     }
 
     const onSelectAll = (e) => {
@@ -206,6 +239,8 @@ function AbbreviatedFilterWidget(props) {
         setSelectAll(e.target.checked);
         setHeadCells(updatedHeadCells);
     }
+
+    const filteredHeadCells = headCells.filter(cell => commonKeys.filter(c => c.key === cell.key && c.tableTitle === cell.tableTitle).length === 0);
 
     let menu = (
         <>
@@ -274,6 +309,7 @@ function AbbreviatedFilterWidget(props) {
             onChangeMode={props.headerProps.onChangeMode}
             onSave={props.headerProps.onSave}
             onReload={props.headerProps.onReload}
+            commonkeys={commonKeys}
             layout={props.headerProps.layout}
             supportedLayouts={props.headerProps.supportedLayouts}
             onChangeLayout={props.headerProps.onChangeLayout}>
@@ -312,7 +348,7 @@ function AbbreviatedFilterWidget(props) {
                                     <TableHead
                                         prefixCells={1}
                                         suffixCells={bufferCollection.hide ? 0 : 1}
-                                        headCells={headCells}
+                                        headCells={filteredHeadCells}
                                         mode={Modes.READ_MODE}
                                         order={order}
                                         orderBy={orderBy}
@@ -346,7 +382,7 @@ function AbbreviatedFilterWidget(props) {
                                                             <TableCell className={classes.cell} sx={{ width: 10 }}>
                                                                 {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
                                                             </TableCell>
-                                                            {headCells.map((cell, i) => {
+                                                            {filteredHeadCells.map((cell, i) => {
 
                                                                 if (cell.hide) return;
                                                                 let mode = Modes.READ_MODE;
@@ -394,6 +430,8 @@ function AbbreviatedFilterWidget(props) {
                                                                         onSelectItemChange={() => { }}
                                                                         onAutocompleteOptionChange={() => { }}
                                                                         onDateTimeChange={() => { }}
+                                                                        forceUpdate={collection.type === DataTypes.STRING ? new Boolean(true) : false}
+                                                                        truncateDateTime={props.truncateDateTime}
                                                                     />
                                                                 )
                                                             })}

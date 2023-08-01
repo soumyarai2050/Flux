@@ -4,14 +4,17 @@ import sys
 import threading
 import time
 import copy
-from typing import Tuple
+from typing import Tuple, Final
 import re
 import pexpect
 from pathlib import PurePath
 from fastapi.encoders import jsonable_encoder
+from csv import writer
 
+# project imports
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import *
+from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import TopOfBookBaseModel, \
+    QuoteOptional, LastTradeBaseModel, MarketDepthBaseModel, SymbolOverviewBaseModel, TickTypeEnum
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import \
@@ -19,29 +22,54 @@ from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
-from FluxPythonUtils.scripts.utility_functions import clean_mongo_collections
-from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations, update_yaml_configurations
+from FluxPythonUtils.scripts.utility_functions import clean_mongo_collections, YAMLConfigurationManager, parse_to_int, \
+    get_native_host_n_port_from_config_dict
 
-strat_manager_service_web_client: StratManagerServiceWebClient = StratManagerServiceWebClient()
-market_data_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient()
+
+code_gen_projects_dir_path = PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects"
+
+PAIR_STRAT_ENGINE_DIR = code_gen_projects_dir_path / "addressbook"
+ps_config_yaml_path: PurePath = PAIR_STRAT_ENGINE_DIR / "data" / "config.yaml"
+ps_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ps_config_yaml_path))
+
+MARKET_DATA_DIR = code_gen_projects_dir_path / "market_data"
+md_config_yaml_path = MARKET_DATA_DIR / "data" / "config.yaml"
+md_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(md_config_yaml_path))
+
+HOST: Final[str] = "127.0.0.1"
+PAIR_STRAT_CACHE_PORT: Final[str] = ps_config_yaml_dict.get("cache_port")
+PAIR_STRAT_BEANIE_PORT: Final[str] = ps_config_yaml_dict.get("beanie_port")
+MARKET_DATA_BEANIE_PORT: Final[str] = md_config_yaml_dict.get("beanie_port")
+os.environ["HOST"] = HOST
+os.environ["PAIR_STRAT_BEANIE_PORT"] = PAIR_STRAT_BEANIE_PORT
+os.environ["MARKET_DATA_BEANIE_PORT"] = MARKET_DATA_BEANIE_PORT
+
+host, port = get_native_host_n_port_from_config_dict(ps_config_yaml_dict)
+strat_manager_service_native_web_client: StratManagerServiceWebClient = \
+    StratManagerServiceWebClient(host=host, port=parse_to_int(port))
+market_data_web_client: MarketDataServiceWebClient = \
+    MarketDataServiceWebClient(host=HOST, port=int(MARKET_DATA_BEANIE_PORT))
+
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
 project_dir_path = \
     PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects" / "addressbook"
 project_app_dir_path = project_dir_path / "app"
 test_project_dir_path = PurePath(__file__).parent.parent / 'data'
 test_config_file_path: PurePath = test_project_dir_path / "config.yaml"
+static_data_dir: PurePath = project_dir_path / "data"
 
 
 def clean_all_collections_ignoring_ui_layout(ps_db_name: str, md_db_name: str) -> None:
-    clean_mongo_collections(mongo_server_uri="mongodb://localhost:27017", database_name=ps_db_name,
+    mongo_server_uri: str = get_mongo_server_uri()
+    clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=ps_db_name,
                             ignore_collections=["UILayout"])
-    clean_mongo_collections(mongo_server_uri="mongodb://localhost:27017", database_name=md_db_name,
+    clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=md_db_name,
                             ignore_collections=["UILayout"])
 
 
 def get_ps_n_md_db_names(test_config_file_path: str | PurePath):
     if os.path.isfile(str(test_config_file_path)):
-        test_config = load_yaml_configurations(str(test_config_file_path))
+        test_config = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
         ps_db_name = \
             fetched_ps_db_name if (fetched_ps_db_name := test_config.get(
                 "ps_db_name")) is not None else "addressbook"
@@ -58,23 +86,23 @@ def clean_slate_post_test():
     clean_all_collections_ignoring_ui_layout(ps_db_name, md_db_name)
 
 
-def run_log_analyzer(executor_n_log_anaylzer: 'ExecutorNLogAnalyzerManager'):
+def run_pair_strat_log_analyzer(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
     log_analyzer = pexpect.spawn("python addressbook_log_analyzer.py &",
                                  cwd=project_app_dir_path)
     log_analyzer.timeout = None
     log_analyzer.logfile = sys.stdout.buffer
-    executor_n_log_anaylzer.log_analyzer_pid = log_analyzer.pid
-    print(f"LA PID: {log_analyzer.pid}")
+    executor_n_log_analyzer.pair_strat_log_analyzer_pid = log_analyzer.pid
+    print(f"pair_strat_log_analyzer PID: {log_analyzer.pid}")
     log_analyzer.expect("CRITICAL: log analyzer running in simulation mode...")
     log_analyzer.interact()
 
 
-def run_executor(executor_n_log_anaylzer: 'ExecutorNLogAnalyzerManager'):
+def run_executor(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
     executor = pexpect.spawn("python strat_executor.py &", cwd=project_app_dir_path)
     executor.timeout = None
     executor.logfile = sys.stdout.buffer
-    executor_n_log_anaylzer.executor_pid = executor.pid
-    print(f"Ex PID: {executor.pid}")
+    executor_n_log_analyzer.executor_pid = executor.pid
+    print(f"executor PID: {executor.pid}")
     executor.expect(pexpect.EOF)
     executor.interact()
 
@@ -100,31 +128,38 @@ class ExecutorNLogAnalyzerManager:
     """
 
     def __init__(self):
+        # p_id(s) are getting populated by their respective thread target functions
         self.executor_pid = None
-        self.log_analyzer_pid = None
+        self.pair_strat_log_analyzer_pid = None
 
     def __enter__(self):
-        from Flux.CodeGenProjects.addressbook.app.trading_link_base import config_file_path
-        config_dict = load_yaml_configurations(str(config_file_path))
         executor_thread = threading.Thread(target=run_executor, args=(self,))
-        log_analyzer_thread = threading.Thread(target=run_log_analyzer, args=(self,))
+        pair_strat_log_analyzer_thread = threading.Thread(target=run_pair_strat_log_analyzer, args=(self,))
         executor_thread.start()
-        log_analyzer_thread.start()
+        pair_strat_log_analyzer_thread.start()
 
         # delay for log_analyzer and executor to get started
         time.sleep(20)
         return self
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        assert kill_process(self.executor_pid), f"Something went wrong while killing trade_executor process, " \
-                                                f"pid: {self.executor_pid}"
-        assert kill_process(self.log_analyzer_pid), f"Something went wrong while killing log_analyzer process, " \
-                                                    f"pid: {self.executor_pid}"
+        assert kill_process(self.executor_pid), \
+            f"Something went wrong while killing trade_executor process, pid: {self.executor_pid}"
+        assert kill_process(self.pair_strat_log_analyzer_pid), \
+            f"Something went wrong while killing pair_strat_log_analyzer process, " \
+            f"pid: {self.pair_strat_log_analyzer_pid}"
 
-        clean_env_var = os.environ.get("DISABLE_CLEAN_SLATE")
-        if clean_env_var is None or int(clean_env_var) != 1:
+        # Env var based post test cleaning
+        clean_env_var = os.environ.get("ENABLE_CLEAN_SLATE")
+        if clean_env_var is not None and len(clean_env_var) and parse_to_int(clean_env_var) == 1:
             # cleaning db
             clean_slate_post_test()
+
+        # Env var based delay in test
+        post_test_delay = os.environ.get("POST_TEST_DELAY")
+        if post_test_delay is not None and len(post_test_delay):
+            # cleaning db
+            time.sleep(parse_to_int(post_test_delay))
 
 
 def get_continuous_order_configs(symbol: str) -> Tuple[int | None, int | None]:
@@ -150,12 +185,12 @@ def position_fixture():
     return position
 
 
-def sec_position_fixture(sec_id: str):
+def sec_position_fixture(sec_id: str, sec_type: SecurityType):
     sec_position_json = {
         "_id": SecPosition.next_id(),
         "security": {
             "sec_id": sec_id,
-            "sec_type": "SEC_TYPE_UNSPECIFIED"
+            "sec_type": sec_type
         },
         "positions": [
             position_fixture(),
@@ -167,8 +202,8 @@ def sec_position_fixture(sec_id: str):
 
 
 def broker_fixture():
-    sec_position_1 = sec_position_fixture("CB_Sec_1")
-    sec_position_2 = sec_position_fixture("EQT_Sec_1")
+    sec_position_1 = sec_position_fixture("CB_Sec_1", SecurityType.SEDOL)
+    sec_position_2 = sec_position_fixture("EQT_Sec_1.SS", SecurityType.RIC)
 
     broker_json = {
         "bkr_disable": False,
@@ -315,7 +350,7 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
     Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after order is triggered
     """
-    order_journal_obj_list = strat_manager_service_web_client.get_all_order_journal_client()
+    order_journal_obj_list = strat_manager_service_native_web_client.get_all_order_journal_client()
     assert buy_placed_order_journal in order_journal_obj_list, f"Couldn't find {buy_placed_order_journal} in " \
                                                                f"{order_journal_obj_list}"
 
@@ -333,7 +368,7 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
     expected_order_snapshot_obj.create_date_time = buy_placed_order_journal.order_event_date_time
     expected_order_snapshot_obj.order_brief.text.extend(buy_placed_order_journal.order.text)
 
-    order_snapshot_list = strat_manager_service_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = strat_manager_service_native_web_client.get_all_order_snapshot_client()
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -364,7 +399,7 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
         expected_symbol_side_snapshot.avg_cxled_px = (single_buy_unfilled_qty * single_buy_order_px * (
                     loop_count - 1)) / (single_buy_unfilled_qty * (loop_count - 1))
 
-    symbol_side_snapshot_list = strat_manager_service_web_client.get_all_symbol_side_snapshot_client()
+    symbol_side_snapshot_list = strat_manager_service_native_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
     for symbol_side_snapshot in symbol_side_snapshot_list:
         symbol_side_snapshot.id = None
@@ -377,20 +412,24 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
                                         buy_placed_order_journal.order_event_date_time)
 
     print(f"@@@ fetching strat_brief for symbol: {symbol} at {DateTime.utcnow()}")
-    strat_brief_list = strat_manager_service_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    strat_brief_list = strat_manager_service_native_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
         strat_brief.id = None
         strat_brief.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
         strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
+        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
         # Since sell side of strat_brief is not updated till sell cycle
         strat_brief.pair_sell_side_trading_brief = expected_strat_brief_obj.pair_sell_side_trading_brief
+
+    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find expected strat_brief {expected_strat_brief_obj} in " \
                                                          f"list {strat_brief_list} at {DateTime.utcnow()}"
 
     # Checking pair_strat
     expected_pair_strat.last_active_date_time = None
     expected_pair_strat.frequency = None
+    expected_strat_limits.eligible_brokers = []
     expected_pair_strat.strat_limits = expected_strat_limits
     expected_strat_status.total_buy_qty = single_buy_order_qty * loop_count
     expected_strat_status.total_order_qty = single_buy_order_qty * loop_count
@@ -431,12 +470,13 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
 
     expected_pair_strat.strat_status = expected_strat_status
 
-    pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
     # removing id field from received obj list for comparison
     for pair_strat in pair_strat_list:
         pair_strat.id = None
         pair_strat.last_active_date_time = None
         pair_strat.frequency = None
+        pair_strat.strat_limits.eligible_brokers = []
         pair_strat.strat_status_update_seq_num = 0
         pair_strat.strat_limits_update_seq_num = 0
         pair_strat.pair_strat_params_update_seq_num = 0
@@ -463,7 +503,7 @@ def placed_buy_order_ack_receive(loop_count: int, expected_order_id: str, buy_or
                                  expected_order_journal: OrderJournalBaseModel,
                                  expected_order_snapshot_obj: OrderSnapshotBaseModel):
     """Checking after order's ACK status is received"""
-    order_journal_obj_list = strat_manager_service_web_client.get_all_order_journal_client()
+    order_journal_obj_list = strat_manager_service_native_web_client.get_all_order_journal_client()
 
     assert expected_order_journal in order_journal_obj_list, f"Couldn't find {expected_order_journal} in list " \
                                                              f"{order_journal_obj_list}"
@@ -480,7 +520,7 @@ def placed_buy_order_ack_receive(loop_count: int, expected_order_id: str, buy_or
     expected_order_snapshot_obj.last_update_date_time = expected_order_journal.order_event_date_time
     expected_order_snapshot_obj.create_date_time = buy_order_placed_date_time
 
-    order_snapshot_list = strat_manager_service_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = strat_manager_service_native_web_client.get_all_order_snapshot_client()
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -503,7 +543,7 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
     Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after fill is received
     """
-    fill_journal_obj_list = strat_manager_service_web_client.get_all_fills_journal_client()
+    fill_journal_obj_list = strat_manager_service_native_web_client.get_all_fills_journal_client()
     assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
 
     single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
@@ -524,7 +564,7 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
     expected_order_snapshot_obj.create_date_time = buy_order_placed_date_time
     expected_order_snapshot_obj.order_status = "OE_ACKED"
 
-    order_snapshot_list = strat_manager_service_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = strat_manager_service_native_web_client.get_all_order_snapshot_client()
     # removing below field from received_order_snapshot_list for comparison
     for symbol_side_snapshot in order_snapshot_list:
         symbol_side_snapshot.id = None
@@ -551,7 +591,7 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
             (single_buy_unfilled_qty * single_buy_order_px * (loop_count - 1)) / (single_buy_unfilled_qty *
                                                                                   (loop_count - 1))
 
-    symbol_side_snapshot_list = strat_manager_service_web_client.get_all_symbol_side_snapshot_client()
+    symbol_side_snapshot_list = strat_manager_service_native_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
     for symbol_side_snapshot in symbol_side_snapshot_list:
         symbol_side_snapshot.id = None
@@ -563,7 +603,7 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
                                         expected_strat_limits, expected_strat_brief_obj,
                                         buy_fill_journal.fill_date_time)
 
-    strat_brief_list = strat_manager_service_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    strat_brief_list = strat_manager_service_native_web_client.get_strat_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
         strat_brief.id = None
@@ -571,12 +611,15 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
         strat_brief.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
         # Since sell side of strat_brief is not updated till sell cycle
         strat_brief.pair_sell_side_trading_brief = expected_strat_brief_obj.pair_sell_side_trading_brief
+        strat_brief.pair_buy_side_trading_brief.last_update_date_time = None
+    expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = None
     assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
                                                          f"{strat_brief_list}"
 
     # Checking pair_strat
     expected_pair_strat.last_active_date_time = None
     expected_pair_strat.frequency = None
+    expected_strat_limits.eligible_brokers = []
     expected_pair_strat.strat_limits = expected_strat_limits
     expected_strat_status.total_buy_qty = single_buy_order_qty * loop_count
     expected_strat_status.total_order_qty = single_buy_order_qty * loop_count
@@ -614,12 +657,13 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
             expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
     expected_pair_strat.strat_status = expected_strat_status
 
-    pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
     # removing id field from received obj list for comparison
     for pair_strat in pair_strat_list:
         pair_strat.id = None
         pair_strat.frequency = None
         pair_strat.last_active_date_time = None
+        pair_strat.strat_limits.eligible_brokers = []
         pair_strat.strat_status_update_seq_num = 0
         pair_strat.strat_limits_update_seq_num = 0
         pair_strat.pair_strat_params_update_seq_num = 0
@@ -649,7 +693,7 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
                                      expected_strat_status: StratStatus,
                                      expected_strat_brief_obj: StratBriefBaseModel,
                                      expected_portfolio_status: PortfolioStatusBaseModel):
-    order_journal_obj_list = strat_manager_service_web_client.get_all_order_journal_client()
+    order_journal_obj_list = strat_manager_service_native_web_client.get_all_order_journal_client()
 
     assert sell_placed_order_journal in order_journal_obj_list, f"Couldn't find {sell_placed_order_journal} in " \
                                                                 f"{order_journal_obj_list}"
@@ -670,7 +714,7 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
     expected_order_snapshot_obj.create_date_time = sell_placed_order_journal.order_event_date_time
     expected_order_snapshot_obj.order_brief.text.extend(sell_placed_order_journal.order.text)
 
-    order_snapshot_list = strat_manager_service_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = strat_manager_service_native_web_client.get_all_order_snapshot_client()
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -696,7 +740,7 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
         expected_symbol_side_snapshot.avg_cxled_px = (single_sell_unfilled_qty * single_sell_order_px * (
                     loop_count - 1)) / (single_sell_unfilled_qty * (loop_count - 1))
 
-    symbol_side_snapshot_list = strat_manager_service_web_client.get_all_symbol_side_snapshot_client()
+    symbol_side_snapshot_list = strat_manager_service_native_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
     for symbol_side_snapshot in symbol_side_snapshot_list:
         symbol_side_snapshot.id = None
@@ -708,7 +752,8 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_placed_order_journal.order_event_date_time)
 
-    strat_brief_list = strat_manager_service_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    strat_brief_list = strat_manager_service_native_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
         strat_brief.id = None
@@ -716,6 +761,7 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
         strat_brief.pair_buy_side_trading_brief = expected_strat_brief_obj.pair_buy_side_trading_brief
         strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
         strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
+        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
     for strat_brief in strat_brief_list:
         if strat_brief.pair_sell_side_trading_brief == expected_strat_brief_obj.pair_sell_side_trading_brief:
             assert True
@@ -726,6 +772,7 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
     # Checking pair_strat
     expected_pair_strat.last_active_date_time = None
     expected_pair_strat.frequency = None
+    expected_strat_limits.eligible_brokers = []
     expected_pair_strat.strat_limits = expected_strat_limits
     expected_strat_status.total_buy_qty = single_buy_order_qty * total_loop_count
     expected_strat_status.total_sell_qty = single_sell_order_qty * loop_count
@@ -785,12 +832,14 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
 
     expected_pair_strat.strat_status = expected_strat_status
 
-    pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
     # removing id field from received obj list for comparison
     for pair_strat in pair_strat_list:
         pair_strat.id = None
         pair_strat.last_active_date_time = None
         pair_strat.frequency = None
+        pair_strat.strat_status.average_premium = 0.0
+        pair_strat.strat_limits.eligible_brokers = []
         pair_strat.strat_status_update_seq_num = 0
         pair_strat.strat_limits_update_seq_num = 0
         pair_strat.pair_strat_params_update_seq_num = 0
@@ -819,7 +868,7 @@ def placed_sell_order_ack_receive(loop_count: int, expected_order_id: str, sell_
                                   total_loop_count: int, expected_order_journal: OrderJournalBaseModel,
                                   expected_order_snapshot_obj: OrderSnapshotBaseModel):
     """Checking after order's ACK status is received"""
-    order_journal_obj_list = strat_manager_service_web_client.get_all_order_journal_client()
+    order_journal_obj_list = strat_manager_service_native_web_client.get_all_order_journal_client()
 
     assert expected_order_journal in order_journal_obj_list, f"Couldn't find {expected_order_journal} in " \
                                                              f"{order_journal_obj_list}"
@@ -836,7 +885,7 @@ def placed_sell_order_ack_receive(loop_count: int, expected_order_id: str, sell_
     expected_order_snapshot_obj.last_update_date_time = expected_order_journal.order_event_date_time
     expected_order_snapshot_obj.create_date_time = sell_order_placed_date_time
 
-    order_snapshot_list = strat_manager_service_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = strat_manager_service_native_web_client.get_all_order_snapshot_client()
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -855,7 +904,7 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
                                              expected_strat_status: StratStatus,
                                              expected_strat_brief_obj: StratBriefBaseModel,
                                              expected_portfolio_status: PortfolioStatusBaseModel):
-    fill_journal_obj_list = strat_manager_service_web_client.get_all_fills_journal_client()
+    fill_journal_obj_list = strat_manager_service_native_web_client.get_all_fills_journal_client()
     assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
 
     single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
@@ -878,7 +927,7 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     expected_order_snapshot_obj.create_date_time = sell_order_placed_date_time
     expected_order_snapshot_obj.order_status = "OE_ACKED"
 
-    order_snapshot_list = strat_manager_service_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = strat_manager_service_native_web_client.get_all_order_snapshot_client()
     # removing below field from received_order_snapshot_list for comparison
     for symbol_side_snapshot in order_snapshot_list:
         symbol_side_snapshot.id = None
@@ -904,7 +953,7 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
         expected_symbol_side_snapshot.avg_cxled_px = (single_sell_unfilled_qty * single_sell_order_px * (
                     loop_count - 1)) / (single_sell_unfilled_qty * (loop_count - 1))
 
-    symbol_side_snapshot_list = strat_manager_service_web_client.get_all_symbol_side_snapshot_client()
+    symbol_side_snapshot_list = strat_manager_service_native_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
     for symbol_side_snapshot in symbol_side_snapshot_list:
         symbol_side_snapshot.id = None
@@ -914,6 +963,7 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
     # Checking pair_strat
     expected_pair_strat.last_active_date_time = None
     expected_pair_strat.frequency = None
+    expected_strat_limits.eligible_brokers = []
     expected_pair_strat.strat_limits = expected_strat_limits
     expected_strat_status.total_buy_qty = single_buy_order_qty * total_loop_count
     expected_strat_status.total_sell_qty = single_sell_order_qty * loop_count
@@ -975,12 +1025,14 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
             expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
     expected_pair_strat.strat_status = expected_strat_status
 
-    pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
     # removing id field from received obj list for comparison
     for pair_strat in pair_strat_list:
         pair_strat.id = None
         pair_strat.frequency = None
         pair_strat.last_active_date_time = None
+        pair_strat.strat_status.average_premium = 0.0
+        pair_strat.strat_limits.eligible_brokers = []
         pair_strat.strat_status_update_seq_num = 0
         pair_strat.strat_limits_update_seq_num = 0
         pair_strat.pair_strat_params_update_seq_num = 0
@@ -992,7 +1044,8 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
                                          expected_strat_limits, expected_strat_brief_obj,
                                          sell_fill_journal.fill_date_time)
 
-    strat_brief_list = strat_manager_service_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    strat_brief_list = strat_manager_service_native_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
     for strat_brief in strat_brief_list:
         strat_brief.id = None
@@ -1000,6 +1053,7 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
         strat_brief.pair_buy_side_trading_brief = expected_strat_brief_obj.pair_buy_side_trading_brief
         strat_brief.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
         strat_brief.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
+        strat_brief.pair_sell_side_trading_brief.last_update_date_time = None
     for strat_brief in strat_brief_list:
         if strat_brief.pair_sell_side_trading_brief == expected_strat_brief_obj.pair_sell_side_trading_brief:
             assert True
@@ -1174,16 +1228,13 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id = buy_symbol
     pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id = sell_symbol
     stored_pair_strat_basemodel = \
-        strat_manager_service_web_client.create_pair_strat_client(pair_strat_obj)
+        strat_manager_service_native_web_client.create_pair_strat_client(pair_strat_obj)
     assert pair_strat_obj.frequency == stored_pair_strat_basemodel.frequency, \
         f"Mismatch pair_strat_basemodel.frequency: expected {pair_strat_obj.frequency}, " \
         f"received {stored_pair_strat_basemodel.frequency}"
     assert pair_strat_obj.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params, \
         f"Mismatch pair_strat_obj.pair_strat_params: expected {pair_strat_obj.pair_strat_params}, " \
         f"received {stored_pair_strat_basemodel.pair_strat_params}"
-    assert expected_strat_status == stored_pair_strat_basemodel.strat_status, \
-        f"Mismatch pair_strat.strat_status: expected {expected_strat_status}, " \
-        f"received {stored_pair_strat_basemodel.strat_status}"
     assert stored_pair_strat_basemodel.strat_status_update_seq_num == 0, \
         f"Mismatch pair_strat.strat_status_update_seq_num: expected 0 received " \
         f"{stored_pair_strat_basemodel.strat_status_update_seq_num}"
@@ -1196,14 +1247,23 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     print(f"{buy_symbol} - strat created, {stored_pair_strat_basemodel}")
 
     # updating pair_strat for this test-case
+    expected_strat_limits.eligible_brokers = stored_pair_strat_basemodel.strat_limits.eligible_brokers
     pair_strat_base_model = PairStratBaseModel(_id=stored_pair_strat_basemodel.id,
                                                strat_limits=expected_strat_limits)
-    print(f"----------------- {jsonable_encoder(pair_strat_base_model, by_alias=True, exclude_none=True)}")
-    updated_pair_strat_basemodel = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat_base_model, by_alias=True, exclude_none=True))
-    assert stored_pair_strat_basemodel.frequency + 1 == updated_pair_strat_basemodel.frequency, \
+
+    updated_pair_strat_basemodel = strat_manager_service_native_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat_base_model, by_alias=True, exclude_none=True))
+    # clean strat alerts after updating strat limits
+    strat_alerts: List[AlertOptional] = [AlertOptional(_id=alert.id) for alert in updated_pair_strat_basemodel.strat_status.strat_alerts]
+    pair_strat_base_model = \
+        PairStratBaseModel(_id=updated_pair_strat_basemodel.id,
+                           strat_status=StratStatusOptional(strat_alerts=strat_alerts))
+
+    updated_pair_strat_basemodel = strat_manager_service_native_web_client.patch_pair_strat_client(
+        jsonable_encoder(pair_strat_base_model, by_alias=True, exclude_none=True))
+    assert stored_pair_strat_basemodel.frequency + 2 == updated_pair_strat_basemodel.frequency, \
         f"Mismatch pair_strat_basemodel.frequency: expected {stored_pair_strat_basemodel.frequency + 1}, " \
         f"received {updated_pair_strat_basemodel.frequency}"
-    assert stored_pair_strat_basemodel.strat_status_update_seq_num == \
+    assert stored_pair_strat_basemodel.strat_status_update_seq_num + 1 == \
            updated_pair_strat_basemodel.strat_status_update_seq_num, \
         f"Mismatch pair_strat.strat_status_update_seq_num: expected " \
         f"{stored_pair_strat_basemodel.strat_status_update_seq_num} received " \
@@ -1218,6 +1278,9 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
         f"Mismatch pair_strat.pair_strat_params_update_seq_num: expected " \
         f"{stored_pair_strat_basemodel.pair_strat_params_update_seq_num} received " \
         f"{updated_pair_strat_basemodel.pair_strat_params_update_seq_num}"
+    assert expected_strat_status == updated_pair_strat_basemodel.strat_status, \
+        f"Mismatch pair_strat.strat_status: expected {expected_strat_status}, " \
+        f"received {updated_pair_strat_basemodel.strat_status}"
     assert expected_strat_limits == updated_pair_strat_basemodel.strat_limits, \
         f"Mismatch pair_strat.strat_limits: expected {expected_strat_limits}, " \
         f"received {updated_pair_strat_basemodel.strat_limits}"
@@ -1227,7 +1290,7 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     pair_strat_active_obj = PairStratBaseModel(_id=stored_pair_strat_basemodel.id)
     pair_strat_active_obj.strat_status = StratStatus(strat_state=StratState.StratState_ACTIVE)
     activated_pair_strat_basemodel = \
-        strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat_active_obj, by_alias=True, exclude_none=True))
+        strat_manager_service_native_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat_active_obj, by_alias=True, exclude_none=True))
 
     assert updated_pair_strat_basemodel.frequency + 1 == activated_pair_strat_basemodel.frequency, \
         f"Mismatch pair_strat_basemodel.frequency: expected {updated_pair_strat_basemodel.frequency + 1}, " \
@@ -1265,7 +1328,7 @@ def create_n_validate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
 
 
 def create_if_not_exists_and_validate_strat_collection(pair_strat_: PairStratBaseModel):
-    strat_collection_obj_list = strat_manager_service_web_client.get_all_strat_collection_client()
+    strat_collection_obj_list = strat_manager_service_native_web_client.get_all_strat_collection_client()
 
     strat_key = f"{pair_strat_.pair_strat_params.strat_leg2.sec.sec_id}-" \
                 f"{pair_strat_.pair_strat_params.strat_leg1.sec.sec_id}-" \
@@ -1279,7 +1342,7 @@ def create_if_not_exists_and_validate_strat_collection(pair_strat_: PairStratBas
             "buffered_strat_keys": []
         })
         created_strat_collection = \
-            strat_manager_service_web_client.create_strat_collection_client(strat_collection_basemodel)
+            strat_manager_service_native_web_client.create_strat_collection_client(strat_collection_basemodel)
 
         assert created_strat_collection == strat_collection_basemodel, \
             f"Mismatch strat_collection: expected {strat_collection_basemodel} received {created_strat_collection}"
@@ -1288,7 +1351,7 @@ def create_if_not_exists_and_validate_strat_collection(pair_strat_: PairStratBas
         strat_collection_obj = strat_collection_obj_list[0]
         strat_collection_obj.loaded_strat_keys.append(strat_key)
         updated_strat_collection_obj = \
-            strat_manager_service_web_client.put_strat_collection_client(jsonable_encoder(strat_collection_obj, by_alias=True, exclude_none=True))
+            strat_manager_service_native_web_client.put_strat_collection_client(jsonable_encoder(strat_collection_obj, by_alias=True, exclude_none=True))
 
         assert updated_strat_collection_obj == strat_collection_obj, \
             f"Mismatch strat_collection: expected {strat_collection_obj} received {updated_strat_collection_obj}"
@@ -1317,6 +1380,9 @@ def create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list: Li
             market_depth_basemodel.symbol = sell_symbol
         created_market_depth = market_data_web_client.create_market_depth_client(market_depth_basemodel)
         created_market_depth.id = None
+        created_market_depth.cumulative_avg_px = None
+        created_market_depth.cumulative_notional = None
+        created_market_depth.cumulative_qty = None
         assert created_market_depth == market_depth_basemodel, \
             f"Mismatch market_depth: expected {market_depth_basemodel} received {created_market_depth}"
 
@@ -1346,19 +1412,19 @@ def wait_for_get_new_order_placed_from_tob(wait_stop_px: int | float, symbol_to_
 
 
 def set_n_verify_limits(expected_order_limits_obj, expected_portfolio_limits_obj):
-    created_order_limits_obj = strat_manager_service_web_client.create_order_limits_client(expected_order_limits_obj)
+    created_order_limits_obj = strat_manager_service_native_web_client.create_order_limits_client(expected_order_limits_obj)
     assert created_order_limits_obj == expected_order_limits_obj, \
         f"Mismatch order_limits: expected {expected_order_limits_obj} received {created_order_limits_obj}"
 
     created_portfolio_limits_obj = \
-        strat_manager_service_web_client.create_portfolio_limits_client(expected_portfolio_limits_obj)
+        strat_manager_service_native_web_client.create_portfolio_limits_client(expected_portfolio_limits_obj)
     assert created_portfolio_limits_obj == expected_portfolio_limits_obj, \
         f"Mismatch portfolio_limits: expected {expected_portfolio_limits_obj} received {created_portfolio_limits_obj}"
 
 
 def create_n_verify_portfolio_status(portfolio_status_obj: PortfolioStatusBaseModel):
     portfolio_status_obj.id = 1
-    created_portfolio_status = strat_manager_service_web_client.create_portfolio_status_client(portfolio_status_obj)
+    created_portfolio_status = strat_manager_service_native_web_client.create_portfolio_status_client(portfolio_status_obj)
     assert created_portfolio_status == portfolio_status_obj, \
         f"Mismatch portfolio_status: expected {portfolio_status_obj}, received {created_portfolio_status}"
 
@@ -1383,7 +1449,7 @@ def verify_portfolio_status(total_loop_count: int, symbol_pair_count: int,
     expected_portfolio_status.overall_sell_fill_notional = \
         single_sell_filled_qty * get_px_in_usd(single_sell_filled_px) * total_loop_count * symbol_pair_count
 
-    portfolio_status_list = strat_manager_service_web_client.get_all_portfolio_status_client()
+    portfolio_status_list = strat_manager_service_native_web_client.get_all_portfolio_status_client()
     for portfolio_status in portfolio_status_list:
         portfolio_status.portfolio_alerts = []
         portfolio_status.alert_update_seq_num = 0
@@ -1404,7 +1470,7 @@ def get_latest_order_journal_with_status_and_symbol(expected_order_event, expect
         loop_wait_secs = 2
 
     for loop_count in range(max_loop_count):
-        stored_order_journal_list = strat_manager_service_web_client.get_all_order_journal_client()
+        stored_order_journal_list = strat_manager_service_native_web_client.get_all_order_journal_client()
         for stored_order_journal in stored_order_journal_list:
             if stored_order_journal.order_event == expected_order_event and \
                     stored_order_journal.order.security.sec_id == expected_symbol:
@@ -1439,7 +1505,7 @@ def get_latest_order_journal_with_status_and_symbol(expected_order_event, expect
 def get_latest_fill_journal_from_order_id(expected_order_id: str):
     found_fill_journal = None
 
-    stored_fill_journals = strat_manager_service_web_client.get_all_fills_journal_client()
+    stored_fill_journals = strat_manager_service_native_web_client.get_all_fills_journal_client()
     for stored_fill_journal in stored_fill_journals:
         if stored_fill_journal.order_id == expected_order_id:
             # since fills_journal is having option to sort in descending, first occurrence will be latest
@@ -1452,7 +1518,7 @@ def get_latest_fill_journal_from_order_id(expected_order_id: str):
 def get_fill_journals_for_order_id(expected_order_id: str):
     found_fill_journals = []
 
-    stored_fill_journals = strat_manager_service_web_client.get_all_fills_journal_client()
+    stored_fill_journals = strat_manager_service_native_web_client.get_all_fills_journal_client()
     for stored_fill_journal in stored_fill_journals:
         if stored_fill_journal.order_id == expected_order_id:
             found_fill_journals.append(stored_fill_journal)
@@ -1463,7 +1529,7 @@ def get_fill_journals_for_order_id(expected_order_id: str):
 def place_new_order(sec_id: str, side: Side, px: float, qty: int):
     security = Security(sec_id=sec_id, sec_type=SecurityType.TICKER)
     new_order_obj = NewOrderBaseModel(security=security, side=side, px=px, qty=qty)
-    created_new_order_obj = strat_manager_service_web_client.create_new_order_client(new_order_obj)
+    created_new_order_obj = strat_manager_service_native_web_client.create_new_order_client(new_order_obj)
 
     new_order_obj.id = created_new_order_obj.id
     assert created_new_order_obj == new_order_obj, f"Mismatch new_order_obj: expected {new_order_obj}, " \
@@ -1476,15 +1542,14 @@ def create_pre_order_test_requirements(buy_symbol: str, sell_symbol: str, pair_s
                                        last_trade_fixture_list: List[Dict],
                                        market_depth_basemodel_list: List[MarketDepthBaseModel]) -> PairStratBaseModel:
     print(f"Test started, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    # running symbol_overview
+    run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
+    print(f"SymbolOverview created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
     # Creating Strat
     active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                                 copy.deepcopy(expected_strat_limits_),
                                                 copy.deepcopy(expected_start_status_))
     print(f"strat created, buy_symbol: {buy_symbol}, sell symbol: {sell_symbol}")
-
-    # running symbol_overview
-    run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
-    print(f"SymbolOverview created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # running Last Trade
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list)
@@ -1494,6 +1559,7 @@ def create_pre_order_test_requirements(buy_symbol: str, sell_symbol: str, pair_s
     create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list)
     print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
+    # time.sleep(100)
     # Adding strat in strat_collection
     create_if_not_exists_and_validate_strat_collection(active_pair_strat)
     print(f"Added to strat_collection, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
@@ -1580,8 +1646,8 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
             buy_tob_last_update_date_time_tracker = \
                 wait_for_get_new_order_placed_from_tob(110, buy_symbol, buy_tob_last_update_date_time_tracker, Side.BUY)
             time_delta = DateTime.utcnow() - start_time
-            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received buy TOB, "
-                  f"time delta {time_delta.total_seconds()}")
+            print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received buy TOB of last_update_date_time "
+                  f"{buy_tob_last_update_date_time_tracker}, time delta {time_delta.total_seconds()}")
         else:
             # placing new non-systematic new_order
             place_new_order(buy_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty)
@@ -1637,7 +1703,7 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
         # Sleeping to let the order get cxlled
         time.sleep(residual_test_wait)
 
-        portfolio_status_list = strat_manager_service_web_client.get_all_portfolio_status_client()
+        portfolio_status_list = strat_manager_service_native_web_client.get_all_portfolio_status_client()
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, "
               f"loop completed portfolio_status {portfolio_status_list}")
 
@@ -1736,13 +1802,13 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
         # Sleeping to let the order get cxlled
         time.sleep(residual_test_wait)
 
-        portfolio_status_list = strat_manager_service_web_client.get_all_portfolio_status_client()
+        portfolio_status_list = strat_manager_service_native_web_client.get_all_portfolio_status_client()
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, "
               f"loop completed portfolio_status {portfolio_status_list}")
 
 
 def get_pair_strat_from_symbol(symbol: str):
-    pair_strat_obj_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    pair_strat_obj_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
     for pair_strat_obj in pair_strat_obj_list:
         if pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id == symbol or \
                 pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id == symbol:
@@ -1750,7 +1816,7 @@ def get_pair_strat_from_symbol(symbol: str):
 
 
 def get_order_snapshot_from_order_id(order_id) -> OrderSnapshotBaseModel | None:
-    order_snapshot_list = strat_manager_service_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = strat_manager_service_native_web_client.get_all_order_snapshot_client()
     expected_order_snapshot: OrderSnapshotBaseModel | None = None
     for order_snapshot in order_snapshot_list:
         if order_snapshot.order_brief.order_id == order_id:
@@ -2048,7 +2114,7 @@ def handle_place_order_for_portfolio_lvl_limit_test(symbol: str, side: Side, px:
     new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, symbol,
                                                                         expect_no_order=True)
 
-    portfolio_status = strat_manager_service_web_client.get_portfolio_status_client(1)
+    portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(1)
     portfolio_alerts = portfolio_status.portfolio_alerts
 
     for alert in portfolio_alerts:
@@ -2070,7 +2136,7 @@ def handle_place_order_and_check_str_in_alert_for_executor_limits(symbol: str, s
                                                                         expect_no_order=True,
                                                                         last_order_id=last_order_id)
 
-    pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
     # assuming only one strat exists
     strat_alerts = pair_strat_list[0].strat_status.strat_alerts
 
@@ -2116,7 +2182,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_sell
     print(f"symbol: {check_symbol}, Created new_order obj")
 
     new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, check_symbol)
-    pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
     # since only one strat exists for current test
     assert len(pair_strat_list) == 1
     pair_strat_obj = pair_strat_list[0]
@@ -2161,7 +2227,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
 
     ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, check_symbol)
     cxl_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, check_symbol)
-    pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
     # since only one strat exists for current test
     assert len(pair_strat_list) == 1
     pair_strat_obj = pair_strat_list[0]
@@ -2229,3 +2295,31 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
                                                                    f"expected {partial_filled_qty}, received " \
                                                                    f"{latest_fill_journal.fill_px}"
     return last_order_id, partial_filled_qty
+
+
+def get_mongo_server_uri():
+    mongo_server_uri: str = "mongodb://localhost:27017"
+    if os.path.isfile(str(test_config_file_path)):
+        test_config = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
+        mongo_server_uri = fetched_mongo_server_uri if \
+            (fetched_mongo_server_uri := test_config.get("mongo_server_uri")) is not None else mongo_server_uri
+    return mongo_server_uri
+
+
+def clean_today_activated_ticker_dict():
+    command_n_control_obj: CommandNControlBaseModel = CommandNControlBaseModel(command_type=CommandType.CLEAR_STRAT, datetime=DateTime.utcnow())
+    strat_manager_service_native_web_client.create_command_n_control_client(command_n_control_obj)
+
+
+def clear_cache_in_model():
+    command_n_control_obj: CommandNControlBaseModel = CommandNControlBaseModel(command_type=CommandType.RESET_STATE,
+                                                                               datetime=DateTime.utcnow())
+    strat_manager_service_native_web_client.create_command_n_control_client(command_n_control_obj)
+
+
+def append_csv_file(file_name: str, records: List[List[any]]):
+    with open(file_name, "a") as csv_file:
+        list_writer = writer(csv_file)
+        record: List[any]
+        for record in records:
+            list_writer.writerow(record)

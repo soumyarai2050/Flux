@@ -1,30 +1,191 @@
+# standard imports
 import math
 import concurrent.futures
 import re
-from fastapi.encoders import jsonable_encoder
+import numpy as np
+import pendulum
+import pexpect
+import pytest
 
+# project imports
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
-from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, config_file_path
-from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations, update_yaml_configurations
-from FluxPythonUtils.scripts.utility_functions import drop_mongo_collections, clean_mongo_collections
+from Flux.CodeGenProjects.addressbook.app.trading_link_base import config_file_path
+from FluxPythonUtils.scripts.utility_functions import drop_mongo_collections, parse_to_float
+
+
+strat_manager_service_beanie_web_client: StratManagerServiceWebClient = \
+    StratManagerServiceWebClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_BEANIE_PORT))
+strat_manager_service_cache_web_client: StratManagerServiceWebClient = \
+    StratManagerServiceWebClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_CACHE_PORT))
+
+if strat_manager_service_beanie_web_client.port == strat_manager_service_native_web_client.port:
+    clients_list = [strat_manager_service_beanie_web_client]
+else:
+    clients_list = [strat_manager_service_beanie_web_client, strat_manager_service_cache_web_client]
 
 
 def test_clean_and_set_limits(clean_and_set_limits):
     pass
 
 
+@pytest.mark.parametrize("web_client", clients_list)
+def test_create_get_put_patch_delete_order_limits_client(clean_and_set_limits, web_client):
+    order_limits_obj = OrderLimitsBaseModel(id=2, max_px_deviation=2)
+    # testing create_order_limits_client()
+    created_order_limits_obj = web_client.create_order_limits_client(order_limits_obj)
+    assert created_order_limits_obj == order_limits_obj, \
+        f"Created obj {created_order_limits_obj} mismatched expected order_limits_obj {order_limits_obj}"
+
+    # checking if created obj present in get_all objects
+    fetched_order_limits_list = web_client.get_all_order_limits_client()
+    assert order_limits_obj in fetched_order_limits_list, \
+        f"Couldn't find expected order_limits_obj {order_limits_obj} in get-all fetched list of objects"
+
+    # Checking get_by_id client
+    fetched_order_limits_obj = web_client.get_order_limits_client(order_limits_obj.id)
+    assert fetched_order_limits_obj == order_limits_obj, \
+        f"Mismatched expected order_limits_obj {order_limits_obj} from " \
+        f"fetched_order_limits obj fetched by get_by_id {fetched_order_limits_obj}"
+
+    # checking put operation client
+    order_limits_obj.max_basis_points = 2
+    updated_order_limits_obj = web_client.put_order_limits_client(order_limits_obj)
+    assert updated_order_limits_obj == order_limits_obj, \
+        f"Mismatched expected order_limits_obj: {order_limits_obj} from updated obj: {updated_order_limits_obj}"
+
+    # checking patch operation client
+    patch_order_limits_obj = OrderLimitsBaseModel(id=order_limits_obj.id, max_px_levels=2)
+    # making changes to expected_obj
+    order_limits_obj.max_px_levels = patch_order_limits_obj.max_px_levels
+
+    patch_updated_order_limits_obj = \
+        web_client.patch_order_limits_client(json.loads(patch_order_limits_obj.json(by_alias=True, exclude_none=True)))
+    assert patch_updated_order_limits_obj == order_limits_obj, \
+        f"Mismatched expected obj: {order_limits_obj} from patch updated obj {patch_updated_order_limits_obj}"
+
+    # checking delete operation client
+    delete_resp = web_client.delete_order_limits_client(order_limits_obj.id)
+    assert isinstance(delete_resp, dict), \
+        f"Mismatched type of delete resp, expected dict received {type(delete_resp)}"
+    assert delete_resp.get("id") == order_limits_obj.id, \
+        f"Mismatched delete resp id, expected {order_limits_obj.id} received {delete_resp.get('id')}"
+
+
+@pytest.mark.parametrize("web_client", clients_list)
+def test_post_all(clean_and_set_limits, web_client):
+    order_limits_objects_list = [
+        OrderLimitsBaseModel(id=2, max_px_deviation=2),
+        OrderLimitsBaseModel(id=3, max_px_deviation=3),
+        OrderLimitsBaseModel(id=4, max_px_deviation=4)
+    ]
+
+    fetched_strat_manager_beanie = web_client.get_all_order_limits_client()
+
+    for obj in order_limits_objects_list:
+        assert obj not in fetched_strat_manager_beanie, f"Object {obj} must not be present in get-all list " \
+                                                        f"{fetched_strat_manager_beanie} before post-all operation"
+
+    web_client.create_all_order_limits_client(order_limits_objects_list)
+
+    fetched_strat_manager_beanie = web_client.get_all_order_limits_client()
+
+    for obj in order_limits_objects_list:
+        assert obj in fetched_strat_manager_beanie, f"Couldn't find object {obj} in get-all list " \
+                                                    f"{fetched_strat_manager_beanie}"
+
+
+@pytest.mark.parametrize("web_client", clients_list)
+def test_put_all(clean_and_set_limits, web_client):
+    order_limits_objects_list = [
+        OrderLimitsBaseModel(id=2, max_px_deviation=2),
+        OrderLimitsBaseModel(id=3, max_px_deviation=3),
+        OrderLimitsBaseModel(id=4, max_px_deviation=4)
+    ]
+
+    web_client.create_all_order_limits_client(order_limits_objects_list)
+
+    fetched_strat_manager_beanie = web_client.get_all_order_limits_client()
+
+    for obj in order_limits_objects_list:
+        assert obj in fetched_strat_manager_beanie, f"Couldn't find object {obj} in get-all list " \
+                                                    f"{fetched_strat_manager_beanie}"
+
+    # updating values
+    for obj in order_limits_objects_list:
+        obj.max_contract_qty = obj.id
+
+    web_client.put_all_order_limits_client(order_limits_objects_list)
+
+    updated_order_limits_list = web_client.get_all_order_limits_client()
+
+    for expected_obj in order_limits_objects_list:
+        assert expected_obj in updated_order_limits_list, \
+            f"expected obj {expected_obj} not found in updated list of objects: {updated_order_limits_list}"
+
+
+@pytest.mark.parametrize("web_client", clients_list)
+def test_patch_all(clean_and_set_limits, web_client):
+
+    portfolio_limits_objects_list = [
+        PortfolioLimitsBaseModel(id=2, max_open_baskets=20),
+        PortfolioLimitsBaseModel(id=3, max_open_baskets=30),
+        PortfolioLimitsBaseModel(id=4, max_open_baskets=45)
+    ]
+
+    web_client.create_all_portfolio_limits_client(portfolio_limits_objects_list)
+
+    fetched_get_all_obj_list = web_client.get_all_portfolio_limits_client()
+
+    for obj in portfolio_limits_objects_list:
+        assert obj in fetched_get_all_obj_list, f"Couldn't find object {obj} in get-all list " \
+                                                f"{fetched_get_all_obj_list}"
+
+    # updating values
+    portfolio_limits_objects_json_list = []
+    for obj in portfolio_limits_objects_list:
+        obj.eligible_brokers = []
+        for broker_obj_id in [1, 2]:
+            broker = broker_fixture()
+            broker.id = f"{broker_obj_id}"
+            broker.bkr_priority = broker_obj_id
+            obj.eligible_brokers.append(broker)
+        portfolio_limits_objects_json_list.append(jsonable_encoder(obj, by_alias=True, exclude_none=True))
+
+    web_client.patch_all_portfolio_limits_client(portfolio_limits_objects_json_list)
+
+    updated_portfolio_limits_list = web_client.get_all_portfolio_limits_client()
+
+    for expected_obj in portfolio_limits_objects_list:
+        assert expected_obj in updated_portfolio_limits_list, \
+            f"expected obj {expected_obj} not found in updated list of objects: {updated_portfolio_limits_list}"
+
+    delete_broker = BrokerOptional()
+    delete_broker.id = "1"
+
+    delete_obj = PortfolioLimitsBaseModel(id=4, eligible_brokers=[delete_broker])
+    delete_obj_json = jsonable_encoder(delete_obj, by_alias=True, exclude_none=True)
+
+    web_client.patch_all_portfolio_limits_client([delete_obj_json])
+
+    updated_portfolio_limits = web_client.get_portfolio_limits_client(portfolio_limits_id=4)
+
+    assert delete_broker.id not in [broker.id for broker in updated_portfolio_limits.eligible_brokers], \
+        f"Deleted obj: {delete_obj} using patch still found in updated object: {updated_portfolio_limits}"
+
+
 # sanity test to create and activate pair_strat
-def test_create_pair_strat(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
-                           expected_strat_limits_, expected_start_status_):
+def test_create_pair_strat(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+                           expected_strat_limits_, expected_start_status_, symbol_overview_obj_list):
     with ExecutorNLogAnalyzerManager():
         # creates and activates multiple pair_strats
         for buy_symbol, sell_symbol in buy_sell_symbol_list:
+            run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
             create_n_validate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                     expected_start_status_)
 
 
 # sanity test to create orders
-def test_place_sanity_orders(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                              expected_start_status_, symbol_overview_obj_list,
                              last_trade_fixture_list, market_depth_basemodel_list,
                              top_of_book_list_, buy_order_, sell_order_,
@@ -33,7 +194,7 @@ def test_place_sanity_orders(clean_and_set_limits, buy_sell_symbol_list, pair_st
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
@@ -78,9 +239,10 @@ def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
         broker = broker_fixture()
 
         portfolio_limits_basemodel = PortfolioLimitsBaseModel(_id=1, eligible_brokers=[broker])
-        strat_manager_service_web_client.patch_portfolio_limits_client(jsonable_encoder(portfolio_limits_basemodel, by_alias=True, exclude_none=True))
+        strat_manager_service_native_web_client.patch_portfolio_limits_client(
+            jsonable_encoder(portfolio_limits_basemodel, by_alias=True, exclude_none=True))
 
-        stored_portfolio_limits_ = strat_manager_service_web_client.get_portfolio_limits_client(1)
+        stored_portfolio_limits_ = strat_manager_service_native_web_client.get_portfolio_limits_client(1)
         for stored_broker in stored_portfolio_limits_.eligible_brokers:
             stored_broker.id = None
         broker.id = None
@@ -89,7 +251,7 @@ def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
                                                                     f"{stored_portfolio_limits_.eligible_brokers}"
 
 
-def test_buy_sell_order_multi_pair_serialized(clean_and_set_limits, pair_securities_with_sides_,
+def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                               buy_order_, sell_order_, buy_fill_journal_,
                                               sell_fill_journal_, expected_buy_order_snapshot_,
                                               expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
@@ -116,7 +278,7 @@ def test_buy_sell_order_multi_pair_serialized(clean_and_set_limits, pair_securit
         verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
-def test_buy_sell_order_multi_pair_parallel(clean_and_set_limits, pair_securities_with_sides_,
+def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                             buy_order_, sell_order_, buy_fill_journal_,
                                             sell_fill_journal_, expected_buy_order_snapshot_,
                                             expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
@@ -151,7 +313,7 @@ def test_buy_sell_order_multi_pair_parallel(clean_and_set_limits, pair_securitie
         verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
-def test_buy_sell_non_systematic_order_multi_pair_serialized(clean_and_set_limits, pair_securities_with_sides_,
+def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                                              buy_order_, sell_order_, buy_fill_journal_,
                                                              sell_fill_journal_, expected_buy_order_snapshot_,
                                                              expected_sell_order_snapshot_,
@@ -182,7 +344,7 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(clean_and_set_limit
         verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
-def test_buy_sell_non_systematic_order_multi_pair_parallel(clean_and_set_limits, pair_securities_with_sides_,
+def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                                            buy_order_, sell_order_, buy_fill_journal_,
                                                            sell_fill_journal_, expected_buy_order_snapshot_,
                                                            expected_sell_order_snapshot_,
@@ -220,7 +382,7 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(clean_and_set_limits,
         verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
-def test_validate_kill_switch_systematic(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+def test_validate_kill_switch_systematic(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
                                          expected_strat_limits_, expected_start_status_,
                                          symbol_overview_obj_list, last_trade_fixture_list,
                                          market_depth_basemodel_list, top_of_book_list_):
@@ -234,7 +396,8 @@ def test_validate_kill_switch_systematic(clean_and_set_limits, buy_sell_symbol_l
                                                market_depth_basemodel_list)
 
             portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-            updated_portfolio_status = strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+            updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
+                jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
             assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
                                                          "expected to be True"
 
@@ -251,7 +414,7 @@ def test_validate_kill_switch_systematic(clean_and_set_limits, buy_sell_symbol_l
                                                                 sell_symbol, expect_no_order=True)
 
 
-def test_validate_kill_switch_non_systematic(clean_and_set_limits, buy_sell_symbol_list,
+def test_validate_kill_switch_non_systematic(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                              pair_strat_, expected_strat_limits_,
                                              expected_start_status_, symbol_overview_obj_list,
                                              last_trade_fixture_list, market_depth_basemodel_list,
@@ -266,7 +429,8 @@ def test_validate_kill_switch_non_systematic(clean_and_set_limits, buy_sell_symb
                                                market_depth_basemodel_list)
 
             portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-            updated_portfolio_status = strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+            updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
+                jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
             assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
                                                          "expected to be True"
 
@@ -287,7 +451,7 @@ def test_validate_kill_switch_non_systematic(clean_and_set_limits, buy_sell_symb
                                                                 sell_symbol, expect_no_order=True)
 
 
-def test_simulated_partial_fills(clean_and_set_limits, buy_sell_symbol_list,
+def test_simulated_partial_fills(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                  pair_strat_, expected_strat_limits_,
                                  expected_start_status_, symbol_overview_obj_list,
                                  last_trade_fixture_list, market_depth_basemodel_list,
@@ -297,14 +461,14 @@ def test_simulated_partial_fills(clean_and_set_limits, buy_sell_symbol_list,
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         partial_filled_qty: int | None = None
         unfilled_amount: int | None = None
 
         # updating fixture values for this test-case
-        max_loop_count_per_side = 5
+        max_loop_count_per_side = 2
         buy_sell_symbol_list = buy_sell_symbol_list[:2]
 
         for buy_symbol, sell_symbol in buy_sell_symbol_list:
@@ -336,7 +500,7 @@ def test_simulated_partial_fills(clean_and_set_limits, buy_sell_symbol_list,
                         f"received {pair_strat_obj.strat_status.total_fill_sell_qty}"
 
 
-def test_simulated_multi_partial_fills(clean_and_set_limits, buy_sell_symbol_list,
+def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                        pair_strat_, expected_strat_limits_,
                                        expected_start_status_, symbol_overview_obj_list,
                                        last_trade_fixture_list, market_depth_basemodel_list,
@@ -347,14 +511,14 @@ def test_simulated_multi_partial_fills(clean_and_set_limits, buy_sell_symbol_lis
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 10
         config_dict["symbol_configs"][symbol]["total_fill_count"] = 5
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
         partial_filled_qty: int | None = None
 
         # updating fixture values for this test-case
-        max_loop_count_per_side = 5
+        max_loop_count_per_side = 2
         buy_sell_symbol_list = buy_sell_symbol_list[:2]
 
         for buy_symbol, sell_symbol in buy_sell_symbol_list:
@@ -383,7 +547,7 @@ def test_simulated_multi_partial_fills(clean_and_set_limits, buy_sell_symbol_lis
                                                                   f"{total_fill_qty}"
 
 
-def test_filled_status(clean_and_set_limits, buy_sell_symbol_list,
+def test_filled_status(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                        pair_strat_, expected_strat_limits_,
                        expected_start_status_, symbol_overview_obj_list,
                        last_trade_fixture_list, market_depth_basemodel_list,
@@ -392,7 +556,7 @@ def test_filled_status(clean_and_set_limits, buy_sell_symbol_list,
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         buy_symbol = buy_sell_symbol_list[0][0]
@@ -437,7 +601,7 @@ def test_filled_status(clean_and_set_limits, buy_sell_symbol_list,
                                                                          f"{order_snapshot.order_status}"
 
 
-def test_over_fill_case_1(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                           expected_start_status_, symbol_overview_obj_list,
                           last_trade_fixture_list, market_depth_basemodel_list,
                           top_of_book_list_, buy_order_, sell_order_, config_dict):
@@ -449,7 +613,7 @@ def test_over_fill_case_1(clean_and_set_limits, buy_sell_symbol_list, pair_strat
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 60
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         buy_symbol = buy_sell_symbol_list[0][0]
@@ -498,7 +662,7 @@ def test_over_fill_case_1(clean_and_set_limits, buy_sell_symbol_list, pair_strat
                                                                          f"{order_snapshot.order_status}"
 
         time.sleep(15)
-        pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+        pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
         # since only one strat exists for this test
         assert len(pair_strat_list) == 1, "Expected only one pair_strat since this test only created single strategy " \
                                           f"received {len(pair_strat_list)}, pair_strat_list: {pair_strat_list}"
@@ -513,7 +677,7 @@ def test_over_fill_case_1(clean_and_set_limits, buy_sell_symbol_list, pair_strat
         assert True
 
 
-def test_over_fill_case_2(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_over_fill_case_2(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                           expected_start_status_, symbol_overview_obj_list,
                           last_trade_fixture_list, market_depth_basemodel_list,
                           top_of_book_list_, buy_order_, sell_order_, config_dict):
@@ -525,7 +689,7 @@ def test_over_fill_case_2(clean_and_set_limits, buy_sell_symbol_list, pair_strat
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 100
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
@@ -575,7 +739,7 @@ def test_over_fill_case_2(clean_and_set_limits, buy_sell_symbol_list, pair_strat
                                                                          f"{order_snapshot.order_status}"
 
         time.sleep(15)
-        pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+        pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
         # since only one strat exists for this test
         assert len(pair_strat_list) == 1, "Expected only one pair_strat since this test only created single strategy " \
                                           f"received {len(pair_strat_list)}, pair_strat_list: {pair_strat_list}"
@@ -590,7 +754,7 @@ def test_over_fill_case_2(clean_and_set_limits, buy_sell_symbol_list, pair_strat
         assert True
 
 
-def test_ack_to_rej_orders(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_ack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                            expected_start_status_, symbol_overview_obj_list,
                            last_trade_fixture_list, market_depth_basemodel_list,
                            top_of_book_list_, max_loop_count_per_side, config_dict):
@@ -599,7 +763,7 @@ def test_ack_to_rej_orders(clean_and_set_limits, buy_sell_symbol_list, pair_stra
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         config_dict["symbol_configs"][symbol]["simulate_ack_to_reject_orders"] = True
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         # updating fixture values for this test-case
@@ -612,7 +776,7 @@ def test_ack_to_rej_orders(clean_and_set_limits, buy_sell_symbol_list, pair_stra
                               top_of_book_list_, max_loop_count_per_side, True)
 
 
-def test_unack_to_rej_orders(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_unack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                              expected_start_status_, symbol_overview_obj_list,
                              last_trade_fixture_list, market_depth_basemodel_list,
                              top_of_book_list_, max_loop_count_per_side, config_dict):
@@ -622,11 +786,11 @@ def test_unack_to_rej_orders(clean_and_set_limits, buy_sell_symbol_list, pair_st
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         config_dict["symbol_configs"][symbol]["simulate_new_to_reject_orders"] = True
 
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         # updating fixture values for this test-case
-        max_loop_count_per_side = 5
+        max_loop_count_per_side = 2
         buy_sell_symbol_list = buy_sell_symbol_list[:2]
 
         handle_rej_order_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -635,7 +799,7 @@ def test_unack_to_rej_orders(clean_and_set_limits, buy_sell_symbol_list, pair_st
                               top_of_book_list_, max_loop_count_per_side, False)
 
 
-def test_cxl_rej(clean_and_set_limits, buy_sell_symbol_list,
+def test_cxl_rej(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                  pair_strat_, expected_strat_limits_,
                  expected_start_status_, symbol_overview_obj_list,
                  last_trade_fixture_list, market_depth_basemodel_list,
@@ -646,7 +810,7 @@ def test_cxl_rej(clean_and_set_limits, buy_sell_symbol_list,
         config_dict["symbol_configs"][symbol]["simulate_cxl_rej_orders"] = True
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
@@ -690,15 +854,16 @@ def test_cxl_rej(clean_and_set_limits, buy_sell_symbol_list,
                                                                               check_order_event, check_symbol)
 
 
-def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_list,
+def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                        pair_strat_, expected_strat_limits_,
-                                       expected_start_status_, sample_alert):
+                                       expected_start_status_, sample_alert, symbol_overview_obj_list):
     with ExecutorNLogAnalyzerManager():
 
         # creating strat
         buy_symbol = buy_sell_symbol_list[0][0]
         sell_symbol = buy_sell_symbol_list[0][1]
         total_loop_count = 5
+        run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
         active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, pair_strat_,
                                                     expected_strat_limits_, expected_start_status_)
 
@@ -714,7 +879,8 @@ def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_lis
                                    strat_status=StratStatusOptional(strat_alerts=[alert]),
                                    strat_limits=StratLimitsOptional(eligible_brokers=[broker]))
 
-            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
+            updated_pair_strat = strat_manager_service_native_web_client.patch_pair_strat_client(
+                jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
             assert alert in updated_pair_strat.strat_status.strat_alerts, f"Couldn't find alert {alert} in " \
                                                                           f"strat_alerts list" \
                                                                           f"{updated_pair_strat.strat_status.strat_alerts}"
@@ -732,7 +898,8 @@ def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_lis
             update_pair_strat = \
                 PairStratBaseModel(_id=active_pair_strat.id,
                                    strat_status=StratStatusOptional(strat_alerts=[updated_alert]))
-            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
+            updated_pair_strat = strat_manager_service_native_web_client.patch_pair_strat_client(
+                jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
 
             alert.impacted_order.extend(updated_alert.impacted_order)
             alert.alert_brief = updated_alert.alert_brief
@@ -746,7 +913,8 @@ def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_lis
             update_pair_strat = \
                 PairStratBaseModel(_id=active_pair_strat.id,
                                    strat_status=StratStatusOptional(strat_alerts=[delete_intended_alert]))
-            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
+            updated_pair_strat = strat_manager_service_native_web_client.patch_pair_strat_client(
+                jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
             alert_id_list = [alert.id for alert in updated_pair_strat.strat_status.strat_alerts]
             assert alert_id not in alert_id_list, f"Unexpectedly found alert_id {alert_id} " \
                                                   f"in alert_id list {alert_id_list}"
@@ -757,13 +925,14 @@ def test_alert_handling_for_pair_strat(clean_and_set_limits, buy_sell_symbol_lis
             update_pair_strat = \
                 PairStratBaseModel(_id=active_pair_strat.id,
                                    strat_limits=StratLimitsOptional(eligible_brokers=[delete_intended_broker]))
-            updated_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
+            updated_pair_strat = strat_manager_service_native_web_client.patch_pair_strat_client(
+                jsonable_encoder(update_pair_strat, by_alias=True, exclude_none=True))
             broker_id_list = [broker.id for broker in updated_pair_strat.strat_limits.eligible_brokers]
             assert broker_id not in broker_id_list, f"Unexpectedly found broker_id {broker_id} in broker_id list " \
                                                     f"{broker_id_list}"
 
 
-def test_underlying_account_cumulative_fill_qty_query(clean_and_set_limits, buy_sell_symbol_list,
+def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                       pair_strat_, expected_strat_limits_,
                                                       expected_start_status_, symbol_overview_obj_list,
                                                       last_trade_fixture_list, market_depth_basemodel_list,
@@ -795,8 +964,8 @@ def test_underlying_account_cumulative_fill_qty_query(clean_and_set_limits, buy_
 
             for symbol, side in [(buy_symbol, "BUY"), (sell_symbol, "SELL")]:
                 underlying_account_cumulative_fill_qty_obj_list = \
-                    strat_manager_service_web_client.get_underlying_account_cumulative_fill_qty_query_client(symbol,
-                                                                                                             side)
+                    strat_manager_service_native_web_client.get_underlying_account_cumulative_fill_qty_query_client(symbol,
+                                                                                                                    side)
                 assert len(underlying_account_cumulative_fill_qty_obj_list) == 1, \
                     "Expected exactly one obj from query get_underlying_account_cumulative_fill_qty_query_client," \
                     f"received {len(underlying_account_cumulative_fill_qty_obj_list)}, received list " \
@@ -822,7 +991,7 @@ def test_underlying_account_cumulative_fill_qty_query(clean_and_set_limits, buy_
                         f"{underlying_account_n_cum_fill_qty_obj.cumulative_qty}"
 
 
-def test_last_n_sec_order_qty_sum_and_order_count(clean_and_set_limits, buy_sell_symbol_list,
+def test_last_n_sec_order_qty_sum_and_order_count(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                   pair_strat_, expected_strat_limits_,
                                                   expected_start_status_, symbol_overview_obj_list,
                                                   last_trade_fixture_list, market_depth_basemodel_list,
@@ -831,7 +1000,7 @@ def test_last_n_sec_order_qty_sum_and_order_count(clean_and_set_limits, buy_sell
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
@@ -872,15 +1041,15 @@ def test_last_n_sec_order_qty_sum_and_order_count(clean_and_set_limits, buy_sell
             rolling_max_order_count = RollingMaxOrderCountOptional(rolling_tx_count_period_seconds=last_n_sec)
             portfolio_limits = PortfolioLimitsBaseModel(_id=1, rolling_max_order_count=rolling_max_order_count)
             updated_portfolio_limits = \
-                strat_manager_service_web_client.patch_portfolio_limits_client(portfolio_limits.dict(by_alias=True,
-                                                                                                     exclude_none=True))
+                strat_manager_service_native_web_client.patch_portfolio_limits_client(portfolio_limits.dict(by_alias=True,
+                                                                                                            exclude_none=True))
             assert updated_portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds == last_n_sec, \
                 f"Unexpected last_n_sec value: expected {last_n_sec}, " \
                 f"received {updated_portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds}"
 
             call_date_time = DateTime.utcnow()
             executor_check_snapshot_obj = \
-                strat_manager_service_web_client.get_executor_check_snapshot_query_client(
+                strat_manager_service_native_web_client.get_executor_check_snapshot_query_client(
                     buy_symbol, "BUY", last_n_sec)
 
             assert len(executor_check_snapshot_obj) == 1, \
@@ -894,7 +1063,7 @@ def test_last_n_sec_order_qty_sum_and_order_count(clean_and_set_limits, buy_sell
                 f"secs from {call_date_time} of {buy_symbol} for side {Side.BUY}"
 
 
-def test_acked_unsolicited_cxl(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                expected_start_status_, symbol_overview_obj_list,
                                last_trade_fixture_list, market_depth_basemodel_list,
                                top_of_book_list_, buy_order_, sell_order_,
@@ -904,7 +1073,7 @@ def test_acked_unsolicited_cxl(clean_and_set_limits, buy_sell_symbol_list, pair_
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         handle_unsolicited_cxl(buy_sell_symbol_list, expected_strat_limits_, expected_start_status_, pair_strat_,
@@ -912,7 +1081,7 @@ def test_acked_unsolicited_cxl(clean_and_set_limits, buy_sell_symbol_list, pair_
                                max_loop_count_per_side, top_of_book_list_)
 
 
-def test_unacked_unsolicited_cxl(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                  expected_start_status_, symbol_overview_obj_list,
                                  last_trade_fixture_list, market_depth_basemodel_list,
                                  top_of_book_list_, buy_order_, sell_order_,
@@ -922,7 +1091,7 @@ def test_unacked_unsolicited_cxl(clean_and_set_limits, buy_sell_symbol_list, pai
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_orders"] = True
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         handle_unsolicited_cxl(buy_sell_symbol_list, expected_strat_limits_, expected_start_status_, pair_strat_,
@@ -930,7 +1099,7 @@ def test_unacked_unsolicited_cxl(clean_and_set_limits, buy_sell_symbol_list, pai
                                max_loop_count_per_side, top_of_book_list_)
 
 
-def test_pair_strat_update_counters(clean_and_set_limits, buy_sell_symbol_list,
+def test_pair_strat_update_counters(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                     pair_strat_, expected_strat_limits_, expected_start_status_):
     with ExecutorNLogAnalyzerManager():
         activated_strats = []
@@ -946,7 +1115,8 @@ def test_pair_strat_update_counters(clean_and_set_limits, buy_sell_symbol_list,
             pair_strat = \
                 PairStratBaseModel(_id=activated_strat.id,
                                    pair_strat_params=PairStratParamsOptional(common_premium=index))
-            updates_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
+            updates_pair_strat = strat_manager_service_native_web_client.patch_pair_strat_client(
+                jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
             assert updates_pair_strat.pair_strat_params_update_seq_num == \
                    activated_strat.pair_strat_params_update_seq_num + 1, \
                 f"Mismatched pair_strat_params_update_seq_num: expected " \
@@ -957,7 +1127,8 @@ def test_pair_strat_update_counters(clean_and_set_limits, buy_sell_symbol_list,
             # updating pair_strat_params
             pair_strat = \
                 PairStratBaseModel(_id=activated_strat.id, strat_limits=StratLimitsOptional(max_concentration=index))
-            updates_pair_strat = strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
+            updates_pair_strat = strat_manager_service_native_web_client.patch_pair_strat_client(
+                jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
             assert updates_pair_strat.strat_limits_update_seq_num == \
                    activated_strat.strat_limits_update_seq_num + 1, \
                 f"Mismatched strat_limits_update_seq_num: expected " \
@@ -965,14 +1136,15 @@ def test_pair_strat_update_counters(clean_and_set_limits, buy_sell_symbol_list,
                 f"{updates_pair_strat.strat_limits_update_seq_num}"
 
 
-def test_portfolio_status_alert_updates(clean_and_set_limits, sample_alert):
+def test_portfolio_status_alert_updates(static_data_, clean_and_set_limits, sample_alert):
     with ExecutorNLogAnalyzerManager():
-        stored_portfolio_status = strat_manager_service_web_client.get_portfolio_status_client(portfolio_status_id=1)
+        stored_portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(portfolio_status_id=1)
 
         alert = copy.deepcopy(sample_alert)
         portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert])
         updated_portfolio_status = \
-            strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
+            strat_manager_service_native_web_client.patch_portfolio_status_client(
+                jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
         assert stored_portfolio_status.alert_update_seq_num + 1 == updated_portfolio_status.alert_update_seq_num, \
             f"Mismatched alert_update_seq_num: expected {stored_portfolio_status.alert_update_seq_num + 1}, " \
             f"received {updated_portfolio_status.alert_update_seq_num}"
@@ -982,7 +1154,8 @@ def test_portfolio_status_alert_updates(clean_and_set_limits, sample_alert):
             alert.alert_brief = f"Test update - {loop_count}"
             portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert])
             alert_updated_portfolio_status = \
-                strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
+                strat_manager_service_native_web_client.patch_portfolio_status_client(
+                    jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
             assert updated_portfolio_status.alert_update_seq_num + (loop_count + 1) == \
                    alert_updated_portfolio_status.alert_update_seq_num, \
                 f"Mismatched alert_update_seq_num: expected " \
@@ -990,7 +1163,7 @@ def test_portfolio_status_alert_updates(clean_and_set_limits, sample_alert):
                 f"received {alert_updated_portfolio_status.alert_update_seq_num}"
 
 
-def test_cxl_order_cxl_confirmed_status(clean_and_set_limits, buy_sell_symbol_list,
+def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                         pair_strat_, expected_strat_limits_,
                                         expected_start_status_, symbol_overview_obj_list,
                                         last_trade_fixture_list, market_depth_basemodel_list,
@@ -1000,7 +1173,7 @@ def test_cxl_order_cxl_confirmed_status(clean_and_set_limits, buy_sell_symbol_li
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
@@ -1039,7 +1212,7 @@ def test_cxl_order_cxl_confirmed_status(clean_and_set_limits, buy_sell_symbol_li
                     "no new order created in this test"
 
                 cxl_order_list = []
-                cxl_order_obj_list = strat_manager_service_web_client.get_all_cancel_order_client()
+                cxl_order_obj_list = strat_manager_service_native_web_client.get_all_cancel_order_client()
                 for cxl_order_obj in cxl_order_obj_list:
                     if cxl_order_obj.order_id == cxl_order_id:
                         cxl_order_list.append(cxl_order_obj)
@@ -1074,7 +1247,7 @@ def test_cxl_order_cxl_confirmed_status(clean_and_set_limits, buy_sell_symbol_li
                     "no new order created in this test"
 
                 cxl_order_list = []
-                cxl_order_obj_list = strat_manager_service_web_client.get_all_cancel_order_client()
+                cxl_order_obj_list = strat_manager_service_native_web_client.get_all_cancel_order_client()
                 for cxl_order_obj in cxl_order_obj_list:
                     if cxl_order_obj.order_id == cxl_order_id:
                         cxl_order_list.append(cxl_order_obj)
@@ -1085,7 +1258,7 @@ def test_cxl_order_cxl_confirmed_status(clean_and_set_limits, buy_sell_symbol_li
                                                         f"received False"
 
 
-def test_partial_ack(clean_and_set_limits, config_dict, pair_strat_,
+def test_partial_ack(static_data_, clean_and_set_limits, config_dict, pair_strat_,
                      expected_strat_limits_, top_of_book_list_,
                      expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
                      market_depth_basemodel_list, buy_sell_symbol_list):
@@ -1093,7 +1266,7 @@ def test_partial_ack(clean_and_set_limits, config_dict, pair_strat_,
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["ack_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         partial_ack_qty: int | None = None
@@ -1143,7 +1316,7 @@ def test_partial_ack(clean_and_set_limits, config_dict, pair_strat_,
                 f"received {pair_strat_obj.strat_status.total_fill_sell_qty}"
 
 
-def test_update_residual_query(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_update_residual_query(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
                                market_depth_basemodel_list, top_of_book_list_):
     with ExecutorNLogAnalyzerManager():
@@ -1164,9 +1337,9 @@ def test_update_residual_query(clean_and_set_limits, buy_sell_symbol_list, pair_
 
         for loop_count in range(total_loop_count):
             # buy side
-            strat_manager_service_web_client.update_residuals_query_client(buy_symbol, Side.BUY, residual_qty)
-            pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
-            strat_brief_list = strat_manager_service_web_client.get_all_strat_brief_client()
+            strat_manager_service_native_web_client.update_residuals_query_client(buy_symbol, Side.BUY, residual_qty)
+            pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
+            strat_brief_list = strat_manager_service_native_web_client.get_all_strat_brief_client()
 
             # since only one strat is created in this test
             pair_strat = pair_strat_list[0]
@@ -1181,9 +1354,9 @@ def test_update_residual_query(clean_and_set_limits, buy_sell_symbol_list, pair_
                 f"{pair_strat.strat_status.residual.residual_notional}"
 
             # sell side
-            strat_manager_service_web_client.update_residuals_query_client(sell_symbol, Side.SELL, residual_qty)
-            pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
-            strat_brief_list = strat_manager_service_web_client.get_all_strat_brief_client()
+            strat_manager_service_native_web_client.update_residuals_query_client(sell_symbol, Side.SELL, residual_qty)
+            pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
+            strat_brief_list = strat_manager_service_native_web_client.get_all_strat_brief_client()
 
             # since only one strat is created in this test
             pair_strat = pair_strat_list[0]
@@ -1196,7 +1369,7 @@ def test_update_residual_query(clean_and_set_limits, buy_sell_symbol_list, pair_
                 f"Mismatch residual_notional: expected 0 received {pair_strat.strat_status.residual.residual_notional}"
 
 
-def test_post_unack_unsol_cxl(clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                               expected_start_status_, symbol_overview_obj_list,
                               last_trade_fixture_list, market_depth_basemodel_list,
                               top_of_book_list_, buy_order_, sell_order_,
@@ -1207,7 +1380,7 @@ def test_post_unack_unsol_cxl(clean_and_set_limits, buy_sell_symbol_list, pair_s
         config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_orders"] = True
         config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
         config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         buy_symbol = buy_sell_symbol_list[0][0]
@@ -1243,7 +1416,7 @@ def test_post_unack_unsol_cxl(clean_and_set_limits, buy_sell_symbol_list, pair_s
             f"Mismatch order_snapshot.order_status: expected OrderStatusType.OE_DOD, " \
             f"received {order_snapshot.order_status}"
 
-        pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+        pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
         assert len(pair_strat_list) == 1, "Expected exactly one pair_strat as only one start exists for this test, " \
                                           f"received {len(pair_strat_list)}, pair_strat_list: {pair_strat_list}"
         # since only one strat in this test
@@ -1252,18 +1425,19 @@ def test_post_unack_unsol_cxl(clean_and_set_limits, buy_sell_symbol_list, pair_s
             "Unexpected alerts found in pair_strat.strat_status, expected no alert for this test"
 
 
-def test_get_ongoing_strat_from_symbol_side_query(clean_and_set_limits, buy_sell_symbol_list,
+def test_get_ongoing_strat_from_symbol_side_query(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                   pair_strat_, expected_strat_limits_,
                                                   expected_start_status_, symbol_overview_obj_list,
                                                   last_trade_fixture_list, market_depth_basemodel_list,
                                                   top_of_book_list_, buy_order_, sell_order_, config_dict):
     with ExecutorNLogAnalyzerManager():
         for buy_symbol, sell_symbol in buy_sell_symbol_list:
+            run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
             activated_strat = create_n_validate_strat(buy_symbol, sell_symbol, pair_strat_,
                                                       expected_strat_limits_, expected_start_status_)
             # buy check
             ongoing_strat_list = \
-                strat_manager_service_web_client.get_ongoing_strat_from_symbol_side_query_client(buy_symbol, Side.BUY)
+                strat_manager_service_native_web_client.get_ongoing_strat_from_symbol_side_query_client(buy_symbol, Side.BUY)
             assert len(ongoing_strat_list) == 1, \
                 f"Expected exact one ongoing strat since only single strat got created in this test, " \
                 f"received {len(ongoing_strat_list)}, ongoing_strat_list: {ongoing_strat_list}"
@@ -1271,8 +1445,9 @@ def test_get_ongoing_strat_from_symbol_side_query(clean_and_set_limits, buy_sell
                                                              f"received {ongoing_strat_list[0]}"
 
             # sell check
-            ongoing_strat_list = strat_manager_service_web_client.get_ongoing_strat_from_symbol_side_query_client(sell_symbol,
-                                                                                                            Side.SELL)
+            ongoing_strat_list = strat_manager_service_native_web_client.get_ongoing_strat_from_symbol_side_query_client(
+                sell_symbol,
+                Side.SELL)
             assert len(ongoing_strat_list) == 1, \
                 f"Expected exact one ongoing strat since only single strat got created in this test, " \
                 f"received {len(ongoing_strat_list)}, ongoing_strat_list: {ongoing_strat_list}"
@@ -1281,7 +1456,7 @@ def test_get_ongoing_strat_from_symbol_side_query(clean_and_set_limits, buy_sell
 
 
 # strat pause tests
-def test_strat_pause_on_residual_notional_breach(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                  pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
                                                  last_trade_fixture_list, market_depth_basemodel_list,
@@ -1290,7 +1465,7 @@ def test_strat_pause_on_residual_notional_breach(clean_and_set_limits, buy_sell_
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
@@ -1304,7 +1479,7 @@ def test_strat_pause_on_residual_notional_breach(clean_and_set_limits, buy_sell_
         sell_symbol = buy_sell_symbol_list[0][1]
 
         residual_qty = 10
-        strat_manager_service_web_client.update_residuals_query_client(buy_symbol, Side.BUY, residual_qty)
+        strat_manager_service_native_web_client.update_residuals_query_client(buy_symbol, Side.BUY, residual_qty)
 
         # placing new non-systematic new_order
         px = 100
@@ -1317,7 +1492,7 @@ def test_strat_pause_on_residual_notional_breach(clean_and_set_limits, buy_sell_
         print(f"symbol: {buy_symbol}, Created new_order obj")
 
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol)
-        pair_strat_list = strat_manager_service_web_client.get_all_pair_strat_client()
+        pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
         # since only one strat exists for current test
         assert len(pair_strat_list) == 1, "Expected single strat since only single strat got created in this test, " \
                                           f"received {pair_strat_list}"
@@ -1331,7 +1506,7 @@ def test_strat_pause_on_residual_notional_breach(clean_and_set_limits, buy_sell_
         assert True
 
 
-def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                                  pair_strat_, expected_strat_limits_,
                                                                  expected_start_status_, symbol_overview_obj_list,
                                                                  last_trade_fixture_list, market_depth_basemodel_list,
@@ -1343,16 +1518,16 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(clean_and_set_l
         config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
         config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
         config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(
             buy_sell_symbol_list, pair_strat_, expected_strat_limits_, expected_start_status_,
             symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-             top_of_book_list_, Side.BUY)
+            top_of_book_list_, Side.BUY)
 
 
-def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                                   pair_strat_, expected_strat_limits_,
                                                                   expected_start_status_, symbol_overview_obj_list,
                                                                   last_trade_fixture_list, market_depth_basemodel_list,
@@ -1364,7 +1539,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(clean_and_set_
         config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
         config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
         config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(
@@ -1373,7 +1548,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(clean_and_set_
             top_of_book_list_, Side.SELL)
 
 
-def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                               pair_strat_, expected_strat_limits_,
                                                               expected_start_status_, symbol_overview_obj_list,
                                                               last_trade_fixture_list, market_depth_basemodel_list,
@@ -1383,7 +1558,7 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(clean_and_set_limi
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 80
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
@@ -1392,7 +1567,7 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(clean_and_set_limi
             top_of_book_list_, Side.BUY)
 
 
-def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                                pair_strat_, expected_strat_limits_,
                                                                expected_start_status_, symbol_overview_obj_list,
                                                                last_trade_fixture_list, market_depth_basemodel_list,
@@ -1402,7 +1577,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(clean_and_set_lim
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 80
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
@@ -1411,15 +1586,200 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(clean_and_set_lim
             top_of_book_list_, Side.SELL)
 
 
+def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
+    # Checking for alerts in portfolio_status
+    with ExecutorNLogAnalyzerManager():
+        stored_portfolio_status = \
+            strat_manager_service_native_web_client.get_portfolio_status_client(portfolio_status_id=1)
+
+        alert_list = []
+        for _ in range(10):
+            alert = copy.deepcopy(sample_alert)
+            alert.id = Alert.__fields__.get("id").default_factory()
+            alert.last_update_date_time = DateTime.utcnow()
+            alert_list.append(alert)
+            portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert])
+            json_obj = jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True)
+            updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(json_obj)
+
+        portfolio_status_list = strat_manager_service_native_web_client.get_all_portfolio_status_client()
+        agg_sorted_alerts: List[Alert] = portfolio_status_list[0].portfolio_alerts[:10]
+        for alert in agg_sorted_alerts:
+            alert.last_update_date_time = pendulum.parse(str(alert.last_update_date_time)).in_timezone("utc")
+        for alert in alert_list:
+            alert.last_update_date_time = \
+                alert.last_update_date_time.replace(microsecond=
+                                                    int(str(alert.last_update_date_time.microsecond)[:3] + "000"))
+        for sorted_alert, expected_alert in zip(agg_sorted_alerts, list(reversed(alert_list))):
+            assert sorted_alert.id == expected_alert.id, \
+                f"Alert ID mismatch: expected Alert {expected_alert.id}, received {sorted_alert.id}"
+            assert sorted_alert.last_update_date_time == expected_alert.last_update_date_time, \
+                f"Alert Datetime mismatch: expected Alert {expected_alert}, received {sorted_alert}"
+
+
+def test_routes_performance():
+    latest_file_date_time_format = "YYYYMMDD"
+    older_file_date_time_format = "YYYYMMDD.HHmmss"
+    log_dir_path = PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / \
+                   "CodeGenProjects" / "addressbook" / "log"
+    files_list = os.listdir(log_dir_path)
+
+    filtered_beanie_latest_log_file_list = []
+    filtered_beanie_older_log_file_list = []
+    for file in files_list:
+        if re.match(".*_beanie_logs_.*", file):
+            if re.match(".*log$", file):
+                filtered_beanie_latest_log_file_list.append(file)
+            else:
+                filtered_beanie_older_log_file_list.append(file)
+
+    # getting latest 2 logs
+    latest_file: str | None = None
+    sec_latest_file: str | None = None
+    for file in filtered_beanie_latest_log_file_list:
+        # First getting latest log
+        # Also setting last log other than latest as sec_latest_file
+        if latest_file is None:
+            latest_file = file
+        else:
+            latest_file_name = latest_file.split(".")[0]
+            latest_file_date_time = pendulum.from_format(
+                latest_file_name[len(latest_file_name)-len(latest_file_date_time_format):],
+                fmt=latest_file_date_time_format
+            )
+
+            current_file_name = file.split(".")[0]
+            current_file_date_time = pendulum.from_format(
+                current_file_name[len(current_file_name) - len(latest_file_date_time_format):],
+                fmt=latest_file_date_time_format
+            )
+
+            if current_file_date_time > latest_file_date_time:
+                sec_latest_file = latest_file
+                latest_file = file
+
+    # If other log is present having .log.YYYYMMDD.HHmmss format with same data then taking
+    # latest log in this category as sec_latest_file
+    if any(latest_file in older_file for older_file in filtered_beanie_older_log_file_list):
+        sec_latest_file = None
+        for file in filtered_beanie_older_log_file_list:
+            if sec_latest_file is None:
+                sec_latest_file = file
+            else:
+                sec_latest_file_date_time = pendulum.from_format(
+                    sec_latest_file[len(sec_latest_file) - len(older_file_date_time_format):],
+                    fmt=older_file_date_time_format
+                )
+
+                current_file_date_time = pendulum.from_format(
+                    file[len(file) - len(older_file_date_time_format):],
+                    fmt=older_file_date_time_format
+                )
+
+                if current_file_date_time > sec_latest_file_date_time:
+                    sec_latest_file = file
+
+    # taking all grep found statements in log matching pattern
+    pattern = "_Callable_"
+    latest_file_content_list: List[str] = []
+    # grep in latest file
+    if latest_file:
+        latest_file_path = log_dir_path / latest_file
+        grep_cmd = pexpect.spawn(f"grep {pattern} {latest_file_path}")
+        for line in grep_cmd:
+            latest_file_content_list.append(line.decode())
+
+    sec_latest_file_content_list: List[str] = []
+    # grep in sec_latest file if exists
+    if sec_latest_file:
+        sec_latest_file_path = log_dir_path / sec_latest_file
+        grep_cmd = pexpect.spawn(f"grep {pattern} {sec_latest_file_path}")
+        for line in grep_cmd:
+            sec_latest_file_content_list.append(line.decode())
+
+    # getting set of callables to be checked in latest and last log file
+    callable_name_set = set()
+    for line in latest_file_content_list:
+        line_space_separated = line.split(" ")
+        callable_name = line_space_separated[line_space_separated.index(pattern)+1]
+        callable_name_set.add(callable_name)
+
+    # processing statement found having particular callable and getting list of all callable
+    # durations and showing average of it in report
+    for callable_name in callable_name_set:
+        callable_time_delta_list = []
+        callable_pattern = f".*{pattern} {callable_name}.*"
+        for line in latest_file_content_list:
+            if re.match(callable_pattern, line):
+                line_space_separated = line.split(" ")
+                time_delta = line_space_separated[line_space_separated.index(pattern)+3]
+                callable_time_delta_list.append(parse_to_float(time_delta))
+        latest_avg_delta = np.mean(callable_time_delta_list)
+        print(f"Avg duration of callable {callable_name} in latest run: {latest_avg_delta:.7f}")
+
+        # if sec_latest_file exists, processing statement found having particular callable and
+        # getting list of all callable durations and showing average of it in report and
+        # showing delta between latest and last callable duration average
+        callable_time_delta_list = []
+        for line in sec_latest_file_content_list:
+            if re.match(callable_pattern, line):
+                line_space_separated = line.split(" ")
+                time_delta = line_space_separated[line_space_separated.index(pattern) + 3]
+                callable_time_delta_list.append(parse_to_float(time_delta))
+        if callable_time_delta_list:
+            sec_latest_avg_delta = np.mean(callable_time_delta_list)
+            print(f"Avg duration of callable {callable_name} in last run: {sec_latest_avg_delta:.7f}")
+            print(f"Delta between last run and latest run for callable {callable_name}: "
+                  f"{(sec_latest_avg_delta-latest_avg_delta):.7f}")
+
+
+# todo: currently contains beanie http call of market data, once cache http is implemented test that too
+def test_update_agg_feature_in_post_put_patch_http_call(clean_and_set_limits):
+    """
+    This test case contains check of update aggregate feature available in beanie port, put and patch http calls.
+    Note: since post, put and patch all uses same method call for this feature and currently only
+          underlying_create_market_depth_http contains this call, testing it to assume this feature is working
+    """
+    for side in [TickTypeEnum.BID, TickTypeEnum.ASK]:
+        expected_cum_notional = 0
+        expected_cum_qty = 0
+        for position in range(1, 6):
+            market_depth_obj = MarketDepthBaseModel()
+            market_depth_obj.symbol = "CB_Sec_1"
+            market_depth_obj.time = DateTime.utcnow()
+            market_depth_obj.side = side
+            market_depth_obj.px = position
+            market_depth_obj.qty = position
+            market_depth_obj.position = position
+
+            created_market_depth_obj = market_data_web_client.create_market_depth_client(market_depth_obj)
+
+            expected_cum_notional += (market_depth_obj.qty * market_depth_obj.px)
+            assert expected_cum_notional == created_market_depth_obj.cumulative_notional, \
+                f"Cumulative notional Mismatched: expected {expected_cum_notional}, " \
+                f"received {created_market_depth_obj.cumulative_notional}"
+
+            expected_cum_qty += market_depth_obj.qty
+            assert expected_cum_qty == created_market_depth_obj.cumulative_qty, \
+                f"Cumulative qty Mismatched: expected {expected_cum_qty}, " \
+                f"received {created_market_depth_obj.cumulative_qty}"
+
+            expected_cum_avg_px = (expected_cum_notional / expected_cum_qty)
+            assert expected_cum_avg_px == created_market_depth_obj.cumulative_avg_px, \
+                f"Cumulative avg px Mismatched: expected {expected_cum_avg_px}, " \
+                f"received {created_market_depth_obj.cumulative_avg_px}"
+
+
 def test_drop_test_environment():
-    drop_mongo_collections(mongo_server_uri="mongodb://localhost:27017", database_name="addressbook_test",
+    ps_db_name, md_db_name = get_ps_n_md_db_names(test_config_file_path)
+    mongo_server_uri: str = get_mongo_server_uri()
+    drop_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=ps_db_name,
                            ignore_collections=["UILayout"])
-    drop_mongo_collections(mongo_server_uri="mongodb://localhost:27017", database_name="market_data_test_fixture",
+    drop_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=md_db_name,
                            ignore_collections=["UILayout"])
 
 
 def test_clear_test_environment():
-    clean_mongo_collections(mongo_server_uri="mongodb://localhost:27017", database_name="addressbook_test",
-                            ignore_collections=["UILayout"])
-    clean_mongo_collections(mongo_server_uri="mongodb://localhost:27017", database_name="market_data_test_fixture",
-                            ignore_collections=["UILayout"])
+    ps_db_name, md_db_name = get_ps_n_md_db_names(test_config_file_path)
+    clean_all_collections_ignoring_ui_layout(ps_db_name, md_db_name)
+

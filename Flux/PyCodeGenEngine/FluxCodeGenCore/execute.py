@@ -53,7 +53,8 @@ class Execute:
             os.system(protoc_cmd)
 
             # Adding python generated dir in PYTHONPATH
-            python_path_env = os.getenv("PYTHONPATH") if os.getenv("PYTHONPATH") is not None else ""
+            python_path_env = python_path if ((python_path := os.getenv("PYTHONPATH")) is not None and
+                                              len(python_path)) else ""
             os.environ["PYTHONPATH"] = python_path_env + ":" + str(PurePath(out_dir) / dir_names[0])
 
         except Exception as e:

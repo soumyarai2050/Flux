@@ -9,7 +9,7 @@ const AlertBubble = (props) => {
     }
 
     return (
-        <Badge className={alertBubbleClass} badgeContent={props.content} />
+        <Badge className={alertBubbleClass} badgeContent={props.content} max={999} />
     )
 }
 

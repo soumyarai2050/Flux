@@ -8,7 +8,7 @@ import pytest
 from ibapi.contract import Contract
 from ibapi.common import BarData, TickerId, TagValueList
 # project imports
-from FluxPythonUtils.scripts.utility_functions import yaml_loader, configure_logger
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 from FluxPythonUtils.scripts.utility_functions import str_from_file
 from Flux.CodeGenProjects.market_data.app.ib_api_client import IbApiClient
 from Flux.CodeGenProjects.market_data.app.store_historical_data_client import StoreHistoricalDataClient
@@ -24,7 +24,7 @@ misc_dir_path = project_root_path / "misc"
 @pytest.fixture(scope="session")
 def config_yaml():
     config_file_path: PurePath = misc_dir_path / "config.yaml"
-    config_yaml = yaml_loader(str(config_file_path))
+    config_yaml = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
     log_dir_path: PurePath = misc_dir_path
     configure_logger(config_yaml["log_level"], str(log_dir_path))
     yield config_yaml

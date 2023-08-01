@@ -5,9 +5,11 @@ from typing import List, Callable, Dict, ClassVar
 import time
 from abc import abstractmethod
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -26,10 +28,12 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     query_params_key: ClassVar[str] = "query_params"
     query_params_data_types_key: ClassVar[str] = "query_params_data_types"
     query_type_key: ClassVar[str] = "query_type"
+    query_route_type_key: ClassVar[str] = "query_route_type"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
-        if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
+        if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and \
+                len(response_field_case_style):
             self.response_field_case_style: str = response_field_case_style
         else:
             err_str = f"Env var 'RESPONSE_FIELD_CASE_STYLE' received as {response_field_case_style}"
@@ -51,16 +55,18 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.client_file_name: str = ""
         self.launch_file_name: str = ""
         self.routes_callback_class_name: str = ""
-        self.routes_callback_class_name_override: str = ""
+        self.base_native_override_routes_callback_class_name: str = ""
+        self.beanie_native_override_routes_callback_class_name: str = ""
+        self.beanie_bare_override_routes_callback_class_name: str = ""
+        self.cache_native_override_routes_callback_class_name: str = ""
+        self.cache_bare_override_routes_callback_class_name: str = ""
         self.routes_callback_class_name_capital_camel_cased: str = ""
         self.int_id_message_list: List[protogen.Message] = []
         self.callback_override_set_instance_file_name: str = ""
         self.reentrant_lock_non_required_msg: List[protogen.Message] = [
             # messages having SetReentrantLock field as True of FluxMsgJsonRoot option
         ]
-        self.reentrant_lock_on_top_required_msg: List[protogen.Message] = [
-            # messages having SetReentrantLockToTop field as True of FluxMsgJsonRoot option
-        ]
+
 
     def load_dependency_messages_and_enums_in_dicts(self, message: protogen.Message):
         for field in message.fields:
@@ -101,20 +107,6 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 # else not required: If json root option don't have reentrant field then considering it requires
                 # reentrant lock as default and avoiding its append to reentrant lock non-required list
 
-                if (is_reentrant_on_top := json_root_msg_option_val_dict.get(
-                        BaseFastapiPlugin.flux_json_root_set_reentrant_lock_to_top_field)) is not None:
-                    if not is_reentrant_required:
-                        err_str = "Field SetReentrantLock is set to true, avoiding adding model's reentrant lock " \
-                                  "to generated route for this model therefor no use can be made of " \
-                                  "SetReentrantLockToTop field set to true, make changes to proto file for it"
-                        logging.error(err_str)
-                        raise Exception(err_str)
-                    else:
-                        if is_reentrant_on_top:
-                            self.reentrant_lock_on_top_required_msg.append(message)
-                        # else not required: if not set or is false then lock will be created on default position
-                # else not required: If not set then avoiding any processing for it
-
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
@@ -148,7 +140,10 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 option_dict[BaseFastapiPlugin.flux_json_query_name_field]
             agg_value_dict[BaseFastapiPlugin.query_aggregate_var_name_key] = \
                 option_dict.get(BaseFastapiPlugin.flux_json_query_aggregate_var_name_field)
-            query_type = option_dict.get(BaseFastapiPlugin.flux_json_query_type_field)
+            agg_value_dict[BaseFastapiPlugin.query_type_key] = \
+                option_dict.get(BaseFastapiPlugin.flux_json_query_type_field)
+            agg_value_dict[BaseFastapiPlugin.query_route_type_key] = \
+                option_dict.get(BaseFastapiPlugin.flux_json_query_route_type_field)
             if (query_params := option_dict.get(
                     BaseFastapiPlugin.flux_json_query_params_field)) is not None:
                 query_params_data_types = \
@@ -170,7 +165,6 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             else:
                 agg_value_dict[BaseFastapiPlugin.query_params_key] = []
                 agg_value_dict[BaseFastapiPlugin.query_params_data_types_key] = []
-            agg_value_dict[BaseFastapiPlugin.query_type_key] = query_type
 
             list_of_agg_value_dict.append(agg_value_dict)
         return list_of_agg_value_dict
@@ -190,6 +184,9 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             for field in message.fields:
                 if field.proto.name == BaseFastapiPlugin.default_id_field_name:
                     if "int" == (field_type := self.proto_to_py_datatype(field)):
+                        id_field_type = field_type
+                        break
+                    elif "str" == (field_type := self.proto_to_py_datatype(field)):
                         id_field_type = field_type
                         break
                     else:
@@ -219,6 +216,15 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         routes_callback_class_name_camel_cased: str = convert_to_camel_case(self.routes_callback_class_name)
         self.routes_callback_class_name_capital_camel_cased: str = \
             routes_callback_class_name_camel_cased[0].upper() + routes_callback_class_name_camel_cased[1:]
-        self.routes_callback_class_name_override = f"{self.proto_file_name}_routes_callback_override"
+        self.base_native_override_routes_callback_class_name: str = \
+            f"{self.proto_file_name}_routes_callback_base_native_override"
+        self.beanie_native_override_routes_callback_class_name = \
+            f"{self.proto_file_name}_routes_callback_beanie_native_override"
+        self.beanie_bare_override_routes_callback_class_name = \
+            f"{self.proto_file_name}_routes_callback_beanie_bare_override"
+        self.cache_native_override_routes_callback_class_name = \
+            f"{self.proto_file_name}_routes_callback_cache_native_override"
+        self.cache_bare_override_routes_callback_class_name = \
+            f"{self.proto_file_name}_routes_callback_cache_bare_override"
         self.callback_override_set_instance_file_name = f"{self.proto_file_name}_callback_override_set_instance"
 

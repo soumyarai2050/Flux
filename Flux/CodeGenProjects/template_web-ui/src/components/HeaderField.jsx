@@ -26,8 +26,8 @@ const HeaderField = (props) => {
 
     let add = false;
     let remove = false;
-    if (props.data.mode === Modes.EDIT_MODE && !props.data.uiUpdateOnly) {
-        if (props.data.type === DataTypes.ARRAY && !props.data['data-remove']) {
+    if (props.data.mode === Modes.EDIT_MODE) {
+        if (props.data.type === DataTypes.ARRAY && !props.data['data-remove']  && !props.data.uiUpdateOnly) {
             add = true;
             remove = true;
         }

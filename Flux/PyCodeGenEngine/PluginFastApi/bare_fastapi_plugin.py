@@ -58,7 +58,7 @@ class BareFastapiPlugin(FastapiCallbackFileHandler,
                 self.handle_callback_override_set_instance_file_gen(),
 
             # Adding dummy callback override class file
-            "dummy_" + self.routes_callback_class_name_override + ".py": self.handle_callback_override_file_gen(),
+            "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py": self.handle_callback_override_file_gen(),
 
             # Adding project's routes.py
             self.routes_file_name + ".py": self.handle_routes_file_gen(),

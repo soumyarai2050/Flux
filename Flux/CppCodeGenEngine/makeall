@@ -1,0 +1,36 @@
+DIR_LIST=`ls | grep -v Make | grep -v AddNewGenerator | grep -v makeall | grep -v FluxCodeGenCore`
+if [  "$1" == "clean" ] ; then
+	cd FluxCodeGenCore
+	make clean
+	cd -
+	for DIRECTORY_NAME in $DIR_LIST
+	do
+		cd ${DIRECTORY_NAME}
+		make clean
+		cd -
+	done
+else 
+	if [  "$1" == "all" ] ; then
+		cd FluxCodeGenCore
+		make clean
+		make
+		cd -
+		for DIRECTORY_NAME in $DIR_LIST
+		do
+			cd ${DIRECTORY_NAME}
+			make clean
+			make
+			cd -
+		done
+	else
+                cd FluxCodeGenCore
+                make
+                cd -
+                for DIRECTORY_NAME in $DIR_LIST
+                do
+                        cd ${DIRECTORY_NAME}
+                        make
+                        cd -
+                done
+	fi
+fi

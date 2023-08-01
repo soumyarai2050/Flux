@@ -5,6 +5,12 @@ import "trade_core.proto";
 package addressbook;
 
 
+enum CommandType {
+  COMMAND_TYPE_UNSPECIFIED = 0;
+  CLEAR_STRAT = 1;
+  RESET_STATE = 2;
+}
+
 enum OrderEventType{
   OE_UNSPECIFIED = 0;
   OE_NEW = 1;
@@ -81,7 +87,8 @@ message OrderBrief{
   optional int64 qty = 5;
   optional float order_notional = 6 [(FluxFldDisplayType) = "int"];
   required string underlying_account = 7;
-  repeated string text = 8 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
+  optional string exchange = 8;
+  repeated string text = 9 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
 }
 
 message Alert{

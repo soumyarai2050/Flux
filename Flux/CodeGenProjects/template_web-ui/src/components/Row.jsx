@@ -93,6 +93,9 @@ const Row = (props) => {
                         onAutocompleteOptionChange={onAutocompleteOptionChange}
                         onDateTimeChange={onDateTimeChange}
                         onFormUpdate={props.onFormUpdate}
+                        index={props.index}
+                        forceUpdate={props.forceUpdate}
+                        truncateDateTime={props.truncateDateTime}
                     />
                 )
             })}

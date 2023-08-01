@@ -13,6 +13,28 @@ import classes from './NodeField.module.css';
 const NodeField = (props) => {
     const state = useSelector(state => state);
     const validationError = useRef(null);
+    const [inputValue, setInputValue] = useState(props.data.value);
+    const [focus, setFocus] = useState(false);
+    const inputRef = useRef(null);
+    const cursorPos = useRef(null);
+
+    useEffect(() => {
+        setInputValue(props.data.value);
+    }, [props.data.index])
+
+    useEffect(() => {
+        if (props.data.forceUpdate) {
+            setInputValue(props.data.value);
+        }
+    }, [props.data.forceUpdate])
+
+    useEffect(() => {
+        if (inputRef.current && focus && cursorPos.current !== null) {
+            if (inputRef.current.selectionStart !== cursorPos.current) {
+                inputRef.current.setSelectionRange(cursorPos.current, cursorPos.current);
+            }
+        }
+    }, [inputValue])
 
     useEffect(() => {
         if (props.data.onFormUpdate) {
@@ -25,13 +47,22 @@ const NodeField = (props) => {
         }
     }, [props.data.onFormUpdate])
 
+    const handleTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
+        cursorPos.current = e.target.selectionStart;
+        setInputValue(value);
+        props.data.onTextChange(e, type, xpath, value, dataxpath, validationRes);
+    }
+
     let disabled = true;
     if (props.data.mode === Modes.EDIT_MODE) {
         if (props.data.ormNoUpdate && !props.data['data-add']) {
             disabled = true;
-        } else if (props.data.uiUpdateOnly && props.data['data-add']) {
-            disabled = true;
-        } else if (props.data['data-remove']) {
+        }
+        // disabled to allow object with ui update only to be created and edited
+        // else if (props.data.uiUpdateOnly && props.data['data-add']) {
+        //    disabled = true;
+        // }
+        else if (props.data['data-remove']) {
             disabled = true;
         } else {
             disabled = false;
@@ -239,7 +270,7 @@ const NodeField = (props) => {
             </LocalizationProvider>
         )
     } else {
-        let value = props.data.value ? props.data.value : '';
+        let value = inputValue ? inputValue : '';
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
             <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
@@ -255,14 +286,18 @@ const NodeField = (props) => {
                 size='small'
                 required={props.data.required}
                 error={validationError.current !== null}
+                focused={focus}
+                onFocus={() => setFocus(true)}
+                onBlur={() => setFocus(false)}
                 value={value}
                 disabled={disabled}
-                onChange={(e) => props.data.onTextChange(e, props.data.type, props.data.xpath, e.target.value, props.data.dataxpath,
+                onChange={(e) => handleTextChange(e, props.data.type, props.data.xpath, e.target.value, props.data.dataxpath,
                     validateConstraints(props.data, e.target.value))}
                 variant='outlined'
                 placeholder={props.data.placeholder}
                 InputProps={inputProps}
                 inputProps={{
+                    ref: inputRef,
                     style: { padding: '6px 10px' },
                     dataxpath: props.data.dataxpath,
                     underlyingtype: props.data.underlyingtype

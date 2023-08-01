@@ -2,7 +2,7 @@
 # project imports
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import config_file_path
-from FluxPythonUtils.scripts.utility_functions import update_yaml_configurations
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
 
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
@@ -10,7 +10,7 @@ test_config_file_path: PurePath = PROJECT_DATA_DIR / "config.yaml"
 
 
 # limit breach order blocks test-cases
-def test_min_order_notional_breach(clean_and_set_limits, buy_sell_symbol_list,
+def test_min_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                    pair_strat_, expected_strat_limits_,
                                    expected_start_status_, symbol_overview_obj_list,
                                    last_trade_fixture_list, market_depth_basemodel_list,
@@ -36,7 +36,7 @@ def test_min_order_notional_breach(clean_and_set_limits, buy_sell_symbol_list,
                                                                       check_str, assert_fail_msg)
 
 
-def test_max_order_notional_breach(clean_and_set_limits, buy_sell_symbol_list,
+def test_max_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                    pair_strat_, expected_strat_limits_,
                                    expected_start_status_, symbol_overview_obj_list,
                                    last_trade_fixture_list, market_depth_basemodel_list,
@@ -61,7 +61,7 @@ def test_max_order_notional_breach(clean_and_set_limits, buy_sell_symbol_list,
                                                                       check_str, assert_fail_msg)
 
 
-def test_max_order_qty_breach(clean_and_set_limits, buy_sell_symbol_list,
+def test_max_order_qty_breach(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                               pair_strat_, expected_strat_limits_,
                               expected_start_status_, symbol_overview_obj_list,
                               last_trade_fixture_list, market_depth_basemodel_list,
@@ -86,7 +86,7 @@ def test_max_order_qty_breach(clean_and_set_limits, buy_sell_symbol_list,
                                                                       check_str, assert_fail_msg)
 
 
-def test_breach_threshold_px_with_wrong_tob(clean_and_set_limits, buy_sell_symbol_list,
+def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                             pair_strat_, expected_strat_limits_,
                                             expected_start_status_, symbol_overview_obj_list,
                                             last_trade_fixture_list, market_depth_basemodel_list,
@@ -138,7 +138,7 @@ def test_breach_threshold_px_with_wrong_tob(clean_and_set_limits, buy_sell_symbo
                                                                       check_str, assert_fail_msg)
 
 
-def test_breach_threshold_px_with_unsupported_side(clean_and_set_limits, buy_sell_symbol_list,
+def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                    pair_strat_, expected_strat_limits_,
                                                    expected_start_status_, symbol_overview_obj_list,
                                                    last_trade_fixture_list, market_depth_basemodel_list,
@@ -162,7 +162,7 @@ def test_breach_threshold_px_with_unsupported_side(clean_and_set_limits, buy_sel
                                                                       check_str, assert_fail_msg)
 
 
-def test_breach_threshold_px_with_0_depth_px(clean_and_set_limits, buy_sell_symbol_list,
+def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                              pair_strat_, expected_strat_limits_,
                                              expected_start_status_, symbol_overview_obj_list,
                                              last_trade_fixture_list, market_depth_basemodel_list,
@@ -193,7 +193,7 @@ def test_breach_threshold_px_with_0_depth_px(clean_and_set_limits, buy_sell_symb
                                                                       check_str, assert_fail_msg)
 
 
-def test_breach_threshold_px_with_none_aggressive_quote(clean_and_set_limits, buy_sell_symbol_list,
+def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                         pair_strat_, expected_strat_limits_,
                                                         expected_start_status_, symbol_overview_obj_list,
                                                         last_trade_fixture_list, market_depth_basemodel_list,
@@ -247,7 +247,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(clean_and_set_limits, bu
 
 
 # todo: currently failing since executor not reaches limits check if tob is None
-def _test_px_check_if_tob_none(clean_and_set_limits, buy_sell_symbol_list,
+def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                pair_strat_, expected_strat_limits_,
                                expected_start_status_, symbol_overview_obj_list,
                                last_trade_fixture_list, market_depth_basemodel_list,
@@ -257,7 +257,7 @@ def _test_px_check_if_tob_none(clean_and_set_limits, buy_sell_symbol_list,
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     # delay to manually start addressbook_log_analyzer.py
     time.sleep(30)
@@ -285,7 +285,7 @@ def _test_px_check_if_tob_none(clean_and_set_limits, buy_sell_symbol_list,
     clean_slate_post_test()
 
 
-def test_breach_threshold_px_for_max_basis_points(clean_and_set_limits, buy_sell_symbol_list,
+def test_breach_threshold_px_for_max_basis_points(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                   pair_strat_, expected_strat_limits_,
                                                   expected_start_status_, symbol_overview_obj_list,
                                                   last_trade_fixture_list, market_depth_basemodel_list,
@@ -330,7 +330,7 @@ def test_breach_threshold_px_for_max_basis_points(clean_and_set_limits, buy_sell
                                                                       check_str, assert_fail_message)
 
 
-def test_breach_threshold_px_for_max_px_by_deviation(clean_and_set_limits, buy_sell_symbol_list,
+def test_breach_threshold_px_for_max_px_by_deviation(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                      pair_strat_, expected_strat_limits_,
                                                      expected_start_status_, symbol_overview_obj_list,
                                                      last_trade_fixture_list, market_depth_basemodel_list,
@@ -376,7 +376,7 @@ def test_breach_threshold_px_for_max_px_by_deviation(clean_and_set_limits, buy_s
                                                                       check_str, assert_fail_message)
 
 
-def test_breach_threshold_px_for_px_by_max_depth(clean_and_set_limits, buy_sell_symbol_list,
+def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                  pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
                                                  last_trade_fixture_list, market_depth_basemodel_list,
@@ -418,7 +418,7 @@ def test_breach_threshold_px_for_px_by_max_depth(clean_and_set_limits, buy_sell_
                                                                       check_str, assert_fail_message)
 
 
-def test_strat_limits_with_none_symbol_overview(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_none_symbol_overview(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                 pair_strat_, expected_strat_limits_,
                                                 expected_start_status_, symbol_overview_obj_list,
                                                 last_trade_fixture_list, market_depth_basemodel_list,
@@ -463,7 +463,7 @@ def test_strat_limits_with_none_symbol_overview(clean_and_set_limits, buy_sell_s
                                                                       check_str, assert_fail_message)
 
 
-def test_strat_limits_with_0_consumable_open_orders(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                     pair_strat_, expected_strat_limits_,
                                                     expected_start_status_, symbol_overview_obj_list,
                                                     last_trade_fixture_list, market_depth_basemodel_list,
@@ -478,7 +478,7 @@ def test_strat_limits_with_0_consumable_open_orders(clean_and_set_limits, buy_se
         buy_symbol = buy_sell_symbol_list[0][0]
         sell_symbol = buy_sell_symbol_list[0][1]
 
-        strat_brief_list = strat_manager_service_web_client.get_all_strat_brief_client()
+        strat_brief_list = strat_manager_service_native_web_client.get_all_strat_brief_client()
         # since only one strat in current test
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
@@ -486,7 +486,7 @@ def test_strat_limits_with_0_consumable_open_orders(clean_and_set_limits, buy_se
         strat_brief = strat_brief_list[0]
         strat_brief.pair_buy_side_trading_brief.consumable_open_orders = -1
         updated_strat_brief = \
-            strat_manager_service_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
+            strat_manager_service_native_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
         assert updated_strat_brief.pair_buy_side_trading_brief.consumable_open_orders == -1, \
             "Updated strat_brief.pair_buy_side_trading_brief.consumable_open_orders to -1 using http route call but " \
             f"received unexpected returned value {updated_strat_brief}"
@@ -499,13 +499,13 @@ def test_strat_limits_with_0_consumable_open_orders(clean_and_set_limits, buy_se
                               "orders due to 0 consumable open orders"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message)
-        strat_brief_list = strat_manager_service_web_client.get_all_strat_brief_client()
+        strat_brief_list = strat_manager_service_native_web_client.get_all_strat_brief_client()
         # since only one strat in current test
         assert len(strat_brief_list) == 1
         strat_brief = strat_brief_list[0]
         strat_brief.pair_sell_side_trading_brief.consumable_open_orders = -1
         updated_strat_brief = \
-            strat_manager_service_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
+            strat_manager_service_native_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
         assert updated_strat_brief.pair_sell_side_trading_brief.consumable_open_orders == -1
 
         # placing new non-systematic new_order
@@ -516,7 +516,7 @@ def test_strat_limits_with_0_consumable_open_orders(clean_and_set_limits, buy_se
                                                                       check_str, assert_fail_message)
 
 
-def test_strat_limits_with_high_consumable_notional(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                     pair_strat_, expected_strat_limits_,
                                                     expected_start_status_, symbol_overview_obj_list,
                                                     last_trade_fixture_list, market_depth_basemodel_list,
@@ -526,7 +526,7 @@ def test_strat_limits_with_high_consumable_notional(clean_and_set_limits, buy_se
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 30
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -553,7 +553,7 @@ def test_strat_limits_with_high_consumable_notional(clean_and_set_limits, buy_se
                                                                       check_str, assert_fail_message)
 
 
-def test_strat_limits_with_less_consumable_concentration(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                          pair_strat_, expected_strat_limits_,
                                                          expected_start_status_, symbol_overview_obj_list,
                                                          last_trade_fixture_list, market_depth_basemodel_list,
@@ -568,7 +568,7 @@ def test_strat_limits_with_less_consumable_concentration(clean_and_set_limits, b
         buy_symbol = buy_sell_symbol_list[0][0]
         sell_symbol = buy_sell_symbol_list[0][1]
 
-        strat_brief_list = strat_manager_service_web_client.get_all_strat_brief_client()
+        strat_brief_list = strat_manager_service_native_web_client.get_all_strat_brief_client()
         # since only one strat in current test
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
@@ -576,7 +576,7 @@ def test_strat_limits_with_less_consumable_concentration(clean_and_set_limits, b
         strat_brief = strat_brief_list[0]
         strat_brief.pair_buy_side_trading_brief.consumable_concentration = 0
         strat_brief.pair_sell_side_trading_brief.consumable_concentration = 0
-        updated_strat_brief = strat_manager_service_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
+        updated_strat_brief = strat_manager_service_native_web_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
         assert updated_strat_brief.pair_buy_side_trading_brief.consumable_concentration == 0, \
             "Mismatch pair_buy_side_trading_brief.consumable_concentration: expected 0, received " \
             f"{updated_strat_brief.pair_buy_side_trading_brief.consumable_concentration}"
@@ -600,7 +600,7 @@ def test_strat_limits_with_less_consumable_concentration(clean_and_set_limits, b
                                                                       check_str, assert_fail_message)
 
 
-def test_strat_limits_with_symbol_overview_limit_dn_up_px(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                           pair_strat_, expected_strat_limits_,
                                                           expected_start_status_, symbol_overview_obj_list,
                                                           last_trade_fixture_list, market_depth_basemodel_list,
@@ -634,7 +634,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(clean_and_set_limits, 
                                                                       check_str, assert_fail_message)
 
 
-def test_strat_limits_with_negative_consumable_participation_qty(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_negative_consumable_participation_qty(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                                  pair_strat_, expected_strat_limits_,
                                                                  expected_start_status_, symbol_overview_obj_list,
                                                                  last_trade_fixture_list, market_depth_basemodel_list,
@@ -645,7 +645,7 @@ def test_strat_limits_with_negative_consumable_participation_qty(clean_and_set_l
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
@@ -680,7 +680,7 @@ def test_strat_limits_with_negative_consumable_participation_qty(clean_and_set_l
                                                                       last_order_id=placed_new_order_journal.order.order_id)
 
 
-def test_strat_limits_with_0_consumable_participation_qty(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                           pair_strat_, expected_strat_limits_,
                                                           expected_start_status_, symbol_overview_obj_list,
                                                           last_trade_fixture_list, market_depth_basemodel_list,
@@ -690,12 +690,12 @@ def test_strat_limits_with_0_consumable_participation_qty(clean_and_set_limits, 
         buy_symbol = buy_sell_symbol_list[0][0]
         sell_symbol = buy_sell_symbol_list[0][1]
 
+        # running symbol_overview
+        run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
         # Creating Strat
         active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                                     copy.deepcopy(expected_strat_limits_),
                                                     copy.deepcopy(expected_start_status_))
-        # running symbol_overview
-        run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
 
         # creating market_depth
         create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list)
@@ -720,7 +720,7 @@ def test_strat_limits_with_0_consumable_participation_qty(clean_and_set_limits, 
                                                                       check_str, assert_fail_message)
 
 
-def test_strat_limits_with_low_consumable_participation_qty(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                             pair_strat_, expected_strat_limits_,
                                                             expected_start_status_, symbol_overview_obj_list,
                                                             last_trade_fixture_list, market_depth_basemodel_list,
@@ -730,12 +730,12 @@ def test_strat_limits_with_low_consumable_participation_qty(clean_and_set_limits
         buy_symbol = buy_sell_symbol_list[0][0]
         sell_symbol = buy_sell_symbol_list[0][1]
 
+        # running symbol_overview
+        run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
         # Creating Strat
         active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                                     copy.deepcopy(expected_strat_limits_),
                                                     copy.deepcopy(expected_start_status_))
-        # running symbol_overview
-        run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
 
         # creating market_depth
         create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list)
@@ -762,7 +762,7 @@ def test_strat_limits_with_low_consumable_participation_qty(clean_and_set_limits
 
 
 # portfolio limits checks
-def test_portfolio_limits_rolling_new_order_breach(clean_and_set_limits, buy_sell_symbol_list,
+def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                    pair_strat_, expected_strat_limits_,
                                                    expected_start_status_, symbol_overview_obj_list,
                                                    last_trade_fixture_list, market_depth_basemodel_list,
@@ -772,7 +772,7 @@ def test_portfolio_limits_rolling_new_order_breach(clean_and_set_limits, buy_sel
     for symbol in config_dict["symbol_configs"]:
         config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
         config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-    update_yaml_configurations(config_dict, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
     with ExecutorNLogAnalyzerManager():
 
@@ -786,7 +786,7 @@ def test_portfolio_limits_rolling_new_order_breach(clean_and_set_limits, buy_sel
 
         rolling_max_order_count = RollingMaxOrderCountOptional(max_rolling_tx_count=1, rolling_tx_count_period_seconds=100)
         portfolio_limits_basemodel = PortfolioLimitsBaseModel(_id=1, rolling_max_order_count=rolling_max_order_count)
-        updated_portfolio_limits = strat_manager_service_web_client.patch_portfolio_limits_client(
+        updated_portfolio_limits = strat_manager_service_native_web_client.patch_portfolio_limits_client(
             portfolio_limits_basemodel.dict(by_alias=True, exclude_none=True))
         assert updated_portfolio_limits.rolling_max_order_count == rolling_max_order_count, \
             f"Mismatch rolling_max_order_count: expected {rolling_max_order_count}, " \
@@ -811,7 +811,7 @@ def test_portfolio_limits_rolling_new_order_breach(clean_and_set_limits, buy_sel
 
 
 # tests for not implemented limits
-def test_strat_limits_with_high_consumable_open_notional(clean_and_set_limits, buy_sell_symbol_list,
+def test_strat_limits_with_high_consumable_open_notional(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                          pair_strat_, expected_strat_limits_,
                                                          expected_start_status_, symbol_overview_obj_list,
                                                          last_trade_fixture_list, market_depth_basemodel_list,

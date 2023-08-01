@@ -14,7 +14,7 @@ def test_build_and_clean_web_project(root_dir: PurePath, build_and_clean_web_pro
                                      'strat_manager_service_launch_server.py', 'strat_manager_service_model_imports.py',
                                      'strat_manager_service_pb2.py', 'strat_manager_service_routes.py',
                                      'strat_manager_service_routes_callback.py',
-                                     'strat_manager_service_routes_callback_override.py',
+                                     'strat_manager_service_routes_callback_beanie_override.py',
                                      'strat_manager_service_web_client.py', 'StratCollection.jsx',
                                      'stratCollectionSlice.js', 'StratLimits.jsx', 'StratStatus.jsx', 'uiLayoutSlice.js'
                                      ]

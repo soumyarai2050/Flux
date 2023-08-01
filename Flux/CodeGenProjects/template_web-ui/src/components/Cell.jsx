@@ -9,13 +9,17 @@ import { Error } from '@mui/icons-material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
-    getHoverTextType, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getLocalizedValueAndSuffix
+    getHoverTextType, getValueFromReduxStoreFromXpath, floatToInt,
+    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray
 } from '../utils';
 import { DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import classes from './Cell.module.css';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+dayjs.extend(utc);
 
 const Cell = (props) => {
     const {
@@ -38,6 +42,33 @@ const Cell = (props) => {
     const [newUpdateClass, setNewUpdateClass] = useState("");
     const timeoutRef = useRef(null);
     const validationError = useRef(null);
+    const [inputValue, setInputValue] = useState(currentValue);
+    const inputRef = useRef(null);
+    const cursorPos = useRef(null);
+
+    useEffect(() => {
+        setInputValue(currentValue);
+    }, [props.index])
+
+    useEffect(() => {
+        if (props.forceUpdate) {
+            setInputValue(currentValue);
+        }
+    }, [props.forceUpdate])
+
+    useEffect(() => {
+        if (mode === Modes.READ_MODE) {
+            setInputValue(currentValue);
+        }
+    }, [currentValue])
+
+    useEffect(() => {
+        if (inputRef.current && active && cursorPos.current !== null) {
+            if (inputRef.current.selectionStart !== cursorPos.current) {
+                inputRef.current.setSelectionRange(cursorPos.current, cursorPos.current);
+            }
+        }
+    }, [inputValue])
 
     useEffect(() => {
         if (props.onFormUpdate && xpath) {
@@ -58,6 +89,12 @@ const Cell = (props) => {
         }
     }, [currentValue, oldValue, timeoutRef, classes, props.highlightUpdate])
 
+    const handleTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
+        cursorPos.current = e.target.selectionStart;
+        setInputValue(value);
+        props.onTextChange(e, type, xpath, value, dataxpath, validationRes);
+    }
+
     const onFocusIn = useCallback(() => {
         setActive(true);
     }, [])
@@ -75,7 +112,7 @@ const Cell = (props) => {
     }, [])
 
     const onKeyDown = useCallback((e) => {
-        if (e.keyCode == 13) {
+        if (e.keyCode === 13) {
             onFocusOut();
         }
     }, [])
@@ -97,16 +134,20 @@ const Cell = (props) => {
         } else if (type === DataTypes.ENUM) {
             value = value ? value : null;
         } else if (type === DataTypes.NUMBER) {
-            value = value ? value : value === 0 ? 0 : '';
+            value = value ? value : value === 0 ? 0 : value;
             if (collection.displayType === DataTypes.INTEGER) {
                 if (value !== '') {
                     value = floatToInt(value);
                 }
             }
         } else if (type === DataTypes.DATE_TIME) {
+        if (props.truncateDateTime) {
+            value = value ? dayjs.utc(value).format('YYYY-MM-DD HH:mm') : null;
+        } else {
             value = value ? value : null;
+        }
         } else if (type === DataTypes.STRING) {
-            value = value ? value : '';
+            value = inputValue ? inputValue : inputValue;
         }
     }
     let color = getColorTypeFromValue(collection, currentValue);
@@ -147,7 +188,7 @@ const Cell = (props) => {
                         id={collection.key}
                         options={collection.options}
                         getOptionLabel={(option) => option}
-                        isOptionEqualToValue={(option, value) => option == value}
+                        isOptionEqualToValue={(option, value) => option === value}
                         disableClearable
                         disabled={disabled}
                         forcePopupIcon={false}
@@ -178,12 +219,6 @@ const Cell = (props) => {
             )
         } else if (type === DataTypes.BOOLEAN) {
             validationError.current = validateConstraints(collection, value);
-            const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
-            ) : null;
-            const inputProps = endAdornment ? {
-                endAdornment: endAdornment
-            } : {};
             return (
                 <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Checkbox
@@ -195,9 +230,7 @@ const Cell = (props) => {
                         checked={value}
                         disabled={disabled}
                         error={validationError.current}
-                        // ref={inputRef}
                         onChange={(e) => props.onCheckboxChange(e, dataxpath, xpath)}
-                        // InputProps={inputProps}
                         autoFocus
                     />
                 </TableCell >
@@ -360,11 +393,12 @@ const Cell = (props) => {
                         disabled={disabled}
                         // ref={inputRef}
                         placeholder={collection.placeholder}
-                        onChange={(e) => props.onTextChange(e, type, xpath, e.target.value, dataxpath,
+                        onChange={(e) => handleTextChange(e, type, xpath, e.target.value, dataxpath,
                             validateConstraints(collection, e.target.value))}
                         variant='outlined'
                         InputProps={inputProps}
                         inputProps={{
+                            ref: inputRef,
                             style: { padding: '6px 10px' },
                             dataxpath: dataxpath,
                             underlyingtype: collection.underlyingtype
@@ -403,7 +437,7 @@ const Cell = (props) => {
                 disabledCaptions[buttonValue] = caption;
             })
         }
-        let isDisabledValue = _.keys(disabledCaptions).includes(String(value)) ? true : false;
+        let isDisabledValue = _.keys(disabledCaptions).includes(String(value));
         let disabledCaption = isDisabledValue ? disabledCaptions[String(value)] : '';
         let checked = String(value) === collection.button.pressed_value_as_text;
         let color = getColorTypeFromValue(collection, String(value));
@@ -428,7 +462,7 @@ const Cell = (props) => {
                     value={value}
                     caption={caption}
                     xpath={dataxpath}
-                    disabled={dataRemove || disabled || buttonDisable || isDisabledValue ? true : false}
+                    disabled={!!(dataRemove || disabled || buttonDisable || isDisabledValue)}
                     action={collection.button.action}
                     onClick={props.onButtonClick}
                 />
@@ -479,11 +513,14 @@ const Cell = (props) => {
         let updatedData = currentValue;
         if (type === DataTypes.OBJECT || type === DataTypes.ARRAY || (type === DataTypes.STRING && isValidJsonString(updatedData))) {
             if (type === DataTypes.OBJECT || type === DataTypes.ARRAY) {
-                updatedData = updatedData ? clearxpath(cloneDeep(updatedData)) : {};
+                updatedData = updatedData ? cloneDeep(updatedData) : {};
+                formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
+                updatedData = clearxpath(updatedData);
             } else {
                 updatedData = updatedData.replace(/\\/g, '');
                 updatedData = JSON.parse(updatedData);
             }
+            excludeNullFromObject(updatedData);
 
             return (
                 <TableCell className={`${classes.cell} ${classes.abbreviated_json_cell} ${tableCellRemove}`} align='center' size='medium' onClick={onOpenTooltip}>

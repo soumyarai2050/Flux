@@ -138,7 +138,10 @@ class PathWSConnectionManager(WSConnectionManager):
                         task = asyncio.create_task(ws.send_text(json_str), name=f"{len(task_list)}")
                         task_list.append(task)
         except Exception as e:
-            logging.error(f"await asyncio.wait raised exception: {e}")
+            logging.exception(f"await asyncio.wait raised exception: {e}")
+
+    def has_activ_ws(self):
+        return True if len(self.active_ws_callable_n_kwargs_tuple_set) > 0 else False
 
 
 class PathWithIdWSConnectionManager(WSConnectionManager):
@@ -150,8 +153,8 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
     def __str__(self):
         ret_str = "active_ws_set: "
         with self.rlock:
-            for obj_id, active_ws_set in self.id_to_active_ws_set_dict.items():
-                set_as_str = "".join([str(ws) for ws in active_ws_set])
+            for obj_id, active_ws_n_filter_callable_tuple_set in self.id_to_active_ws_n_filter_callable_set_dict.items():
+                set_as_str = "".join([str(ws) for ws, _, _ in active_ws_n_filter_callable_tuple_set])
                 ret_str += f"obj_id: {obj_id} set: {set_as_str}\n"
             return ret_str + "\n" + str(super)
 
@@ -203,39 +206,50 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
     #     else:
     #         return cleaned_json_data_str
 
-    async def broadcast(self, json_str, obj_id: Any, task_list: List[asyncio.Task]):
+    async def broadcast_to_ws_tuple_set(self,
+                                  active_ws_n_filter_callable_tuple_set: Set[Tuple[WebSocket, Callable[..., Any] | None,
+                                                                                   Tuple[Tuple[Any, Any]] | None]],
+                                  json_str: str, obj_id, task_list: List[asyncio.Task]):
         active_ws = None
         remove_websocket_list: List[WebSocket] = list()
-        try:
-            async with self.rlock:
-                if obj_id in self.id_to_active_ws_n_filter_callable_set_dict:
-                    active_ws_n_filter_callable_tuple_set: \
-                        Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]] = \
-                        self.id_to_active_ws_n_filter_callable_set_dict[obj_id]
-                    for ws, filter_callable, kwargs_tuple in active_ws_n_filter_callable_tuple_set:
-                        active_ws = ws
-                        # somehow this was found as a string
-                        if filter_callable is None:
-                            create_task = True
-                        else:
-                            kwargs = {k: v for k, v in kwargs_tuple}
-                            create_task = filter_callable(json_str, **kwargs)
-                            # else not required: ignore task creation if callable not allows
-                        if create_task:
-                            task = asyncio.create_task(ws.send_text(json_str), name=f"{len(task_list)}")
-                            task_list.append(task)
+        for ws, filter_callable, kwargs_tuple in active_ws_n_filter_callable_tuple_set:
+            try:
+                active_ws = ws
+                # somehow this was found as a string
+                if filter_callable is None:
+                    create_task = True
                 else:
-                    logging.info(f"broadcast called on id: {obj_id} - no registered websocket found for this id")
-        except WebSocketDisconnect as e:
-            remove_websocket_list.append(ws)
-            logging.exception(f"WebSocketDisconnect: encountered while broadcasting, exception: {e}, ws: {active_ws}")
-        except RuntimeError as e:
-            remove_websocket_list.append(active_ws)
-            logging.exception(f"RuntimeError: encountered while broadcasting, exception: {e}, ws: {active_ws}")
-        except Exception as e:
-            remove_websocket_list.append(ws)
-            logging.exception(f"Exception: {e}, ws: {active_ws}")
-        finally:
-            for ws in remove_websocket_list:
-                if ws in self.id_to_active_ws_n_filter_callable_set_dict[obj_id]:
-                    await self.disconnect(ws, obj_id)
+                    kwargs = {k: v for k, v in kwargs_tuple}
+                    create_task = filter_callable(json_str, **kwargs)
+                    # else not required: ignore task creation if callable not allows
+                if create_task:
+                    task = asyncio.create_task(ws.send_text(json_str), name=f"{len(task_list)}")
+                    task_list.append(task)
+            except WebSocketDisconnect as e:
+                remove_websocket_list.append(ws)
+                logging.exception(
+                    f"WebSocketDisconnect: encountered while broadcasting, exception: {e}, ws: {active_ws}")
+            except RuntimeError as e:
+                remove_websocket_list.append(active_ws)
+                logging.exception(f"RuntimeError: encountered while broadcasting, exception: {e}, ws: {active_ws}")
+            except Exception as e:
+                remove_websocket_list.append(ws)
+                logging.exception(f"Exception: {e}, ws: {active_ws}")
+            finally:
+                for ws in remove_websocket_list:
+                    if ws in self.id_to_active_ws_n_filter_callable_set_dict[obj_id]:
+                        await self.disconnect(ws, obj_id)
+
+    def get_activ_ws_tuple_set(self, obj_id) -> \
+            Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]] | None:
+        return self.id_to_active_ws_n_filter_callable_set_dict.get(obj_id)
+
+    async def broadcast(self, json_str, obj_id: Any, task_list: List[asyncio.Task]):
+        async with self.rlock:
+            active_ws_n_filter_callable_tuple_set: \
+                Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]]
+            if active_ws_n_filter_callable_tuple_set := self.get_activ_ws_tuple_set(obj_id):
+                await self.broadcast_to_ws_tuple_set(active_ws_n_filter_callable_tuple_set, json_str, obj_id, task_list)
+            else:
+                logging.error(f"Unexpected: no registered websocket found for broadcast call with id: {obj_id}")
+

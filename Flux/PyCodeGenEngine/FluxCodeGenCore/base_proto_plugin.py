@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os
 import re
-from typing import List, Dict, ClassVar
+from typing import List, Dict, ClassVar, Any
 import logging
 from abc import ABC, abstractmethod
 import protogen
@@ -9,6 +9,7 @@ import protogen
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
+from FluxPythonUtils.scripts.utility_functions import parse_to_int, parse_to_float
 
 # Required for accessing custom options from schema
 from Flux.PyCodeGenEngine.FluxCodeGenCore import insertion_imports
@@ -31,6 +32,7 @@ class BaseProtoPlugin(ABC):
         will be populated by derived implementation based on output generation
         depending on insert points based template
     """
+    flux_option_file_name = "flux_options.proto"
     msg_options_standard_prefix = "FluxMsg"
     fld_options_standard_prefix = "FluxFld"
     flux_fld_val_is_datetime: ClassVar[str] = "FluxFldValIsDateTime"
@@ -38,19 +40,25 @@ class BaseProtoPlugin(ABC):
     flux_msg_json_root: ClassVar[str] = "FluxMsgJsonRoot"
     flux_msg_json_query: ClassVar[str] = "FluxMsgJsonQuery"
     flux_json_root_create_field: ClassVar[str] = "CreateDesc"
+    flux_json_root_create_all_field: ClassVar[str] = "CreateAllDesc"
     flux_json_root_read_field: ClassVar[str] = "ReadDesc"
     flux_json_root_update_field: ClassVar[str] = "UpdateDesc"
+    flux_json_root_update_all_field: ClassVar[str] = "UpdateAllDesc"
     flux_json_root_patch_field: ClassVar[str] = "PatchDesc"
+    flux_json_root_patch_all_field: ClassVar[str] = "PatchAllDesc"
     flux_json_root_delete_field: ClassVar[str] = "DeleteDesc"
     flux_json_root_read_websocket_field: ClassVar[str] = "ReadWebSocketDesc"
     flux_json_root_update_websocket_field: ClassVar[str] = "UpdateWebSocketDesc"
     flux_json_root_set_reentrant_lock_field: ClassVar[str] = "SetReentrantLock"
-    flux_json_root_set_reentrant_lock_to_top_field: ClassVar[str] = "SetReentrantLockToTop"
     flux_json_query_name_field: ClassVar[str] = "QueryName"
     flux_json_query_aggregate_var_name_field: ClassVar[str] = "AggregateVarName"
     flux_json_query_params_field: ClassVar[str] = "QueryParams"
     flux_json_query_params_data_type_field: ClassVar[str] = "QueryParamsDataType"
     flux_json_query_type_field: ClassVar[str] = "QueryType"
+    flux_json_query_route_type_field: ClassVar[str] = "QueryRouteType"
+    flux_json_query_route_get_type_field_val: ClassVar[str] = "GET"
+    flux_json_query_route_patch_type_field_val: ClassVar[str] = "PATCH"
+    flux_json_query_require_js_slice_changes_field: ClassVar[str] = "RequireJsSliceChanges"
     flux_fld_is_required: ClassVar[str] = "FluxFldIsRequired"
     flux_fld_cmnt: ClassVar[str] = "FluxFldCmnt"
     flux_msg_cmnt: ClassVar[str] = "FluxMsgCmnt"
@@ -70,7 +78,8 @@ class BaseProtoPlugin(ABC):
     flux_fld_date_time_format: str = "FluxFldDateTimeFormat"
     flux_fld_elaborated_title: str = "FluxFldElaborateTitle"
     flux_fld_name_color: str = "FluxFldNameColor"
-    flux_msg_widget_ui_data: str = "FluxMsgWidgetUIData"
+    flux_msg_widget_ui_data_element: str = "FluxMsgWidgetUIDataElement"
+    flux_msg_widget_ui_data_element_widget_ui_data_field: str = "widget_ui_data"
     flux_msg_aggregate_query_var_name: str = "FluxMsgAggregateQueryVarName"
     aggregation_type_update: str = "AggregateType_UpdateAggregate"
     aggregation_type_filter: str = "AggregateType_FilterAggregate"
@@ -80,22 +89,22 @@ class BaseProtoPlugin(ABC):
     flux_file_crud_host: str = "FluxFileCRUDHost"
     flux_file_crud_port_offset: str = "FluxFileCRUDPortOffset"
     flux_fld_help: str = "FluxFldHelp"
-    flux_fld_ui_update_only:  str = "FluxFldUIUpdateOnly"
-    flux_fld_ui_placeholder:  str = "FluxFldUIPlaceholder"
-    flux_fld_default_value_placeholder_string:  str = "FluxFldDefaultValuePlaceholderString"
-    flux_fld_alert_bubble_color:  str = "FluxFldAlertBubbleColor"
-    flux_fld_alert_bubble_source:  str = "FluxFldAlertBubbleSource"
-    flux_fld_color:  str = "FluxFldColor"
-    flux_fld_server_populate:  str = "FluxFldServerPopulate"
-    flux_fld_switch:  str = "FluxFldSwitch"
-    flux_fld_orm_no_update:  str = "FluxFldOrmNoUpdate"
-    flux_fld_size_max:  str = "FluxFldSizeMax"
-    flux_fld_sticky:  str = "FluxFldSticky"
-    flux_fld_val_sort_weight:  str = "FluxFldValSortWeight"
-    flux_fld_hide:  str = "FluxFldHide"
-    flux_fld_progress_bar:  str = "FluxFldProgressBar"
-    flux_fld_filter_enable:  str = "FluxFldFilterEnable"
-    flux_msg_server_populate:  str = "FluxMsgServerPopulate"
+    flux_fld_ui_update_only: str = "FluxFldUIUpdateOnly"
+    flux_fld_ui_placeholder: str = "FluxFldUIPlaceholder"
+    flux_fld_default_value_placeholder_string: str = "FluxFldDefaultValuePlaceholderString"
+    flux_fld_alert_bubble_color: str = "FluxFldAlertBubbleColor"
+    flux_fld_alert_bubble_source: str = "FluxFldAlertBubbleSource"
+    flux_fld_color: str = "FluxFldColor"
+    flux_fld_server_populate: str = "FluxFldServerPopulate"
+    flux_fld_switch: str = "FluxFldSwitch"
+    flux_fld_orm_no_update: str = "FluxFldOrmNoUpdate"
+    flux_fld_size_max: str = "FluxFldSizeMax"
+    flux_fld_sticky: str = "FluxFldSticky"
+    flux_fld_val_sort_weight: str = "FluxFldValSortWeight"
+    flux_fld_hide: str = "FluxFldHide"
+    flux_fld_progress_bar: str = "FluxFldProgressBar"
+    flux_fld_filter_enable: str = "FluxFldFilterEnable"
+    flux_msg_server_populate: str = "FluxMsgServerPopulate"
     flux_msg_main_crud_operations_agg: str = "FluxMsgMainCRUDOperationsAgg"
     flux_fld_collection_link: str = "FluxFldCollectionLink"
     flux_fld_no_common_key: str = "FluxFldNoCommonKey"
@@ -187,6 +196,7 @@ class BaseProtoPlugin(ABC):
             return True
         return False
 
+    # deprecated
     @staticmethod
     def __get_complex_option_value_as_list_of_tuple(option_string: str, option_name: str):
         option_value_list_of_tuples = []
@@ -214,6 +224,7 @@ class BaseProtoPlugin(ABC):
             # else not required: option_name not in option_string line, then ignore
         return option_value_list_of_tuples
 
+    # deprecated
     @staticmethod
     def get_complex_msg_option_values_as_list_of_tuple(message: protogen.Message, option_name: str) -> List[Dict]:
         message_options_temp_str = str(message.proto.options)
@@ -247,68 +258,159 @@ class BaseProtoPlugin(ABC):
         return output_str
 
     @staticmethod
-    def _get_complex_option_value_as_list_of_dict(option_string: str, option_name: str) -> List[Dict]:
-        option_value_list_of_dict: List[Dict] = []
-        for option_str_line in str(option_string).split("\n"):
-            temp_dict: Dict[List[str, ...] | str] = {}
-            if option_name in str(option_str_line):
-                option_str_line_index = option_string.index(option_str_line)
-                sliced_message_option_str = option_string[option_str_line_index:]
-                option_string = option_string[option_str_line_index + 1:]
-                for sliced_option_str_line in sliced_message_option_str.split("\n"):
-                    if ":" in sliced_option_str_line:
-                        field_name = sliced_option_str_line.split(":")[0][2:]
-                        field_val = sliced_option_str_line.split(":")[1]
-                        if '"' in field_val:
-                            # For string value: removing extra quotation marks
-                            processed_field_val = str(field_val[2:-1])
-                        else:
-                            # For bool value
-                            if ' true' == field_val or ' false' == field_val:
-                                processed_field_val = True if field_val == ' true' else False
-                            else:
-                                if sliced_option_str_line.split(":")[1].isdigit():
-                                    processed_field_val = int(field_val)
-                                else:
-                                    processed_field_val = field_val
-                        if field_name in temp_dict:
-                            if isinstance(temp_dict[field_name], list):
-                                temp_dict[field_name].append(processed_field_val)
-                            else:
-                                temp_dict[field_name] = [temp_dict[field_name], processed_field_val]
-                        else:
-                            temp_dict[field_name] = processed_field_val
-                    elif "}" in sliced_option_str_line:
-                        option_value_list_of_dict.append(temp_dict)
-                        break
-            # else not required: option_name not in option_string line, then ignore
-        return option_value_list_of_dict
+    def _type_cast_option_str_val_to_type(val_str: str, proto_type: str):
+        if proto_type.lower() == "string":
+            return f'{val_str[2:-1]}'
+        elif proto_type.lower() == "int32" or proto_type.lower() == "int32":
+            return parse_to_int(val_str)
+        elif proto_type.lower() == "bool":
+            return True if ('true' in val_str) else False
+        elif proto_type.lower() == "float":
+            return parse_to_float(val_str)
+        else:
+            return val_str.strip()
+
+    @staticmethod
+    def _get_complex_option_set_values(option_string: str, option_name: str | None = None,
+                                       proto_entity: protogen.Message | protogen.Field | protogen.File | None = None,
+                                       option_type: protogen.Message | None = None) -> Dict:
+        if option_type is None:
+            if isinstance(proto_entity, protogen.Message) or isinstance(proto_entity, protogen.Field):
+                option_type = BaseProtoPlugin.get_complex_option_type(proto_entity.parent_file, option_name)
+            elif isinstance(proto_entity, protogen.File):
+                option_type = BaseProtoPlugin.get_complex_option_type(proto_entity, option_name)
+            else:
+                err_str = f"Unexpected: proto_entity type: {type(proto_entity)}, name: {proto_entity.proto.name}"
+                logging.exception(err_str)
+                raise Exception(err_str)
+        # else taking param value
+
+        output_dict: Dict[str, Any] = {}
+        for field in option_type.fields:
+            if field.message is None:
+                field_name_search_str = f"{field.proto.name}:"
+                if field_name_search_str in option_string:
+                    field_name_index = option_string.index(field_name_search_str)
+                    option_string_sliced = option_string[field_name_index + len(field_name_search_str):]
+                    new_line_index = option_string_sliced.index("\n")
+                    field_val = BaseProtoPlugin._type_cast_option_str_val_to_type(option_string_sliced[:new_line_index],
+                                                                                  field.kind.name.lower())
+
+                    is_repeated = False
+                    field_val_list = []
+                    if field.cardinality.name.lower() == "repeated":
+                        is_repeated = True
+                        field_val_list.append(field_val)
+                        while field_name_search_str in option_string_sliced:
+                            field_name_index = option_string_sliced.index(field_name_search_str)
+                            option_string_sliced = option_string_sliced[field_name_index+len(field_name_search_str):]
+                            new_line_index = option_string_sliced.index("\n")
+                            field_val = \
+                                BaseProtoPlugin._type_cast_option_str_val_to_type(option_string_sliced[:new_line_index],
+                                                                                  field.kind.name.lower())
+                            field_val_list.append(field_val)
+
+                    if is_repeated:
+                        output_dict[f"{field.proto.name}"] = field_val_list
+                    else:
+                        output_dict[f"{field.proto.name}"] = field_val
+
+            else:
+                field_name_search_str = f"{field.proto.name}"+" {"
+                if field_name_search_str in option_string:
+                    field_name_index = option_string.index(field_name_search_str)
+                    option_string_sliced = option_string[field_name_index + len(field_name_search_str):]
+                    field_val = (
+                        BaseProtoPlugin._get_complex_option_set_values(option_string_sliced, option_type=field.message))
+
+                    is_repeated = False
+                    field_val_list = []
+                    if field.cardinality.name.lower() == "repeated":
+                        is_repeated = True
+                        field_val_list.append(field_val)
+                        while field_name_search_str in option_string_sliced:
+                            field_name_index = option_string_sliced.index(field_name_search_str)
+                            option_string_sliced = option_string_sliced[field_name_index + len(field_name_search_str):]
+                            field_val = (
+                                BaseProtoPlugin._get_complex_option_set_values(option_string_sliced,
+                                                                               option_type=field.message))
+                            field_val_list.append(field_val)
+
+                    if is_repeated:
+                        output_dict[f"{field.proto.name}"] = field_val_list
+                    else:
+                        output_dict[f"{field.proto.name}"] = field_val
+        return output_dict
 
     @staticmethod
     def get_complex_option_set_values(proto_entity: protogen.Message | protogen.Field | protogen.File,
                                       option_name: str,
                                       is_option_repeated: bool | None = None) -> List[Dict] | Dict:
         """
-        Returns list of dictionaries containing each complex option's value tree on each index.
-        If Option is repeated type returns list of option value tree dicts else returns only one for non-repeated.
+        Interface to get option values from proto model file
+        :param proto_entity: proto entity of which option value is to be found
+        :param option_name: options name string
+        :param is_option_repeated: used to check if option is repeated or not
+        :return: returns List[Dict] if `is_option_repeated` is True else returns Dict,
+                 returns empty List or Dict if option is not found
         """
-        proto_entity_options_str = str(proto_entity.proto.options)
-        option_value_list_of_dict = \
-            BaseProtoPlugin._get_complex_option_value_as_list_of_dict(proto_entity_options_str, option_name)
-        if is_option_repeated is not None and is_option_repeated:
-            return option_value_list_of_dict
-        else:
-            if len(option_value_list_of_dict) < 2:
-                if len(option_value_list_of_dict) == 1:
-                    return option_value_list_of_dict[0]
-                else:
-                    return {}
+        option_string = str(proto_entity.proto.options)
+        option_name_check_str = f"[{option_name}]"
+        if option_name_check_str in option_string:
+
+            # taking list of options_str if options is repeated type
+            option_string_list = []
+            if is_option_repeated:
+                while option_name_check_str in option_string:
+                    option_name_index = option_string.index(option_name_check_str)
+                    option_string = option_string[option_name_index + len(option_name_check_str):]
+                    if option_name_check_str in option_string:
+                        option_string_list.append(option_string[:option_string.index(option_name_check_str)])
+                    else:
+                        option_string_list.append(option_string)
+                repeated_option_value_as_list_of_dict: List[Dict] = []
+                for option_string_ in option_string_list:
+                    option_val_dict = BaseProtoPlugin._get_complex_option_set_values(option_string_,
+                                                                                     option_name, proto_entity)
+                    repeated_option_value_as_list_of_dict.append(option_val_dict)
+                return repeated_option_value_as_list_of_dict
             else:
-                err_str = "Interface get_complex_option_values_as_list_of_dict has param is_option_repeated set " \
-                          f"as either None or False but received repeated option values for option name {option_name}" \
-                          f" in proto_entity {proto_entity.proto.name}"
-                logging.exception(err_str)
-                raise Exception(err_str)
+                option_name_index = option_string.index(option_name_check_str)
+                # removing unnecessary starting str
+                option_string = option_string[option_name_index + len(option_name_check_str):]
+
+                # checking if any more option after this is present in this option_str
+                if "[FluxMsg" in option_string:
+                    # if next option is found taking start of next option as end of current option str
+                    option_str_end_index = option_string.index("[FluxMsg")
+                    option_string = option_string[:option_str_end_index]
+                # else not required: taking complete sliced option_str
+                option_val_dict = BaseProtoPlugin._get_complex_option_set_values(option_string,
+                                                                                 option_name, proto_entity)
+                return option_val_dict
+        if is_option_repeated:
+            return []
+        else:
+            return {}
+
+    @staticmethod
+    def get_dependency_message_proto_obj(file: protogen.File, message_name: str):
+        for dependency in file.dependencies:
+            for message in dependency.messages:
+                if message.proto.name == message_name:
+                    return message
+        return None
+
+    @staticmethod
+    def get_complex_option_type(file: protogen.File, option_name: str) -> protogen.Message | None:
+        """
+        returns option type if is of complex type or returns None otherwise
+        """
+        for dependency in file.dependencies:
+            if dependency.proto.name == BaseProtoPlugin.flux_option_file_name:
+                for option_field in dependency.extensions:
+                    if option_field.proto.name == option_name:
+                        return option_field.message
 
     @staticmethod
     def get_flux_msg_cmt_option_value(message: protogen.Message) -> str:
@@ -335,8 +437,8 @@ class BaseProtoPlugin(ABC):
     @staticmethod
     def import_path_from_os_path(os_path_env_var_name: str, import_file_name: str):
         # remove projects home prefix from all import paths
-        if (project_root_dir := os.getenv("PROJECT_ROOT")) is not None:
-            if (pydantic_path := os.getenv(os_path_env_var_name)) is not None:
+        if (project_root_dir := os.getenv("PROJECT_ROOT")) is not None and len(project_root_dir):
+            if (pydantic_path := os.getenv(os_path_env_var_name)) is not None and len(pydantic_path):
                 if pydantic_path is not None and pydantic_path.startswith("/"):
                     pydantic_path = pydantic_path.removeprefix(project_root_dir)
                 else:
@@ -345,11 +447,11 @@ class BaseProtoPlugin(ABC):
                     pydantic_path = pydantic_path[1:]
                 return f'{".".join(pydantic_path.split(os.sep))}.{import_file_name}'
             else:
-                err_str = f"Env var '{os_path_env_var_name}' received as None"
+                err_str = f"Env var '{os_path_env_var_name}' received as {pydantic_path}"
                 logging.exception(err_str)
                 raise Exception(err_str)
         else:
-            err_str = "Env var 'PROJECT_ROOT' received as None"
+            err_str = f"Env var 'PROJECT_ROOT' received as {project_root_dir}"
             logging.exception(err_str)
             raise Exception(err_str)
 
@@ -383,7 +485,7 @@ class BaseProtoPlugin(ABC):
                                   f"output_file_name: {output_file_name}"
                         logging.exception(err_str)
                         raise Exception(err_str)
-                    
+
                     output_file_name_to_insertion_points_n_content_dict[output_file_name] = {}
                     for insert_point, replacing_content in output_file_content.items():
                         output_file_name_to_insertion_points_n_content_dict[output_file_name][insert_point] = \
@@ -409,10 +511,10 @@ class BaseProtoPlugin(ABC):
 
 
 def main(plugin_class):
-    if (project_dir_path := os.getenv("PROJECT_DIR")) is not None:
+    if (project_dir_path := os.getenv("PROJECT_DIR")) is not None and len(project_dir_path):
         pydantic_class_gen_plugin = plugin_class(project_dir_path)
         pydantic_class_gen_plugin.process()
     else:
-        err_str = "Env var 'PROJECT_DIR' received as None"
+        err_str = f"Env var 'PROJECT_DIR' received as {project_dir_path}"
         logging.exception(err_str)
         raise Exception(err_str)

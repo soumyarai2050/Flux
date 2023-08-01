@@ -11,7 +11,7 @@ if __name__ == "__main__":
     env_var_dict = CodeGenEngineEnvManager.default_gen_env_var_dict
     env_var_dict["PLUGIN_FILE_NAME"] = "cpp_key_handler.py"
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",
-                                                             "PluginCppKeyHandler", env_var_dict)
+                                                             "PluginCppUtilGen", env_var_dict)
 
     plugin_execute_script = PluginExecuteScript(str(code_gen_engine_env_manager.project_dir), "service.proto")
     plugin_execute_script.execute()

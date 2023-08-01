@@ -47,7 +47,7 @@ const TableWidget = (props) => {
         setRows(props.rows);
         setHeadCells(props.tableColumns);
         setCommonkeys(props.commonKeyCollections);
-    }, [props.data]);
+    }, [props.data, props.rows]);
 
     useEffect(() => {
         let trees = generateRowTrees(cloneDeep(data), props.collections, props.xpath);
@@ -230,7 +230,7 @@ const TableWidget = (props) => {
                 enableOverride.splice(index, 1);
             }
         }
-        props.onOverrideChange(props.headerProps.name, enableOverride, disableOverride);
+        props.onOverrideChange(enableOverride, disableOverride);
     }
 
     const onSettingsOpen = () => {
@@ -404,6 +404,7 @@ const TableWidget = (props) => {
             onReload={props.headerProps.onReload}
             onSave={props.headerProps.onSave}
             commonkeys={commonkeys}
+            truncateDateTime={props.truncateDateTime}
             supportedLayouts={props.headerProps.supportedLayouts}>
 
             {getFilteredCells().length > 0 && rows.length > 0 &&
@@ -482,6 +483,9 @@ const TableWidget = (props) => {
                                                 selected={selected}
                                                 mode={props.mode}
                                                 onFormUpdate={props.onFormUpdate}
+                                                index={props.index}
+                                                forceUpdate={props.forceUpdate}
+                                                truncateDateTime={props.truncateDateTime}
                                             />
                                         )
                                     })}

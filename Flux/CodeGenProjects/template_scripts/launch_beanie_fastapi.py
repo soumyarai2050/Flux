@@ -4,21 +4,25 @@ from datetime import datetime
 home_dir_path = PurePath(__file__).parent.parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
 from Flux.code_gen_engine_env import CodeGenEngineEnvManager
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, parse_to_int
 
 
 if __name__ == "__main__":
-
     project_dir: PurePath = PurePath(__file__).parent.parent
+    config_yaml_path = project_dir / "data" / "config.yaml"
+    config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
     code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
     db_type: str = "beanie"
     datetime_str: str = datetime.now().strftime("%Y%m%d")
+    port = 8000 if ((config_port := config_yaml_dict.get(f"{db_type}_port")) is None or
+                    len(config_port) == 0) else parse_to_int(config_port)
     env_dict = {
         "RELOAD": "false",
         "DEBUG_SLEEP_TIME": "0",
         "LOG_FILE_DIR_PATH": f"{project_dir / 'log' }",
         "LOG_FILE_NAME": f"template_project_name_{db_type}_logs_{datetime_str}.log",
-        "LOG_LEVEL": "debug",
         "FASTAPI_FILE_NAME": f"template_model_service_{db_type}_fastapi",
+        "PORT": f"{port}",
         "DBType": f"{db_type}"
     }
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "_", env_dict)

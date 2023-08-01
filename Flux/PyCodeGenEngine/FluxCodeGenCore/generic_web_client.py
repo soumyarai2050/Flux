@@ -34,6 +34,19 @@ def generic_http_post_client(url: str, pydantic_obj, pydantic_type):
 
 
 @log_n_except
+def generic_http_post_all_client(url: str, pydantic_obj_list, pydantic_type):
+    # When used for routes
+    if pydantic_obj_list is not None:
+        json_data = jsonable_encoder(pydantic_obj_list, by_alias=True, exclude_none=True)
+
+    # When used for queries like get last date query, as there is no pydantic obj in case of query
+    else:
+        json_data = None
+    response: requests.Response = requests.post(url, json=json_data)
+    return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.POST)
+
+
+@log_n_except
 def generic_http_get_client(url: str, query_param: Any, pydantic_type):
     # When used for routes
     if query_param is not None:
@@ -59,8 +72,26 @@ def generic_http_put_client(url: str, pydantic_obj, pydantic_type):
 
 
 @log_n_except
+def generic_http_put_all_client(url: str, pydantic_obj_list, pydantic_type):
+    if pydantic_obj_list is not None:
+        # When used for routes
+        json_data = jsonable_encoder(pydantic_obj_list, by_alias=True)
+    else:
+        # When used for queries like get last date query, as there is no pydantic obj in case of query
+        json_data = None
+    response: requests.Response = requests.put(url, json=json_data)
+    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PUT)
+
+
+@log_n_except
 def generic_http_patch_client(url: str, pydantic_obj_json, pydantic_type):
     response: requests.Response = requests.patch(url, json=pydantic_obj_json)
+    return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
+
+
+@log_n_except
+def generic_http_patch_all_client(url: str, pydantic_obj_json_list, pydantic_type):
+    response: requests.Response = requests.patch(url, json=pydantic_obj_json_list)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.PATCH)
 
 
@@ -169,6 +200,12 @@ def generic_http_index_client(url: str, query_params: List[Any], pydantic_type):
 
 
 @log_n_except
-def generic_http_query_client(url: str, query_params_dict: Dict[str, Any], pydantic_type):
+def generic_http_get_query_client(url: str, query_params_dict: Dict[str, Any], pydantic_type):
     response: requests.Response = requests.get(url, params=query_params_dict)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
+
+
+@log_n_except
+def generic_http_patch_query_client(url: str, query_payload_dict: Dict[str, Any], pydantic_type):
+    response: requests.Response = requests.patch(url, json=query_payload_dict)
+    return http_response_as_class_type(url, response, 201, pydantic_type, HTTPRequestType.PATCH)

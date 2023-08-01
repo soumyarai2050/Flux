@@ -3,10 +3,10 @@ import logging
 import os
 import time
 from typing import Tuple
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -240,6 +240,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
     def assign_required_data_members(self, file: protogen.File):
         super().assign_required_data_members(file)
         self.model_file_name = f'{self.proto_file_name}_beanie_model'
+        self.generic_routes_file_name = f'generic_beanie_routes'
 
 
 if __name__ == "__main__":

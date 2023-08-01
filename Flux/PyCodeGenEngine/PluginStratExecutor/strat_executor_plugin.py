@@ -5,9 +5,10 @@ from typing import List, Callable, Tuple, Dict
 import os
 import time
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -56,37 +57,15 @@ class StratExecutorPlugin(BaseProtoPlugin):
                 BaseProtoPlugin.get_complex_option_set_values(message, BaseProtoPlugin.flux_msg_executor_options)
             key_sequence_option_val: List[str] | str | None = \
                 option_dict.get(BaseProtoPlugin.executor_option_executor_key_sequence_field)
-            key_counts_option_val: str | None = option_dict.get(
-                BaseProtoPlugin.executor_option_executor_key_count_field)
             if key_sequence_option_val is not None:
-                key_counts_option_val: int = \
-                    parse_to_int(key_counts_option_val) if key_counts_option_val is not None else 1
-                if isinstance(key_sequence_option_val, str):
-                    if key_counts_option_val != 1:
-                        err_str = f"Unexpected: Received single key_sequence_option_val but " \
-                                  f"key_counts_option_val is {key_counts_option_val}"
-                        logging.exception(err_str)
-                        raise Exception(err_str)
-                    key_sequence_option_val_hyphen_sep = key_sequence_option_val.split("-")
+                return_list = []
+                for key_seq in key_sequence_option_val:
+                    key_sequence_option_val_hyphen_sep = key_seq.split("-")
                     for index, key_sequence_option_val in enumerate(key_sequence_option_val_hyphen_sep):
                         key_sequence_option_val_hyphen_sep[index] = \
                             StratExecutorPlugin._clean_string_key_val(key_sequence_option_val)
-                    return [key_sequence_option_val_hyphen_sep]
-                elif isinstance(key_sequence_option_val, list):
-                    if key_counts_option_val != 2:
-                        err_str = f"Unexpected: Received no. of key_sequence_option_val " \
-                                  f"is {len(key_sequence_option_val)} but " \
-                                  f"key_counts_option_val is {key_counts_option_val}"
-                        logging.exception(err_str)
-                        raise Exception(err_str)
-                    return_list = []
-                    for key_seq in key_sequence_option_val:
-                        key_sequence_option_val_hyphen_sep = key_seq.split("-")
-                        for index, key_sequence_option_val in enumerate(key_sequence_option_val_hyphen_sep):
-                            key_sequence_option_val_hyphen_sep[index] = \
-                                StratExecutorPlugin._clean_string_key_val(key_sequence_option_val)
-                        return_list.append(key_sequence_option_val_hyphen_sep)
-                    return return_list
+                    return_list.append(key_sequence_option_val_hyphen_sep)
+                return return_list
             # else not required: other cases are acceptable and None will be returned since no
             # key_sequence_option_val is found to be processed or if key_sequence_option_val is
             # present but key_counts_option_val is not then default value 1 is used as key_counts

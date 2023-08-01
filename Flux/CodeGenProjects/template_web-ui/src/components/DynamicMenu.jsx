@@ -63,8 +63,8 @@ const DynamicMenu = (props) => {
     }
 
     let alertBubble = <></>;
-    let alertBubbleSourceXpath = props.currentSchema.widget_ui_data ? props.currentSchema.widget_ui_data.alert_bubble_source: undefined;
-    let alertBubbleColorXpath = props.currentSchema.widget_ui_data ? props.currentSchema.widget_ui_data.alert_bubble_color : undefined;
+    let alertBubbleSourceXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_source: undefined;
+    let alertBubbleColorXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_color : undefined;
     if (props.data && alertBubbleSourceXpath && alertBubbleColorXpath) {
         alertBubbleSourceXpath = alertBubbleSourceXpath.substring(alertBubbleSourceXpath.indexOf('.') + 1);
         alertBubbleColorXpath = alertBubbleColorXpath.substring(alertBubbleColorXpath.indexOf('.') + 1);

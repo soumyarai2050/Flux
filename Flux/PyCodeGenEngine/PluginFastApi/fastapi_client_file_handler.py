@@ -4,9 +4,11 @@ import time
 from abc import ABC
 from typing import List
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -29,6 +31,15 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                       f"pydantic_obj, {message_name}BaseModel)"
         return output_str
 
+    def handle_POST_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = " "*4 + f"def create_all_{message_name_snake_cased}_client(self, pydantic_obj_list: " \
+                     f"List[{message_name}BaseModel]) -> List[{message_name}BaseModel]:\n"
+        output_str += " "*8 + f"return generic_http_post_all_client(self.create_all_{message_name_snake_cased}_client_url, " \
+                      f"pydantic_obj_list, {message_name}BaseModel)"
+        return output_str
+
     def handle_GET_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
@@ -47,6 +58,15 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                       f"pydantic_obj, {message_name}BaseModel)"
         return output_str
 
+    def handle_PUT_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = " "*4 + f"def put_all_{message_name_snake_cased}_client(self, pydantic_obj: " \
+                     f"List[{message_name}BaseModel]) -> List[{message_name}BaseModel]:\n"
+        output_str += " "*4 + f"    return generic_http_put_all_client(self.put_all_{message_name_snake_cased}_client_url," \
+                      f" pydantic_obj, {message_name}BaseModel)"
+        return output_str
+
     def handle_PATCH_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
@@ -54,6 +74,15 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                      f"Dict) -> {message_name}BaseModel:\n"
         output_str += " "*4 + f"    return generic_http_patch_client(self.patch_{message_name_snake_cased}" \
                       f"_client_url, pydantic_obj_json, {message_name}BaseModel)"
+        return output_str
+
+    def handle_PATCH_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = " "*4 + f"def patch_all_{message_name_snake_cased}_client(self, pydantic_obj_json_list: " \
+                     f"List[Dict]) -> List[{message_name}BaseModel]:\n"
+        output_str += " "*4 + f"    return generic_http_patch_all_client(self.patch_all_{message_name_snake_cased}" \
+                      f"_client_url, pydantic_obj_json_list, {message_name}BaseModel)"
         return output_str
 
     def handle_DELETE_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
@@ -119,6 +148,10 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                                                            "str = f'http://{self.host}:{self.port}/" +
                                                            f"{self.proto_file_package}/"
                                                            f"create-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_create_all_field: f"self.create_all_{message_name_snake_cased}_client_"
+                                                               "url: str = f'http://{self.host}:{self.port}/" +
+                                                               f"{self.proto_file_package}/create_all-" +
+                                                               f"{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_read_field: f"self.get_{message_name_snake_cased}_client_url: str = "
                                                          "f'http://{self.host}:{self.port}/" +
                                                          f"{self.proto_file_package}/"
@@ -127,10 +160,18 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                                                            "f'http://{self.host}:{self.port}/" +
                                                            f"{self.proto_file_package}/"
                                                            f"put-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_update_all_field: f"self.put_all_{message_name_snake_cased}_client_url: str = "
+                                                           "f'http://{self.host}:{self.port}/" +
+                                                           f"{self.proto_file_package}/"
+                                                           f"put_all-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_patch_field: f"self.patch_{message_name_snake_cased}_client_url: "
                                                           "str = f'http://{self.host}:{self.port}/" +
                                                           f"{self.proto_file_package}/"
                                                           f"patch-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_patch_all_field: f"self.patch_all_{message_name_snake_cased}_client_url: "
+                                                          "str = f'http://{self.host}:{self.port}/" +
+                                                          f"{self.proto_file_package}/"
+                                                          f"patch_all-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_delete_field: f"self.delete_{message_name_snake_cased}_client_url: "
                                                            "str = f'http://{self.host}:{self.port}/" +
                                                            f"{self.proto_file_package}/"
@@ -171,7 +212,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
         for aggregate_value in aggregate_value_list:
             query_name = aggregate_value[FastapiClientFileHandler.query_name_key]
-            query_type = str(aggregate_value[FastapiClientFileHandler.query_type_key]).lower()[1:] \
+            query_type = str(aggregate_value[FastapiClientFileHandler.query_type_key]).lower() \
                 if aggregate_value[FastapiClientFileHandler.query_type_key] is not None else None
 
             if query_type is None or query_type == "http":
@@ -205,20 +246,30 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
         return output_str
 
     def _handle_client_http_query_output(self, message: protogen.Message, query_name: str, query_params: List[str],
-                                         params_str: str):
+                                         params_str: str, route_type: str):
         message_name = message.proto.name
         if query_params:
             output_str = " " * 4 + f"def {query_name}_query_client(self, {params_str}) -> " \
                                     f"List[{message_name}]:\n"
             params_dict_str = \
                 ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
-            output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
-            output_str += " " * 4 + f"    return generic_http_query_client(self.query_{query_name}_url, " \
-                                    f"query_params_dict, {message_name}BaseModel)\n\n"
+            if route_type == FastapiClientFileHandler.flux_json_query_route_get_type_field_val:
+                output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
+                output_str += " " * 4 + f"    return generic_http_get_query_client(self.query_{query_name}_url, " \
+                                        f"query_params_dict, {message_name}BaseModel)\n\n"
+            else:
+                output_str += " " * 4 + "    query_payload_dict = {" + f"{params_dict_str}" + "}\n"
+                output_str += " " * 4 + f"    return generic_http_patch_query_client(self.query_{query_name}_url, " \
+                                        f"query_payload_dict, {message_name}BaseModel)\n\n"
         else:
+            if route_type == FastapiClientFileHandler.flux_json_query_route_patch_type_field_val:
+                err_str = f"Patch web client can't be generated without payload parameters, query_name: {query_name} " \
+                          f"in message {message_name} has no query_params"
+                logging.exception(err_str)
+                raise Exception(err_str)
             output_str = " " * 4 + f"def {query_name}_query_client(self) -> " \
-                                    f"List[{message_name}]:\n"
-            output_str += " " * 4 + f"    return generic_http_query_client(self.query_{query_name}_url, " \
+                                   f"List[{message_name}]:\n"
+            output_str += " " * 4 + f"    return generic_http_get_query_client(self.query_{query_name}_url, " \
                                     "{}, " + f"{message_name}BaseModel)\n\n"
         return output_str
 
@@ -237,19 +288,24 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
             query_name = aggregate_value[FastapiClientFileHandler.query_name_key]
             query_params = aggregate_value[FastapiClientFileHandler.query_params_key]
             query_params_types = aggregate_value[FastapiClientFileHandler.query_params_data_types_key]
-            query_type = str(aggregate_value[FastapiClientFileHandler.query_type_key]).lower()[1:] \
-                if aggregate_value[FastapiClientFileHandler.query_type_key] is not None else None
+            query_type_value = aggregate_value[FastapiClientFileHandler.query_type_key]
+            query_type = str(query_type_value).lower() if query_type_value is not None else None
+            query_route_type_value = aggregate_value[FastapiClientFileHandler.query_route_type_key]
+            query_route_type = str(query_route_type_value) if query_route_type_value is not None else \
+                FastapiClientFileHandler.flux_json_query_route_get_type_field_val
 
             params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
                                     for aggregate_param, aggregate_params_type in zip(query_params,
                                                                                       query_params_types)])
 
             if query_type is None or query_type == "http":
-                output_str += self._handle_client_http_query_output(message, query_name, query_params, params_str)
+                output_str += self._handle_client_http_query_output(message, query_name, query_params,
+                                                                    params_str, query_route_type)
             elif query_type == "ws":
                 output_str += self._handle_client_ws_query_output(message, query_name)
             elif query_type == "both":
-                output_str += self._handle_client_http_query_output(message, query_name, query_params, params_str)
+                output_str += self._handle_client_http_query_output(message, query_name, query_params,
+                                                                    params_str, query_route_type)
                 output_str += self._handle_client_ws_query_output(message, query_name)
             else:
                 err_str = f"Unsupported Query type for query web client code generation {query_type}"
@@ -266,9 +322,12 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
         crud_field_name_to_method_call_dict = {
             BaseFastapiPlugin.flux_json_root_create_field: self.handle_POST_client_gen,
+            BaseFastapiPlugin.flux_json_root_create_all_field: self.handle_POST_all_client_gen,
             BaseFastapiPlugin.flux_json_root_read_field: self.handle_GET_client_gen,
             BaseFastapiPlugin.flux_json_root_update_field: self.handle_PUT_client_gen,
+            BaseFastapiPlugin.flux_json_root_update_all_field: self.handle_PUT_all_client_gen,
             BaseFastapiPlugin.flux_json_root_patch_field: self.handle_PATCH_client_gen,
+            BaseFastapiPlugin.flux_json_root_patch_all_field: self.handle_PATCH_all_client_gen,
             BaseFastapiPlugin.flux_json_root_delete_field: self.handle_DELETE_client_gen,
             BaseFastapiPlugin.flux_json_root_read_websocket_field: self.handle_read_by_id_WEBSOCKET_client_gen
         }
@@ -312,20 +371,35 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
             port_offset = \
                 self.get_non_repeated_valued_custom_option_value(file,
                                                                  FastapiClientFileHandler.flux_file_crud_port_offset)
-            port = 8000 + int(port_offset)
+            port = 8000 + parse_to_int(port_offset)
         else:
             port = 8000
 
         output_str = f'from typing import Dict, List, Callable, Any\n'
+        output_str += f'import threading\n'
         generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
         output_str += f'from {generic_web_client_path} import *\n'
         output_str += self._import_model_in_client_file()
         output_str += "\n\n"
-        output_str += f"class {convert_to_capitalized_camel_case(self.client_file_name)}:\n\n"
-        output_str += "    def __init__(self, host: str | None = None, port: int | None = None):\n"
+        class_name = convert_to_capitalized_camel_case(self.client_file_name)
+        output_str += f"class {class_name}:\n"
+        output_str += f"    get_instance_mutex: threading.Lock = threading.Lock()\n"
+        output_str += f"    host_port_key_to_instance_dict: Dict[str, '{class_name}'] = "+"{}\n\n"
+        output_str += f"    @classmethod\n"
+        output_str += f"    def set_or_get_if_instance_exists(cls, host: str | None = None, port: int | None = None):\n"
+        output_str += f"        with cls.get_instance_mutex:\n"
+        output_str += f'            host = {host} if host is None else host\n'
+        output_str += f'            port = {port} if port is None else port\n'
+        output_str += '            key = f"{host}_{port}"\n'
+        output_str += '            if key in cls.host_port_key_to_instance_dict:\n'
+        output_str += '                return cls.host_port_key_to_instance_dict.get(key)\n'
+        output_str += '            else:\n'
+        output_str += f'                cls.host_port_key_to_instance_dict[key] = {class_name}(host, port)\n'
+        output_str += '                return cls.host_port_key_to_instance_dict[key]\n\n'
+        output_str += "    def __init__(self, host: str, port: int):\n"
         output_str += " "*4 + "    # host and port\n"
-        output_str += " "*4 + f'    self.host = {host} if host is None else host\n'
-        output_str += " "*4 + f'    self.port = {port} if port is None else port\n\n'
+        output_str += " "*4 + f'    self.host = host\n'
+        output_str += " "*4 + f'    self.port = port\n\n'
         output_str += " "*4 + f'    # urls\n'
         for message in set(self.root_message_list+list(self.message_to_query_option_list_dict)):
             output_str += self._handle_client_url_gen(message)

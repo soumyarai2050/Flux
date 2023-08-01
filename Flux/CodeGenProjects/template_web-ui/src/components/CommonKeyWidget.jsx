@@ -1,11 +1,17 @@
 import React, { Fragment, useState } from 'react';
 import { Box, Tooltip, ClickAwayListener } from '@mui/material';
 import PropTypes from 'prop-types';
-import { clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt, groupCommonKeys, getLocalizedValueAndSuffix } from '../utils';
+import {
+    clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt, groupCommonKeys,
+    getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray
+} from '../utils';
 import { DataTypes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
 import _, { cloneDeep } from 'lodash';
 import classes from './CommonKeyWidget.module.css';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+dayjs.extend(utc);
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
     // filter unset or null values from common keys
@@ -33,7 +39,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
                 return (
                     <Fragment key={i}>
                         {props.lineBreakStart && collection.groupStart && <div className={classes.break_line} />}
-                        <CommonKey collection={collection} />
+                        <CommonKey collection={collection} truncateDateTime={props.truncateDateTime} />
                         {props.lineBreakEnd && collection.groupEnd && <div className={classes.break_line} />}
                     </Fragment>
                 )
@@ -68,11 +74,14 @@ const CommonKey = (props) => {
         let updatedData = collection.value;
         if (collection.type === DataTypes.OBJECT || collection.type === DataTypes.ARRAY || (collection.type === DataTypes.STRING && isValidJsonString(updatedData))) {
             if (collection.type === DataTypes.OBJECT || collection.type === DataTypes.ARRAY) {
-                updatedData = clearxpath(cloneDeep(updatedData));
+                updatedData = cloneDeep(updatedData);
+                formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
+                updatedData = clearxpath(updatedData);
             } else {
                 updatedData = updatedData.replace(/\\/g, '');
                 updatedData = JSON.parse(updatedData);
             }
+            excludeNullFromObject(updatedData);
             abbreviatedField = (<AbbreviatedJson open={open} onClose={onCloseAbbreviatedField} src={updatedData} />)
         } else if (collection.type === DataTypes.STRING && !isValidJsonString(updatedData)) {
             let tooltipText = "";
@@ -122,6 +131,8 @@ const CommonKey = (props) => {
         if (collection.displayType === DataTypes.INTEGER) {
             value = floatToInt(value);
         }
+    } else if (collection.type === DataTypes.DATE_TIME && props.truncateDateTime && value) {
+        value = dayjs.utc(value).format('YYYY-MM-DD HH:mm');
     } else {
         value = String(value);
     }

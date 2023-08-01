@@ -12,7 +12,7 @@ from ibapi.common import TickerId
 
 # Local project imports
 from Flux.CodeGenProjects.market_data.app.ib_api_client import IbApiClient
-from FluxPythonUtils.scripts.utility_functions import yaml_loader, configure_logger
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 
 os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.market_data.generated.market_data_service_web_client import MarketDataServiceWebClient
@@ -24,7 +24,7 @@ class StoreDepthMarketDataClient(IbApiClient):
     project_root_path = PurePath(__file__).parent.parent
     log_dir_path = project_root_path / "generated" / "logs"
     config_file_path = project_root_path / "misc" / "config.yaml"
-    config_yaml = yaml_loader(str(config_file_path))
+    config_yaml = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
 
     @staticmethod
     def get_side_str_from_side_int(side_int: int):

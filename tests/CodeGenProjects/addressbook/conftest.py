@@ -9,10 +9,10 @@ os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import \
     MarketDepthBaseModel, SymbolOverviewBaseModel
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
-from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations, update_yaml_configurations
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_verify_limits, \
     create_n_verify_portfolio_status, create_fx_symbol_overview, clean_all_collections_ignoring_ui_layout, \
-    get_ps_n_md_db_names, test_config_file_path
+    get_ps_n_md_db_names, test_config_file_path, clean_today_activated_ticker_dict, clear_cache_in_model
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, config_file_path
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 
@@ -41,13 +41,13 @@ def residual_wait_sec() -> int:
 
 @pytest.fixture()
 def config_dict():
-    original_yaml_content_str = load_yaml_configurations(str(config_file_path), load_as_str=True)
+    original_yaml_content_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
     TradingLinkBase.reload_configs()
     TradeSimulator.reload_symbol_configs()
     yield TradingLinkBase.config_dict
 
     # reverting back file
-    update_yaml_configurations(original_yaml_content_str, str(config_file_path))
+    YAMLConfigurationManager.update_yaml_configurations(original_yaml_content_str, str(config_file_path))
     TradingLinkBase.reload_configs()
     TradeSimulator.reload_symbol_configs()
     time.sleep(2)
@@ -55,9 +55,11 @@ def config_dict():
 
 @pytest.fixture
 def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_):
+    clean_today_activated_ticker_dict()
     ps_db_name, md_db_name = get_ps_n_md_db_names(test_config_file_path)
     # cleaning all collections
     clean_all_collections_ignoring_ui_layout(ps_db_name, md_db_name)
+    clear_cache_in_model()
 
     # setting limits
     set_n_verify_limits(expected_order_limits_, expected_portfolio_limits_)
@@ -84,10 +86,7 @@ def market_depth_basemodel_list():
                     "qty": qty+10,
                     "position": 1,
                     "market_maker": "string",
-                    "is_smart_depth": False,
-                    "cumulative_notional": px*(qty+10),
-                    "cumulative_qty": qty+10,
-                    "cumulative_avg_px": (px*(qty+10))/(qty+10)
+                    "is_smart_depth": False
                 },
                 {
                     "symbol": symbol,
@@ -97,10 +96,7 @@ def market_depth_basemodel_list():
                     "qty": qty-20,
                     "position": 2,
                     "market_maker": "string",
-                    "is_smart_depth": False,
-                    "cumulative_notional": (px*(qty+10))+((px+(dev*1))*(qty-20)),
-                    "cumulative_qty": (qty+10) + (qty-20),
-                    "cumulative_avg_px": ((px*(qty+10))+((px+(dev*1))*(qty-20)))/((qty+10) + (qty-20))
+                    "is_smart_depth": False
                 },
                 {
                     "symbol": symbol,
@@ -110,10 +106,7 @@ def market_depth_basemodel_list():
                     "qty": qty+10,
                     "position": 3,
                     "market_maker": "string",
-                    "is_smart_depth": False,
-                    "cumulative_notional": (px*(qty+10))+((px+(dev*1))*(qty-20))+((px+(dev*2))*(qty+10)),
-                    "cumulative_qty": (qty+10) + (qty-20) + (qty+10),
-                    "cumulative_avg_px": ((px*(qty+10))+((px+(dev*1))*(qty-20))+((px+(dev*2))*(qty+10)))/((qty+10) + (qty-20) + (qty+10))
+                    "is_smart_depth": False
                 },
                 {
                     "symbol": symbol,
@@ -123,11 +116,7 @@ def market_depth_basemodel_list():
                     "qty": qty-20,
                     "position": 4,
                     "market_maker": "string",
-                    "is_smart_depth": False,
-                    "cumulative_notional":
-                        (px*(qty+10))+((px+(dev*1))*(qty-20))+((px+(dev*2))*(qty+10))+((px+(dev*3))*(qty-20)),
-                    "cumulative_qty": (qty+10) + (qty-20) + (qty+10) + (qty-20),
-                    "cumulative_avg_px": ((px*(qty+10))+((px+(dev*1))*(qty-20))+((px+(dev*2))*(qty+10))+((px+(dev*3))*(qty-20)))/((qty+10) + (qty-20) + (qty+10) + (qty-20))
+                    "is_smart_depth": False
                 },
                 {
                     "symbol": symbol,
@@ -137,11 +126,7 @@ def market_depth_basemodel_list():
                     "qty": qty+20,
                     "position": 5,
                     "market_maker": "string",
-                    "is_smart_depth": False,
-                    "cumulative_notional":
-                        (px*(qty+10))+((px+(dev*1))*(qty-20))+((px+(dev*2))*(qty+10))+((px+(dev*3))*(qty-20))+((px+(dev*4))*(qty+20)),
-                    "cumulative_qty": (qty+10) + (qty-20) + (qty+10) + (qty-20) + (qty+20),
-                    "cumulative_avg_px": ((px*(qty+10))+((px+(dev*1))*(qty-20))+((px+(dev*2))*(qty+10))+((px+(dev*3))*(qty-20))+((px+(dev*4))*(qty+20)))/((qty+10) + (qty-20) + (qty+10) + (qty-20) + (qty+20))
+                    "is_smart_depth": False
                 }
             ])
 
@@ -308,7 +293,29 @@ def expected_order_limits_():
 
 
 @pytest.fixture()
-def expected_portfolio_limits_():
+def expected_brokers_(buy_sell_symbol_list) -> List[Broker]:
+    sec_positions: List[SecPosition] = []
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        cb_sec_position: SecPosition = SecPosition(security=Security(sec_id=buy_symbol, sec_type=SecurityType.SEDOL))
+        cb_positions: List[Position] = [Position(type=PositionType.SOD, priority=0, available_size=10_000,
+                                                 allocated_size=10_000, consumed_size=0)]
+        cb_sec_position.positions = cb_positions
+        sec_positions.append(cb_sec_position)
+        eqt_sec_position: SecPosition = SecPosition(security=Security(sec_id=f"{sell_symbol}.SS", sec_type=SecurityType.RIC))
+        eqt_positions: List[Position] = [
+            Position(type=PositionType.SOD, priority=0, available_size=10_000, allocated_size=10_000, consumed_size=0),
+            Position(type=PositionType.LOCATE, priority=1, available_size=10_000, allocated_size=10_000,
+                     consumed_size=0),
+            Position(type=PositionType.PTH, priority=2, available_size=10_000, allocated_size=10_000, consumed_size=0)
+        ]
+        eqt_sec_position.positions = eqt_positions
+        sec_positions.append(eqt_sec_position)
+    broker: Broker = Broker(broker="BKR", bkr_priority=10, sec_positions=sec_positions)
+    yield [broker]
+
+
+@pytest.fixture()
+def expected_portfolio_limits_(expected_brokers_):
     rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
@@ -316,7 +323,7 @@ def expected_portfolio_limits_():
                                                     max_gross_n_open_notional=2_400_000,
                                                     rolling_max_order_count=rolling_max_order_count,
                                                     rolling_max_reject_count=rolling_max_reject_count,
-                                                    eligible_brokers=[])
+                                                    eligible_brokers=expected_brokers_)
     yield portfolio_limits_obj
 
 
@@ -327,12 +334,12 @@ def pair_strat_(pair_securities_with_sides_):
         "frequency": 1,
         "pair_strat_params": {
         "strat_leg1": {
-          "exch_id": "EXCH1",
+          "exch_id": None,
           "sec": pair_securities_with_sides_["security1"],
           "side": pair_securities_with_sides_["side1"]
         },
         "strat_leg2": {
-          "exch_id": "EXCH2",
+          "exch_id": None,
           "sec": pair_securities_with_sides_["security2"],
           "side": pair_securities_with_sides_["side2"]
         },
@@ -599,3 +606,13 @@ def sample_alert():
             }
           ]
         })
+
+
+@pytest.fixture()
+def cb_eqt_security_records_(buy_sell_symbol_list) -> List[List[any]] | None:
+    yield
+
+
+@pytest.fixture()
+def static_data_(cb_eqt_security_records_):
+    yield

@@ -5,6 +5,18 @@ import "trade_core.proto";
 
 package market_data;
 
+enum InvertorySource {
+    InventorySource_UNSPECIFIED = 1;
+    QFII = 2;
+    CONNECT = 3;
+    QFII_AND_CONNECT = 4; // generates duplicate entries in final request (one for QFII and other for connect)
+    QFII_OR_CONNECT = 5; // currently we don't support this
+}
+
+enum StratType {
+    StratType_UNSPECIFIED = 1;
+}
+
 message PxRange {
     optional float px_low = 1 [(FluxFldTitle) = "low"];
     optional float px_high = 2 [(FluxFldTitle) = "high"];
@@ -48,14 +60,26 @@ message DashLeg {
     optional string exch_id = 1 [(FluxFldServerPopulate) = true];
     required Security sec = 2 [(FluxFldElaborateTitle) = true];
     optional string company = 3 [(FluxFldServerPopulate) = true];
-    optional float last_px = 4;
-    optional float last_px_change = 5 [(FluxFldNumberFormat) = "%"];  // Against yesterday close px
-    optional float market_notional = 6 [(FluxFldNumberFormat) = "%"];  // market current total last trade notional
-    optional float consumed_notional = 7 [(FluxFldNumberFormat) = "%"];  // all mstrat total cb notional (filled)
+    optional float last_px = 4 [(FluxFldServerPopulate) = true];
+    optional float last_px_change = 5 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%"];  // Against yesterday close px
+    optional float market_notional = 6 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int"];  // market current total last trade notional
+    optional float consumed_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int"];  // all mstrat total cb notional (filled)
 }
 
 message InventorySummary {
-    required int64 qty = 1;
+    required int64 cum_qty = 1 [(FluxFldServerPopulate) = true];
     optional float avg_rate = 2 [(FluxFldNumberFormat) = "%"];
     optional float usd_notional = 3 [(FluxFldDisplayType) = "int"];
+}
+
+message InventoryRequest {
+    required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+    optional string requestor = 2;
+    optional StratType strat_type = 3;
+    optional InvertorySource invertory_source = 4;
+    optional int64 update_time = 5 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true];
+    optional int64 qty = 6 [(FluxFldServerPopulate) = true];
+    optional float max_rate = 7 [(FluxFldNumberFormat) = "%"];
+    optional float usd_notional = 8 [(FluxFldDisplayType) = "int"];
+    optional string note = 9;
 }

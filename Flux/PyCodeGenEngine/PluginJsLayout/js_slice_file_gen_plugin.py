@@ -4,6 +4,7 @@ import os
 import re
 from typing import List, Callable, Dict
 import time
+from pathlib import PurePath
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
@@ -14,7 +15,24 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, capitalized_to_camel_case
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, capitalized_to_camel_case, \
+    convert_to_camel_case, convert_to_capitalized_camel_case, YAMLConfigurationManager
+
+if (project_dir := os.getenv("PROJECT_DIR")) is not None and len(project_dir):
+    project_dir_path = PurePath(project_dir)
+else:
+    err_str = f"Couldn't find 'PROJECT_DIR' env var, value is {project_dir}"
+    logging.exception(err_str)
+    raise Exception(err_str)
+config_yaml_path = project_dir_path / "data" / "config.yaml"
+config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
+
+def get_native_url_js_layout_var_name():
+    cache_override_type = config_yaml_dict.get("cache_override_type")
+    if cache_override_type is not None and cache_override_type.lower() == "native":
+        return "API_ROOT_CACHE_URL"
+    else:
+        return "API_ROOT_URL"
 
 
 class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
@@ -52,26 +70,34 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         super().load_root_message_to_data_member(file)
 
         for message in self.root_msg_list:
-            if self.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_widget_ui_data):
+            if self.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element):
                 widget_ui_data_option_value_dict = \
-                    self.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_widget_ui_data)
+                    self.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element)
                 message_layout_is_repeated = widget_ui_data_option_value_dict.get("is_repeated")
                 if message_layout_is_repeated is not None and message_layout_is_repeated:
                     self.repeated_layout_msg_name_list.append(message.proto.name)
 
             for field in message.fields:
                 if field.message is not None and \
-                        self.is_option_enabled(field.message, JsSliceFileGenPlugin.flux_msg_widget_ui_data):
+                        self.is_option_enabled(field.message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element):
                     # If field of message datatype of this message is found having widget_ui_data option
                     # with layout field then collecting those messages in dependent_message_list
                     widget_ui_data_option_value_dict = \
-                        self.get_complex_option_set_values(field.message, JsSliceFileGenPlugin.flux_msg_widget_ui_data)
-                    if "layout" in widget_ui_data_option_value_dict:
-                        self.dependent_message_list.append(message)
-                        break
-                    # else not required: Avoid if any field of message type doesn't contain layout options
-                # else not required: If couldn't find any field of message type with layout option then avoiding
-                # addition of message in dependent_message_list
+                        self.get_complex_option_set_values(field.message,
+                                                           JsSliceFileGenPlugin.flux_msg_widget_ui_data_element)
+                    widget_ui_data_list = (
+                        widget_ui_data_option_value_dict.get(
+                            BaseJSLayoutPlugin.flux_msg_widget_ui_data_element_widget_ui_data_field))
+                    if widget_ui_data_list is not None and widget_ui_data_list:
+                        widget_ui_data_dict = widget_ui_data_list[0]
+                        if "view_layout" in widget_ui_data_dict:
+                            self.dependent_message_list.append(message)
+                            break
+                        # else not required: Avoid if any field of message type doesn't contain view_layout options
+                    # else not required: Avoid if any field of message type doesn't contain widget_ui_data field
+                    # in option which internally has view_layout field
+                # else not required: If it couldn't find any field of message type with view_layout option
+                # then avoiding addition of message in dependent_message_list
 
                 # Checking abbreviated dependent relation
                 if self.is_option_enabled(field, JsSliceFileGenPlugin.flux_fld_abbreviated):
@@ -102,10 +128,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         # widget_ui_data option enabled, raises exception if is found
         for dependent_message in self.dependent_message_list:
             if dependent_message.proto.name in self.dependent_to_abbreviated_relation_msg_name_dict:
-                if self.is_option_enabled(dependent_message, JsSliceFileGenPlugin.flux_msg_widget_ui_data):
+                if self.is_option_enabled(dependent_message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element):
                     for field in dependent_message.fields:
                         if field.message is not None:
-                            if self.is_option_enabled(field, JsSliceFileGenPlugin.flux_msg_widget_ui_data):
+                            if self.is_option_enabled(field, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element):
                                 err_str = "Dependent message of Abbreviated widget type message if is having " \
                                           "widget_ui_data option enabled then none of the fields of this message can be of" \
                                           "message type that also has widget_ui_data option enabled, currently message " \
@@ -205,7 +231,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if not self.current_message_is_dependent:
             output_str = f"export const create{message_name} = createAsyncThunk('{message_name_camel_cased}/create', " \
                          "async (payload, { rejectWithValue }) => " + "{\n"
-            output_str += "    return axios.post(`${API_ROOT_CACHE_URL}/create-" + f"{message_name_snake_cased}" + \
+            native_url = get_native_url_js_layout_var_name()
+            output_str += "    return axios.post(`${"+f"{native_url}"+"}/create-" + f"{message_name_snake_cased}" + \
                           "`, payload)\n"
             output_str += "        .then(res => res.data)\n"
             output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
@@ -219,7 +246,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                              f"create', async (payload, "+"{ dispatch, getState, rejectWithValue }) => " + "{\n"
                 output_str += "    let { data, abbreviated, loadedKeyName } = payload;\n"
                 output_str += "    abbreviated = abbreviated.split('^')[0].split(':').pop();\n"
-                output_str += "    return axios.post(`${API_ROOT_CACHE_URL}/create-" + f"{message_name_snake_cased}" + \
+                native_url = get_native_url_js_layout_var_name()
+                output_str += "    return axios.post(`${"+f"{native_url}"+"}/create-" + f"{message_name_snake_cased}" + \
                               "`, data)\n"
                 output_str += "        .then(res => {\n"
                 output_str += "            let state = getState();\n"
@@ -245,10 +273,11 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                      "async (payload, { rejectWithValue }) => "+"{\n"
         option_val_dict = self.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_json_root)
 
+        native_url = get_native_url_js_layout_var_name()
         if JsSliceFileGenPlugin.flux_json_root_patch_field in option_val_dict:
-            output_str += "    return axios.patch(`${API_ROOT_CACHE_URL}/patch-"+f"{message_name_snake_cased}"+"`, payload)\n"
+            output_str += "    return axios.patch(`${"+f"{native_url}"+"}/patch-"+f"{message_name_snake_cased}"+"`, payload)\n"
         else:
-            output_str += "    return axios.put(`${API_ROOT_CACHE_URL}/put-"+f"{message_name_snake_cased}"+"`, payload)\n"
+            output_str += "    return axios.put(`${"+f"{native_url}"+"}/put-"+f"{message_name_snake_cased}"+"`, payload)\n"
         output_str += "        .then(res => res.data)\n"
         output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
         output_str += "})\n\n"
@@ -337,7 +366,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        },\n"
         return output_str
 
-    def handle_update_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
+    def handle_update_out_str(self, message: protogen.Message, message_name: str,
+                              message_name_camel_cased: str) -> str:
         output_str = f"        [update{message_name}.pending]: (state) => " + "{\n"
         output_str += f"            state.loading = true;\n"
         output_str += f"            state.error = null;\n"
@@ -354,6 +384,32 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.loading = false;\n"
         output_str += f"            state.modified{message_name} = " \
                       f"addxpath(cloneDeep(state.{message_name_camel_cased}));\n"
+        option_value_dict_list = \
+            JsSliceFileGenPlugin.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_json_query,
+                                                               is_option_repeated=True)
+        if option_value_dict_list:
+            for option_value_dict in option_value_dict_list:
+                if option_value_dict.get(JsSliceFileGenPlugin.flux_json_query_require_js_slice_changes_field):
+                    query_name = option_value_dict.get(JsSliceFileGenPlugin.flux_json_query_name_field)
+                    query_name_capitalized_camel_cased = convert_to_capitalized_camel_case(query_name)
+                    output_str += "        },\n"
+                    output_str += f"        [query{query_name_capitalized_camel_cased}.pending]: (state) => "+"{\n"
+                    output_str += f"            state.error = null;\n"
+                    output_str += "        },\n"
+                    output_str += f"        [query{query_name_capitalized_camel_cased}.fulfilled]: (state, action) => "+"{\n"
+                    output_str += f"            const index = state.{message_name_camel_cased}Array.findIndex(obj => " \
+                                  f"obj[DB_ID] === action.payload[DB_ID]);\n"
+                    output_str += f"            state.{message_name_camel_cased}Array[index] = action.payload;\n"
+                    output_str += f"            state.{message_name_camel_cased} = action.payload;\n"
+                    output_str += f"            state.modified{message_name} = action.payload;\n"
+                    output_str += f"            state.selected{message_name}Id = action.payload[DB_ID];\n"
+                    output_str += "        },\n"
+                    output_str += f"        [query{query_name_capitalized_camel_cased}.rejected]: (state, action) => "+"{\n"
+                    output_str += f"            let updatedData = clearxpath(cloneDeep(state.modified{message_name}));\n"
+                    output_str += "            let { code, message, detail, status } = action.payload;\n"
+                    output_str += "            state.error = { code, message, detail, status, payload: updatedData };\n"
+                    output_str += f"            state.modified{message_name} = addxpath(cloneDeep(" \
+                                  f"state.{message_name_camel_cased}));\n"
         output_str += "        }\n"
         return output_str
 
@@ -361,9 +417,26 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str = ""
         message_name = message.proto.name
         message_name_camel_cased = capitalized_to_camel_case(message_name)
-        output_str += "/* additional async helper actions with callback to support frequent " \
-                      "state updates using redux-toolkit */\n"
         if message_name not in self.repeated_layout_msg_name_list:
+            option_value_dict_list = \
+                JsSliceFileGenPlugin.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_json_query,
+                                                                   is_option_repeated=True)
+            if option_value_dict_list:
+                for option_value_dict in option_value_dict_list:
+                    if option_value_dict.get(JsSliceFileGenPlugin.flux_json_query_require_js_slice_changes_field):
+                        query_name = option_value_dict.get(JsSliceFileGenPlugin.flux_json_query_name_field)
+                        query_name_capitalized_camel_cased = convert_to_capitalized_camel_case(query_name)
+                        output_str += f"/* additional queries actions */\n"
+                        output_str += f"export const query{query_name_capitalized_camel_cased} = createAsyncThunk(" \
+                                      f"'{message_name_camel_cased}/query{query_name_capitalized_camel_cased}', " \
+                                      "async (payload, {rejectWithValue}) => {\n"
+                        native_url = get_native_url_js_layout_var_name()
+                        output_str += "    return axios.patch(`${"+f"{native_url}"+"}/query-"+f"{query_name}`, payload)\n"
+                        output_str += "        .then(res => res.data[0])\n"
+                        output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
+                        output_str += "})\n\n"
+            output_str += "/* additional async helper actions with callback to support frequent " \
+                          "state updates using redux-toolkit */\n"
             output_str += f"export const set{message_name}ArrayWithCallback = createAsyncThunk('" \
                           f"{message_name_camel_cased}/set{message_name}WithCallback', async (callback, " + \
                           "{ getState, dispatch }) => {\n"
@@ -439,6 +512,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "    discardedChanges: {},\n"
         output_str += "    activeChanges: {},\n"
         output_str += "    openWsPopup: false,\n"
+        output_str += "    forceUpdate: false,\n"
         if self.current_message_is_dependent:
             output_str += "    mode: Modes.READ_MODE,\n"
             output_str += "    createMode: false,\n"
@@ -617,6 +691,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        setOpenWsPopup: (state, action) => {\n"
         output_str += "            state.openWsPopup = action.payload;\n"
         output_str += "        },\n"
+        output_str += "        setForceUpdate: (state, action) => {\n"
+        output_str += "            state.forceUpdate = action.payload;\n"
+        output_str += "        },\n"
         if self.current_message_is_dependent:
             output_str += "        setMode: (state, action) => {\n"
             output_str += "            state.mode = action.payload;\n"
@@ -640,7 +717,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         if message_name not in self.repeated_layout_msg_name_list:
             output_str += self.handle_get_out_str(message_name, message_name_camel_cased)
             output_str += self.handle_create_out_str(message_name, message_name_camel_cased)
-            output_str += self.handle_update_out_str(message_name, message_name_camel_cased)
+            output_str += self.handle_update_out_str(message, message_name, message_name_camel_cased)
         output_str += "    }\n"
         output_str += "})\n\n"
         output_str += f"export default {message_name_camel_cased}Slice.reducer;\n\n"
@@ -652,7 +729,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "\n"
             output_str += f"    reset{message_name}, setModified{message_name}, setSelected{message_name}Id, " \
                           f"resetSelected{message_name}Id, resetError,\n"
-            output_str += "    setUserChanges, setDiscardedChanges, setActiveChanges, setOpenWsPopup"
+            output_str += "    setUserChanges, setDiscardedChanges, setActiveChanges, setOpenWsPopup, setForceUpdate"
             if self.current_message_is_dependent:
                 output_str += ", setMode, setCreateMode, setFormValidation, setOpenConfirmSavePopup, setOpenFormValidationPopup"
             output_str += "\n"

@@ -10,7 +10,7 @@ import { HashLoader } from 'react-spinners';
 import { DashboardCustomize, SaveAs } from '@mui/icons-material';
 import { Dialog, DialogContent, DialogActions, DialogContentText, TextField, Button, DialogTitle, Autocomplete, Paper, Box } from '@mui/material';
 import { DB_ID, API_ROOT_URL, COOKIE_NAME } from '../constants';
-import { getIconText } from '../utils';
+import { getIconText, isObject } from '../utils';
 import { defaultLayouts } from '../projectSpecificUtils';
 # @@protoc_insertion_point(add_imports)
 import SideDrawer from './SideDrawer';
@@ -21,10 +21,8 @@ import 'react-resizable/css/styles.css';
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
-const defaultProps = {
-    layouts: {
-        lg: defaultLayouts
-    },
+/* grid layout props. TODO: move to ui config */
+const defaultGridLayoutProps = {
     breakpoints: { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 },
     cols: { lg: 18, md: 12, sm: 6, xs: 4, xxs: 2 },
     className: 'layout',
@@ -39,30 +37,39 @@ const defaultProps = {
     resizeHandles: ['ne', 'se']
 }
 
-const defaultLayoutByIdDict = defaultLayouts.reduce((dict, obj) => {
-    const { i } = obj;
-    dict[i] = obj;
+/* default layout by layout Id dict */
+const defaultLayoutsById = defaultLayouts.reduce((dict, obj) => {
+    dict[obj.i] = obj;
     return dict;
 }, {});
 
 function Layout() {
-    const { uiLayoutArray, uiLayout } = useSelector(state => state.uiLayout);
-    const [layouts, setLayouts] = useState(defaultLayouts);
-    const [draggable, setDraggable] = useState(false);
-    const [openSaveLayout, setOpenSaveLayout] = useState(false);
-    const [openLoadLayout, setOpenLoadLayout] = useState(false);
-    const [searchValue, setSearchValue] = useState('');
-    const [profileId, setProfileId] = useState('');
-    const [show, setShow] = useState({
-        # @@protoc_insertion_point(add_widget_list)
-    });
-    const getAllWsDict = useRef({});
-    const layoutByIdDict = useRef(defaultLayoutByIdDict);
+    /* redux states */
+    const { uiLayoutArray, uiLayout, selectedUILayoutId } = useSelector(state => state.uiLayout);
+    /* local react states */
+    const [updateCounter, setUpdateCounter] = useState(0); // to trigger ui render
+    const [layoutsById, setLayoutsById] = useState(defaultLayoutsById); // stores widget layout data
+    const [draggable, setDraggable] = useState(false); // to enable/disable drag
+    const [openSaveLayout, setOpenSaveLayout] = useState(false); // open close save layout popup
+    const [openLoadLayout, setOpenLoadLayout] = useState(false); // open close load layout popup
+    const [searchValue, setSearchValue] = useState(''); // load layout by profile search input
+    const [profileId, setProfileId] = useState(''); // save layout by profile input
+    const layoutsRef = useRef(defaultLayouts);
+    const getAllWsDict = useRef({}); // stores get-all websocket updates
     const dispatch = useDispatch();
+
+    useEffect(() => {
+        /* update layoutsById dict when layoutRef value changes to trigger ui re-render */
+        const updatedLayoutsById = layoutsRef.current.reduce((dict, obj) => {
+            dict[obj.i] = obj;
+            return dict;
+        }, {});
+        setLayoutsById(updatedLayoutsById);
+    }, [updateCounter])
 
     const flushGetAllWs = useCallback(() => {
         /* apply get-all websocket changes */
-        if (_.keys(getAllWsDict.current).length > 0) {
+        if (Object.keys(getAllWsDict.current).length > 0) {
             dispatch(setUILayoutArrayWs(cloneDeep(getAllWsDict.current)));
             getAllWsDict.current = {};
         }
@@ -70,22 +77,24 @@ function Layout() {
 
     useEffect(() => {
         /* get-all websocket. create a websocket client to listen to get-all interface */
-        let socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/get-all-ui_layout-ws`);
+        const socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/get-all-ui_layout-ws`);
         socket.onmessage = (event) => {
-            let updatedData = JSON.parse(event.data);
+            const updatedData = JSON.parse(event.data);
             if (Array.isArray(updatedData)) {
-                updatedData.forEach(o => {
-                    getAllWsDict.current[o[DB_ID]] = o;
+                updatedData.forEach(obj => {
+                    getAllWsDict.current[obj[DB_ID]] = obj;
                 })
-            } else if (_.isObject(updatedData)) {
+            } else if (isObject(updatedData)) {
                 getAllWsDict.current[updatedData[DB_ID]] = updatedData;
             }
+            // else not required: websocket returns only array or object types
         }
         /* close the websocket on cleanup */
         return () => socket.close();
     }, [])
 
     useEffect(() => {
+        /* periodically apply websocket updates. refresh interval is 250ms */
         const intervalId = setInterval(flushGetAllWs, 250);
         return () => {
             clearInterval(intervalId);
@@ -93,92 +102,114 @@ function Layout() {
     }, [])
 
     useEffect(() => {
-        const updatedLayoutByIdDict = {};
-        defaultLayouts.forEach(defaultLayout => {
-            const layoutId = defaultLayout.i;
-            let layout = layouts.find(l => l.i === layoutId);
-            if (!layout) {
-                const xMax = Math.max(...layouts.map(l => l.x + l.w));
-                const yMax = Math.max(...layouts.map(l => l.y + l.h));
-                layout = { ...defaultLayout, x: xMax, y: yMax };
-            }
-            updatedLayoutByIdDict[layoutId] = layout;
-        })
-        layoutByIdDict.current = updatedLayoutByIdDict;
-    }, [layouts, uiLayout])
-
-    useEffect(() => {
-        let cookie = sessionStorage.getItem(COOKIE_NAME);
-        if (cookie) {
-            cookie = parseInt(cookie);
-            dispatch(setSelectedUILayoutId(cookie));
-            let layout = uiLayoutArray.filter(uiLayout => uiLayout[DB_ID] === cookie)[0];
-            if (layout) {
-                dispatch(setUILayout(layout));
+        /* check for stored layout in cookie/session storage. if present and layout exists, set the layout
+         * else clear the cookie/session storage
+        */
+        if (uiLayoutArray.length > 0) {
+            const cookie = sessionStorage.getItem(COOKIE_NAME);
+            if (cookie) {
+                const layoutId = parseInt(cookie);
+                const layout = uiLayoutArray.find(layout => layout[DB_ID] === layoutId);
+                if (layout) {
+                    dispatch(setSelectedUILayoutId(layoutId));
+                    dispatch(setUILayout(layout));
+                } else {
+                    // clear the storage if layout does not exist
+                    sessionStorage.removeItem(COOKIE_NAME);
+                    dispatch(setSelectedUILayoutId(null));
+                    dispatch(setUILayout({}));
+                }
             }
         }
     }, [uiLayoutArray])
 
     useEffect(() => {
-        if (uiLayout.widget_ui_data) {
-            setLayouts(uiLayout.widget_ui_data);
+        /* set layouts, cookie and profile id of active layout if exists */
+        if (uiLayout.widget_ui_data_elements) {
+            layoutsRef.current = cloneDeep(uiLayout.widget_ui_data_elements);
+            setUpdateCounter(prevCounter => prevCounter + 1);
             setProfileId(uiLayout.profile_id);
-            let updatedShow = cloneDeep(show);
-            Object.keys(updatedShow).map(key => {
-                if (uiLayout.widget_ui_data.filter(widgetLayout => widgetLayout.i === key).length > 0) {
-                    updatedShow[key] = true;
-                } else {
-                    updatedShow[key] = false;
+            const cookie = sessionStorage.getItem(COOKIE_NAME);
+            if (cookie) {
+                const layoutId = parseInt(cookie);
+                if (layoutId !== uiLayout[DB_ID]) {
+                    sessionStorage.setItem(COOKIE_NAME, uiLayout[DB_ID]);
                 }
-            })
-            setShow(updatedShow);
+            } else {
+                sessionStorage.setItem(COOKIE_NAME, uiLayout[DB_ID]);
+            }
         }
     }, [uiLayout])
 
     const onToggleDrag = () => {
-        setDraggable(!draggable);
+        setDraggable(draggable => !draggable);
     }
 
     const onSave = () => {
-        let layout;
-        if (uiLayoutArray.filter(l => l.profile_id === profileId).length > 0) {
-            layout = uiLayoutArray.filter(l => l.profile_id === profileId)[0];
-            layout = cloneDeep(layout);
-            layout.widget_ui_data = layouts;
-            dispatch(updateUILayout(layout));
+        /* create new ui layout. if profile id already exists, update the existing layout
+         * and load the currently saved layout
+        */
+        let updatedLayout;
+        const storedLayout = uiLayoutArray.find(layout => layout.profile_id === profileId);
+        if (storedLayout) {
+            // update the existing ui layout with the current layouts
+            updatedLayout = cloneDeep(storedLayout);
+            updatedLayout.widget_ui_data_elements = layoutsRef.current;
+            dispatch(updateUILayout(updatedLayout));
         } else {
-            layout = { profile_id: profileId, widget_ui_data: layouts }
-            dispatch(createUILayout(layout));
+            // create new layout
+            updatedLayout = { profile_id: profileId, widget_ui_data_elements: layoutsRef.current };
+            dispatch(createUILayout(updatedLayout));
         }
+        // close save layout popup
         setOpenSaveLayout(false);
-        setProfileId(layout.profile_id ? layout.profile_id : '');
     }
 
     const onLoad = () => {
-        let layout = uiLayoutArray.filter(uiLayout => uiLayout[DB_ID] === searchValue[DB_ID])[0];
-        dispatch(setUILayout(layout));
+        /* set the active layout on load */
+        const layout = uiLayoutArray.find(layout => layout[DB_ID] === searchValue[DB_ID]);
+        if (layout) {
+            dispatch(setUILayout(layout));
+            dispatch(setSelectedUILayoutId(layout[DB_ID]));
+        }
+        setSearchValue(null);
+        // close load layout popup
         setOpenLoadLayout(false);
-        setSearchValue('');
-        sessionStorage.setItem(COOKIE_NAME, searchValue[DB_ID]);
     }
 
     const onToggleWidget = (name) => {
-        let updatedData = cloneDeep(show);
-        updatedData[name] = !updatedData[name];
-        # @@protoc_insertion_point(handle_update_data)
-        if (!show[name]) {
-            let layout = layoutByIdDict.current[name];
-            setLayouts([...layouts, layout]);
+        /* if widget is already displayed, hide the widget */
+        if (layoutsRef.current.find(layout => layout.i === name)) {
+            // widget is present
+            const filterList = [name];
+            # @@protoc_insertion_point(load_abbreviated_widget_filter_list)
+            layoutsRef.current = layoutsRef.current.filter(layout => !filterList.includes(layout.i));
+        } else {
+            // widget is hidden
+            const defaultLayout = defaultLayouts.find(layout => layout.i === name);
+            if (defaultLayout) {
+                // TODO: add intelligent widget display co-ordinates
+                const xMax = Math.max(...layoutsRef.current.map(layout => layout.x + layout.w));
+                const yMax = Math.max(...layoutsRef.current.map(layout => layout.y + layout.h));
+                const layout = { ...defaultLayout, x: xMax, y: yMax };
+                layoutsRef.current = [...layoutsRef.current, layout];
+            }
         }
-        setShow(updatedData);
+        setUpdateCounter(prevCounter => prevCounter + 1);
     }
 
-    const onLayoutChange = (updatedLayouts) => {
-        updatedLayouts = updatedLayouts.map(l => {
-            let layout = layouts.filter(widgetLayout => widgetLayout.i === l.i)[0];
-            return { i: l.i, x: l.x, y: l.y, w: l.w, h: l.h, layout: layout.layout, enable_override: layout.enable_override, disable_override: layout.disable_override }
-        })
-        setLayouts(updatedLayouts);
+    const onLayoutChange = (modifiedLayouts) => {
+        if (draggable) {
+            const updatedLayouts = modifiedLayouts.map(layout => {
+                const storedLayout = layoutsRef.current.find(storedLayout => storedLayout.i === layout.i);
+                return {
+                    ...layout,
+                    widget_ui_data: storedLayout.widget_ui_data
+                }
+            })
+            layoutsRef.current = updatedLayouts;
+            setUpdateCounter(prevCounter => prevCounter + 1);
+        }
     }
 
     const onSearchValueChange = (e, value) => {
@@ -202,48 +233,60 @@ function Layout() {
     }
 
     const onResetLayout = () => {
-        setLayouts(defaultLayouts);
         sessionStorage.removeItem(COOKIE_NAME);
+        layoutsRef.current = defaultLayouts;
+        setUpdateCounter(prevCounter => prevCounter + 1);
         setProfileId('');
         dispatch(setUILayout({}));
+        dispatch(setSelectedUILayoutId(null));
+        // close load layout popup
         setOpenLoadLayout(false);
-        let updatedShow = cloneDeep(show);
-        Object.keys(updatedShow).map(key => {
-            if (defaultLayouts.filter(widgetLayout => widgetLayout.i === key).length > 0) {
-                updatedShow[key] = true;
-            } else {
-                updatedShow[key] = false;
-            }
-        })
-        setShow(updatedShow);
     }
 
-
-    const onWidgetLayoutChange = useCallback((name, layoutType) => {
-        let updatedData = cloneDeep(layouts);
-        let updatedLayouts = updatedData.map(widgetLayout => {
-            if (widgetLayout.i === name) {
-                widgetLayout.layout = layoutType;
+    const onLayoutTypeChange = useCallback((name, layoutType, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                if (bindVal) {
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.view_layout = layoutType;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], view_layout: layoutType, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].view_layout = layoutType;
+                }
             }
-            return widgetLayout
+            return layout
         });
-        setLayouts(updatedLayouts);
-    }, [layouts])
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
 
-    const onWidgetOverrideChange = useCallback((name, enableOverride, disableOverride) => {
-        let updatedData = cloneDeep(layouts);
-        let updatedLayouts = updatedData.map(widgetLayout => {
-            if (widgetLayout.i === name) {
-                widgetLayout.enable_override = enableOverride;
-                widgetLayout.disable_override = disableOverride;
+    const onOverrideChange = useCallback((name, enableOverride, disableOverride, bindVal = null) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                if (bindVal) {
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.enable_override = enableOverride;
+                        widgetUIData.disable_override = disableOverride;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], enable_override: enableOverride, disable_override: disableOverride, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].enable_override = enableOverride;
+                    layout.widget_ui_data[0].disable_override = disableOverride;
+                }
             }
-            return widgetLayout
+            return layout
         });
-        setLayouts(updatedLayouts);
-    }, [layouts])
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
 
     const storedCookie = sessionStorage.getItem(COOKIE_NAME);
-    if (storedCookie && !uiLayout.widget_ui_data) {
+    if (storedCookie && !uiLayout.widget_ui_data_elements) {
         return (
             <Box className="app">
                 <HashLoader />
@@ -263,8 +306,8 @@ function Layout() {
                 # @@protoc_insertion_point(add_root_in_jsx_layout)
             </SideDrawer>
             <ResponsiveGridLayout
-                {...defaultProps}
-                layouts={{ lg: layouts }}
+                {...defaultGridLayoutProps}
+                layouts={{ lg: layoutsRef.current }}
                 className={classes.grid}
                 isDraggable={draggable}
                 isResizable={draggable}

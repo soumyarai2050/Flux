@@ -1,9 +1,10 @@
+import logging
 from abc import abstractmethod, ABC
 from typing import List, ClassVar, final
 from pendulum import DateTime
 import os
 
-from FluxPythonUtils.scripts.utility_functions import get_host_port_from_env
+from FluxPythonUtils.scripts.utility_functions import parse_to_int, get_native_host_n_port_from_config_dict
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import Security, \
     OrderBrief, OrderJournalBaseModel, Side, OrderEventType, FillsJournalBaseModel
 from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import MarketDataServiceWebClient
@@ -11,11 +12,11 @@ from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_we
     StratManagerServiceWebClient
 
 from pathlib import PurePath
-from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
 config_file_path: PurePath = PROJECT_DATA_DIR / "config.yaml"
-market_data_int_port: int = 8040 if (port_env := (os.getenv("MARKET_DATA_PORT"))) is None or len(port_env) == 0 else \
+market_data_int_port: int = 8040 if (port_env := (os.getenv("MARKET_DATA_BEANIE_PORT"))) is None or len(port_env) == 0 else \
     int(port_env)
 
 
@@ -27,15 +28,16 @@ def add_to_texts(order_brief: OrderBrief, msg: str):
 
 
 def load_configs():
-    return load_yaml_configurations(str(config_file_path))
+    return YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
 
 
 class TradingLinkBase(ABC):
-    host, port = get_host_port_from_env()
-    strat_manager_service_web_client: ClassVar[StratManagerServiceWebClient] = StratManagerServiceWebClient(host, port)
+    config_dict = load_configs()
+    host, port = get_native_host_n_port_from_config_dict(config_dict)
+    strat_manager_service_web_client: ClassVar[StratManagerServiceWebClient] = \
+        StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
     market_data_service_web_client: ClassVar[MarketDataServiceWebClient] = \
         MarketDataServiceWebClient(host, market_data_int_port)
-    config_dict = load_configs()
 
     @classmethod
     @final

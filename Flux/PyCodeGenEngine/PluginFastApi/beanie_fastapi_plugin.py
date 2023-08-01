@@ -5,9 +5,11 @@ import time
 import logging
 from pathlib import PurePath
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
+
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -51,20 +53,6 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                 # else not required: If json root option don't have reentrant field then considering it requires
                 # reentrant lock as default and avoiding its append to reentrant lock non-required list
 
-                if (is_reentrant_on_top := json_root_msg_option_val_dict.get(
-                        BeanieFastApiPlugin.flux_json_root_set_reentrant_lock_to_top_field)) is not None:
-                    if is_reentrant_required is not None and not is_reentrant_required:
-                        err_str = "Field SetReentrantLock is set to true, avoiding adding model's reentrant lock " \
-                                  "to generated route for this model therefor no use can be made of " \
-                                  "SetReentrantLockToTop field set to true, make changes to proto file for it"
-                        logging.error(err_str)
-                        raise Exception(err_str)
-                    else:
-                        if is_reentrant_on_top:
-                            self.reentrant_lock_on_top_required_msg.append(message)
-                        # else not required: if not set or is false then lock will be created on default position
-                # else not required: If not set then avoiding any processing for it
-
                 if message not in self.root_message_list:
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
@@ -98,28 +86,29 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def handle_init_db(self) -> str:
         root_msg_list = [message.proto.name for message in self.root_message_list]
         output_str = "def get_mongo_server_uri():\n"
-        output_str += '    config_file_path: PurePath = PurePath(__file__).parent.parent.parent / "data" / "config.yaml"\n'
-        output_str += '    config_dict = load_yaml_configurations(str(config_file_path))\n'
+        output_str += '    config_file_path: PurePath = ' \
+                      'PurePath(__file__).parent.parent.parent / "data" / "config.yaml"\n'
+        output_str += '    config_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))\n'
         output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := ' \
                       'config_dict.get("mongo_server")) is None else mongo_env\n'
         output_str += '    if config_dict.get("log_mongo_uri", True):\n'
         output_str += '        logging.debug(f"mongo_server: {mongo_server}")\n'
-        output_str += '    if (db_name := os.getenv("DB_NAME")) is not None:\n'
+        output_str += '    if (db_name := os.getenv("DB_NAME")) is not None and len(db_name):\n'
         output_str += '        mongo_server += f"/{db_name}?authSource=admin"\n'
-        output_str += '    return mongo_server\n\n'
-        output_str += "\n"
+        output_str += '    return mongo_server\n\n\n'
         model_names = ", ".join(root_msg_list)
+        output_str += f'document_models=[{model_names}]\n\n\n'
         output_str += "async def init_db():\n"
         output_str += '    mongo_server = get_mongo_server_uri()\n'
         output_str += '    client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server, tz_aware=True)\n'
-        output_str += f'    if (db_name := os.getenv("DB_NAME")) is not None:\n'
+        output_str += f'    if (db_name := os.getenv("DB_NAME")) is not None and len(db_name):\n'
         output_str += f'        db = client.get_default_database()\n'
         output_str += f'    else:\n'
         output_str += f'        db = client.{self.proto_file_package}\n'
         output_str += '    logging.debug(f"db_name: {db_name}")\n'
         output_str += f'    await init_beanie(\n'
         output_str += f'        database=db,\n'
-        output_str += f'        document_models=[{model_names}]\n'
+        output_str += f'        document_models=document_models\n'
         output_str += f'        )\n'
         return output_str
 
@@ -131,7 +120,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += "from pathlib import PurePath\n"
         output_str += "import logging\n"
 
-        output_str += f"from FluxPythonUtils.scripts.utility_functions import load_yaml_configurations\n"
+        output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f'from {model_file_path} import *\n\n\n'
         output_str += self.handle_init_db()
@@ -156,8 +145,9 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += f'async def connect():\n'
         output_str += f'    await init_db()\n'
         for message in self.custom_id_primary_key_messages:
-            message_name = message.proto.name
-            output_str += f"    await init_max_id_handler({message_name})\n"
+            if "int" == self._get_msg_id_field_type(message):
+                message_name = message.proto.name
+                output_str += f"    await init_max_id_handler({message_name})\n"
         output_str += "\n\n"
         output_str += "if os.getenv('DEBUG'):\n"
         output_str += "    from fastapi.middleware.cors import CORSMiddleware\n\n"
@@ -200,7 +190,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                 self.handle_callback_override_set_instance_file_gen(),
 
             # Adding dummy callback override class file
-            "dummy_" + self.routes_callback_class_name_override + ".py": self.handle_callback_override_file_gen(),
+            "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py": self.handle_callback_override_file_gen(),
 
             # Adding project's routes.py
             self.routes_file_name+".py": self.handle_routes_file_gen(),

@@ -21,7 +21,7 @@ const WidgetContainer = (props) => {
 
     const onChangeLayout = (layout) => {
         onToggleShowLayoutOptions();
-        props.onChangeLayout(props.name, layout);
+        props.onChangeLayout(layout);
     }
 
     const onToggleShowLayoutOptions = () => {
@@ -82,7 +82,15 @@ const WidgetContainer = (props) => {
                     </div>
                 </div>
             </Typography>
-            {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE && <CommonKeyWidget ref={commonkeyRef} commonkeys={commonkeys} lineBreakStart={props.lineBreakStart} lineBreakEnd={props.lineBreakEnd} />}
+            {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE &&
+                <CommonKeyWidget
+                    ref={commonkeyRef}
+                    commonkeys={commonkeys}
+                    lineBreakStart={props.lineBreakStart}
+                    lineBreakEnd={props.lineBreakEnd}
+                    truncateDateTime={props.truncateDateTime}
+                />
+            }
             <Box style={{ height: `calc(100% - 42px - ${height}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
                 {props.children}
             </Box>

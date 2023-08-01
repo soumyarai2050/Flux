@@ -79,3 +79,19 @@ export const FormValidation = (props) => {
         </Dialog>
     )
 }
+
+export const CollectionSwitchPopup = (props) => {
+
+    return (
+        <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
+            <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
+            <DialogContent className={classes.dialog_body}>
+                <DialogContentText className={classes.dialog_text}>Collection switched while in EDIT mode. Your changes me be lost.</DialogContentText>
+            </DialogContent>
+            <DialogActions>
+                <Button variant='contained' color='error' onClick={props.onClose} startIcon={<Delete />}>Discard Changes</Button>
+                <Button variant='contained' color='success' onClick={props.onContinue} startIcon={<Edit />} autoFocus>Continue Editing</Button>
+            </DialogActions>
+        </Dialog>
+    )
+}

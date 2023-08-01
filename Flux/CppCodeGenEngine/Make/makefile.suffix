@@ -1,0 +1,24 @@
+SRCS = src/$(TARGET).cpp
+OBJS = $(SRCS:.cc=.o)
+
+MAIN = bin/$(TARGET)
+
+SHELL = /bin/sh
+.SUFFIXES:
+.SUFFIXES: .cc .o
+
+.PHONY: all clean depend Makefile
+
+all:    $(MAIN)
+$(MAIN): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(MAIN) $(OBJS) $(LFLAGS) $(LIBS)
+
+.cc.o:
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $<  -o $@
+
+clean:
+	$(RM) *.o $(MAIN) 
+
+depend: $(SRCS)
+	makedepend $(INCLUDES) $^
+

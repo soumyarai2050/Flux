@@ -1,0 +1,104 @@
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FileOptions 
+{
+  //General Options - 51
+  optional string FluxFileCmnt = 51151;
+  optional string FluxFileModelType = 51152;//Possible values: SERVICE
+}
+
+extend google.protobuf.MessageOptions
+{
+  //General Options - 51
+  optional string FluxMsgCmnt = 51151;
+  optional string FluxMsgRootId = 51152;
+  optional string FluxMsgPrefixPrepend = 51153;//Inline expansion will cause prefix prepend(tion)
+
+  //DB Options - 52
+  optional string FluxMsgTbl = 52151;
+  optional string FluxMsgTblShared = 52152;
+  //Below 2 options are also available at field level, setting at msg level implies: generate DB only synthesized field
+  // & map same to field named (value of): FluxFldFkCol found in table named (value of): FluxFldFkTbl; synthesized
+  // field name shall be: snake_case (value of): FluxFldFkTbl concatenated with snake_case (value of): FluxFldFkCol
+  optional string FluxMsgFkTbl = 52153;
+  optional string FluxMsgFkCol = 52154;
+
+
+  //Service Options - 53
+  optional string FluxMsgOpName = 53151;
+  optional string FluxMsgRsp = 53152;
+  optional string FluxMsgNotify = 53153;
+ 
+  //DAO Options - 54
+  optional string FluxMsgDaoAccessType = 54151;
+  optional string FluxMsgNoExpand = 54152;
+
+  //ORM options - 55
+  optional string FluxMsgOrmRoot = 55151;//The root message that gets persisted to ORM has this option set
+  //FluxMsgOrmCreateUpdateOrDelete option is expected to hold Orm Persistent class and variable name.
+  //To simplify configuration and reduce redundancy, following variations are possible:
+  //Case -0: If Variable name and Class name have only camel case difference:- value = "PersistenceClassType"
+  //Case -1: If Variable name and class name have more then only camel case difference:- value = "PersistenceClassType,PersistenceClassVar"
+  //Case -2: If Multiple classes are to be persisted and Variable name and Class name have only camel case difference:- value = "PersistenceClassType1:PersistenceClassType2"
+  //Case -3: If Multiple classes are to be persisted and Variable name and class name have more then only camel case difference:- value = "PersistenceClassType1,PersistenceClassVar1:PersistenceClassType2,PersistenceClassVar2"
+  optional string FluxMsgOrmCreateUpdateOrDeleteClasses = 55152;
+
+  // Code does not use QueryRootType and QueryRootVar ATM
+  //I guess at some point my analysis resulted in QueryRootType and QueryRootVar not being required, likely because the mapping can be multi-level and cross-level not 1-1.
+  //Old Thought and Not Supported now (leaving here in case analysis was wrong):
+  //FluxMsgOrmReadRespClasses option is expected to hold Orm Response vs Orm Query mapping.
+  //This can make the configuration look messy and redundant, hence following variations are sufficient and possible
+  //Case - 0: full blown approach:- value = "RespType1,RespVar1;QueryRootType1,QueryRootVar1:RespType2,RespVar2;QueryRootType2,QueryRootVar2"
+  //Case -1: If Resp Type and Query Root are same but Variable name different (ignoring only camel case difference):- value = "RespType,RespVar"
+  //Case -2: If both type are not same but variable name have only camel case difference:- value = "RespType:QueryRootType"
+  //Case -3: If both type are same and both type and variable name have only camel case difference:- value = "RespType"
+
+  //New and Supported:
+  //FluxMsgOrmReadRespClasses option is expected to hold Orm Response class and variable name.
+  //To simplify configuration and reduce redundancy, following variations are possible:
+  //Case -0: If Variable name and Class name have only camel case difference:- value = "RespClassType"
+  //Case -1: If Variable name and class name have more then only camel case difference:- value = "RespClassType,RespClassVar"
+  //Case -2: If Multiple classes are to be persisted and Variable name and Class name have only camel case difference:- value = "RespClassType1:RespClassType2"
+  //Case -3: If Multiple classes are to be persisted and Variable name and class name have more then only camel case difference:- value = "RespClassType1,RespClassVar1:RespClassType2,RespClassVar2"
+  optional string FluxMsgOrmReadRespClasses = 55153;
+
+  //Complexity Option - 56
+  optional string FluxMsgCmplxHigh = 56151;
+  optional string FluxMsgCmplxMed = 56152; 
+  optional string FluxMsgCmplxLow = 56153;
+  
+}
+
+extend google.protobuf.FieldOptions 
+{
+  //General Options - 51
+  optional string FluxFldCmnt = 51151;
+  optional string FluxFldHide=  51152;
+  optional string FluxFldHelp=  51153;
+
+  //DB Options - 52
+  optional string FluxFldTbl = 52151;
+  optional string FluxFldCol = 52152;
+  optional string FluxFldPk = 52153;
+  // left for backward compatibility
+  optional string FluxFldFkTbl = 52154 [deprecated=true];
+  optional string FluxFldFkCol = 52155 [deprecated=true];
+  // new complex type for foreign key support - use this instead
+  //@@@ TSQ
+
+  //Complexity Option - 56
+  optional string FluxFldCmplxHigh = 56151;
+  optional string FluxFldCmplxMed = 56152; 
+  optional string FluxFldCmplxLow = 56153;
+
+  //Value Options - 59
+  optional string FluxFldValMin = 59151;
+  optional string FluxFldValMax = 59152;
+  optional string FluxFldValList = 59153;
+  optional string FluxFldTestVal = 59154;
+  optional string FluxFldValDateTime = 59155;
+
+  //Mapping Options - 60
+  optional string FluxFldMappingSrcType = 60151;
+}
+

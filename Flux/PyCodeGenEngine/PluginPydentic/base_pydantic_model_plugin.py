@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import copy
 import logging
 import os
 from typing import List, Callable, Dict, Tuple, final
@@ -7,10 +8,11 @@ from abc import abstractmethod
 from pathlib import PurePath
 from enum import auto
 from fastapi_utils.enums import StrEnum
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
-if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
-        isinstance(debug_sleep_time := int(debug_sleep_time), int):
-    time.sleep(debug_sleep_time)
+if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
+    time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
@@ -32,8 +34,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
         response_field_case_style = None
-        if (enum_type := os.getenv("ENUM_TYPE")) is not None and \
-                (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None:
+        if ((enum_type := os.getenv("ENUM_TYPE")) is not None and len(enum_type)) and \
+                ((response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and \
+                 len(response_field_case_style)):
             self.enum_type = enum_type
             self.response_field_case_style: str = response_field_case_style
         else:
@@ -51,6 +54,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.proto_file_name: str = ""
         self.proto_package_name: str = ""
         self.model_file_name: str = ""
+        self.generic_routes_file_name: str = ""
         self.model_import_file_name: str = ""
         self.reentrant_lock_non_required_msg: List[protogen.Message] = []
 
@@ -288,7 +292,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def _handle_reentrant_lock(self, message: protogen.Message) -> str:
         # taking first obj since json root is of non-repeated option
         if message in self.root_message_list and message not in self.reentrant_lock_non_required_msg:
-            return "    reentrant_lock: ClassVar[Lock] = RLock()\n"
+            return "    reentrant_lock: ClassVar[AsyncRLock] = AsyncRLock()\n"
         else:
             return ""
 
@@ -362,31 +366,35 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
         return output_str
 
-    def _import_current_models(self) -> str:
+    def _import_current_models(self) -> List[str]:
+        import_statements: List[str] = []
         model_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.model_file_name)
-        output_str = f"from {model_file_path} import *\n"
-        return output_str
+        import_statements.append(f"            from {model_file_path} import *\n")
+        generic_routes_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", self.generic_routes_file_name)
+        import_statements.append(f"            from {generic_routes_file_path} import *\n")
+        return import_statements
 
     def handle_model_import_file_gen(self) -> str:
-        if (output_dir_path := os.getenv("PLUGIN_OUTPUT_DIR")) is not None:
+        if (output_dir_path := os.getenv("PLUGIN_OUTPUT_DIR")) is not None and len(output_dir_path):
             model_import_file_name = self.model_import_file_name + ".py"
             model_import_file_path = PurePath(output_dir_path) / model_import_file_name
-            current_import_statement = self._import_current_models()
-            if (db_type_env_name := os.getenv("DBType")) is None:
-                err_str = "env var DBType received as None"
+            current_import_statements = self._import_current_models()
+            if (db_type_env_name := os.getenv("DBType")) is None or len(db_type_env_name) == 0:
+                err_str = f"env var DBType received as {db_type_env_name}"
                 logging.exception(err_str)
                 raise Exception(err_str)
             if not os.path.exists(model_import_file_path):
                 output_str = "import logging\n"
                 output_str += "import os\n\n"
-                output_str += 'if (db_type := os.getenv("DBType")) is None:\n'
-                output_str += '    err_str = f"env var DBType must not be None"\n'
+                output_str += 'if (db_type := os.getenv("DBType")) is None or len(db_type) == 0:\n'
+                output_str += '    err_str = f"env var DBType must not be {db_type}"\n'
                 output_str += '    logging.exception(err_str)\n'
                 output_str += '    raise Exception(err_str)\n'
                 output_str += 'else:\n'
                 output_str += '    match db_type.lower():\n'
                 output_str += f'        case "{db_type_env_name}":\n'
-                output_str += f'            {current_import_statement}\n'
+                for import_statement in current_import_statements:
+                    output_str += import_statement
                 output_str += f'        case other:\n'
                 output_str += '            err_str = f"unsupported db type {db_type}"\n'
                 output_str += f'            logging.exception(err_str)\n'
@@ -395,25 +403,32 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             else:
                 with open(model_import_file_path) as import_file:
                     imports_file_content: List[str] = import_file.readlines()
-
+                    imports_file_content_copy: List[str] = copy.deepcopy(imports_file_content)
                     match_str_index = imports_file_content.index("    match db_type.lower():\n")
 
                     # checking if already imported
                     for content in imports_file_content[match_str_index:]:
                         if "case" in content and db_type_env_name in content:
-                            # if current db_type already exists in match statement then removing old import
-                            del imports_file_content[imports_file_content.index(content)+2]  # empty space
-                            del imports_file_content[imports_file_content.index(content)+1]  # import statement
-                            del imports_file_content[imports_file_content.index(content)]    # match case check
+                            # getting ending import line for current db_type_env_name
+                            for line in imports_file_content[imports_file_content.index(content)+1:]:
+                                if "case" in line:
+                                    next_db_type_imports_index = imports_file_content.index(line)
+                                    break
+                            counter = 0
+                            for index in range(imports_file_content.index(content), next_db_type_imports_index):
+                                # if current db_type already exists in match statement then removing old import
+                                del imports_file_content_copy[index-counter]
+                                counter += 1
                             break
                         # else not required: if current db_type already not in match statement then no need
                         # to remove it
-                    imports_file_content.insert(match_str_index+1, f'        case "{db_type_env_name}":\n')
-                    imports_file_content.insert(match_str_index+2, f'            {current_import_statement}\n')
+                    imports_file_content_copy.insert(match_str_index+1, f'        case "{db_type_env_name}":\n')
+                    for index, import_statement in enumerate(current_import_statements):
+                        imports_file_content_copy.insert(match_str_index+1+(index+1), import_statement)
 
-                return "".join(imports_file_content)
+                return "".join(imports_file_content_copy)
         else:
-            err_str = "Env var 'PLUGIN_OUTPUT_DIR' received as None"
+            err_str = f"Env var 'PLUGIN_OUTPUT_DIR' received as {output_dir_path}"
             logging.exception(err_str)
             raise Exception(err_str)
 

@@ -1,0 +1,25 @@
+#!/bin/bash
+if [ "$1" != "" ] ; then
+	if [  "$2" == "" ] ; then
+		ORIG_GEN_PRJ=CppGenTemplate
+	else
+		ORIG_GEN_PRJ=$2
+	fi
+	START_DIR=$PWD
+        mkdir $1
+	cd $1
+	cp -pr $CODE_GEN_ENGINE_HOME/$ORIG_GEN_PRJ/. .
+	find . -name .svn | xargs rm -rf
+	cd src
+	mv $ORIG_GEN_PRJ.cpp $1.cpp
+	sed -i -e "s/${ORIG_GEN_PRJ}/${1}/" $1.cpp
+	cd ..
+	sed -i -e "s/${ORIG_GEN_PRJ}/${1}/" makefile
+	rm -f bin/*
+	cd $START_DIR
+	echo "Created Project $1 from $ORIG_GEN_PRJ"
+else
+        echo "No Name Passed for generator, please pass generator name as Argument and re-try"
+        echo "quitting $0"
+fi
+

@@ -1,7 +1,22 @@
 mongo_server: "mongodb://localhost:27017"
+beanie_host: 127.0.0.1
+beanie_port: '8020'
+cache_host: 127.0.0.1
+cache_port: '8030'
+
+# below 2 configs are used to check types of override files to be initialized by fastapi launch script
+# supported values: "native" or "bare"
+beanie_override_type: "native"
+cache_override_type: "bare"
+
 log_mongo_uri: True
 min_refresh_interval: 20
 is_test_run: True
+log_level: "debug"  # log lvl in int or basic log lvl name
+custom_logger_lvls:
+  - TIMING: 15
+  - JUNK: 5
+
 # to run log analyzer in simulator mode
 simulate_log_analyzer: True
 

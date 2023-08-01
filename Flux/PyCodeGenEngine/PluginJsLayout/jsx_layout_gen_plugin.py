@@ -30,32 +30,70 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += f"import {message.proto.name} from '../widgets/{message.proto.name}';\n"
         return output_str
 
-    def handle_widget_list(self, file: protogen.File) -> str:
-        output_str = ""
-        for message in self.layout_msg_list:
-            message_name_case_styled = self.case_style_convert_method(message.proto.name)
-            if message != self.layout_msg_list[-1]:
-                output_str += f"{message_name_case_styled}: true,\n"
-            else:
-                output_str += f"{message_name_case_styled}: true\n"
+    def _load_abbreviated_widget_filter_list(self, abb_msg_name: str,
+                                             dependent_or_linked_msg_name_list: List[str]) -> str:
+        output_str = f"if (name === '{abb_msg_name}') " + "{\n"
+        output_str += f"    filterList.push(...{dependent_or_linked_msg_name_list});\n"
+        output_str += "}\n"
         return output_str
 
-    def handle_update_data(self, file: protogen.File) -> str:
+    def _get_dependent_layout_msg_name_list(self, dependent_msg_name: str) -> List[str]:
+        dependent_msg_name_snake_cased = convert_camel_case_to_specific_case(dependent_msg_name)
+        layout_msg_list = [layout_msg.proto.name for layout_msg in self.layout_msg_list]
+        if dependent_msg_name in layout_msg_list:
+            return [f'{dependent_msg_name_snake_cased}']
+        else:
+            # dependent_msg_name is not layout type then getting its field's layout type messages
+            for root_msg in self.root_msg_list:
+                if dependent_msg_name == root_msg.proto.name:
+                    dependent_msg_name_list = []
+                    for field in root_msg.fields:
+                        if field.message is not None and field.message in self.layout_msg_list:
+                            meg_name_snake_cased = convert_camel_case_to_specific_case(field.message.proto.name)
+                            dependent_msg_name_list.append(f'{meg_name_snake_cased}')
+                    if dependent_msg_name_list:
+                        return dependent_msg_name_list
+                    else:
+                        err_str = f"Couldn't find any message type field in message {dependent_msg_name} " \
+                                  f"having layout option enabled"
+                        logging.exception(err_str)
+                        raise Exception(err_str)
+                # else handled by for loop's else
+            else:
+                err_str = f"Couldn't find message {dependent_msg_name} in " \
+                          f"either layout_msg_list or root_msg_list"
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+    def load_abbreviated_widget_filter_list(self, file: protogen.File) -> str:
         output_str = ""
+        # handling simple abbreviated types
         if self.simple_abbreviated_filter_layout_msg_list:
-            temp_str = ""
             for message in self.simple_abbreviated_filter_layout_msg_list:
-                message_name_camel_cased = convert_camel_case_to_specific_case(message.proto.name)
-                temp_str += f"name === '{message_name_camel_cased}' "
-                if message != self.simple_abbreviated_filter_layout_msg_list[-1]:
-                    temp_str += "|| "
-            output_str += f"if ({temp_str}&& show[name]) " + "{\n"
-            for message in self.layout_msg_list:
-                if message not in self.root_msg_list and message not in self.simple_abbreviated_filter_layout_msg_list:
-                    message_name_camel_cased = convert_camel_case_to_specific_case(message.proto.name)
-                    output_str += f"    updatedData['{message_name_camel_cased}'] = false;\n"
-                # else not required: avoiding other than dependent type layout messages
-            output_str += "}\n"
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+                dependent_msg_name = self.abbreviated_msg_name_to_dependent_msg_name_dict[message_name]
+                dependent_msg_name_list = self._get_dependent_layout_msg_name_list(dependent_msg_name)
+                output_str += self._load_abbreviated_widget_filter_list(message_name_snake_cased,
+                                                                        dependent_msg_name_list)
+
+        # handling parent abbreviated types
+        if self.parent_abbreviated_filter_layout_msg_list:
+            for message in self.parent_abbreviated_filter_layout_msg_list:
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+                dependent_msg_name = self.abbreviated_msg_name_to_dependent_msg_name_dict[message_name]
+                dependent_msg_name_list = self._get_dependent_layout_msg_name_list(dependent_msg_name)
+                linked_msg_name = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
+                linked_msg_name_snake_cased = convert_camel_case_to_specific_case(linked_msg_name)
+                linked_msg_dependent_msg_name = \
+                    self.abbreviated_msg_name_to_dependent_msg_name_dict[linked_msg_name]
+                linked_msg_dependent_msg_name_list = \
+                    self._get_dependent_layout_msg_name_list(linked_msg_dependent_msg_name)
+                output_str += self._load_abbreviated_widget_filter_list(message_name_snake_cased,
+                                                                        dependent_msg_name_list +
+                                                                        [f'{linked_msg_name_snake_cased}'] +
+                                                                        linked_msg_dependent_msg_name_list)
 
         return output_str
 
@@ -66,7 +104,7 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             message_name_space_sep = convert_camel_case_to_specific_case(message_name, " ", False)
             message_name_case_styled = self.case_style_convert_method(message_name)
             output_str += f"<ToggleIcon title='{message_name_space_sep}' name='{message_name_case_styled}' selected=" + \
-                          "{show."+f"{message_name_case_styled}"+"} onClick={onToggleWidget}>\n"
+                          "{layoutsById.hasOwnProperty('"+f"{message_name_case_styled}"+"')} onClick={onToggleWidget}>\n"
             output_str += "    {getIconText('"+f"{message_name_case_styled}"+"')}\n"
             output_str += "</ToggleIcon>\n"
         return output_str
@@ -76,19 +114,15 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
         for index, message in enumerate(self.layout_msg_list):
             message_name = message.proto.name
             message_name_case_styled = self.case_style_convert_method(message_name)
-            output_str += "{"+f"show.{message_name_case_styled} &&\n"
+            output_str += "{"+f"layoutsById.{message_name_case_styled} &&\n"
             output_str += "    <Paper key='"+f"{message_name_case_styled}' id='{message_name_case_styled}'" + \
-                          " className={classes.widget} data-grid={layoutByIdDict.current." + \
+                          " className={classes.widget} data-grid={layoutsById." + \
                           f"{message_name_case_styled}" + "}>\n"
             output_str += f'        <{message.proto.name}\n'
             output_str += f'            name="{message_name_case_styled}"\n'
-            output_str += "            layout={"+f"layoutByIdDict.current.{message_name_case_styled}.layout"+"}\n"
-            output_str += "            onChangeLayout={onWidgetLayoutChange}\n"
-            output_str += "            enableOverride={layoutByIdDict.current."+f"{message_name_case_styled}"+"." \
-                          "enable_override}\n"
-            output_str += "            disableOverride={layoutByIdDict.current."+f"{message_name_case_styled}"+"." \
-                          "disable_override}\n"
-            output_str += '            onOverrideChange={onWidgetOverrideChange}\n'
+            output_str += "            options={"+f"layoutsById.{message_name_case_styled}.widget_ui_data"+"}\n"
+            output_str += "            onChangeLayout={onLayoutTypeChange}\n"
+            output_str += '            onOverrideChange={onOverrideChange}\n'
             output_str += f'        />\n'
             output_str += f'    </Paper>\n'
             output_str += '}\n'
@@ -113,8 +147,7 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
         return {
             output_file_name: {
                 "add_imports": self.handle_imports(file),
-                "add_widget_list": self.handle_widget_list(file),
-                "handle_update_data": self.handle_update_data(file),
+                "load_abbreviated_widget_filter_list": self.load_abbreviated_widget_filter_list(file),
                 "add_root_in_jsx_layout": self.handle_root_msg_addition_to_layout_templ(file),
                 "add_show_widget": self.handle_show_widget(file)
             }

@@ -36,7 +36,9 @@ const TreeWidget = (props) => {
             'onCheckboxChange': props.onCheckboxChange ? props.onCheckboxChange : onCheckboxChange,
             'onAutocompleteOptionChange': props.onAutocompleteOptionChange ? props.onAutocompleteOptionChange : onAutocompleteOptionChange,
             'onDateTimeChange': props.onDateTimeChange ? props.onDateTimeChange : onDateTimeChange,
-            'onFormUpdate': props.onFormUpdate
+            'onFormUpdate': props.onFormUpdate,
+            'index': props.index,
+            'forceUpdate': props.forceUpdate
         }))
         setIsOpen();
     }, [props.schema, props.data, props.mode, props.subtree, props.xpath, isOpen, hide, showDataType])

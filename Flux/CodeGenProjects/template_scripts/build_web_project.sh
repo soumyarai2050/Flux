@@ -35,10 +35,18 @@ python gen_js_layouts.py
 python gen_json_schema.py
 python gen_executor_files.py
 # cpp plugins
-python gen_cpp_db_handler.py
-python gen_cpp_serialize_deserialize.py
-python gen_cpp_db_encode_decode.py
+python gen_cpp_codec.py
+python gen_cpp_db_codec.py
+python gen_cpp_constants.py
 python gen_cpp_key_handler.py
+python gen_populate_random_values.py
+python gen_cpp_db_test.py
+python gen_cpp_web_client.py
+python gen_cpp_web_client_test.py
+python gen_cpp_example_comments.py
+python gen_cpp_codec_test.py
+python gen_proto2_to_proto3.py
+python gen_cpp_build_and_run_test.py
 
 cd ../../
 "$PWD"/gen_web_project.sh "$PROJECT_NAME"
