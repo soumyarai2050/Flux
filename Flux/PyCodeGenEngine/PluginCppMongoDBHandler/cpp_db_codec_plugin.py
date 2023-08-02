@@ -106,7 +106,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                           f"{message_name_snake_cased}_document, IsUpdateOrPatch::DB_TRUE);\n"
         output_content += f"\t\t\t\tstatus = update_or_patch_{message_name_snake_cased}(found->second, " \
                           f"{message_name_snake_cased}_document);\n\t\t\t"
-        output_content += "}\n\t\t}\n\n"
+        output_content += "}\n\t\t\treturn status;\n\t\t}\n\n"
         return output_content
 
     @staticmethod
@@ -242,7 +242,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f"\t\tstd::unordered_map <std::string, std::string> {message_name_snake_cased}_key_to_db_id;\n\n"
         output_content += "\tprotected:"
         output_content += f"\n\n\t\tstd::shared_ptr<{package_name}_handler::{class_name}_MongoDBHandler> mongo_db;\n"
-        output_content += f"\t\tquill::Logger* logger_;"
+        output_content += f"\t\tquill::Logger* logger_;\n"
         output_content += f"\t\tmongocxx::collection {message_name_snake_cased}_collection;\n\n"
 
         return output_content

@@ -176,8 +176,10 @@ class CppDbTestPlugin(BaseProtoPlugin):
 
         output_content += self.header_generate_handler(file_name, class_name_snake_cased)
 
+        output_content += "quill::Logger* logger = quill::get_logger();\n"
+
         output_content += (f'std::shared_ptr<{package_name}_handler::{class_name}_MongoDBHandler> mongo_db = std::'
-                           f'make_shared<{package_name}_handler::{class_name}_MongoDBHandler>();\n\n')
+                           f'make_shared<{package_name}_handler::{class_name}_MongoDBHandler>(logger);\n\n')
 
         output_content += f"using {package_name}_handler::{class_name}JSONCodec;\n"
         output_content += f"using {package_name}_handler::{class_name}KeyHandler;\n"
@@ -197,7 +199,8 @@ class CppDbTestPlugin(BaseProtoPlugin):
                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
                 output_content += f"\nTEST({class_name}{message_name}TestSuite, DBTest) {{\n\t"
-                output_content += f"{class_name}MongoDB{message_name}Codec {message_name_snake_cased}_codec(mongo_db);\n"
+                output_content += (f"{class_name}MongoDB{message_name}Codec {message_name_snake_cased}_codec("
+                                   f"mongo_db, logger);\n")
                 output_content += f'\t{package_name}::{message_name} {message_name_snake_cased};\n'
                 output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_from_db;\n'
                 output_content += f'\t{package_name}::{message_name}List {message_name_snake_cased}_list;\n'
