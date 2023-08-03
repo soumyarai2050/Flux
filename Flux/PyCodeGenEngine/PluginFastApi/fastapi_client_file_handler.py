@@ -203,6 +203,11 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                 break
             # else not required: Avoiding field if index option is not enabled
 
+        id_field_type: str = self._get_msg_id_field_type(message)
+        if id_field_type == "int":
+            output_str += " " * 8 + "self.get_" + f"{message_name_snake_cased}_" + \
+                          "max_id_client_url: str = f'http://{self.host}:{self.port}/" + \
+                          f"{self.proto_file_package}/query-get_{message_name_snake_cased}_max_id'\n"
         return output_str
 
     def _handle_client_query_url(self, message: protogen.Message):
@@ -314,6 +319,14 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
         return output_str
 
+    def _handle_get_max_id_client_generation(self, message):
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = " " * 4 + f"def get_{message_name_snake_cased}_max_id_client(self) -> MaxId:\n"
+        output_str += " " * 4 + f"    return generic_http_get_client(self.get_" \
+                                f"{message_name_snake_cased}_max_id_client_url, None, MaxId)\n\n"
+        return output_str
+
     def _handle_client_route_methods(self, message: protogen.Message) -> str:
         output_str = ""
         option_value_dict = \
@@ -348,6 +361,9 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                 output_str += self.handle_index_client_gen(message)
                 break
             # else not required: Avoiding field if index option is not enabled
+
+        if id_field_type == "int":
+            output_str += self._handle_get_max_id_client_generation(message)
 
         return output_str
 

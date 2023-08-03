@@ -20,6 +20,7 @@ trading_link: TradingLinkBase = get_trading_link()
 
 ps_config_yaml_path = PurePath(__file__).parent.parent / "data" / "config.yaml"
 ps_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ps_config_yaml_path))
+# Using beanie host and port explicitly since websockets handling is in beanie calls
 ps_beanie_host, ps_beanie_port = \
     ps_config_yaml_dict.get("beanie_host"), parse_to_int(ps_config_yaml_dict.get("beanie_port"))
 

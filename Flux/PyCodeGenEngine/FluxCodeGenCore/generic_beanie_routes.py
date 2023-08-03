@@ -18,7 +18,7 @@ from beanie.odm.bulk import BulkWriter
 from fastapi.encoders import jsonable_encoder
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 from beanie import WriteRules, DeleteRules
-from beanie.odm.documents import DocType, InsertManyResult
+from beanie.odm.documents import DocType, InsertManyResult, PydanticObjectId
 from pydantic.fields import SHAPE_LIST
 from pydantic.main import ModelMetaclass
 import pendulum
@@ -254,24 +254,24 @@ async def generic_put_http(pydantic_class_type, proto_package_name: str, stored_
                                          update_agg_pipeline, has_links)
 
 
-def _validate_stored_n_updated_obj_list_len(stored_pydantic_obj_list: List[DocType],
-                                            updated_pydantic_obj_list: List[DocType] | List[Dict]):
-    if len(stored_pydantic_obj_list) != len(updated_pydantic_obj_list):
-        err_str = "Length of stored_pydantic_obj_list is not same as updated_pydantic_obj_list;;; " \
-                  f"stored_pydantic_obj_list: {stored_pydantic_obj_list}, " \
-                  f"updated_pydantic_obj_list: {updated_pydantic_obj_list}"
-        logging.exception(err_str)
-        raise Exception(err_str)
+def get_stored_obj_id_to_obj_dict(stored_pydantic_obj_list: List[DocType]
+                                  ) -> Dict[int, DocType] | Dict[str, DocType] | Dict[PydanticObjectId, DocType]:
+    stored_obj_id_to_obj_dict = {}
+    for stored_pydantic_obj in stored_pydantic_obj_list:
+        if stored_pydantic_obj.id not in stored_obj_id_to_obj_dict:
+            stored_obj_id_to_obj_dict[stored_pydantic_obj.id] = stored_pydantic_obj
+    return stored_obj_id_to_obj_dict
 
 
 def _generic_put_all_http(stored_pydantic_obj_list: List[DocType],
                           updated_pydantic_obj_list: List[DocType]) -> List[Tuple[DocType, Dict]]:
-    _validate_stored_n_updated_obj_list_len(stored_pydantic_obj_list, updated_pydantic_obj_list)
+    stored_obj_id_to_obj_dict = get_stored_obj_id_to_obj_dict(stored_pydantic_obj_list)
 
     stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocType, Dict]] = []
     for index in range(len(updated_pydantic_obj_list)):
-        stored_pydantic_obj_n_updated_obj_dict_tuple_list.append((stored_pydantic_obj_list[index],
-                                                                  updated_pydantic_obj_list[index].dict(by_alias=True)))
+        stored_pydantic_obj_n_updated_obj_dict_tuple_list.append(
+            (stored_obj_id_to_obj_dict[updated_pydantic_obj_list[index].id],
+             updated_pydantic_obj_list[index].dict(by_alias=True)))
     return stored_pydantic_obj_n_updated_obj_dict_tuple_list
 
 
@@ -350,7 +350,7 @@ async def generic_patch_http(pydantic_class_type, proto_package_name: str, store
 def underlying_generic_patch_all_http(pydantic_class_type: Type[DocType], stored_pydantic_obj_list: List[DocType],
                                       pydantic_obj_update_json_list: List[Dict],
                                       ignore_datetime_handling: bool | None = None) -> List[Tuple[DocType, Dict]]:
-    _validate_stored_n_updated_obj_list_len(stored_pydantic_obj_list, pydantic_obj_update_json_list)
+    stored_obj_id_to_obj_dict = get_stored_obj_id_to_obj_dict(stored_pydantic_obj_list)
 
     stored_pydantic_obj_json_list: List[Dict] = []
     stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocType, Dict]] = []
@@ -359,12 +359,14 @@ def underlying_generic_patch_all_http(pydantic_class_type: Type[DocType], stored
                                                    ignore_handling_datetime=ignore_datetime_handling)
 
         # converting stored objs to json
-        stored_pydantic_obj_json = jsonable_encoder(stored_pydantic_obj_list[index], by_alias=True)
+        stored_pydantic_obj_json = jsonable_encoder(stored_obj_id_to_obj_dict[pydantic_obj_update_json.get("_id")],
+                                                    by_alias=True)
         stored_pydantic_obj_json_list.append(stored_pydantic_obj_json)
 
         # this list since contains container types (list of stored_pydantic_obj_json),
         # gets updated in compare_n_patch_list called below
-        stored_pydantic_obj_n_updated_obj_dict_tuple_list.append((stored_pydantic_obj_list[index],
+        stored_pydantic_obj_n_updated_obj_dict_tuple_list.append((stored_obj_id_to_obj_dict[
+                                                                      stored_pydantic_obj_json.get("_id")],
                                                                   stored_pydantic_obj_json))
     compare_n_patch_list(stored_pydantic_obj_json_list, pydantic_obj_update_json_list)
 

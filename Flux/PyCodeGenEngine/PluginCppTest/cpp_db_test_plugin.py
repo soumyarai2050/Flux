@@ -185,106 +185,114 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += f"using {package_name}_handler::{class_name}KeyHandler;\n"
         for message in self.root_message_list:
 
-            if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root) and CppDbTestPlugin.\
-                    is_option_enabled(message, CppDbTestPlugin.flux_msg_executor_options):
-                message_name = message.proto.name
-                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                output_content += f"using {class_name_snake_cased}_handler::{class_name}MongoDB{message_name}Codec;\n"
+            if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root):
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppDbTestPlugin.is_option_enabled(field, "FluxFldPk"):
+                        message_name = message.proto.name
+                        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+                        output_content += f"using {class_name_snake_cased}_handler::{class_name}MongoDB{message_name}Codec;\n"
 
         for message in self.root_message_list:
 
-            if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root) and CppDbTestPlugin.\
-                    is_option_enabled(message, CppDbTestPlugin.flux_msg_executor_options):
+            if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root):
                 message_name = message.proto.name
                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
-                output_content += f"\nTEST({class_name}{message_name}TestSuite, DBTest) {{\n\t"
-                output_content += (f"{class_name}MongoDB{message_name}Codec {message_name_snake_cased}_codec("
-                                   f"mongo_db, logger);\n")
-                output_content += f'\t{package_name}::{message_name} {message_name_snake_cased};\n'
-                output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_from_db;\n'
-                output_content += f'\t{package_name}::{message_name}List {message_name_snake_cased}_list;\n'
-                output_content += f'\t{package_name}::{message_name}List {message_name_snake_cased}_list_from_db;\n'
-                output_content += f"\tstd::string {message_name_snake_cased}_json;\n"
-                output_content += f"\tstd::string {message_name_snake_cased}_json_from_db;\n"
-                output_content += f"\tstd::string {message_name_snake_cased}_key;\n"
-                output_content += f"\tstd::vector < std::string > {message_name_snake_cased}_key_list;\n"
-                output_content += "\tRandomDataGen random_data_gen;\n"
-                output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
-                                  f'({message_name_snake_cased});\n\n'
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppDbTestPlugin.is_option_enabled(field, "FluxFldPk"):
 
-                output_content += f'\t{class_name}KeyHandler::get_{message_name_snake_cased}_key(' \
-                                  f'{message_name_snake_cased}, {message_name_snake_cased}_key);\n\n'
+                        output_content += f"\nTEST({class_name}{message_name}TestSuite, DBTest) {{\n\t"
+                        output_content += (f"{class_name}MongoDB{message_name}Codec {message_name_snake_cased}_codec("
+                                           f"mongo_db, logger);\n")
+                        output_content += f'\t{package_name}::{message_name} {message_name_snake_cased};\n'
+                        output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_from_db;\n'
+                        output_content += f'\t{package_name}::{message_name}List {message_name_snake_cased}_list;\n'
+                        output_content += f'\t{package_name}::{message_name}List {message_name_snake_cased}_list_from_db;\n'
+                        output_content += f"\tstd::string {message_name_snake_cased}_json;\n"
+                        output_content += f"\tstd::string {message_name_snake_cased}_json_from_db;\n"
+                        output_content += f"\tstd::string {message_name_snake_cased}_key;\n"
+                        output_content += f"\tstd::vector < std::string > {message_name_snake_cased}_key_list;\n"
+                        output_content += "\tRandomDataGen random_data_gen;\n"
+                        output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
+                                          f'({message_name_snake_cased});\n\n'
 
-                output_content += f"\t{message_name_snake_cased}_codec.insert_or_update_{message_name_snake_cased}" \
-                                  f"({message_name_snake_cased});\n"
+                        output_content += f'\t{class_name}KeyHandler::get_{message_name_snake_cased}_key(' \
+                                          f'{message_name_snake_cased}, {message_name_snake_cased}_key);\n\n'
 
-                output_content += f'\tauto found = {message_name_snake_cased}_codec.{message_name_snake_cased}' \
-                                  f'_key_to_db_id.find({message_name_snake_cased}_key);\n'
+                        output_content += f"\t{message_name_snake_cased}_codec.insert_or_update_{message_name_snake_cased}" \
+                                          f"({message_name_snake_cased});\n"
 
-                output_content += f'\tif (found != {message_name_snake_cased}_codec.{message_name_snake_cased}' \
-                                  f'_key_to_db_id.end()) {{\n'
+                        output_content += f'\tauto found = {message_name_snake_cased}_codec.{message_name_snake_cased}' \
+                                          f'_key_to_db_id.find({message_name_snake_cased}_key);\n'
 
-                output_content += self.generate_assert(message_name_snake_cased, class_name, 2)
+                        output_content += f'\tif (found != {message_name_snake_cased}_codec.{message_name_snake_cased}' \
+                                          f'_key_to_db_id.end()) {{\n'
 
-                output_content += f"\t}}\n\n"
+                        output_content += self.generate_assert(message_name_snake_cased, class_name, 2)
 
-                output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
-                output_content += f"\t{message_name_snake_cased}_json.clear();\n\n"
+                        output_content += f"\t}}\n\n"
 
-                output_content += self.generate_patch_for_test(message, message_name_snake_cased, class_name)
+                        output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
+                        output_content += f"\t{message_name_snake_cased}_json.clear();\n\n"
 
-                output_content += f"\t{message_name_snake_cased}_json.clear();\n"
-                output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
-                output_content += f'\t{message_name_snake_cased}.Clear();\n'
-                output_content += f"\t{message_name_snake_cased}_from_db.Clear();\n\n"
+                        output_content += self.generate_patch_for_test(message, message_name_snake_cased, class_name)
 
-                output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.delete_data_by_id_from_" \
-                                  f"{message_name_snake_cased}_collection(found->second));\n"
-                output_content += f"\tASSERT_FALSE({message_name_snake_cased}_codec.get_data_by_id_from_" \
-                                  f"{message_name_snake_cased}_collection({message_name_snake_cased}_from_db," \
-                                  f" found->second));\n\n"
+                        output_content += f"\t{message_name_snake_cased}_json.clear();\n"
+                        output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
+                        output_content += f'\t{message_name_snake_cased}.Clear();\n'
+                        output_content += f"\t{message_name_snake_cased}_from_db.Clear();\n\n"
 
-                output_content += "\tfor (int i = 0; i <= 5; ++i) {\n"
-                output_content += f"\t\tMarketDataPopulateRandomValues::{message_name_snake_cased}" \
-                                  f"({message_name_snake_cased});\n"
-                output_content += f"\t\t{message_name_snake_cased}_list.add_{message_name_snake_cased}()->CopyFrom" \
-                                  f"({message_name_snake_cased});\n"
-                output_content += "\t}\n\n"
+                        output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.delete_data_by_id_from_" \
+                                          f"{message_name_snake_cased}_collection(found->second));\n"
+                        output_content += f"\tASSERT_FALSE({message_name_snake_cased}_codec.get_data_by_id_from_" \
+                                          f"{message_name_snake_cased}_collection({message_name_snake_cased}_from_db," \
+                                          f" found->second));\n\n"
 
-                output_content += f'\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_list(' \
-                                  f'{message_name_snake_cased}_list, {message_name_snake_cased}_key_list);\n'
-                output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.bulk_insert_" \
-                                  f"{message_name_snake_cased}({message_name_snake_cased}_list, " \
-                                  f"{message_name_snake_cased}_key_list));\n\n"
+                        output_content += "\tfor (int i = 0; i <= 5; ++i) {\n"
+                        output_content += f"\t\tMarketDataPopulateRandomValues::{message_name_snake_cased}" \
+                                          f"({message_name_snake_cased});\n"
+                        output_content += f"\t\t{message_name_snake_cased}_list.add_{message_name_snake_cased}()->CopyFrom" \
+                                          f"({message_name_snake_cased});\n"
+                        output_content += "\t}\n\n"
 
-                output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.get_all_data_from_" \
-                                  f"{message_name_snake_cased}_collection({message_name_snake_cased}_list_from_db));\n"
-                output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
-                output_content += f"\t{message_name_snake_cased}_json.clear();\n\n"
+                        output_content += f'\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_list(' \
+                                          f'{message_name_snake_cased}_list, {message_name_snake_cased}_key_list);\n'
+                        output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.bulk_insert_" \
+                                          f"{message_name_snake_cased}({message_name_snake_cased}_list, " \
+                                          f"{message_name_snake_cased}_key_list));\n\n"
 
-                output_content += f"\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}_list" \
-                                  f"({message_name_snake_cased}_list_from_db, {message_name_snake_cased}" \
-                                  f"_json_from_db));\n"
+                        output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.get_all_data_from_" \
+                                          f"{message_name_snake_cased}_collection({message_name_snake_cased}_list_from_db));\n"
+                        output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
+                        output_content += f"\t{message_name_snake_cased}_json.clear();\n\n"
 
-                output_content += f"\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}_list" \
-                                  f"({message_name_snake_cased}_list, {message_name_snake_cased}_json));\n"
-                output_content += f"\tASSERT_EQ({message_name_snake_cased}_json_from_db, {message_name_snake_cased}" \
-                                  f"_json);\n\n"
+                        output_content += f"\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}_list" \
+                                          f"({message_name_snake_cased}_list_from_db, {message_name_snake_cased}" \
+                                          f"_json_from_db));\n"
 
-                output_content += self.generate_bulk_patch_for_test(message, message_name_snake_cased, package_name,
-                                                                    class_name)
-                output_content += f"\n\tASSERT_TRUE({message_name_snake_cased}_codec.delete_all_data_from_" \
-                                  f"{message_name_snake_cased}_collection());\n"
-                output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
-                output_content += f"\t{message_name_snake_cased}_json.clear();\n"
-                output_content += f"\t{message_name_snake_cased}_list.Clear();\n"
-                output_content += f'\t{message_name_snake_cased}_list_from_db.Clear();\n\n'
+                        output_content += f"\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}_list" \
+                                          f"({message_name_snake_cased}_list, {message_name_snake_cased}_json));\n"
+                        output_content += f"\tASSERT_EQ({message_name_snake_cased}_json_from_db, {message_name_snake_cased}" \
+                                          f"_json);\n\n"
 
-                output_content += f'\tASSERT_FALSE({message_name_snake_cased}_codec.get_all_data_from_' \
-                                  f'{message_name_snake_cased}_collection({message_name_snake_cased}_list_from_db));\n'
+                        output_content += self.generate_bulk_patch_for_test(message, message_name_snake_cased, package_name,
+                                                                            class_name)
+                        output_content += f"\n\tASSERT_TRUE({message_name_snake_cased}_codec.delete_all_data_from_" \
+                                          f"{message_name_snake_cased}_collection());\n"
+                        output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
+                        output_content += f"\t{message_name_snake_cased}_json.clear();\n"
+                        output_content += f"\t{message_name_snake_cased}_list.Clear();\n"
+                        output_content += f'\t{message_name_snake_cased}_list_from_db.Clear();\n\n'
 
-                output_content += "}\n"
+                        output_content += f'\tASSERT_FALSE({message_name_snake_cased}_codec.get_all_data_from_' \
+                                          f'{message_name_snake_cased}_collection({message_name_snake_cased}_list_from_db));\n'
+
+                        output_content += "}\n"
+                        break
 
         proto_file_name = str(file.proto.name).split(".")[0]
         output_file_name = f"{class_name_snake_cased}_mongo_db_test.h"

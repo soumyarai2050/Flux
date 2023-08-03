@@ -772,7 +772,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_message_camel_cased = convert_to_camel_case(dependent_message)
                 output_str += f"        let loadedKeys = _.get({message_name_camel_cased}, loadedKeyName);\n"
                 output_str += "        if (loadedKeys) {\n"
-                output_str += "            if (loadedKeys.length > 0) {\n"
+                output_str += f"            if (loadedKeys.length > 0 && !selected{dependent_message}Id) " + "{\n"
                 output_str += "                let id = getIdFromAbbreviatedKey(abbreviated, loadedKeys[0]);\n"
                 output_str += f"                dispatch(setSelected{dependent_message}Id(id));\n"
                 if layout_type == JsxFileGenPlugin.parent_abbreviated_type:

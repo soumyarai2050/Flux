@@ -16,8 +16,11 @@ from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
 config_file_path: PurePath = PROJECT_DATA_DIR / "config.yaml"
-market_data_int_port: int = 8040 if (port_env := (os.getenv("MARKET_DATA_BEANIE_PORT"))) is None or len(port_env) == 0 else \
-    int(port_env)
+
+md_config_yaml_path = PurePath(__file__).parent.parent.parent / "market_data" / "data" / "config.yaml"
+md_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(md_config_yaml_path))
+md_beanie_host, market_data_int_port = \
+    md_config_yaml_dict.get("beanie_host"), parse_to_int(md_config_yaml_dict.get("beanie_port"))
 
 
 def add_to_texts(order_brief: OrderBrief, msg: str):

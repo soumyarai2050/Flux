@@ -129,53 +129,62 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
 
         for message in self.root_message_list:
             if CppPopulateRandomValueHandlerPlugin.is_option_enabled\
-                        (message, CppPopulateRandomValueHandlerPlugin.flux_msg_json_root) and \
-                    CppPopulateRandomValueHandlerPlugin.is_option_enabled\
-                                (message, CppPopulateRandomValueHandlerPlugin.flux_msg_executor_options):
-                message_name = message.proto.name
-                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                output_content += f"\tstatic inline void {message_name_snake_cased} ({package_name}::{message_name} " \
-                                  f"&{message_name_snake_cased}) {{\n\t\t"
-                output_content += "RandomDataGen random_data_gen;\n\n"
+                        (message, CppPopulateRandomValueHandlerPlugin.flux_msg_json_root):
 
                 for field in message.fields:
                     field_name: str = field.proto.name
-                    field_type: str = field.kind.name.lower()
-                    field_type_message: protogen.Message | None = field.message
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppPopulateRandomValueHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
+                        message_name = message.proto.name
+                        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+                        output_content += f"\tstatic inline void {message_name_snake_cased} ({package_name}::{message_name} " \
+                                          f"&{message_name_snake_cased}) {{\n\t\t"
+                        output_content += "RandomDataGen random_data_gen;\n\n"
 
-                    if field_type_message is None:
-                        if field.cardinality.name.lower() == "repeated" and field_type != "enum":
-                            output_content += f'\t\t{message_name_snake_cased}.add_{field_name}(random_data_gen.get_random_' \
-                                              f'{field_type}());\n'
-                        else:
-                            if field_type != "enum":
-                                if field_name != "id":
-                                    if CppPopulateRandomValueHandlerPlugin.is_option_enabled\
-                                        (field, CppPopulateRandomValueHandlerPlugin.flux_fld_val_is_datetime):
-                                        output_content += f'\t\t{message_name_snake_cased}.set_{field_name}' \
-                                                          f'(get_utc_time());\n'
-                                    else:
-                                        output_content += f'\t\t{message_name_snake_cased}.set_{field_name}(random_data_gen.get_random_' \
-                                                          f'{field_type}());\n'
+                        for field in message.fields:
+                            field_name: str = field.proto.name
+                            field_type: str = field.kind.name.lower()
+                            field_type_message: protogen.Message | None = field.message
+
+                            if field_type_message is None:
+                                if field.cardinality.name.lower() == "repeated" and field_type != "enum":
+                                    output_content += f'\t\t{message_name_snake_cased}.add_{field_name}(random_data_gen.get_random_' \
+                                                      f'{field_type}());\n'
                                 else:
-                                    output_content += "\t\tauto oid = bsoncxx::oid();\n"
-                                    output_content += f'\t\t{message_name_snake_cased}.set_{field_name}(oid.to_string());\n'
-                            elif field.cardinality.name.lower() == "required":
-                                enum_field_list: list = field.enum.full_name.split(".")
-                                if enum_field_list[-1] != "Side":
-                                    output_content += f"\t\t{message_name_snake_cased}.set_{field_name}" \
-                                                      f"({package_name}::{enum_field_list[-1]}::ASK);\n"
-                                else:
-                                    output_content += f"\t\t{message_name_snake_cased}.set_{field_name}" \
-                                                      f"({field_name.capitalize()}::BUY);\n"
+                                    if field_type != "enum":
+                                        if field_name != "id":
+                                            if CppPopulateRandomValueHandlerPlugin.is_option_enabled\
+                                                (field, CppPopulateRandomValueHandlerPlugin.flux_fld_val_is_datetime):
+                                                output_content += f'\t\t{message_name_snake_cased}.set_{field_name}' \
+                                                                  f'(get_utc_time());\n'
+                                            else:
+                                                output_content += f'\t\t{message_name_snake_cased}.set_{field_name}(random_data_gen.get_random_' \
+                                                                  f'{field_type}());\n'
+                                        else:
+                                            if field.kind.name.lower() == "string":
+                                                output_content += "\t\tauto oid = bsoncxx::oid();\n"
+                                                output_content += (f'\t\t{message_name_snake_cased}.set_{field_name}'
+                                                                   f'(oid.to_string());\n')
+                                            else:
+                                                output_content += (f'\t\t{message_name_snake_cased}.set_{field_name}'
+                                                                   f'(random_data_gen.get_random_{field_type}());\n')
+                                    elif field.cardinality.name.lower() == "required":
+                                        enum_field_list: list = field.enum.full_name.split(".")
+                                        if enum_field_list[-1] != "Side":
+                                            output_content += f"\t\t{message_name_snake_cased}.set_{field_name}" \
+                                                              f"({package_name}::{enum_field_list[-1]}::ASK);\n"
+                                        else:
+                                            output_content += f"\t\t{message_name_snake_cased}.set_{field_name}" \
+                                                              f"({field_name.capitalize()}::BUY);\n"
 
-                    elif field_type_message is not None:
-                        if field.cardinality.name.lower() != "repeated":
-                            output_content += self.generate_nested_fields(field_type_message, field_name,
-                                                                          message_name_snake_cased, package_name, field,
-                                                                          field_name)
+                            elif field_type_message is not None:
+                                if field.cardinality.name.lower() != "repeated":
+                                    output_content += self.generate_nested_fields(field_type_message, field_name,
+                                                                                  message_name_snake_cased, package_name, field,
+                                                                                  field_name)
 
-                output_content += "\t}\n\n"
+                        output_content += "\t}\n\n"
+                        break
 
         output_content += "};"
 

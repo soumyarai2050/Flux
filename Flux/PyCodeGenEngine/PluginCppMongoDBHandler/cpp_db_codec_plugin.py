@@ -203,7 +203,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                         message_name_snake_cased: str, file_name: str):
         output_content: str = ""
 
-        output_content += f"\t\tbool update_or_patch_{message_name_snake_cased}(const std::string " \
+        output_content += f"\t\tbool update_or_patch_{message_name_snake_cased}(const int32_t " \
                           f"&{message_name_snake_cased}_id, const bsoncxx::builder::basic::document " \
                           f"&{message_name_snake_cased}_document)"
         output_content += "{\n\t\t\t"
@@ -225,9 +225,9 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f"auto {message_name_snake_cased}_insert_result = {message_name_snake_cased}" \
                           f"_collection.insert_one({message_name_snake_cased}_document.view());\n\t\t\t"
         output_content += f"auto {message_name_snake_cased}_inserted_id = {message_name_snake_cased}" \
-                          f"_insert_result->inserted_id().get_string().value.to_string();\n\n"
+                          f"_insert_result->inserted_id().get_int32().value;\n\n"
 
-        output_content += f"\t\t\tif (!{message_name_snake_cased}_inserted_id.empty()) {{"
+        output_content += f"\t\t\tif ({message_name_snake_cased}_inserted_id) {{"
         output_content += f"\n\t\t\t\t{message_name_snake_cased}_key_to_db_id" \
                           f"[{message_name_snake_cased}_key] = {message_name_snake_cased}_inserted_id;" \
                           f"\n\t\t\t\treturn true;\n\t\t\t}} else {{\n"
@@ -239,7 +239,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     @staticmethod
     def generate_private_members_handler(class_name: str, package_name: str, message_name_snake_cased: str, file_name: str):
         output_content: str = ""
-        output_content += f"\t\tstd::unordered_map <std::string, std::string> {message_name_snake_cased}_key_to_db_id;\n\n"
+        output_content += f"\t\tstd::unordered_map <std::string, int32_t> {message_name_snake_cased}_key_to_db_id;\n\n"
         output_content += "\tprotected:"
         output_content += f"\n\n\t\tstd::shared_ptr<{package_name}_handler::{class_name}_MongoDBHandler> mongo_db;\n"
         output_content += f"\t\tquill::Logger* logger_;\n"
@@ -279,7 +279,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "\t\t}\n"
 
         output_content += f"\n\t\tbool get_data_by_id_from_{message_name_snake_cased}_collection ({package_name}" \
-                          f"::{message_name} &{message_name_snake_cased}obj, const std::string " \
+                          f"::{message_name} &{message_name_snake_cased}obj, const int32_t " \
                           f"&{message_name_snake_cased}_id) {{\n"
         output_content += "\t\t\tbool status = false;\n"
 
@@ -310,7 +310,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += '\t\t}\n'
 
         output_content += f"\n\t\tbool delete_data_by_id_from_{message_name_snake_cased}_collection (const " \
-                          f"std::string &{message_name_snake_cased}_id) {{\n"
+                          f"int32_t &{message_name_snake_cased}_id) {{\n"
         output_content += f'\t\t\tauto result = {message_name_snake_cased}_collection.delete_one(bsoncxx::builder::' \
                           f'stream::document{{}} << "_id" << {message_name_snake_cased}_id << ' \
                           f'bsoncxx::builder::stream::finalize);\n'
@@ -340,8 +340,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
         output_content += f"\t\t\tfor (int i = 0; i < {message_name_snake_cased}_document_list.size(); ++i) {{\n"
         output_content += f'\t\t\t\t{message_name_snake_cased}_key_to_db_id[{message_name_snake_cased}_key_list[i]] ' \
-                          f'= {message_name_snake_cased}_insert_results->inserted_ids().at(i).get_value().' \
-                          f'get_string().value.to_string();\n'
+                          f'= {message_name_snake_cased}_insert_results->inserted_ids().at(i).get_int32().value;\n'
         output_content += f'\t\t\t}}\n\n'
 
         output_content += (f"\t\t\tif ({message_name_snake_cased}_insert_results->inserted_count() == "
@@ -359,7 +358,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f"\t\t\tstd::vector< std::string > {message_name_snake_cased}_key_list;\n"
         output_content += f'\t\t\tMarketDataKeyHandler::get_{message_name_snake_cased}_key_list(' \
                           f'{message_name_snake_cased}_list_obj, {message_name_snake_cased}_key_list);\n'
-        output_content += f'\t\t\tstd::vector<std::string> {message_name_snake_cased}_ids;\n\n'
+        output_content += f'\t\t\tstd::vector<int32_t> {message_name_snake_cased}_ids;\n\n'
         output_content += f'\t\t\tfor (int i = 0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
                           f'_size(); ++i) {{\n'
         output_content += f'\t\t\t\tif (!{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).' \
@@ -396,7 +395,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f"\t\t\tstd::vector< std::string > {message_name_snake_cased}_key_list;\n"
         output_content += f'\t\t\tMarketDataKeyHandler::get_{message_name_snake_cased}_key_list(' \
                           f'{message_name_snake_cased}_list_obj, {message_name_snake_cased}_key_list);\n'
-        output_content += f'\t\t\tstd::vector<std::string> {message_name_snake_cased}_ids;\n\n'
+        output_content += f'\t\t\tstd::vector<int32_t> {message_name_snake_cased}_ids;\n\n'
         output_content += f'\t\t\tfor (int i = 0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
                           f'_size(); ++i) {{\n'
         output_content += f'\t\t\t\tif (!{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).' \
@@ -427,7 +426,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "\t\t}\n\n"
 
         output_content += f"\t\tbool bulk_update_or_patch_{message_name_snake_cased}_collection " \
-                          f"(const std::vector<std::string> &{message_name_snake_cased}_ids," \
+                          f"(const std::vector<int32_t> &{message_name_snake_cased}_ids," \
                           f" const std::vector<bsoncxx::builder::basic::document> &{message_name_snake_cased}" \
                           f"_document_list) {{\n"
         output_content += f"\t\t\tauto bulk_write = {message_name_snake_cased}_collection.create_bulk_write();\n"
@@ -494,11 +493,11 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                         if message_field_name == "id":
                             output += f'\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
                             output += f'\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
-                                      f'_id", {field_name}_doc_doc.{message_field_name}()));\n'
+                                      f'_id", {field_name}_doc.{message_field_name}()));\n'
                         else:
                             output += f'\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
                             output += f'\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
-                                      f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc_doc' \
+                                      f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc' \
                                       f'.{message_field_name}()));\n'
                     else:
                         if initial_parent == parent_field and parent_field == field_name:
@@ -547,7 +546,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         if parent_field != field_name:
             output += f'\t\t\t\t\t\t{field_name}_list.append({field_name}_document);\n'
             output += "\t\t\t\t\t}\n"
-            output += f"\t\t\t\t\t{parent_field}.append({package_name}_handler::kvp({package_name}_handler::{field_name}_fld_name," \
+            output += f"\t\t\t\t\t{parent_field}_doc.append({package_name}_handler::kvp({package_name}_handler::{field_name}_fld_name," \
                       f" {field_name}_list));\n"
             output += "\n\t\t\t\t}\n"
         else:
@@ -610,11 +609,11 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                         if message_field_name == "id":
                             output += f'\t\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
                             output += f'\t\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
-                                      f'_id", {field_name}_doc_doc.{message_field_name}()));\n'
+                                      f'_id", {field_name}_doc.{message_field_name}()));\n'
                         else:
                             output += f'\t\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
                             output += f'\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
-                                      f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc_doc.' \
+                                      f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc.' \
                                       f'{message_field_name}()));\n'
                     else:
                         if initial_parent == parent_field and parent_field == field_name:
@@ -661,8 +660,8 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         if parent_field != field_name:
             output += f'\t\t\t\t\t\t\t{field_name}_list.append({field_name}_document);\n'
             output += "\t\t\t\t\t\t}\n"
-            output += f"\t\t\t\t\t\t{parent_field}.append({package_name}_handler::kvp({package_name}_handler::" \
-                      f"{field_name}_fld_name, {field_name}_doc_list));\n"
+            output += f"\t\t\t\t\t\t{parent_field}_doc.append({package_name}_handler::kvp({package_name}_handler::" \
+                      f"{field_name}_fld_name, {field_name}_list));\n"
             output += "\n\t\t\t\t}\n"
         else:
             if initial_parent == parent_field and parent_field == field_name:
@@ -711,20 +710,20 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                               f'().{message_field_name}()));\n'
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field:
-                    output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name};\n"
+                    output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
                               f"{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
                     output += self.generate_nested_fields(message_field.message, message_field_name,
                                                           message_name_snake_cased, package_name, field, field_name)
                 else:
-                    output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name};\n"
+                    output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
                     output += self.generate_nested_fields(message_field.message, message_field_name,
                                                           message_name_snake_cased, package_name, field, field_name)
                 output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler::' \
-                          f'{message_field_name}_fld_name, {message_field_name}));\n'
+                          f'{message_field_name}_fld_name, {message_field_name}_doc));\n'
                 output += f"\t\t\t\t}}\n"
             elif message_field.message is not None and field_type == "repeated":
                 output += self.generate_repeated_nested_fields(message_field.message, message_field_name, package_name,
@@ -766,21 +765,21 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                               f'(i).{field_name}().{message_field_name}()));\n'
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field:
-                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name};\n"
+                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                               f"{initial_parent_field}().{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
                     output += self.generate_msg_nested_fields(message_field.message, message_field_name,
                                                               message_name_snake_cased, package_name, field, field_name)
                 else:
-                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name};\n"
+                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}()" \
                               f".has_{message_field_name}()) "
                     output += f"{{\n"
                     output += self.generate_msg_nested_fields(message_field.message, message_field_name,
                                                               message_name_snake_cased, package_name, field, field_name)
                 output += f"\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler::" \
-                          f"{message_field_name}_fld_name, {message_field_name}));\n"
+                          f"{message_field_name}_fld_name, {message_field_name}_doc));\n"
                 output += f"\t\t\t\t\t}}\n"
             elif message_field.message is not None and field_type == "repeated":
                 output += self.generate_msg_repeated_nested_fields(message_field.message, message_field_name, package_name,
@@ -956,51 +955,55 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "\t\tDB_FALSE = false\n\t};\n\n"
 
         for message in self.root_message_list:
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root) and \
-                    CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_executor_options):
-                message_name = message.proto.name
-                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppDbHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
+                        message_name = message.proto.name
+                        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
-                output_content += self.generate_class_handler(class_name, message_name, package_name,
-                                                              message_name_snake_cased, file_name)
+                        output_content += self.generate_class_handler(class_name, message_name, package_name,
+                                                                      message_name_snake_cased, file_name)
 
-                output_content += self.generate_insert_handler(class_name, message_name, package_name,
-                                                               message_name_snake_cased, file_name)
-
-                output_content += self.generate_patch_handler(class_name, message_name, package_name,
-                                                              message_name_snake_cased, file_name)
-
-                output_content += self.generate_public_members_handler(class_name, message_name, package_name,
+                        output_content += self.generate_insert_handler(class_name, message_name, package_name,
                                                                        message_name_snake_cased, file_name)
 
-                output_content += self.generate_bulk_insert_and_update(message_name_snake_cased, message_name,
-                                                                       package_name)
-                output_content += self.generate_get_data_from_db(message_name, package_name,
-                                                                 message_name_snake_cased, class_name)
-                output_content += self.generate_delete_from_db_handler(message_name_snake_cased)
+                        output_content += self.generate_patch_handler(class_name, message_name, package_name,
+                                                                      message_name_snake_cased, file_name)
 
-                output_content += f"\t\tstd::string {message_name}KeyToDbIdAsString() {{\n"
-                output_content += f'\t\t\tstd::string result = "{message_name_snake_cased}_key_to_db_id: ";\n'
-                output_content += '\t\t\tint index = 1;\n'
-                output_content += f'\t\t\tfor (const auto& entry : {message_name_snake_cased}_key_to_db_id) {{\n'
-                output_content += (f'\t\t\t\tresult += "key " + std::to_string(index) + ":" + entry.first + " ; value " '
-                                   f'+ std::to_string(index) + ":" + entry.second;\n')
-                output_content += "\t\t\t\t++index;\n"
-                output_content += "\t\t\t}\n"
-                output_content += "\t\t\treturn result;\n\t\t}\n\n"
+                        output_content += self.generate_public_members_handler(class_name, message_name, package_name,
+                                                                               message_name_snake_cased, file_name)
 
-                output_content += self.generate_private_members_handler(class_name, package_name,
-                                                                        message_name_snake_cased, file_name)
-                output_content += self.generate_prepare_doc(message, message_name_snake_cased, package_name,
-                                                            message_name)
-                output_content += "\t\t}\n\n"
-                output_content += self.generate_prepare_docs(message, message_name_snake_cased, package_name,
-                                                             message_name)
-                output_content += f"\t\t\t\t{message_name_snake_cased}_document_list.push_back(std::move(" \
-                                  f"{message_name_snake_cased}_document));\n"
-                output_content += "\t\t\t}\n\t\t}\n\n"
+                        output_content += self.generate_bulk_insert_and_update(message_name_snake_cased, message_name,
+                                                                               package_name)
+                        output_content += self.generate_get_data_from_db(message_name, package_name,
+                                                                         message_name_snake_cased, class_name)
+                        output_content += self.generate_delete_from_db_handler(message_name_snake_cased)
 
-                output_content += "\t};\n\n"
+                        output_content += f"\t\tstd::string {message_name}KeyToDbIdAsString() {{\n"
+                        output_content += f'\t\t\tstd::string result = "{message_name_snake_cased}_key_to_db_id: ";\n'
+                        output_content += '\t\t\tint index = 1;\n'
+                        output_content += f'\t\t\tfor (const auto& entry : {message_name_snake_cased}_key_to_db_id) {{\n'
+                        output_content += (f'\t\t\t\tresult += "key " + std::to_string(index) + ":" + entry.first + " ; value " '
+                                           f'+ std::to_string(index) + ":" + std::to_string(entry.second);\n')
+                        output_content += "\t\t\t\t++index;\n"
+                        output_content += "\t\t\t}\n"
+                        output_content += "\t\t\treturn result;\n\t\t}\n\n"
+
+                        output_content += self.generate_private_members_handler(class_name, package_name,
+                                                                                message_name_snake_cased, file_name)
+                        output_content += self.generate_prepare_doc(message, message_name_snake_cased, package_name,
+                                                                    message_name)
+                        output_content += "\t\t}\n\n"
+                        output_content += self.generate_prepare_docs(message, message_name_snake_cased, package_name,
+                                                                     message_name)
+                        output_content += f"\t\t\t\t{message_name_snake_cased}_document_list.push_back(std::move(" \
+                                          f"{message_name_snake_cased}_document));\n"
+                        output_content += "\t\t\t}\n\t\t}\n\n"
+
+                        output_content += "\t};\n\n"
+                        break
 
         output_content += "}\n"
 

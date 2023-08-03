@@ -195,10 +195,14 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "\t\t// All model encoders and decoders\n\n"
 
         for message in self.root_message_list:
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root) and \
-                    CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_executor_options):
-                output_content += self.encode_generate_handler(message, package_name)
-                output_content += self.decode_generate_handler(message, package_name)
+            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppDbHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
+                        output_content += self.encode_generate_handler(message, package_name)
+                        output_content += self.decode_generate_handler(message, package_name)
+                        break
 
         output_content += "\n\tprotected:\n"
         output_content += "\t\tstatic inline quill::Logger* logger_;\n"

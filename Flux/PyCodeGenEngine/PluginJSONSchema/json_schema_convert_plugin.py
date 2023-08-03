@@ -120,7 +120,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     widget_ui_data_option_value_dict = \
                         self.get_complex_option_set_values(field.message,
                                                            JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
-                    if "layout" in widget_ui_data_option_value_dict:
+                    widget_ui_data_list = widget_ui_data_option_value_dict.get("widget_ui_data")
+                    # since there will always be single widget_ui_data
+                    if widget_ui_data_list and "view_layout" in widget_ui_data_list[0]:
                         if field.message not in self.__json_layout_message_list:
                             self.__json_layout_message_list.append(field.message)
                         # else not required: avoiding repetition
@@ -146,7 +148,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 widget_ui_data_option_value_dict = \
                     self.get_complex_option_set_values(message,
                                                        JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
-                if "layout" in widget_ui_data_option_value_dict:
+                widget_ui_data_list = widget_ui_data_option_value_dict.get("widget_ui_data")
+                # since there will always be single widget_ui_data
+                if widget_ui_data_list and "view_layout" in widget_ui_data_list[0]:
                     if message not in self.__json_layout_message_list:
                         self.__json_layout_message_list.append(message)
                     # else not required: avoiding repetition

@@ -193,7 +193,7 @@ message TopOfBook {
     ExecutorKeySequence: "symbol-'BUY'",
     ExecutorKeySequence: "symbol-'SELL'"
   };
-  required string id = 1;
+  required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional Quote bid_quote = 3 [(FluxFldElaborateTitle) = true];
   optional Quote ask_quote = 4 [(FluxFldElaborateTitle) = true];
@@ -220,7 +220,7 @@ message MarketDataBrief{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  required string id = 1;
+  required int32 id = 1;
   required Security security = 2;
   required Side side = 3;
   required string last_update_date_time = 4 [(FluxFldValIsDateTime) = true];
@@ -261,7 +261,7 @@ message SymbolOverview{
     ExecutorKeySequence: "symbol-'BUY'",
     ExecutorKeySequence: "symbol-'SELL'"
   };
-  required string id = 1;
+  required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional string  company = 3;
   optional string status = 4;
@@ -289,7 +289,7 @@ message BarData {
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  required string id = 1;
+  required int32 id = 1;
   required string symbol = 2 [(FluxFldIndex) = true];
   optional string datetime = 3 [(FluxFldValIsDateTime) = true];
   optional float open = 4;
@@ -311,7 +311,7 @@ message BBO {
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  required string id = 1;
+  required int32 id = 1;
   required string symbol = 2 [(FluxFldIndex) = true];
   required TickTypeEnum tick_type = 3;
   required string date_time = 4 [(FluxFldValIsDateTime) = true];
@@ -331,7 +331,7 @@ message TickByTickBidAsk {
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
-  required string id = 1;
+  required int32 id = 1;
   required string symbol = 2 [(FluxFldIndex) = true];
   required string time = 3 [(FluxFldValIsDateTime) = true];
   required float bid_px = 4;
@@ -362,7 +362,7 @@ message LastTrade {
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
-  required string id = 1;
+  required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   required string time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
   required float px = 4;
@@ -415,7 +415,7 @@ message MarketDepth {
     ExecutorKeySequence: "symbol-'BUY'",
     ExecutorKeySequence: "symbol-'SELL'"
   };
-  required string id = 1;
+  required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   required string time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
   required TickTypeEnum side = 4;
@@ -431,7 +431,7 @@ message MarketDepth {
 }
 
 message MarketTradeVolume{
-  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int64 participation_period_last_trade_qty_sum = 2;
   optional int32 applicable_period_seconds = 3 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
 }
@@ -445,7 +445,7 @@ message RawMarketDepthHistory {
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  required string id = 1;
+  required int32 id = 1;
   required string symbol = 2 [(FluxFldIndex) = true];
   required string time = 3 [(FluxFldValIsDateTime) = true];
   required int32 position = 4;
@@ -535,4 +535,12 @@ message SymbolOverviewList {
 
 message MarketDepthList {
   repeated MarketDepth market_depth = 1[(FluxFldPk) = "true"];
+}
+
+message LastTradeList {
+  repeated LastTrade last_trade = 1 [(FluxFldPk) = "true"];
+}
+
+message DashList {
+  repeated Dash dash = 1 [(FluxFldPk) = "true"];
 }

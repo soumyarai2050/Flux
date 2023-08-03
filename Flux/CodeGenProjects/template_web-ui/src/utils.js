@@ -2193,7 +2193,7 @@ export function isObject(value) {
 export function getWidgetOptionById(widgetOptions, id, isIdBound = false) {
     let widgetOption = widgetOptions[0];
     if (isIdBound) {
-        const dataElement = widgetOptions.find(data => data.hasOwnProperty('bind_id_val') && data.bind_id_val === String(id));
+        const dataElement = widgetOptions.find(data => data.hasOwnProperty('bind_id_val') && String(data.bind_id_val) === String(id));
         if (dataElement) {
             widgetOption = dataElement;
         }

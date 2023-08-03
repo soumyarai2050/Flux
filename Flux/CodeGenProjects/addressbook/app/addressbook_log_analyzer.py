@@ -6,8 +6,9 @@ from pathlib import PurePath
 from typing import Callable, Set
 from pendulum import DateTime
 import re
-from threading import Lock
+from threading import Lock, Semaphore, Thread
 from fastapi.encoders import jsonable_encoder
+from queue import Queue
 
 os.environ["DBType"] = "beanie"
 # Project imports
@@ -26,6 +27,15 @@ config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_
 host, port = get_native_host_n_port_from_config_dict(config_yaml_dict)
 debug_mode: bool = False if (debug_env := os.getenv("DEBUG")) is None or len(debug_env) == 0 or debug_env == "0" \
     else True
+portfolio_update_bulk_update_counts_per_call: int = config_yaml_dict.get("portfolio_update_bulk_update_counts_per_call")
+if portfolio_update_bulk_update_counts_per_call is None:
+    portfolio_update_bulk_update_counts_per_call = 1
+strat_alert_bulk_update_counts_per_call: int = config_yaml_dict.get("strat_alert_bulk_update_counts_per_call")
+if strat_alert_bulk_update_counts_per_call is None:
+    strat_alert_bulk_update_counts_per_call = 1
+raw_performance_data_bulk_create_counts_per_call: int = config_yaml_dict.get("perf_benchmark_bulk_create_counts_per_call")
+if raw_performance_data_bulk_create_counts_per_call is None:
+    raw_performance_data_bulk_create_counts_per_call = 1
 
 PAIR_STRAT_DATA_DIR = (
     PurePath(__file__).parent.parent / "data"
@@ -44,7 +54,15 @@ class AddressbookLogAnalyzer(LogAnalyzer):
         self.strat_id_by_symbol_side_dict: Dict[str, int] = dict()
         self.strat_alert_cache_by_strat_id_dict: Dict[int, List[Alert]] = dict()
         self.service_up: bool = False
-        self.send_alert_lock: Lock = Lock()
+        self.portfolio_alert_queue_lock: Lock = Lock()
+        self.strat_alert_queue_lock: Lock = Lock()
+        self.perf_benchmark_queue_lock: Lock = Lock()
+        self.portfolio_alert_queue_semaphore: Semaphore = Semaphore()
+        self.strat_alert_queue_semaphore: Semaphore = Semaphore()
+        self.raw_performance_data_queue_semaphore: Semaphore = Semaphore()
+        self.portfolio_alert_queue: Queue = Queue()
+        self.strat_alert_queue: Queue = Queue()
+        self.raw_performance_data_queue: Queue = Queue()
         self.strat_manager_service_web_client: StratManagerServiceWebClient = \
             StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
         self.severity_map: Dict[str, str] = {
@@ -73,7 +91,47 @@ class AddressbookLogAnalyzer(LogAnalyzer):
             alert_brief: str = "Log analyzer running in simulation mode"
             self._send_alerts(severity=self._get_severity("critical"), alert_brief=alert_brief, alert_details="")
 
+        self.run_queue_handler()
         self.run()
+
+    def _handle_portfolio_alert_queue(self):
+        portfolio_alert_obj_list = []
+        while True:
+            self.portfolio_alert_queue_semaphore.acquire()
+            if len(portfolio_alert_obj_list) < portfolio_update_bulk_update_counts_per_call:
+                portfolio_alert_obj_list.append(self.portfolio_alert_queue.get())
+            else:
+                self.strat_manager_service_web_client.patch_all_portfolio_status_client(portfolio_alert_obj_list)
+                portfolio_alert_obj_list.clear()
+
+    def _handle_strat_alert_queue(self):
+        strat_alert_obj_list = []
+        while True:
+            self.strat_alert_queue_semaphore.acquire()
+            if len(strat_alert_obj_list) < strat_alert_bulk_update_counts_per_call:
+                strat_alert_obj_list.append(self.strat_alert_queue.get())
+            else:
+                self.strat_manager_service_web_client.patch_all_pair_strat_client(strat_alert_obj_list)
+                strat_alert_obj_list.clear()
+
+    def _handle_raw_performance_data_queue(self):
+        raw_performance_data_obj_list = []
+        while True:
+            self.raw_performance_data_queue_semaphore.acquire()
+            if len(raw_performance_data_obj_list) < raw_performance_data_bulk_create_counts_per_call:
+                raw_performance_data_obj_list.append(self.raw_performance_data_queue.get())
+            else:
+                self.strat_manager_service_web_client.create_all_raw_performance_data_client(raw_performance_data_obj_list)
+                raw_performance_data_obj_list.clear()
+
+    def run_queue_handler(self):
+        portfolio_alert_handler_thread = Thread(target=self._handle_portfolio_alert_queue, daemon=True)
+        strat_alert_handler_thread = Thread(target=self._handle_strat_alert_queue, daemon=True)
+        raw_performance_handler_thread = Thread(target=self._handle_raw_performance_data_queue, daemon=True)
+
+        portfolio_alert_handler_thread.start()
+        strat_alert_handler_thread.start()
+        raw_performance_handler_thread.start()
 
     def _init_service(self) -> bool:
         if self.service_up:
@@ -91,7 +149,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
             return False
 
     def _send_alerts(self, severity: str, alert_brief: str, alert_details: str) -> None:
-        with self.send_alert_lock:
+        with self.portfolio_alert_queue_lock:
             logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
                           f"alert_details: {alert_details}")
             created: bool = False
@@ -111,7 +169,9 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                                                                    alert_details)
                     updated_portfolio_status: PortfolioStatusBaseModel = \
                         PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert_obj])
-                    self.strat_manager_service_web_client.patch_portfolio_status_client(jsonable_encoder(updated_portfolio_status, by_alias=True, exclude_none=True))
+                    self.portfolio_alert_queue.put(jsonable_encoder(updated_portfolio_status,
+                                                                    by_alias=True, exclude_none=True))
+                    self.portfolio_alert_queue_semaphore.release()
                     created = True
                 except Exception as e:
                     logging.exception(f"_send_alerts failed;;;exception: {e}")
@@ -273,7 +333,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                               alert_details=alert_details)
 
     def _send_strat_alerts(self, strat_id: int, severity: str, alert_brief: str, alert_details: str) -> None:
-        with self.send_alert_lock:
+        with self.strat_alert_queue_lock:
             logging.debug(f"sending strat alert with strat_id: {strat_id} severity: {severity}, alert_brief: "
                           f"{alert_brief}, alert_details: {alert_details}")
             created: bool = False
@@ -291,7 +351,9 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                     updated_pair_strat: PairStratBaseModel = \
                         PairStratBaseModel(_id=strat_id, strat_status=StratStatusOptional())
                     updated_pair_strat.strat_status.strat_alerts = [alert_obj]
-                    self.strat_manager_service_web_client.patch_pair_strat_client(jsonable_encoder(updated_pair_strat, by_alias=True, exclude_none=True))
+                    self.strat_alert_queue.put(jsonable_encoder(updated_pair_strat,
+                                                                    by_alias=True, exclude_none=True))
+                    self.strat_alert_queue_semaphore.release()
                     created = True
                 except Exception as e:
                     logging.exception(f"_send_strat_alerts failed;;;exception: {e}")
@@ -345,31 +407,32 @@ class AddressbookLogAnalyzer(LogAnalyzer):
 
     def handle_perf_benchmark_matched_log_message(self, log_prefix: str, log_message: str):
         pattern = re.compile("_timeit_.*_timeit_")
-        if search_obj := re.search(pattern, log_message):
-            found_pattern = search_obj.group()
-            found_pattern = found_pattern[8:-8]  # removing beginning and ending _timeit_
-            found_pattern_list = found_pattern.split("~")  # splitting pattern values
-            if len(found_pattern_list) == 5:
-                callable_name, date_time, start_time, end_time, delta = found_pattern_list
-                if callable_name != "underlying_create_raw_performance_data_http":
-                    raw_performance_data_obj = RawPerformanceDataBaseModel()
-                    raw_performance_data_obj.callable_name = callable_name
-                    raw_performance_data_obj.call_date_time = pendulum.parse(date_time)
-                    raw_performance_data_obj.start_time_it_val = parse_to_float(start_time)
-                    raw_performance_data_obj.end_time_it_val = parse_to_float(end_time)
-                    raw_performance_data_obj.delta = parse_to_float(delta)
+        with self.perf_benchmark_queue_lock:
+            if search_obj := re.search(pattern, log_message):
+                found_pattern = search_obj.group()
+                found_pattern = found_pattern[8:-8]  # removing beginning and ending _timeit_
+                found_pattern_list = found_pattern.split("~")  # splitting pattern values
+                if len(found_pattern_list) == 5:
+                    callable_name, date_time, start_time, end_time, delta = found_pattern_list
+                    if callable_name != "underlying_create_raw_performance_data_http":
+                        raw_performance_data_obj = RawPerformanceDataBaseModel()
+                        raw_performance_data_obj.callable_name = callable_name
+                        raw_performance_data_obj.call_date_time = pendulum.parse(date_time)
+                        raw_performance_data_obj.start_time_it_val = parse_to_float(start_time)
+                        raw_performance_data_obj.end_time_it_val = parse_to_float(end_time)
+                        raw_performance_data_obj.delta = parse_to_float(delta)
 
-                    self.strat_manager_service_web_client.create_raw_performance_data_client(
-                        raw_performance_data_obj)
-                    logging.debug(f"Created raw_performance_data in db for callable {callable_name} "
-                                  f"with datetime {date_time}")
-                # else not required: avoiding callable underlying_create_raw_performance_data to avoid infinite loop
-            else:
-                err_str_: str = f"Found timeit pattern but internally only contains {found_pattern_list}, " \
-                                f"ideally must contain callable_name, date_time, start_time, end_time & delta " \
-                                f"seperated by '~'"
-                logging.exception(err_str_)
-        # else not required: if no pattern is matched ignoring this log_message
+                        self.raw_performance_data_queue.put(raw_performance_data_obj)
+                        self.raw_performance_data_queue_semaphore.release()
+                        logging.debug(f"Created raw_performance_data in db for callable {callable_name} "
+                                      f"with datetime {date_time}")
+                    # else not required: avoiding callable underlying_create_raw_performance_data to avoid infinite loop
+                else:
+                    err_str_: str = f"Found timeit pattern but internally only contains {found_pattern_list}, " \
+                                    f"ideally must contain callable_name, date_time, start_time, end_time & delta " \
+                                    f"seperated by '~'"
+                    logging.exception(err_str_)
+            # else not required: if no pattern is matched ignoring this log_message
 
 
 if __name__ == '__main__':

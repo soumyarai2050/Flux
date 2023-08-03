@@ -112,17 +112,22 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
         for message in self.root_message_list:
             message_name = message.proto.name
             message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-            if CppKeyHandlerPlugin.is_option_enabled(message, CppKeyHandlerPlugin.flux_msg_executor_options):
-                # message_name = message.proto.name
-                output_content += f"\n\t\tstatic inline void get_{message_name_snake_cased}_key(const {package_name}::" \
-                                  f"{message_name} &{message_name_snake_cased}_obj, std::string &" \
-                                  f"{message_name_snake_cased}_key)"
-                output_content += "{\n"
-                output_content += self.generate_get_key_handler(message, message_name_snake_cased)
-                output_content += "\n\t\t}\n"
+            if CppKeyHandlerPlugin.is_option_enabled(message, CppKeyHandlerPlugin.flux_msg_json_root):
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppKeyHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
+                        # message_name = message.proto.name
+                        output_content += f"\n\t\tstatic inline void get_{message_name_snake_cased}_key(const {package_name}::" \
+                                          f"{message_name} &{message_name_snake_cased}_obj, std::string &" \
+                                          f"{message_name_snake_cased}_key)"
+                        output_content += "{\n"
+                        output_content += self.generate_get_key_handler(message, message_name_snake_cased)
+                        output_content += "\n\t\t}\n"
 
-                output_content += self.generate_get_key_list(package_name, message)
-                output_content += "\t\t}\n\n"
+                        output_content += self.generate_get_key_list(package_name, message)
+                        output_content += "\t\t}\n\n"
+                        break
 
         output_content += "\t};\n\n"
         output_content += "}\n"

@@ -506,7 +506,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"    selected{message_name}Id: null,\n"
         else:
             output_str += f"    {message_name_camel_cased}: " + "[],\n"
-        output_str += "    loading: false,\n"
+        if message_name == self.__ui_layout_msg_name:
+            output_str += "    loading: true,\n"
+        else:
+            output_str += "    loading: false,\n"
         output_str += "    error: null,\n"
         output_str += "    userChanges: {},\n"
         output_str += "    discardedChanges: {},\n"

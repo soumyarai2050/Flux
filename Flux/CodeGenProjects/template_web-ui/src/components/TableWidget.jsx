@@ -454,11 +454,9 @@ const TableWidget = (props) => {
 
                                         let cells = getFilteredCells();
                                         let selected = selectedRows.filter(id => id === row['data-id']).length > 0;
-                                        let rowKey = Number.isInteger(row['data-id']);
-                                        if (rowKey) {
+                                        let rowKey = row['data-id'];
+                                        if (Number.isInteger(rowKey)) {
                                             rowKey = index;
-                                        } else {
-                                            rowKey = _.get(data, row['data-id'])[DB_ID];
                                         }
 
                                         return (

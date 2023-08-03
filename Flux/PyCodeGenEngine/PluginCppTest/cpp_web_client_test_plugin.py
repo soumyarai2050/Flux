@@ -64,207 +64,215 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
         output_content += self.header_generate_handler(file_name, class_name_snake_cased)
         output_content += 'std::string host = "127.0.0.1";\n'
         output_content += 'std::string port = "8040";\n'
-        output_content += f'const static {class_name}WebClient {class_name_snake_cased}_web_client(host, port);\n\n'
+        output_content += (f'const static {package_name}_handler::{class_name}WebClient {class_name_snake_cased}'
+                           f'_web_client(host, port);\n\n')
+
+        output_content += f"using {package_name}_handler::{class_name}JSONCodec;\n\n"
 
         for message in self.root_message_list:
             message_name = message.proto.name
             message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-            if CppWebClientTestPlugin.is_option_enabled (message, CppWebClientTestPlugin.flux_msg_json_root)\
-                    and CppWebClientTestPlugin.is_option_enabled(message, CppWebClientTestPlugin.
-                                                                 flux_msg_executor_options):
-                if message_name == "MarketDepth":
-                    output_content += f'TEST({message_name}TestSuite, WebClient) {{\n'
-                    output_content += f'\t{package_name}::{message_name} {message_name_snake_cased};\n'
-                    output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_from_server;\n'
-                    output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_for_patch;\n'
-                    output_content += f'\tstd::string {message_name_snake_cased}_json;\n'
-                    output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
-                    output_content += f'\tRandomDataGen random_data_gen;\n'
-                    output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
-                                      f'({message_name_snake_cased});\n'
-                    output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
-                    output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.create_' \
-                                      f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_notional());\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_qty());\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_avg_px());\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
-                                      f'_json_from_server, true));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
-                    output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
-                                      f'{message_name_snake_cased}_json);\n\n'
+            if CppWebClientTestPlugin.is_option_enabled (message, CppWebClientTestPlugin.flux_msg_json_root):
+                for field1 in message.fields:
+                    field_name1: str = field1.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name1)
+                    if CppWebClientTestPlugin.is_option_enabled(field1, "FluxFldPk"):
+                        if message_name == "MarketDepth":
+                            output_content += f'TEST({message_name}TestSuite, WebClient) {{\n'
+                            output_content += f'\t{package_name}::{message_name} {message_name_snake_cased};\n'
+                            output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_from_server;\n'
+                            output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_for_patch;\n'
+                            output_content += f'\tstd::string {message_name_snake_cased}_json;\n'
+                            output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
+                            output_content += f'\tRandomDataGen random_data_gen;\n'
+                            output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
+                                              f'({message_name_snake_cased});\n'
+                            output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.create_' \
+                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_notional());\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_qty());\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_avg_px());\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
+                                              f'_json_from_server, true));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
+                            output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
+                                              f'{message_name_snake_cased}_json);\n\n'
 
-                    output_content += f'\tauto {message_name_snake_cased}_id = {message_name_snake_cased}.id();\n'
-                    output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
-                    output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
-                    output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.get_{message_name_snake_cased}' \
-                                      f'_client({message_name_snake_cased}_from_server, {message_name_snake_cased}_id));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}' \
-                                      f'({message_name_snake_cased}_from_server, {message_name_snake_cased}' \
-                                      f'_json_from_server, true));\n'
-                    output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
-                                      f'{message_name_snake_cased}_json);\n\n'
+                            output_content += f'\tauto {message_name_snake_cased}_id = {message_name_snake_cased}.id();\n'
+                            output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
+                            output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.get_{message_name_snake_cased}' \
+                                              f'_client({message_name_snake_cased}_from_server, {message_name_snake_cased}_id));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}' \
+                                              f'({message_name_snake_cased}_from_server, {message_name_snake_cased}' \
+                                              f'_json_from_server, true));\n'
+                            output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
+                                              f'{message_name_snake_cased}_json);\n\n'
 
-                    output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
-                    output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
-                    output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
+                            output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
+                            output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
+                            output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
 
-                    output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased});\n'
-                    output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
-                    output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n\n'
-                    output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_{message_name_snake_cased}' \
-                                      f'_client({message_name_snake_cased}_from_server));\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_notional());\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_qty());\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_avg_px());\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
-                                      f'_json_from_server, true));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
-                    output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
-                                      f'{message_name_snake_cased}_json);\n\n'
+                            output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased});\n'
+                            output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
+                            output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_{message_name_snake_cased}' \
+                                              f'_client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_notional());\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_qty());\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_avg_px());\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
+                                              f'_json_from_server, true));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
+                            output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
+                                              f'{message_name_snake_cased}_json);\n\n'
 
-                    for field in message.fields:
-                        field_name: str = field.proto.name
-                        field_type_message: None | protogen.Message = field.message
-                        field_type: str = field.kind.name.lower()
-                        if field_type_message is None:
-                            if field_name != "id" and field.cardinality.name.lower() != "bool":
-                                if not CppWebClientTestPlugin.is_option_enabled(field, CppWebClientTestPlugin.
-                                                                                flux_fld_val_is_datetime):
-                                    if field_type != "enum":
+                            for field in message.fields:
+                                field_name: str = field.proto.name
+                                field_type_message: None | protogen.Message = field.message
+                                field_type: str = field.kind.name.lower()
+                                if field_type_message is None:
+                                    if field_name != "id" and field.cardinality.name.lower() != "bool":
+                                        if not CppWebClientTestPlugin.is_option_enabled(field, CppWebClientTestPlugin.
+                                                                                        flux_fld_val_is_datetime):
+                                            if field_type != "enum":
+                                                output_content += f'\t{message_name_snake_cased}_for_patch.set_{field_name}(' \
+                                                                  f'random_data_gen.get_random_{field_type}());\n'
+                                                output_content += f'\t{message_name_snake_cased}.set_{field_name}(' \
+                                                                  f'{message_name_snake_cased}_for_patch.{field_name}());\n'
+                                    else:
+
                                         output_content += f'\t{message_name_snake_cased}_for_patch.set_{field_name}(' \
-                                                          f'random_data_gen.get_random_{field_type}());\n'
-                                        output_content += f'\t{message_name_snake_cased}.set_{field_name}(' \
-                                                          f'{message_name_snake_cased}_for_patch.{field_name}());\n'
-                            else:
+                                                          f'{message_name_snake_cased}.{field_name}());\n'
 
-                                output_content += f'\t{message_name_snake_cased}_for_patch.set_{field_name}(' \
-                                                  f'{message_name_snake_cased}.{field_name}());\n'
+                            output_content += f'\n\t{message_name_snake_cased}_from_server.CopyFrom(' \
+                                              f'{message_name_snake_cased}_for_patch);\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.patch_' \
+                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_notional());\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_qty());\n'
+                            output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
+                                              f'_from_server.cumulative_avg_px());\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
+                                              f'_json_from_server, true));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
+                            output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
+                                              f'{message_name_snake_cased}_json);\n\n'
 
-                    output_content += f'\n\t{message_name_snake_cased}_from_server.CopyFrom(' \
-                                      f'{message_name_snake_cased}_for_patch);\n'
-                    output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.patch_' \
-                                      f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_notional());\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_qty());\n'
-                    output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
-                                      f'_from_server.cumulative_avg_px());\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
-                                      f'_json_from_server, true));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
-                    output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
-                                      f'{message_name_snake_cased}_json);\n\n'
+                            output_content += f'\tstd::string json = R"({{"msg":"Deletion Successful","id":)";\n'
+                            output_content += (f'\tjson += std::to_string({message_name_snake_cased}.id()); // '
+                                               f'Convert int to string and append\n')
+                            output_content += f'\tjson += R"(}})";\n\n'
 
-                    output_content += f'\tstd::string json = R"({{"msg":"Deletion Successful","id":")";\n'
-                    output_content += f'\tjson += {message_name_snake_cased}.id();\n'
-                    output_content += f'\tjson += R"("}})";\n\n'
+                            output_content += f'\tauto delete_response = {class_name_snake_cased}_web_client.delete_' \
+                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_id);\n'
+                            output_content += "\tASSERT_EQ(delete_response, json);\n"
+                            output_content += "}\n\n"
+                        else:
+                            output_content += f'TEST({message_name}TestSuite, WebClient) {{\n'
+                            output_content += f'\t{package_name}::{message_name} {message_name_snake_cased};\n'
+                            output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_from_server;\n'
+                            output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_for_patch;\n'
+                            output_content += f'\tstd::string {message_name_snake_cased}_json;\n'
+                            output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
+                            output_content += f'\tRandomDataGen random_data_gen;\n'
+                            output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
+                                              f'({message_name_snake_cased});\n'
+                            output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.create_' \
+                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
+                                              f'_json_from_server, true));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
+                            output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
+                                              f'{message_name_snake_cased}_json);\n\n'
 
-                    output_content += f'\tauto delete_response = {class_name_snake_cased}_web_client.delete_' \
-                                      f'{message_name_snake_cased}_client({message_name_snake_cased}_id);\n'
-                    output_content += "\tASSERT_EQ(delete_response, json);\n"
-                    output_content += "}\n\n"
-                else:
-                    output_content += f'TEST({message_name}TestSuite, WebClient) {{\n'
-                    output_content += f'\t{package_name}::{message_name} {message_name_snake_cased};\n'
-                    output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_from_server;\n'
-                    output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_for_patch;\n'
-                    output_content += f'\tstd::string {message_name_snake_cased}_json;\n'
-                    output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
-                    output_content += f'\tRandomDataGen random_data_gen;\n'
-                    output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
-                                      f'({message_name_snake_cased});\n'
-                    output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
-                    output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.create_' \
-                                      f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
-                                      f'_json_from_server, true));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
-                    output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
-                                      f'{message_name_snake_cased}_json);\n\n'
+                            output_content += f'\tauto {message_name_snake_cased}_id = {message_name_snake_cased}.id();\n'
+                            output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
+                            output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.get_{message_name_snake_cased}' \
+                                              f'_client({message_name_snake_cased}_from_server, {message_name_snake_cased}_id));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}' \
+                                              f'({message_name_snake_cased}_from_server, {message_name_snake_cased}' \
+                                              f'_json_from_server, true));\n'
+                            output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
+                                              f'{message_name_snake_cased}_json);\n\n'
 
-                    output_content += f'\tauto {message_name_snake_cased}_id = {message_name_snake_cased}.id();\n'
-                    output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
-                    output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
-                    output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.get_{message_name_snake_cased}' \
-                                      f'_client({message_name_snake_cased}_from_server, {message_name_snake_cased}_id));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}' \
-                                      f'({message_name_snake_cased}_from_server, {message_name_snake_cased}' \
-                                      f'_json_from_server, true));\n'
-                    output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
-                                      f'{message_name_snake_cased}_json);\n\n'
+                            output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
+                            output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
+                            output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
 
-                    output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
-                    output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
-                    output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
+                            output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased});\n'
+                            output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
+                            output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_{message_name_snake_cased}' \
+                                              f'_client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
+                                              f'_json_from_server, true));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
+                            output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
+                                              f'{message_name_snake_cased}_json);\n\n'
 
-                    output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased});\n'
-                    output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
-                    output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n\n'
-                    output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_{message_name_snake_cased}' \
-                                      f'_client({message_name_snake_cased}_from_server));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
-                                      f'_json_from_server, true));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
-                    output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
-                                      f'{message_name_snake_cased}_json);\n\n'
+                            for field in message.fields:
+                                field_name: str = field.proto.name
+                                field_type_message: None | protogen.Message = field.message
+                                field_type: str = field.kind.name.lower()
+                                if field_type_message is None:
+                                    if field_name != "id" and field.cardinality.name.lower() != "bool" and field_type != "enum":
+                                        if not CppWebClientTestPlugin.is_option_enabled(field, CppWebClientTestPlugin.
+                                                                                        flux_fld_val_is_datetime):
+                                            output_content += f'\t{message_name_snake_cased}_for_patch.set_{field_name}(' \
+                                                              f'random_data_gen.get_random_{field_type}());\n'
+                                            output_content += f'\t{message_name_snake_cased}.set_{field_name}(' \
+                                                              f'{message_name_snake_cased}_for_patch.{field_name}());\n'
+                                    else:
 
-                    for field in message.fields:
-                        field_name: str = field.proto.name
-                        field_type_message: None | protogen.Message = field.message
-                        field_type: str = field.kind.name.lower()
-                        if field_type_message is None:
-                            if field_name != "id" and field.cardinality.name.lower() != "bool" and field_type != "enum":
-                                if not CppWebClientTestPlugin.is_option_enabled(field, CppWebClientTestPlugin.
-                                                                                flux_fld_val_is_datetime):
-                                    output_content += f'\t{message_name_snake_cased}_for_patch.set_{field_name}(' \
-                                                      f'random_data_gen.get_random_{field_type}());\n'
-                                    output_content += f'\t{message_name_snake_cased}.set_{field_name}(' \
-                                                      f'{message_name_snake_cased}_for_patch.{field_name}());\n'
-                            else:
+                                        output_content += f'\t{message_name_snake_cased}_for_patch.set_{field_name}(' \
+                                                          f'{message_name_snake_cased}.{field_name}());\n'
 
-                                output_content += f'\t{message_name_snake_cased}_for_patch.set_{field_name}(' \
-                                                  f'{message_name_snake_cased}.{field_name}());\n'
+                            output_content += f'\n\t{message_name_snake_cased}_from_server.CopyFrom(' \
+                                              f'{message_name_snake_cased}_for_patch);\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.patch_' \
+                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
+                                              f'_json_from_server, true));\n'
+                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
+                            output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
+                                              f'{message_name_snake_cased}_json);\n\n'
 
-                    output_content += f'\n\t{message_name_snake_cased}_from_server.CopyFrom(' \
-                                      f'{message_name_snake_cased}_for_patch);\n'
-                    output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.patch_' \
-                                      f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
-                                      f'_json_from_server, true));\n'
-                    output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
-                                      f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
-                    output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
-                                      f'{message_name_snake_cased}_json);\n\n'
+                            output_content += f'\tstd::string json = R"({{"msg":"Deletion Successful","id":)";\n'
+                            output_content += (f'\tjson += std::to_string({message_name_snake_cased}.id()); // '
+                                               f'Convert int to string and append\n')
+                            output_content += f'\tjson += R"(}})";\n\n'
 
-                    output_content += f'\tstd::string json = R"({{"msg":"Deletion Successful","id":")";\n'
-                    output_content += f'\tjson += {message_name_snake_cased}.id();\n'
-                    output_content += f'\tjson += R"("}})";\n\n'
-
-                    output_content += f'\tauto delete_response = {class_name_snake_cased}_web_client.delete_' \
-                                      f'{message_name_snake_cased}_client({message_name_snake_cased}_id);\n'
-                    output_content += "\tASSERT_EQ(delete_response, json);\n"
-                    output_content += "}\n\n"
+                            output_content += f'\tauto delete_response = {class_name_snake_cased}_web_client.delete_' \
+                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_id);\n'
+                            output_content += "\tASSERT_EQ(delete_response, json);\n"
+                            output_content += "}\n\n"
+                        break
 
         output_file_name = f"{class_name_snake_cased}_web_client_test.h"
         return {output_file_name: output_content}

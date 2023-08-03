@@ -1325,6 +1325,9 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 break
             # else not required: Avoiding field if index option is not enabled
 
+        if id_field_type == "int":
+            output_str += self._handle_get_max_id_query_generation(message)
+
         return output_str
 
     def _handle_http_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
@@ -1452,6 +1455,20 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
 
         return output_str
 
+    def _handle_get_max_id_query_generation(self, message: protogen.Message):
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f'@{self.api_router_app_name}.get("/query-get_{message_name_snake_cased}_max_id' + \
+                     f'", response_model=MaxId, status_code=200)\n'
+        output_str += f"async def get_{message_name_snake_cased}_max_id_http() -> MaxId:\n"
+        output_str += f'    """\n'
+        output_str += f'    Get Query of {message.proto.name} to get max int id\n'
+        output_str += f'    """\n'
+        output_str += f'    max_val = await {message.proto.name}.find_all().max("_id")\n'
+        output_str += f'    max_val = int(max_val) if max_val is not None else 0\n'
+        output_str += f"    return MaxId(max_id_val=max_val)\n"
+        output_str += "\n\n"
+        return output_str
+
     def handle_CRUD_task(self) -> str:
         output_str = ""
         for message in self.root_message_list:
@@ -1461,6 +1478,9 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
         for message in self.root_message_list + self.non_root_message_list:
             if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_query):
                 output_str += self._handle_query_methods(message)
+
+        # for message in self.int_id_message_list:
+        #     output_str += self._handle_get_max_id_query_generation(message)
 
         return output_str
 

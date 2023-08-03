@@ -67,7 +67,6 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             # messages having SetReentrantLock field as True of FluxMsgJsonRoot option
         ]
 
-
     def load_dependency_messages_and_enums_in_dicts(self, message: protogen.Message):
         for field in message.fields:
             if field.kind.name.lower() == "enum":

@@ -104,134 +104,138 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         for message in self.root_message_list:
             message_name: str = message.proto.name
             message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root) and \
-                    CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_executor_options):
+            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppDbHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
 
-                output_content += self.generate_encode_list_comment(message, message_name, message_name_snake_cased)
+                        output_content += self.generate_encode_list_comment(message, message_name, message_name_snake_cased)
 
-                output_content += f"Decode {message_name}List:\n\n"
-                output_content += "From Mongo: \n"
-                output_content += f'Before adding string: {{'
-                for i in range(2):
-                    for field_id, fields in enumerate(message.fields):
-                        field_name: str = fields.proto.name
-                        field_type: str = fields.cardinality.name.lower()
-                        if field_type != "repeated":
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":""'
+                        output_content += f"Decode {message_name}List:\n\n"
+                        output_content += "From Mongo: \n"
+                        output_content += f'Before adding string: {{'
+                        for i in range(2):
+                            for field_id, fields in enumerate(message.fields):
+                                field_name: str = fields.proto.name
+                                field_type: str = fields.cardinality.name.lower()
+                                if field_type != "repeated":
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":""'
+                                    else:
+                                        output_content += f'"{field_name}":"",'
+                                else:
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":[]'
+                                    else:
+                                        output_content += f'"{field_name}":[],'
+                            if i != 1:
+                                output_content += f'}},{{'
                             else:
-                                output_content += f'"{field_name}":"",'
-                        else:
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":[]'
-                            else:
-                                output_content += f'"{field_name}":[],'
-                    if i != 1:
-                        output_content += f'}},{{'
-                    else:
-                        output_content += f'}}\n'
+                                output_content += f'}}\n'
 
-                output_content += f'After adding string: {{"{message_name_snake_cased}":[{{'
-                for i in range(2):
-                    for field_id, fields in enumerate(message.fields):
-                        field_name: str = fields.proto.name
-                        field_type: str = fields.cardinality.name.lower()
-                        if field_type != "repeated":
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":""'
+                        output_content += f'After adding string: {{"{message_name_snake_cased}":[{{'
+                        for i in range(2):
+                            for field_id, fields in enumerate(message.fields):
+                                field_name: str = fields.proto.name
+                                field_type: str = fields.cardinality.name.lower()
+                                if field_type != "repeated":
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":""'
+                                    else:
+                                        output_content += f'"{field_name}":"",'
+                                else:
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":[]'
+                                    else:
+                                        output_content += f'"{field_name}":[],'
+                            if i != 1:
+                                output_content += f'}},{{'
                             else:
-                                output_content += f'"{field_name}":"",'
-                        else:
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":[]'
-                            else:
-                                output_content += f'"{field_name}":[],'
-                    if i != 1:
-                        output_content += f'}},{{'
-                    else:
-                        output_content += f'}}]}}\n\n'
+                                output_content += f'}}]}}\n\n'
 
-                output_content += "From Python: \n"
-                output_content += f'Before adding string: [{{'
-                for i in range(2):
-                    for field_id, fields in enumerate(message.fields):
-                        field_name: str = fields.proto.name
-                        field_type: str = fields.cardinality.name.lower()
-                        if field_type != "repeated":
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":""'
+                        output_content += "From Python: \n"
+                        output_content += f'Before adding string: [{{'
+                        for i in range(2):
+                            for field_id, fields in enumerate(message.fields):
+                                field_name: str = fields.proto.name
+                                field_type: str = fields.cardinality.name.lower()
+                                if field_type != "repeated":
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":""'
+                                    else:
+                                        output_content += f'"{field_name}":"",'
+                                else:
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":[]'
+                                    else:
+                                        output_content += f'"{field_name}":[],'
+                            if i != 1:
+                                output_content += f'}},{{'
                             else:
-                                output_content += f'"{field_name}":"",'
-                        else:
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":[]'
-                            else:
-                                output_content += f'"{field_name}":[],'
-                    if i != 1:
-                        output_content += f'}},{{'
-                    else:
-                        output_content += f'}}]\n'
+                                output_content += f'}}]\n'
 
-                output_content += f'After adding string: {{"{message_name_snake_cased}":[{{'
-                for i in range(2):
-                    for field_id, fields in enumerate(message.fields):
-                        field_name: str = fields.proto.name
-                        field_type: str = fields.cardinality.name.lower()
-                        if field_type != "repeated":
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":""'
+                        output_content += f'After adding string: {{"{message_name_snake_cased}":[{{'
+                        for i in range(2):
+                            for field_id, fields in enumerate(message.fields):
+                                field_name: str = fields.proto.name
+                                field_type: str = fields.cardinality.name.lower()
+                                if field_type != "repeated":
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":""'
+                                    else:
+                                        output_content += f'"{field_name}":"",'
+                                else:
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":[]'
+                                    else:
+                                        output_content += f'"{field_name}":[],'
+                            if i != 1:
+                                output_content += f'}},{{'
                             else:
-                                output_content += f'"{field_name}":"",'
-                        else:
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":[]'
-                            else:
-                                output_content += f'"{field_name}":[],'
-                    if i != 1:
-                        output_content += f'}},{{'
-                    else:
-                        output_content += f'}}]}}\n\n'
+                                output_content += f'}}]}}\n\n'
 
-                output_content += "From Cpp: \n"
-                output_content += f'Before adding string: [{{'
-                for i in range(2):
-                    for field_id, fields in enumerate(message.fields):
-                        field_name: str = fields.proto.name
-                        field_type: str = fields.cardinality.name.lower()
-                        if field_type != "repeated":
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":""'
+                        output_content += "From Cpp: \n"
+                        output_content += f'Before adding string: [{{'
+                        for i in range(2):
+                            for field_id, fields in enumerate(message.fields):
+                                field_name: str = fields.proto.name
+                                field_type: str = fields.cardinality.name.lower()
+                                if field_type != "repeated":
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":""'
+                                    else:
+                                        output_content += f'"{field_name}":"",'
+                                else:
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":[]'
+                                    else:
+                                        output_content += f'"{field_name}":[],'
+                            if i != 1:
+                                output_content += f'}},{{'
                             else:
-                                output_content += f'"{field_name}":"",'
-                        else:
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":[]'
-                            else:
-                                output_content += f'"{field_name}":[],'
-                    if i != 1:
-                        output_content += f'}},{{'
-                    else:
-                        output_content += f'}}]\n'
+                                output_content += f'}}]\n'
 
-                output_content += f'After adding string: {{"{message_name_snake_cased}":[{{'
-                for i in range(2):
-                    for field_id, fields in enumerate(message.fields):
-                        field_name: str = fields.proto.name
-                        field_type: str = fields.cardinality.name.lower()
-                        if field_type != "repeated":
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":""'
+                        output_content += f'After adding string: {{"{message_name_snake_cased}":[{{'
+                        for i in range(2):
+                            for field_id, fields in enumerate(message.fields):
+                                field_name: str = fields.proto.name
+                                field_type: str = fields.cardinality.name.lower()
+                                if field_type != "repeated":
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":""'
+                                    else:
+                                        output_content += f'"{field_name}":"",'
+                                else:
+                                    if field_id == len(message.fields) - 1:
+                                        output_content += f'"{field_name}":[]'
+                                    else:
+                                        output_content += f'"{field_name}":[],'
+                            if i != 1:
+                                output_content += f'}},{{'
                             else:
-                                output_content += f'"{field_name}":"",'
-                        else:
-                            if field_id == len(message.fields) - 1:
-                                output_content += f'"{field_name}":[]'
-                            else:
-                                output_content += f'"{field_name}":[],'
-                    if i != 1:
-                        output_content += f'}},{{'
-                    else:
-                        output_content += f'}}]}}\n\n\n'
+                                output_content += f'}}]}}\n\n\n'
+                        break
 
         output_file_name = f"{class_name_snake_cased}_example_comments.txt"
         return {output_file_name: output_content}

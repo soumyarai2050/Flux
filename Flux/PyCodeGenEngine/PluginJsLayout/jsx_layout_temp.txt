@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import _, { cloneDeep } from 'lodash';
 import {
-    createUILayout, updateUILayout,
+    getAllUILayout, createUILayout, updateUILayout,
     setUILayoutArrayWs, setUILayout, setSelectedUILayoutId
 } from '../features/uiLayoutSlice';
 import { Responsive, WidthProvider } from "react-grid-layout";
@@ -45,7 +45,7 @@ const defaultLayoutsById = defaultLayouts.reduce((dict, obj) => {
 
 function Layout() {
     /* redux states */
-    const { uiLayoutArray, uiLayout, selectedUILayoutId } = useSelector(state => state.uiLayout);
+    const { uiLayoutArray, uiLayout, loading } = useSelector(state => state.uiLayout);
     /* local react states */
     const [updateCounter, setUpdateCounter] = useState(0); // to trigger ui render
     const [layoutsById, setLayoutsById] = useState(defaultLayoutsById); // stores widget layout data
@@ -57,6 +57,10 @@ function Layout() {
     const layoutsRef = useRef(defaultLayouts);
     const getAllWsDict = useRef({}); // stores get-all websocket updates
     const dispatch = useDispatch();
+
+    useEffect(() => {
+        dispatch(getAllUILayout());
+    }, [])
 
     useEffect(() => {
         /* update layoutsById dict when layoutRef value changes to trigger ui re-render */
@@ -105,7 +109,7 @@ function Layout() {
         /* check for stored layout in cookie/session storage. if present and layout exists, set the layout
          * else clear the cookie/session storage
         */
-        if (uiLayoutArray.length > 0) {
+        if (!loading) {
             const cookie = sessionStorage.getItem(COOKIE_NAME);
             if (cookie) {
                 const layoutId = parseInt(cookie);

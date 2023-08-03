@@ -364,6 +364,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         for message in self.ordered_message_list:
             output_str += self.handle_message_output(message)
 
+        output_str += f"class MaxId(BaseModel):\n"
+        output_str += f"    max_id_val: int\n\n"
+
         return output_str
 
     def _import_current_models(self) -> List[str]:

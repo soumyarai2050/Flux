@@ -9,6 +9,11 @@ cache_port: '8030'
 beanie_override_type: "native"
 cache_override_type: "bare"
 
+# to be used in pair_strat_log_analyzer to take out counts of created from waiting queue to execute create in db
+portfolio_update_bulk_update_counts_per_call: 5
+strat_alert_bulk_update_counts_per_call: 5
+perf_benchmark_bulk_create_counts_per_call: 100
+
 log_mongo_uri: True
 min_refresh_interval: 20
 is_test_run: True

@@ -438,6 +438,7 @@ message PortfolioStatus{
     ReadDesc: AggregateType_FilterAggregate,
     UpdateDesc: AggregateType_FilterAggregate,
     PatchDesc: AggregateType_FilterAggregate,
+    PatchAllDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_FilterAggregate
   };
@@ -489,6 +490,7 @@ message PairStrat{
     ReadDesc: AggregateType_FilterAggregate,
     UpdateDesc: AggregateType_FilterAggregate,
     PatchDesc: AggregateType_FilterAggregate,
+    PatchAllDesc: AggregateType_UNSPECIFIED,
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_FilterAggregate
   };
@@ -819,7 +821,7 @@ message CommandNControl {
 message RawPerformanceData{
   option (FluxMsgJsonRoot) = {
     CreateDesc: AggregateType_UNSPECIFIED,
-    CreateAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    CreateAllDesc: AggregateType_UNSPECIFIED,
     ReadDesc: AggregateType_UNSPECIFIED,
     UpdateDesc: AggregateType_UNSPECIFIED,
     PatchDesc: AggregateType_UNSPECIFIED,

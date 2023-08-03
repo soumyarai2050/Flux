@@ -1770,6 +1770,18 @@ def test_update_agg_feature_in_post_put_patch_http_call(clean_and_set_limits):
                 f"received {created_market_depth_obj.cumulative_avg_px}"
 
 
+def test_get_max_id_query(clean_and_set_limits):
+    order_limits_max_id = strat_manager_service_native_web_client.get_order_limits_max_id_client()
+    assert order_limits_max_id.max_id_val == 1, f"max_id mismatch, expected 1 received {order_limits_max_id.max_id_val}"
+
+    order_limits_basemodel = OrderLimitsBaseModel()
+    created_order_limits_obj = strat_manager_service_native_web_client.create_order_limits_client(order_limits_basemodel)
+
+    order_limits_max_id = strat_manager_service_native_web_client.get_order_limits_max_id_client()
+    assert order_limits_max_id.max_id_val == created_order_limits_obj.id, \
+        f"max_id mismatch, expected {created_order_limits_obj.id} received {order_limits_max_id.max_id_val}"
+
+
 def test_drop_test_environment():
     ps_db_name, md_db_name = get_ps_n_md_db_names(test_config_file_path)
     mongo_server_uri: str = get_mongo_server_uri()

@@ -2374,7 +2374,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
             # updating pair_strat's residual notional
             ongoing_pair_strats = await underlying_read_pair_strat_http(get_ongoing_pair_strat_filter(security_id),
-                                                                        generic_read_http)
+                                                                        self.get_generic_read_route())
             if len(ongoing_pair_strats) == 1:
                 ongoing_pair_strat = ongoing_pair_strats[0]
                 updated_residual = self.__get_residual_obj(side, updated_strat_brief)
@@ -2440,7 +2440,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
         raw_performance_data_list = \
             await underlying_read_raw_performance_data_http(
-                get_raw_performance_data_from_callable_name_agg_pipeline(callable_name))
+                get_raw_performance_data_from_callable_name_agg_pipeline(callable_name), self.get_generic_read_route())
 
         raw_performance_data_of_callable = RawPerformanceDataOfCallable(raw_performance_data=raw_performance_data_list)
 

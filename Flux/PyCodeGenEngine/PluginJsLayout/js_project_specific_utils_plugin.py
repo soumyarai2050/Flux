@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import json
 import os
 from typing import List, Callable
 import time
@@ -37,13 +38,29 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
 
                 title_val = widget_ui_data_option_value_dict["i"] if "i" in widget_ui_data_option_value_dict \
                     else convert_camel_case_to_specific_case(message.proto.name)
+
+                # converting python bool values to js bools
+                widget_ui_data_list = widget_ui_data_option_value_dict["widget_ui_data"]
+                if widget_ui_data_list:
+                    # since we will always have single obj in list
+                    widget_ui_data = widget_ui_data_list[0]
+                    highlight_update = widget_ui_data.get("highlight_update")
+                    if highlight_update is not None:
+                        widget_ui_data["highlight_update"] = f"{highlight_update}".lower()
+                    truncate_date_time = widget_ui_data.get("truncate_date_time")
+                    if truncate_date_time is not None:
+                        widget_ui_data["truncate_date_time"] = f"{truncate_date_time}".lower()
+                widget_ui_data_list_str = json.dumps(widget_ui_data_list)
+                for old_item, new_item in [('"true"', 'true'), ('"false"', 'false')]:
+                    widget_ui_data_list_str = widget_ui_data_list_str.replace(old_item, new_item)
+
                 output_str += '    { ' + \
                               f'i: "{title_val}", ' + \
                               f'x: {widget_ui_data_option_value_dict["x"]}, ' + \
                               f'y: {widget_ui_data_option_value_dict["y"]}, ' + \
                               f'w: {widget_ui_data_option_value_dict["w"]}, ' + \
                               f'h: {widget_ui_data_option_value_dict["h"]}, ' + \
-                              f'widget_ui_data: {widget_ui_data_option_value_dict["widget_ui_data"]}' + \
+                              f'widget_ui_data: {widget_ui_data_list_str}' + \
                               ' },\n'
         output_str += "]\n\n"
         output_str += "export function flux_toggle(value) {\n"

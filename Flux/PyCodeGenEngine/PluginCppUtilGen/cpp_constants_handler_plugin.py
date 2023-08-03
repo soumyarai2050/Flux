@@ -29,13 +29,20 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         for message in messages:
             self.root_message_list.append(message)
 
-    def get_field_names(self, messages: List[protogen.Message]) -> None:
-        for message in messages:
-            field_names = [field.proto.name for field in message.fields]
+    def get_field_names(self, messages: protogen.Message) -> None:
+        field_names = []
+        for field in messages.fields:
+            field_name: str = field.proto.name
+            field_type_message: protogen.Message | None = field.message
+            if field_type_message is None:
+                field_names.append(field_name)
+            else:
+                field_names.append(field_name)
+                self.get_field_names(field_type_message)
 
-            for field_name in field_names:
-                if field_name not in self.field:
-                    self.field.append(field_name)
+        for field_name in field_names:
+            if field_name not in self.field:
+                self.field.append(field_name)
 
     def const_string_generate_handler(self, file: protogen.File):
         output_content: str = ""
@@ -45,6 +52,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
             output_content += f'\tconst std::string {message_name_snake_cased}_msg_name = "{message_name}";\n'
 
         output_content += "\n\n"
+
         for field_name in self.field:
             output_content += f'\tconst std::string {field_name}_fld_name = "{field_name}";\n'
         return output_content
@@ -52,7 +60,9 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     def output_file_generate_handler(self, file: protogen.File):
         # pre-requisite calls
         self.get_all_root_message(file.messages)
-        self.get_field_names(self.root_message_list)
+
+        for message in self.root_message_list:
+            self.get_field_names(message)
         package_name = str(file.proto.package)
         class_name_list = package_name.split("_")
         class_name: str = ""
