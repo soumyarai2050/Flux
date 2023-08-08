@@ -104,6 +104,7 @@ const NodeField = (props) => {
                 required={props.data.required}
                 value={value}
                 onChange={(e, v) => props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath)}
+                componentsProps={{ popper: { style: { width: 'fit-content' } } }}
                 renderInput={(params) => (
                     <TextField
                         {...params}

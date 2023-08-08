@@ -24,7 +24,7 @@ include_directories(${Protobuf_INCLUDE_DIRS} ${BOOST_INCLUDE_DIR} ${EXTERNAL_DIR
         ${EXTERNAL_DIR4}
         )
 
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ../model/dashboards_core.proto ../model/market_data_core.proto ../model/market_data_service.proto ../../../ui_core.proto ../../../flux_utils.proto ../../../flux_options.proto ../../../trade_core.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ../model/dashboards_core.proto ../model/market_data_core.proto ../model/market_data_service.proto ../../../ui_option_utils.proto ../../../ui_core.proto ../../../flux_utils.proto ../../../flux_options.proto ../../../trade_core.proto)
 #protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS model/market_data_service3.proto)
 
 add_executable(market_data main.cpp serialize_and_deserialize_using_proto2.cpp ${PROTO_SRCS} ${PROTO_HDRS})

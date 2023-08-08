@@ -1,10 +1,12 @@
 syntax = "proto2";
 
-import "ui_core.proto";
+import "ui_option_utils.proto";
 import "flux_options.proto";
+import "ui_core.proto";
 import "trade_core.proto";
 import "dashboards_core.proto";
 import "market_data_core.proto";
+
 
 package market_data;
 
@@ -35,7 +37,7 @@ message RTDash {
   optional int64 cum_usd_notional = 9 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all USD notional in the underlying"];
   optional float avg_max_rate = 10 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%"];
   optional string cum_strat = 11 [(FluxFldServerPopulate) = true];
-  optional int64 last_update_time = 12 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true, (FluxFldHelp) = "most recent of all update_time(s) in the underlying"];
+  optional string last_update_time = 12 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true, (FluxFldHelp) = "most recent of all update_time(s) in the underlying"];
   optional string notes = 13 [(FluxFldServerPopulate) = true, (FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "server generated: holds newline concatanated ashare_locate_requests.note field data"];
   repeated InventoryRequest ashare_locate_requests = 14 [(FluxFldAbbreviated) = "JSON"];
   optional InventorySummary indicative_summary = 15 [(FluxFldFilterEnable) = true];
@@ -63,7 +65,7 @@ message Dash {
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required RTDash rt_dash = 2;
+  required RTDash rt_dash = 2[(FluxFldPk) = "leg2.sec.sec_id"];
   optional bool cached = 3;
 }
 
@@ -88,7 +90,7 @@ message DashCollection {
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required string dash_name = 2;
+  optional string dash_name = 2;
   repeated string loaded_dashes = 3 [(FluxFldMicroSeparator) = "@", (FluxFldAbbreviated) = "Id:Dash.id^CB:Dash.rt_dash.leg1.sec.sec_id^Company:Dash.rt_dash.leg1.company^CBLastPx:Dash.rt_dash.leg1.last_px^CBLastPxChng %:Dash.rt_dash.leg1.last_px_change^CBMkt $:Dash.rt_dash.leg1.market_notional^CBOur $:Dash.rt_dash.leg1.consumed_notional^MaxBuy $:Dash.rt_dash.max_buy_notional^MaxSell $:Dash.rt_dash.max_sell_notional^Premium %:Dash.rt_dash.mkt_premium^PremiumChng %:Dash.rt_dash.mkt_premium_change^EQT:Dash.rt_dash.leg2.sec.sec_id^Company:Dash.rt_dash.leg2.company^EQTLastPx:Dash.rt_dash.leg2.last_px^EQTLastPxChng %:Dash.rt_dash.leg2.last_px_change^EQTMkt $:Dash.rt_dash.leg2.market_notional^EQTOur $:Dash.rt_dash.leg2.consumed_notional^Indicative %:Dash.rt_dash.indicative_summary.avg_rate^Indicative $:Dash.rt_dash.indicative_summary.usd_notional^LReqstStrat:Dash.rt_dash.cum_strat^LReqstMax %:Dash.rt_dash.avg_max_rate^LReqst $:Dash.rt_dash.cum_usd_notional^LReqstTime:Dash.rt_dash.last_update_time^LReqstNote:Dash.rt_dash.notes^Locate %:Dash.rt_dash.locate_summary.avg_rate^Locate $:Dash.rt_dash.locate_summary.usd_notional^PTH %:Dash.rt_dash.pth_summary.avg_rate^PTH $:Dash.rt_dash.pth_summary.usd_notional^SOD %:Dash.rt_dash.sod_summary.avg_rate^SOD $:Dash.rt_dash.sod_summary.usd_notional"];  //Any dashes that don't match user desired filter move to buffered
   repeated string buffered_dashes = 4 [(FluxFldHide) = "True"];
 }
@@ -431,7 +433,7 @@ message MarketDepth {
 }
 
 message MarketTradeVolume{
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int64 participation_period_last_trade_qty_sum = 2;
   optional int32 applicable_period_seconds = 3 [(FluxFldHelp) = "sliding window interval of above volume, unset value implies seconds from SOD till time current time"];
 }

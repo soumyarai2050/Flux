@@ -1,5 +1,5 @@
 driver:
-  chrome: "path-to/chromedriver.exe"
+  chrome: "C:/Users/abhis/Downloads/chromedriver_win32/chromedriver.exe"
 mongo_server_uri: "mongodb://localhost:27017"
 ps_db_name: "addressbook"
 md_db_name: "market_data"

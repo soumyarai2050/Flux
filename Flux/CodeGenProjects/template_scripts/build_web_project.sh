@@ -47,6 +47,9 @@ python gen_cpp_example_comments.py
 python gen_cpp_codec_test.py
 python gen_proto2_to_proto3.py
 python gen_cpp_build_and_run_test.py
+python gen_web_client.py
+python gen_cpp_max_id_handler.py
+python gen_cpp_db_test_cpp_plugin.py
 
 cd ../../
 "$PWD"/gen_web_project.sh "$PROJECT_NAME"

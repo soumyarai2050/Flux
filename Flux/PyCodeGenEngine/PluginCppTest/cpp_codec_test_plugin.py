@@ -79,8 +79,8 @@ class CppCodecTestPlugin(BaseProtoPlugin):
                                           f'list;\n'
                         output_content += f"\tstd::string {message_name_snake_cased}_json;\n"
                         output_content += f"\t{class_name}JSONCodec {class_name_snake_cased}_json_codec;\n"
-                        output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
-                                          f'{message_name_snake_cased});\n\n'
+                        output_content += (f'\t{package_name}_handler::{class_name}PopulateRandomValues::'
+                                           f'{message_name_snake_cased}({message_name_snake_cased});\n')
                         output_content += f"\tASSERT_TRUE({class_name_snake_cased}_json_codec.encode_" \
                                           f"{message_name_snake_cased}({message_name_snake_cased}, " \
                                           f"{message_name_snake_cased}_json));\n"
@@ -92,8 +92,8 @@ class CppCodecTestPlugin(BaseProtoPlugin):
 
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n"
                         output_content += f"\tfor (int i = 0; i < 2; ++i) {{\n"
-                        output_content += f'\t\t{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
-                                          f'{message_name_snake_cased});\n'
+                        output_content += (f'\t{package_name}_handler::{class_name}PopulateRandomValues::'
+                                           f'{message_name_snake_cased}({message_name_snake_cased});\n')
                         output_content += f'\t\t{message_name_snake_cased}_list.add_{message_name_snake_cased}()->CopyFrom(' \
                                           f'{message_name_snake_cased});\n'
                         output_content += "\t}\n\n"

@@ -41,7 +41,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += f'#include "gtest/gtest.h"\n'
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n'
         output_content += f'#include "../../cpp_app/include/{class_name}_mongo_db_handler.h"\n'
-        output_content += f'#include "../CppMongoDBHandler/{class_name}_mongo_db_codec.h"\n'
+        output_content += f'#include "../CppCodec/{class_name}_mongo_db_codec.h"\n'
         output_content += f'#include "../CppCodec/{class_name}_json_codec.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_key_handler.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
@@ -85,6 +85,25 @@ class CppDbTestPlugin(BaseProtoPlugin):
                             output_content += f'\t\t{message_name_snake_cased}_list.mutable_{message_name_snake_cased}' \
                                               f'(i)->set_{field_name}(random_data_gen.get_random_' \
                                               f'{field.kind.name.lower()}());\n'
+            else:
+                if field_type_message is not None and field_type != "repeated":
+                    for f in field_type_message.fields:
+                        field_variable_type: str = f.kind.name.lower()
+                        if f.message is None:
+                            if CppDbTestPlugin.is_option_enabled(f, CppDbTestPlugin.flux_fld_val_is_datetime):
+                                output_content += f'\t\t{message_name_snake_cased}_list.mutable_' \
+                                                  f'{message_name_snake_cased}(i)->mutable_{field_name}()->set_' \
+                                                  f'{f.proto.name}({class_name}PopulateRandomValues::get_utc_time());\n'
+                            else:
+                                output_content += f'\t\t{message_name_snake_cased}_list.mutable_' \
+                                                  f'{message_name_snake_cased}(i)->mutable_{field_name}()->set_' \
+                                                  f'{f.proto.name}(random_data_gen.get_random_{field_variable_type}());\n'
+                elif field_type_message is None and field_type != "repeated":
+                    if field.kind.name.lower() != "enum" and field_name != "id":
+                        if CppDbTestPlugin.is_option_enabled(field, CppDbTestPlugin.flux_fld_val_is_datetime):
+                            output_content += f'\t\t{message_name_snake_cased}_list.mutable_{message_name_snake_cased}' \
+                                              f'(i)->set_{field_name}({class_name}PopulateRandomValues::get_utc_time());\n'
+
 
         output_content += "\t}\n"
         output_content += f"\t{message_name_snake_cased}_json.clear();\n\t{message_name_snake_cased}_json_from_db" \
@@ -111,7 +130,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
             field_name = field.proto.name
             field_type = field.cardinality.name.lower()
             field_type_message = field.message
-            if not CppDbTestPlugin.is_option_enabled(field, "FluxFldPk"):
+            if not CppDbTestPlugin.is_option_enabled(field, CppDbTestPlugin.flux_fld_PK):
 
                 if field_type_message is not None and field_type != "repeated":
                     for f in field_type_message.fields:
@@ -131,6 +150,22 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         else:
                             output_content += f'\t{message_name_snake_cased}.set_{field_name}(random_data_gen.get_random_' \
                                               f'{field.kind.name.lower()}());\n'
+            else:
+                if field_type_message is not None and field_type != "repeated":
+                    for f in field_type_message.fields:
+                        field_variable_type: str = f.kind.name.lower()
+                        if f.message is None:
+                            if CppDbTestPlugin.is_option_enabled(f, CppDbTestPlugin.flux_fld_val_is_datetime):
+                                output_content += f'\t{message_name_snake_cased}.mutable_{field_name}()->set_{f.proto.name}' \
+                                                  f'({class_name}PopulateRandomValues::get_utc_time());\n'
+                            else:
+                                output_content += f'\t{message_name_snake_cased}.mutable_{field_name}()->set_{f.proto.name}' \
+                                                  f'(random_data_gen.get_random_{field_variable_type}());\n'
+                elif field_type_message is None and field_type != "repeated":
+                    if field.kind.name.lower() != "enum" and field_name != "id":
+                        if CppDbTestPlugin.is_option_enabled(field, CppDbTestPlugin.flux_fld_val_is_datetime):
+                            output_content += f'\t{message_name_snake_cased}.set_{field_name}({class_name}' \
+                                              f'PopulateRandomValues::get_utc_time());\n'
 
         output_content += f"\t{message_name_snake_cased}_from_db.Clear();\n"
         output_content += f'\n\tASSERT_TRUE({message_name_snake_cased}_codec.patch_{message_name_snake_cased}' \
@@ -183,6 +218,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
 
         output_content += f"using {package_name}_handler::{class_name}JSONCodec;\n"
         output_content += f"using {package_name}_handler::{class_name}KeyHandler;\n"
+        output_content += f"using {package_name}_handler::{class_name}PopulateRandomValues;\n"
         for message in self.root_message_list:
 
             if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root):
@@ -203,7 +239,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                 for field in message.fields:
                     field_name: str = field.proto.name
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
-                    if CppDbTestPlugin.is_option_enabled(field, "FluxFldPk"):
+                    if CppDbTestPlugin.is_option_enabled(field, CppDbTestPlugin.flux_fld_PK):
 
                         output_content += f"\nTEST({class_name}{message_name}TestSuite, DBTest) {{\n\t"
                         output_content += (f"{class_name}MongoDB{message_name}Codec {message_name_snake_cased}_codec("
@@ -217,14 +253,17 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         output_content += f"\tstd::string {message_name_snake_cased}_key;\n"
                         output_content += f"\tstd::vector < std::string > {message_name_snake_cased}_key_list;\n"
                         output_content += "\tRandomDataGen random_data_gen;\n"
+                        output_content += "\tint32_t new_generated_id;\n"
+                        output_content += "\tstd::vector < int32_t > new_generated_id_list;\n"
                         output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
                                           f'({message_name_snake_cased});\n\n'
 
-                        output_content += f'\t{class_name}KeyHandler::get_{message_name_snake_cased}_key(' \
+                        output_content += f'\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_out(' \
                                           f'{message_name_snake_cased}, {message_name_snake_cased}_key);\n\n'
 
                         output_content += f"\t{message_name_snake_cased}_codec.insert_or_update_{message_name_snake_cased}" \
-                                          f"({message_name_snake_cased});\n"
+                                          f"({message_name_snake_cased}, new_generated_id);\n"
+                        output_content += f"\t{message_name_snake_cased}.set_id(new_generated_id);\n\n"
 
                         output_content += f'\tauto found = {message_name_snake_cased}_codec.{message_name_snake_cased}' \
                                           f'_key_to_db_id.find({message_name_snake_cased}_key);\n'
@@ -263,7 +302,12 @@ class CppDbTestPlugin(BaseProtoPlugin):
                                           f'{message_name_snake_cased}_list, {message_name_snake_cased}_key_list);\n'
                         output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.bulk_insert_" \
                                           f"{message_name_snake_cased}({message_name_snake_cased}_list, " \
-                                          f"{message_name_snake_cased}_key_list));\n\n"
+                                          f"{message_name_snake_cased}_key_list, new_generated_id_list));\n\n"
+
+                        output_content += "\tfor (int i = 0; i <= 5; ++i) {\n"
+                        output_content += f"\t\t{message_name_snake_cased}_list.mutable_{message_name_snake_cased}" \
+                                          f"(i)->set_id(new_generated_id_list[i]);\n"
+                        output_content += "\t}\n\n"
 
                         output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.get_all_data_from_" \
                                           f"{message_name_snake_cased}_collection({message_name_snake_cased}_list_from_db));\n"

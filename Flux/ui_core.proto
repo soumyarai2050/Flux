@@ -1,92 +1,65 @@
 syntax = "proto2";
+import 'flux_options.proto';
 
-
-enum ButtonType{
-  BUTTON_TYPE_UNSPECIFIED = 0;
-  BUTTON_TYPE_ROUND = 1;
-  BUTTON_TYPE_RECTANGLE = 2;
+message RawPerformanceData{
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    CreateAllDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    PatchAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 32,
+    w: 8,
+    h: 8,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string callable_name = 2;
+  required string call_date_time = 3 [(FluxFldValIsDateTime) = true];
+  required float start_time_it_val = 4;
+  required float end_time_it_val = 5;
+  required float delta = 6;
 }
 
-enum ButtonSize{
-  BUTTON_SIZE_UNSPECIFIED = 0;
-  BUTTON_SIZE_SMALL = 1;
-  BUTTON_SIZE_MEDIUM = 2;
-  BUTTON_SIZE_LARGE = 3;
+message RawPerformanceDataOfCallable{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_raw_performance_data_of_callable",
+      QueryParams: "callable_name",
+      QueryParamsDataType: "str"
+  };
+  repeated RawPerformanceData raw_performance_data = 1;
 }
 
-enum Theme{
-    THEME_UNSPECIFIED = 0;
-    THEME_DARK = 1;
-    THEME_LIGHT = 3;
+message ProcessedPerformanceAnalysis{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_performance_analysis_of_callable",
+      QueryParams: "callable_name",
+      QueryParamsDataType: "str",
+      QueryParams: "start_datetime",
+      QueryParamsDataType: "DateTime",
+      QueryParams: "last_datetime",
+      QueryParamsDataType: "DateTime"
+  };
+  optional float min = 1;
+  optional float max = 2;
+  optional float avg = 3;
+  optional float std_dev = 4;
+  optional float per_10 = 5;
+  optional float per_20 = 6;
+  optional float per_30 = 7;
+  optional float per_40 = 8;
+  optional float per_50 = 9;
+  optional float per_60 = 10;
+  optional float per_70 = 11;
+  optional float per_80 = 12;
+  optional float per_90 = 13;
 }
 
-enum HoverTextType{
-    HoverTextType_NONE = 0;
-    HoverTextType_VALUE = 1;
-    HoverTextType_PERCENTAGE = 3;
-    HoverTextType_VALUE_AND_PERCENTAGE = 4;
-}
-
-enum UILayouts{
-  UI_ABBREVIATED_FILTER = 0;
-  UI_TABLE = 1;
-  UI_TREE = 2;
-  UI_GRAPH = 3;
-  UI_TABBED_TABLE = 4;
-  UI_PIVOT_TABLE = 5;
-}
-
-message WebPageUIData{
-  optional Theme theme = 1;
-}
-
-message WidgetUIDataElement {
-  // key string connects Widget with Model - future better name via: [(FluxFldAlias) = 'i']
-  optional string i = 1;
-  // X coordinate magnitude (left most is 0)
-  optional int32 x = 2;
-  // Y coordinate magnitude (top most is 0)
-  optional int32 y = 3;
-  // width
-  optional int32 w = 4;
-  // height
-  optional int32 h = 5;
-  optional bool is_repeated = 7 [default = false];
-  optional string alert_bubble_source = 8;
-  optional string alert_bubble_color = 9;
-  optional bool disable_ws_on_edit = 10 [default = false];
-  // allows user-data-model identifier bound UI configuration - user can save different UI configs for each unique ID. Value to be MessageName.FieldName from the target model
-  optional string bind_id_fld = 11;
-  optional string dynamic_widget_title_fld = 12;
-  repeated WidgetUIData widget_ui_data = 13;
-
-}
-
-message WidgetUIData{
-  // layout type
-  optional UILayouts view_layout = 1;
-  repeated string enable_override = 2;
-  repeated string disable_override = 3;
-  optional bool highlight_update = 4 [default = false];
-  optional UILayouts edit_layout = 5;
-  optional bool truncate_date_time = 6 [default = false];
-  // for UI to store the bounded id value
-  optional string bind_id_val = 7;
-}
-
-message UIButton{
-  optional string unpressed_caption = 1;
-  optional string pressed_caption = 2;
-  optional string disabled_captions = 3; // coma separated list of value=caption
-  optional ButtonType button_type = 5;
-  optional ButtonSize button_size = 6;
-  optional string value_color_map = 7;  // coma separated list of key=value
-  optional string action = 8;
-  required string pressed_value_as_text = 9;
-}
-
-message UIProgressBar{
-  optional string value_color_map = 1;  // coma separated list of key=value
-  optional HoverTextType hover_text_type = 2;  // x of y
-  optional bool is_reverse = 3; // if this is set to true the progress bar is reversed (e.g: 20 in 0-100 is 20% on progress bar, if is_reverse property is set the same 20 is 80% on the progress bar)
-}

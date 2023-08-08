@@ -289,6 +289,27 @@ function Layout() {
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
+    const onChartDataChange = useCallback((name, chartDataObj) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                if (layout.chart_data) {
+                    const chartData = cloneDeep(layout.chart_data);
+                    const index = chartData.map(obj => obj.chart_name).indexOf(chartDataObj.chart_name);
+                    if (index !== -1) {
+                        chartData[index] = chartDataObj;
+                    } else {
+                        chartData.push(chartDataObj);
+                    }
+                    layout.chart_data = chartData;
+                } else {
+                    layout.chart_data = [chartDataObj];
+                }
+            }
+            return layout
+        });
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
     const storedCookie = sessionStorage.getItem(COOKIE_NAME);
     if (storedCookie && !uiLayout.widget_ui_data_elements) {
         return (

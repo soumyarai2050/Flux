@@ -36,6 +36,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
         output += '#include "gtest/gtest.h"\n\n'
         output += f'#include "{file_name}.pb.h"\n'
         output += f'#include "{class_name}_web_client.h"\n'
+        # output += f'#include "{class_name}_max_id_handler.h"\n'
         output += f'#include "../../cpp_app/include/RandomDataGen.h"\n'
         output += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output
@@ -62,10 +63,8 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
         output_content: str = ""
 
         output_content += self.header_generate_handler(file_name, class_name_snake_cased)
-        output_content += 'std::string host = "127.0.0.1";\n'
-        output_content += 'std::string port = "8040";\n'
-        output_content += (f'const static {package_name}_handler::{class_name}WebClient {class_name_snake_cased}'
-                           f'_web_client(host, port);\n\n')
+        output_content += 'const std::string host = "127.0.0.1";\n'
+        output_content += 'const std::string port = "8040";\n'
 
         output_content += f"using {package_name}_handler::{class_name}JSONCodec;\n\n"
 
@@ -85,7 +84,9 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\tstd::string {message_name_snake_cased}_json;\n'
                             output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
                             output_content += f'\tRandomDataGen random_data_gen;\n'
-                            output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
+                            output_content += (f'\t{package_name}_handler::{class_name}WebClient {class_name_snake_cased}'
+                                               f'_web_client(host, port);\n\n')
+                            output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}' \
                                               f'({message_name_snake_cased});\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
                             output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.create_' \
@@ -119,7 +120,9 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
                             output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
 
-                            output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
+                            # output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_{message_name_snake_cased}"
+                            #                    f"_max_id(market_data_web_client);\n")
+                            output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
                                               f'{message_name_snake_cased});\n'
                             output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n\n'
@@ -192,7 +195,9 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\tstd::string {message_name_snake_cased}_json;\n'
                             output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
                             output_content += f'\tRandomDataGen random_data_gen;\n'
-                            output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
+                            output_content += (f'\t{package_name}_handler::{class_name}WebClient '
+                                               f'{class_name_snake_cased}_web_client(host, port);\n\n')
+                            output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}' \
                                               f'({message_name_snake_cased});\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
                             output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.create_' \
@@ -220,8 +225,10 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
                             output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
 
-                            output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
-                                              f'{message_name_snake_cased});\n'
+                            # output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_"
+                            #                    f"{message_name_snake_cased}_max_id({class_name_snake_cased}_web_client);\n")
+                            output_content += (f'\t{package_name}_handler::{class_name}PopulateRandomValues::'
+                                               f'{message_name_snake_cased}({message_name_snake_cased});\n')
                             output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n\n'
                             output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_{message_name_snake_cased}' \

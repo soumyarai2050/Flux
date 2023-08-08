@@ -14,19 +14,23 @@ FetchContent_Declare(
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-set(EXTERNAL_DIR1 ../../../../../Flux/CodeGenProjects/market_data/generated/CppCodec ../../../../../Flux/CodeGenProjects/market_data/generated/CppTest)
-set(EXTERNAL_DIR2 ../../../../../Flux/CodeGenProjects/market_data/generated/CppMongoDBHandler)
-set(EXTERNAL_DIR3 ../../../../../Flux/CodeGenProjects/market_data/generated/CppUtilGen)
-set(EXTERNAL_DIR4 ../../../../../Flux/CodeGenProjects/market_data/generated/ProtoGenCc)
-set(EXTERNAL_DIR5 ../../../../../Flux/PyCodeGenEngine/FluxCodeGenCore ../../../../../Flux/CodeGenProjects/market_data/cpp_app/include)
+set(CppCodec ../../../../../Flux/CodeGenProjects/market_data/generated/CppCodec)
+set(CppTest ../../../../../Flux/CodeGenProjects/market_data/generated/CppTest)
+set(CppMongoDBHandler ../../../../../Flux/CodeGenProjects/market_data/generated/CppMongoDBHandler)
+set(CppUtilGen ../../../../../Flux/CodeGenProjects/market_data/generated/CppUtilGen)
+set(ProtoGenCc ../../../../../Flux/CodeGenProjects/market_data/generated/ProtoGenCc)
+#set(FluxCodeGenCore ../../../../../Flux/PyCodeGenEngine/FluxCodeGenCore)
+set(App ../../../../../Flux/CodeGenProjects/market_data/cpp_app/cmake)
 
-set(EXTERNAL_CPP1 ../../../../../Flux/CodeGenProjects/market_data/generated/ProtoGenCc/dashboards_core.pb.cc)
-set(EXTERNAL_CPP2 ../../../../../Flux/CodeGenProjects/market_data/generated/ProtoGenCc/market_data_core.pb.cc)
-set(EXTERNAL_CPP3 ../../../../../Flux/CodeGenProjects/market_data/generated/ProtoGenCc/market_data_service.pb.cc)
-set(EXTERNAL_CPP4 ../../../../../Flux/PyCodeGenEngine/FluxCodeGenCore/ui_core.pb.cc)
-set(EXTERNAL_CPP5 ../../../../../Flux/PyCodeGenEngine/FluxCodeGenCore/flux_options.pb.cc)
-set(EXTERNAL_CPP6 ../../../../../Flux/PyCodeGenEngine/FluxCodeGenCore/flux_utils.pb.cc)
-set(EXTERNAL_CPP7 ../../../../../Flux/PyCodeGenEngine/FluxCodeGenCore/trade_core.pb.cc )
+file(GLOB SRC_FILES ${CppCodec}/*)
+file(GLOB SRC_FILES ${CppTest}/*)
+file(GLOB SRC_FILES ${CppMongoDBHandler}/*)
+file(GLOB SRC_FILES ${CppUtilGen}/*)
+file(GLOB SRC_FILES ${ProtoGenCc}/*)
+#file(GLOB SRC_FILES ${FluxCodeGenCore}/*)
+file(GLOB SRC_FILES ${App}/*)
+
+message(SRC_FILES ${SRC_FILES})
 
 FetchContent_MakeAvailable(googletest)
 
@@ -36,16 +40,15 @@ message(WARNING ${MONGO_INCLUDE_DIR})
 message(WARNING ${BSON_INCLUDE_DIR})
 
 include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR}
-        ${Protobuf_INCLUDE_DIRS} ${EXTERNAL_DIR1} ${EXTERNAL_DIR2} ${EXTERNAL_DIR3} ${EXTERNAL_DIR4}
-        ${EXTERNAL_DIR5} /usr/local/lib/quill
-        )
+        ${Protobuf_INCLUDE_DIRS} ${CppCodec} ${CppTest} ${CppCodec} ${CppMongoDBHandler} ${CppUtilGen} ${ProtoGenCc} ${FluxCodeGenCore} ${${FluxCodeGenCore}} /usr/local/lib/quill)
 
-protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ../../../../../Flux/CodeGenProjects/market_data/model/dashboards_core.proto ../../../../../Flux/CodeGenProjects/market_data/model/market_data_core.proto ../../../../../Flux/CodeGenProjects/market_data/model/market_data_service.proto ../../../../../Flux/trade_core.proto ../../../../../Flux/flux_utils.proto ../../../../../Flux/flux_options.proto ../../../../../Flux/ui_core.proto)
+set(MD_MODEL ../../../../../Flux/CodeGenProjects/market_data/model)
+set(FLUX_MODEL ../../../../../Flux)
+protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/dashboards_core.proto ${MD_MODEL}/market_data_core.proto ${MD_MODEL}/market_data_service.proto ${FLUX_MODEL}/trade_core.proto  ${FLUX_MODEL}/flux_utils.proto  ${FLUX_MODEL}/flux_options.proto  ${FLUX_MODEL}/ui_option_utils.proto  ${FLUX_MODEL}/ui_core.proto)
 
 
 # adding the Google_Tests_run target
-add_executable(Google_Tests_run DB_Test.cpp ${EXTERNAL_CPP1} ${EXTERNAL_CPP2} ${EXTERNAL_CPP3} ${EXTERNAL_CPP4} ${EXTERNAL_CPP5} ${EXTERNAL_CPP6} ${EXTERNAL_CPP7})
-
+add_executable(Google_Tests_run DB_Test.cpp ${SRC_FILES})
 # linking Google_Tests_run with DateConverter_lib which will be tested
 #target_link_libraries(Google_Tests_run DateConverter_lib)
 

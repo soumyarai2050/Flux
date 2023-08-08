@@ -1,8 +1,9 @@
 syntax = "proto2";
 
+import "ui_option_utils.proto";
 import "flux_options.proto";
-import "trade_core.proto";
 import "ui_core.proto";
+import "trade_core.proto";
 import "strat_core.proto";
 
 package addressbook;
@@ -156,7 +157,7 @@ message OrderJournal{
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional OrderBrief order = 2;
-  optional int64 order_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
+  optional string order_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
   optional OrderEventType order_event = 4;
   optional int32 current_period_order_count = 8 [ (FluxFldHelp) = "total new order count within order_rate(s) applicable_period_seconds"];
 }
@@ -214,8 +215,8 @@ message OrderSnapshot{
   optional int64 cxled_qty = 9;
   optional float avg_cxled_px = 10;
   optional float cxled_notional = 11 [(FluxFldDisplayType) = "int"];
-  optional int64 create_date_time = 12 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
-  optional int64 last_update_date_time = 13 [(FluxFldValIsDateTime) = true];
+  optional string create_date_time = 12 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
+  optional string last_update_date_time = 13 [(FluxFldValIsDateTime) = true];
   optional int64 last_n_sec_total_qty = 14 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec order qty
 }
 
@@ -268,7 +269,7 @@ message SymbolSideSnapshot{
   optional int64 total_cxled_qty = 11;
   optional float avg_cxled_px = 12;
   optional float total_cxled_notional = 13 [(FluxFldDisplayType) = "int"];
-  optional int64 last_update_date_time = 14 [(FluxFldValIsDateTime) = true];
+  optional string last_update_date_time = 14 [(FluxFldValIsDateTime) = true];
   optional int32 order_count = 15 [(FluxFldNoCommonKey) = true];
 }
 
@@ -324,7 +325,7 @@ message FillsJournal{
   optional string fill_symbol = 6 [(FluxFldIndex) = true];
   optional Side fill_side = 7;
   required string underlying_account = 8;
-  optional int64 fill_date_time = 9 [(FluxFldValIsDateTime) = true];
+  optional string fill_date_time = 9 [(FluxFldValIsDateTime) = true];
   required string fill_id = 10;
   optional int64 underlying_account_cumulative_fill_qty = 11[(FluxFldHide) = "True"]; // used by executor query at strat start
 }
@@ -538,7 +539,7 @@ message PairStrat{
     required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     //An int64 may or may-not be date time. A datetime field must have FluxFldValIsDateTime option set to true
     // CodeGen to handle appropriate datetime generation if the FluxFldValIsDateTime option is set
-    optional int64 last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
+    optional string last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
     optional int32  frequency = 3 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 1, (FluxFldServerPopulate) = true];
     required PairStratParams pair_strat_params = 4;
     optional StratStatus strat_status = 5 [(FluxFldUIUpdateOnly) = true];
@@ -644,7 +645,7 @@ message StratBrief{
 message PairSideTradingBrief{
   required Security security = 1;
   required Side side = 2;
-  required int64 last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
+  required string last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
   optional float consumable_open_orders = 4 [(FluxFldHelp) = "max_open_orders_per_side - open_orders for this symbol side"];
   optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_cb_notional - filled_notional - open_notional"];
   optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_open_cb_notional - open_notional"];
@@ -675,7 +676,7 @@ message TestSample{
     //Server generated unique Id
     required int32 id = 1 [(FluxFldOrmNoUpdate) = true];
     optional string sample = 2 [(FluxFldIndex) = true];
-    required int64 date = 3 [(FluxFldValIsDateTime) = true];
+    required string date = 3 [(FluxFldValIsDateTime) = true];
 }
 
 //Not used , maybe deleted in future
@@ -685,7 +686,7 @@ message TradeBrief{
   required Side side = 3;
   required float px = 4;
   required int64 qty = 5;
-  optional int64 create_date_time = 7 [(FluxFldValIsDateTime) = true];
+  optional string create_date_time = 7 [(FluxFldValIsDateTime) = true];
   optional float computed_notional = 8 [(FluxFldDisplayType) = "int", (FluxFldHide) = "True"];
 }
 
@@ -816,43 +817,6 @@ message CommandNControl {
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required CommandType command_type = 2;
   optional string datetime = 3 [(FluxFldValIsDateTime) = true];
-}
-
-message RawPerformanceData{
-  option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    CreateAllDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    PatchAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
-  };
-  option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
-    y: 32,
-    w: 8,
-    h: 8,
-    widget_ui_data: {
-      view_layout: UI_TABLE
-    }
-  };
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required string callable_name = 2;
-  required string call_date_time = 3 [(FluxFldValIsDateTime) = true];
-  required float start_time_it_val = 4;
-  required float end_time_it_val = 5;
-  required float delta = 6;
-}
-
-message RawPerformanceDataOfCallable{
-  option (FluxMsgJsonQuery) = {
-      QueryName: "get_raw_performance_data_of_callable",
-      QueryParams: "callable_name",
-      QueryParamsDataType: "str"
-  };
-  repeated RawPerformanceData raw_performance_data = 1;
 }
 
 // Link impl Example models

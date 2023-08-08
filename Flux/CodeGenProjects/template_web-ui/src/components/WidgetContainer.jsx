@@ -1,7 +1,7 @@
 import React, { Fragment, useRef, useState } from 'react';
 import _ from 'lodash';
 import { Typography, Box, ToggleButtonGroup, ToggleButton, ClickAwayListener, Tooltip } from '@mui/material';
-import { Save, Cached, Edit, AccountTree, GridView, TableChartSharp, PivotTableChartSharp, FormatListNumberedSharp } from '@mui/icons-material';
+import { Save, Cached, Edit, AccountTree, GridView, TableChartSharp, PivotTableChartSharp, FormatListNumberedSharp, BarChart } from '@mui/icons-material';
 import { Icon } from './Icon';
 import { Modes, Layouts } from '../constants';
 import PropTypes from 'prop-types';
@@ -40,6 +40,7 @@ const WidgetContainer = (props) => {
                                     {layout === Layouts.TREE_LAYOUT && <AccountTree fontSize='medium' />}
                                     {layout === Layouts.PIVOT_TABLE && <PivotTableChartSharp fontSize='medium' />}
                                     {layout === Layouts.ABBREVIATED_FILTER_LAYOUT && <FormatListNumberedSharp fontSize='medium' />}
+                                    {layout === Layouts.CHART && <BarChart fontSize='medium' />}
                                 </span>
                             </Tooltip>
                         </ToggleButton>

@@ -10,9 +10,15 @@ beanie_override_type: "native"
 cache_override_type: "bare"
 
 # to be used in pair_strat_log_analyzer to take out counts of created from waiting queue to execute create in db
-portfolio_update_bulk_update_counts_per_call: 5
-strat_alert_bulk_update_counts_per_call: 5
-perf_benchmark_bulk_create_counts_per_call: 100
+portfolio_alert_configs:
+  transaction_counts_per_call: 5
+  transaction_timeout_secs: 2  # secs
+strat_alert_config:
+  transaction_counts_per_call: 5
+  transaction_timeout_secs: 2  # secs
+raw_perf_data_config:
+  transaction_counts_per_call: 500
+  transaction_timeout_secs: 60  # secs
 
 log_mongo_uri: True
 min_refresh_interval: 20

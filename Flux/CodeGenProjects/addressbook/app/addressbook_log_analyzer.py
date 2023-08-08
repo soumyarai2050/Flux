@@ -1,20 +1,15 @@
 # System imports
-import logging
 import os
 import time
-from pathlib import PurePath
-from typing import Callable, Set
-from pendulum import DateTime
 import re
-from threading import Lock, Semaphore, Thread
-from fastapi.encoders import jsonable_encoder
+from threading import Thread
 from queue import Queue
 
 os.environ["DBType"] = "beanie"
 # Project imports
-from FluxPythonUtils.scripts.utility_functions import configure_logger, \
-    YAMLConfigurationManager, get_native_host_n_port_from_config_dict
-from FluxPythonUtils.log_analyzer.log_analyzer import LogAnalyzer, LogDetail
+from FluxPythonUtils.scripts.utility_functions import configure_logger, get_native_host_n_port_from_config_dict
+from FluxPythonUtils.log_analyzer.log_analyzer import LogDetail, get_transaction_counts_n_timeout_from_config
+from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_analyzer import AppLogAnalyzer
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
@@ -22,70 +17,39 @@ from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import crea
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import is_service_up
 
-config_yaml_path = PurePath(__file__).parent.parent / "data" / "config.yaml"
-config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
-host, port = get_native_host_n_port_from_config_dict(config_yaml_dict)
-debug_mode: bool = False if (debug_env := os.getenv("DEBUG")) is None or len(debug_env) == 0 or debug_env == "0" \
-    else True
-portfolio_update_bulk_update_counts_per_call: int = config_yaml_dict.get("portfolio_update_bulk_update_counts_per_call")
-if portfolio_update_bulk_update_counts_per_call is None:
-    portfolio_update_bulk_update_counts_per_call = 1
-strat_alert_bulk_update_counts_per_call: int = config_yaml_dict.get("strat_alert_bulk_update_counts_per_call")
-if strat_alert_bulk_update_counts_per_call is None:
-    strat_alert_bulk_update_counts_per_call = 1
-raw_performance_data_bulk_create_counts_per_call: int = config_yaml_dict.get("perf_benchmark_bulk_create_counts_per_call")
-if raw_performance_data_bulk_create_counts_per_call is None:
-    raw_performance_data_bulk_create_counts_per_call = 1
-
 PAIR_STRAT_DATA_DIR = (
     PurePath(__file__).parent.parent / "data"
 )
 
+config_yaml_path = PAIR_STRAT_DATA_DIR / "config.yaml"
+config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
+host, port = get_native_host_n_port_from_config_dict(config_yaml_dict)
+debug_mode: bool = False if (debug_env := os.getenv("DEBUG")) is None or len(debug_env) == 0 or debug_env == "0" \
+    else True
+strat_manager_service_web_client = StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
 
-class AddressbookLogAnalyzer(LogAnalyzer):
+portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout = (
+    get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs")))
+strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
+    get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("strat_alert_config")))
+
+
+class AddressbookLogAnalyzer(AppLogAnalyzer):
     def __init__(self, regex_file: str, log_details: List[LogDetail] | None = None,
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
                  simulation_mode: bool = False):
-        super().__init__(regex_file=regex_file, log_details=log_details,
-                         log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict)
+        super().__init__(regex_file, config_yaml_dict, strat_manager_service_web_client,
+                         RawPerformanceDataBaseModel, log_details=log_details,
+                         log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                         debug_mode=debug_mode)
         logging.info(f"starting pair_strat log analyzer. monitoring logs: {log_details}")
         self.simulation_mode = simulation_mode
         self.portfolio_alerts_cache: List[Alert] = list()
         self.strat_id_by_symbol_side_dict: Dict[str, int] = dict()
         self.strat_alert_cache_by_strat_id_dict: Dict[int, List[Alert]] = dict()
         self.service_up: bool = False
-        self.portfolio_alert_queue_lock: Lock = Lock()
-        self.strat_alert_queue_lock: Lock = Lock()
-        self.perf_benchmark_queue_lock: Lock = Lock()
-        self.portfolio_alert_queue_semaphore: Semaphore = Semaphore()
-        self.strat_alert_queue_semaphore: Semaphore = Semaphore()
-        self.raw_performance_data_queue_semaphore: Semaphore = Semaphore()
         self.portfolio_alert_queue: Queue = Queue()
         self.strat_alert_queue: Queue = Queue()
-        self.raw_performance_data_queue: Queue = Queue()
-        self.strat_manager_service_web_client: StratManagerServiceWebClient = \
-            StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
-        self.severity_map: Dict[str, str] = {
-            "error": "Severity_ERROR",
-            "critical": "Severity_CRITICAL",
-            "warning": "Severity_WARNING"
-        }
-        self.error_patterns: Dict[str, re.Pattern] = {
-            "error": re.compile(r"ERROR"),
-            "critical": re.compile(r"CRITICAL"),
-            "warning": re.compile(r"WARNING")
-        }
-        if debug_mode:
-            logging.warning(f"Running log analyzer in DEBUG mode;;; log_files: {self.log_details}, "
-                            f"debug_mode: {debug_mode}")
-            self.error_patterns.update({
-                "info": re.compile(r"INFO"),
-                "debug": re.compile(r"DEBUG")
-            })
-            self.severity_map.update({
-                "info": "Severity_INFO",
-                "debug": "Severity_DEBUG"
-            })
         if self.simulation_mode:
             print("CRITICAL: log analyzer running in simulation mode...")
             alert_brief: str = "Log analyzer running in simulation mode"
@@ -95,43 +59,22 @@ class AddressbookLogAnalyzer(LogAnalyzer):
         self.run()
 
     def _handle_portfolio_alert_queue(self):
-        portfolio_alert_obj_list = []
-        while True:
-            self.portfolio_alert_queue_semaphore.acquire()
-            if len(portfolio_alert_obj_list) < portfolio_update_bulk_update_counts_per_call:
-                portfolio_alert_obj_list.append(self.portfolio_alert_queue.get())
-            else:
-                self.strat_manager_service_web_client.patch_all_portfolio_status_client(portfolio_alert_obj_list)
-                portfolio_alert_obj_list.clear()
+        AddressbookLogAnalyzer.queue_handler(
+            self.portfolio_alert_queue, portfolio_alert_bulk_update_counts_per_call,
+            portfolio_alert_bulk_update_timeout,
+            self.webclient_object.patch_all_portfolio_status_client)
 
     def _handle_strat_alert_queue(self):
-        strat_alert_obj_list = []
-        while True:
-            self.strat_alert_queue_semaphore.acquire()
-            if len(strat_alert_obj_list) < strat_alert_bulk_update_counts_per_call:
-                strat_alert_obj_list.append(self.strat_alert_queue.get())
-            else:
-                self.strat_manager_service_web_client.patch_all_pair_strat_client(strat_alert_obj_list)
-                strat_alert_obj_list.clear()
-
-    def _handle_raw_performance_data_queue(self):
-        raw_performance_data_obj_list = []
-        while True:
-            self.raw_performance_data_queue_semaphore.acquire()
-            if len(raw_performance_data_obj_list) < raw_performance_data_bulk_create_counts_per_call:
-                raw_performance_data_obj_list.append(self.raw_performance_data_queue.get())
-            else:
-                self.strat_manager_service_web_client.create_all_raw_performance_data_client(raw_performance_data_obj_list)
-                raw_performance_data_obj_list.clear()
+        AddressbookLogAnalyzer.queue_handler(
+            self.strat_alert_queue, strat_alert_bulk_update_counts_per_call,
+            strat_alert_bulk_update_timeout,
+            self.webclient_object.patch_all_pair_strat_client)
 
     def run_queue_handler(self):
         portfolio_alert_handler_thread = Thread(target=self._handle_portfolio_alert_queue, daemon=True)
         strat_alert_handler_thread = Thread(target=self._handle_strat_alert_queue, daemon=True)
-        raw_performance_handler_thread = Thread(target=self._handle_raw_performance_data_queue, daemon=True)
-
         portfolio_alert_handler_thread.start()
         strat_alert_handler_thread.start()
-        raw_performance_handler_thread.start()
 
     def _init_service(self) -> bool:
         if self.service_up:
@@ -140,7 +83,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
             self.service_up = is_service_up(ignore_error=True)
             if self.service_up:
                 portfolio_status: PortfolioStatusBaseModel = \
-                    self.strat_manager_service_web_client.get_portfolio_status_client(1)
+                    self.webclient_object.get_portfolio_status_client(1)
                 if portfolio_status.portfolio_alerts is not None:
                     self.portfolio_alerts_cache = portfolio_status.portfolio_alerts
                 else:
@@ -149,34 +92,32 @@ class AddressbookLogAnalyzer(LogAnalyzer):
             return False
 
     def _send_alerts(self, severity: str, alert_brief: str, alert_details: str) -> None:
-        with self.portfolio_alert_queue_lock:
-            logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
-                          f"alert_details: {alert_details}")
-            created: bool = False
-            while self.run_mode and not created:
-                try:
-                    if not self.service_up:
-                        service_ready: bool = self._init_service()
-                        if not service_ready:
-                            raise Exception("service up check failed. waiting for the service to start...")
-                        # else not required: proceed to creating alert
-                    # else not required
+        logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
+                      f"alert_details: {alert_details}")
+        created: bool = False
+        while self.run_mode and not created:
+            try:
+                if not self.service_up:
+                    service_ready: bool = self._init_service()
+                    if not service_ready:
+                        raise Exception("service up check failed. waiting for the service to start...")
+                    # else not required: proceed to creating alert
+                # else not required
 
-                    if not alert_details:
-                        alert_details = None
-                    severity: Severity = self.get_severity_type_from_severity_str(severity_str=severity)
-                    alert_obj: Alert = self.create_or_update_alert(self.portfolio_alerts_cache, severity, alert_brief,
-                                                                   alert_details)
-                    updated_portfolio_status: PortfolioStatusBaseModel = \
-                        PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert_obj])
-                    self.portfolio_alert_queue.put(jsonable_encoder(updated_portfolio_status,
-                                                                    by_alias=True, exclude_none=True))
-                    self.portfolio_alert_queue_semaphore.release()
-                    created = True
-                except Exception as e:
-                    logging.exception(f"_send_alerts failed;;;exception: {e}")
-                    self.service_up = False
-                    time.sleep(30)
+                if not alert_details:
+                    alert_details = None
+                severity: Severity = self.get_severity_type_from_severity_str(severity_str=severity)
+                alert_obj: Alert = self.create_or_update_alert(self.portfolio_alerts_cache, severity, alert_brief,
+                                                               alert_details)
+                updated_portfolio_status: PortfolioStatusBaseModel = \
+                    PortfolioStatusBaseModel(_id=1, portfolio_alerts=[alert_obj])
+                self.portfolio_alert_queue.put(jsonable_encoder(updated_portfolio_status,
+                                                                by_alias=True, exclude_none=True))
+                created = True
+            except Exception as e:
+                logging.exception(f"_send_alerts failed;;;exception: {e}")
+                self.service_up = False
+                time.sleep(30)
 
     def create_or_update_alert(self, alerts: List[Alert] | None, severity: Severity, alert_brief: str,
                                alert_details: str | None) -> Alert:
@@ -228,13 +169,6 @@ class AddressbookLogAnalyzer(LogAnalyzer):
         # remove all numeric digits
         cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)
         return cleaned_alert_str
-
-    def _get_severity(self, error_type: str) -> str:
-        error_type = error_type.lower()
-        if error_type in self.severity_map:
-            return self.severity_map[error_type]
-        else:
-            return 'Severity_UNKNOWN'
 
     def _create_alert(self, error_dict: Dict) -> List[str]:
         alert_brief_n_detail_lists: List[str] = error_dict["line"].split(";;;", 1)
@@ -305,7 +239,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                 strat_id: int | None = self.strat_id_by_symbol_side_dict.get(symbol_side)
                 if strat_id is None or self.strat_alert_cache_by_strat_id_dict.get(strat_id) is None:
                     pair_strat_list: List[PairStrat] = \
-                        self.strat_manager_service_web_client.get_ongoing_strat_from_symbol_side_query_client(
+                        self.webclient_object.get_ongoing_strat_from_symbol_side_query_client(
                             sec_id=symbol, side=side)
                     if len(pair_strat_list) == 0:
                         raise Exception(f"no ongoing pair strat found for symbol_side: {symbol_side} while creating "
@@ -333,31 +267,29 @@ class AddressbookLogAnalyzer(LogAnalyzer):
                               alert_details=alert_details)
 
     def _send_strat_alerts(self, strat_id: int, severity: str, alert_brief: str, alert_details: str) -> None:
-        with self.strat_alert_queue_lock:
-            logging.debug(f"sending strat alert with strat_id: {strat_id} severity: {severity}, alert_brief: "
-                          f"{alert_brief}, alert_details: {alert_details}")
-            created: bool = False
-            while self.run_mode and not created:
-                try:
-                    if not self.service_up:
-                        raise Exception("service up check failed. waiting for the service to start...")
-                    # else not required
+        logging.debug(f"sending strat alert with strat_id: {strat_id} severity: {severity}, alert_brief: "
+                      f"{alert_brief}, alert_details: {alert_details}")
+        created: bool = False
+        while self.run_mode and not created:
+            try:
+                if not self.service_up:
+                    raise Exception("service up check failed. waiting for the service to start...")
+                # else not required
 
-                    if not alert_details:
-                        alert_details = None
-                    severity: Severity = self.get_severity_type_from_severity_str(severity_str=severity)
-                    alert_obj: Alert = self.create_or_update_alert(self.strat_alert_cache_by_strat_id_dict[strat_id],
-                                                                   severity, alert_brief, alert_details)
-                    updated_pair_strat: PairStratBaseModel = \
-                        PairStratBaseModel(_id=strat_id, strat_status=StratStatusOptional())
-                    updated_pair_strat.strat_status.strat_alerts = [alert_obj]
-                    self.strat_alert_queue.put(jsonable_encoder(updated_pair_strat,
-                                                                    by_alias=True, exclude_none=True))
-                    self.strat_alert_queue_semaphore.release()
-                    created = True
-                except Exception as e:
-                    logging.exception(f"_send_strat_alerts failed;;;exception: {e}")
-                    time.sleep(30)
+                if not alert_details:
+                    alert_details = None
+                severity: Severity = self.get_severity_type_from_severity_str(severity_str=severity)
+                alert_obj: Alert = self.create_or_update_alert(self.strat_alert_cache_by_strat_id_dict[strat_id],
+                                                               severity, alert_brief, alert_details)
+                updated_pair_strat: PairStratBaseModel = \
+                    PairStratBaseModel(_id=strat_id, strat_status=StratStatusOptional())
+                updated_pair_strat.strat_status.strat_alerts = [alert_obj]
+                self.strat_alert_queue.put(jsonable_encoder(updated_pair_strat,
+                                                            by_alias=True, exclude_none=True))
+                created = True
+            except Exception as e:
+                logging.exception(f"_send_strat_alerts failed;;;exception: {e}")
+                time.sleep(30)
 
     def _get_error_dict(self, log_prefix: str, log_message: str) -> \
             Dict[str, str] | None:
@@ -376,7 +308,7 @@ class AddressbookLogAnalyzer(LogAnalyzer):
     def notify_no_activity(self, log_detail: LogDetail):
         alert_brief: str = f"No new logs found for {log_detail.service} for last " \
                            f"{self.log_refresh_threshold} seconds"
-        alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file}"
+        alert_details: str = f"{log_detail.service} log file path: {log_detail.log_file_path}"
         self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
                           alert_details=alert_details)
 
@@ -405,72 +337,42 @@ class AddressbookLogAnalyzer(LogAnalyzer):
             self._send_alerts(severity=severity, alert_brief=alert_brief, alert_details=alert_details)
         # else not required: error pattern doesn't match, no alerts to send
 
-    def handle_perf_benchmark_matched_log_message(self, log_prefix: str, log_message: str):
-        pattern = re.compile("_timeit_.*_timeit_")
-        with self.perf_benchmark_queue_lock:
-            if search_obj := re.search(pattern, log_message):
-                found_pattern = search_obj.group()
-                found_pattern = found_pattern[8:-8]  # removing beginning and ending _timeit_
-                found_pattern_list = found_pattern.split("~")  # splitting pattern values
-                if len(found_pattern_list) == 5:
-                    callable_name, date_time, start_time, end_time, delta = found_pattern_list
-                    if callable_name != "underlying_create_raw_performance_data_http":
-                        raw_performance_data_obj = RawPerformanceDataBaseModel()
-                        raw_performance_data_obj.callable_name = callable_name
-                        raw_performance_data_obj.call_date_time = pendulum.parse(date_time)
-                        raw_performance_data_obj.start_time_it_val = parse_to_float(start_time)
-                        raw_performance_data_obj.end_time_it_val = parse_to_float(end_time)
-                        raw_performance_data_obj.delta = parse_to_float(delta)
-
-                        self.raw_performance_data_queue.put(raw_performance_data_obj)
-                        self.raw_performance_data_queue_semaphore.release()
-                        logging.debug(f"Created raw_performance_data in db for callable {callable_name} "
-                                      f"with datetime {date_time}")
-                    # else not required: avoiding callable underlying_create_raw_performance_data to avoid infinite loop
-                else:
-                    err_str_: str = f"Found timeit pattern but internally only contains {found_pattern_list}, " \
-                                    f"ideally must contain callable_name, date_time, start_time, end_time & delta " \
-                                    f"seperated by '~'"
-                    logging.exception(err_str_)
-            # else not required: if no pattern is matched ignoring this log_message
-
 
 if __name__ == '__main__':
     def main():
         from datetime import datetime
-        # read log analyzer run configuration
-        config_dict_path: PurePath = PAIR_STRAT_DATA_DIR / "config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_dict_path))
-        simulation_mode: bool = config_dict.get("simulate_log_analyzer", False)
+        simulation_mode: bool = config_yaml_dict.get("simulate_log_analyzer", False)
         # to suppress new alerts, add regex pattern to the file
         suppress_alert_regex_file: PurePath = PAIR_STRAT_DATA_DIR / "suppress_alert_regex.txt"
         # register new logs directory and log details below
         log_dir: PurePath = PurePath(__file__).parent.parent / "log"
         market_data_log_dir: PurePath = PurePath(__file__).parent.parent.parent / "market_data" / "log"
         datetime_str: str = datetime.now().strftime("%Y%m%d")
-        log_details: List[LogDetail] = [
-            LogDetail(service="market_data_beanie_fastapi",
-                      log_file=str(market_data_log_dir / f"market_data_beanie_logs_{datetime_str}.log"), critical=True),
-            LogDetail(service="addressbook_beanie_fastapi",
-                      log_file=str(log_dir / f"addressbook_beanie_logs_{datetime_str}.log"), critical=True),
-            LogDetail(service="addressbook_cache_fastapi",
-                      log_file=str(log_dir / f"addressbook_cache_logs_{datetime_str}.log"), critical=True),
-            LogDetail(service="strat_executor",
-                      log_file=str(log_dir / f"strat_executor_{datetime_str}.log"), critical=True)
-        ]
+
         configure_logger("debug", str(log_dir), f"addressbook_log_analyzer_{datetime_str}.log")
         pair_strat_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
                                                    r"DEBUG|INFO|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*] : "
-        perf_benchmark_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
-                                                       r"TIMING) : \[[a-zA-Z._]* : \d*] : "
         log_prefix_regex_pattern_to_callable_name_dict = {
-            pair_strat_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message",
-            perf_benchmark_log_prefix_regex_pattern: "handle_perf_benchmark_matched_log_message"
+            pair_strat_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
         }
 
+        log_details: List[LogDetail] = [
+            LogDetail(service="market_data_beanie_fastapi",
+                      log_file_path=str(market_data_log_dir / f"market_data_beanie_logs_{datetime_str}.log"),
+                      critical=True,
+                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict),
+            LogDetail(service="addressbook_beanie_fastapi",
+                      log_file_path=str(log_dir / f"addressbook_beanie_logs_{datetime_str}.log"), critical=True,
+                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict),
+            LogDetail(service="addressbook_cache_fastapi",
+                      log_file_path=str(log_dir / f"addressbook_cache_logs_{datetime_str}.log"), critical=True,
+                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict),
+            LogDetail(service="strat_executor",
+                      log_file_path=str(log_dir / f"strat_executor_{datetime_str}.log"), critical=True,
+                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict)
+        ]
+
         AddressbookLogAnalyzer(regex_file=str(suppress_alert_regex_file), log_details=log_details,
-                                   log_prefix_regex_pattern_to_callable_name_dict=
-                                   log_prefix_regex_pattern_to_callable_name_dict,
                                    simulation_mode=simulation_mode)
 
     main()

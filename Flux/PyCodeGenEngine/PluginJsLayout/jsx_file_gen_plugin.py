@@ -142,6 +142,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "import DynamicMenu from '../components/DynamicMenu';\n"
             if layout_type == JsxFileGenPlugin.repeated_root_type:
                 output_str += "import PivotTable from '../components/PivotTable';\n"
+                output_str += "import ChartWidget from '../components/ChartWidget';\n"
             else:
                 output_str += "import TreeWidget from '../components/TreeWidget';\n"
         if layout_type == JsxFileGenPlugin.root_type or \
@@ -176,7 +177,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += '        />\n'
             output_str += '    )\n\n'
             output_str += "    let cleanedRows = [];\n"
-            output_str += "    if (widgetOption.view_layout === Layouts.PIVOT_TABLE) {\n"
+            output_str += "    if ([Layouts.PIVOT_TABLE, Layouts.CHART].includes(widgetOption.view_layout)) {\n"
             output_str += "        cleanedRows = removeRedundantFieldsFromRows(rows);\n"
             output_str += "    }\n"
             output_str += "    const pivotTable = (\n"
@@ -186,10 +187,28 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            menu={menu}\n"
             output_str += "            layout={widgetOption.view_layout}\n"
             output_str += "            onReload={onReload}\n"
-            output_str += "            onChangeLayout={props.onChangeLayout}\n"
-            output_str += "            supportedLayouts={[Layouts.TABLE_LAYOUT, Layouts.PIVOT_TABLE]}>\n"
+            output_str += "            onChangeLayout={onChangeLayout}\n"
+            output_str += "            supportedLayouts={[Layouts.TABLE_LAYOUT, Layouts.PIVOT_TABLE, Layouts.CHART]}>\n"
             output_str += "            {cleanedRows.length > 0 && <PivotTable pivotData={cleanedRows} />}\n"
             output_str += "        </WidgetContainer>\n"
+            output_str += "    )\n\n"
+            output_str += "    const chart = (\n"
+            output_str += "        <ChartWidget\n"
+            output_str += "            name={props.name}\n"
+            output_str += "            title={title}\n"
+            output_str += "            layout={widgetOption.view_layout}\n"
+            output_str += "            onReload={onReload}\n"
+            output_str += "            onChangeLayout={onChangeLayout}\n"
+            output_str += "            supportedLayouts={[Layouts.TABLE_LAYOUT, Layouts.PIVOT_TABLE, Layouts.CHART]}\n"
+            output_str += "            schema={schema}\n"
+            output_str += "            mode={mode}\n"
+            output_str += "            menu={menu}\n"
+            output_str += "            onChangeMode={onChangeMode}\n"
+            output_str += "            rows={cleanedRows}\n"
+            output_str += "            chartData={props.chartData}\n"
+            output_str += "            onChartDataChange={props.onChartDataChange}\n"
+            output_str += "            collections={collections}\n"
+            output_str += "        />\n"
             output_str += "    )\n\n"
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str = "    let menu = (\n"
@@ -229,7 +248,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                        mode: mode,\n"
             output_str += "                        supportedLayouts: [Layouts.TABLE_LAYOUT, Layouts.TREE_LAYOUT],\n"
         else:
-            output_str += "                        supportedLayouts: [Layouts.TABLE_LAYOUT, Layouts.PIVOT_TABLE],\n"
+            output_str += "                        supportedLayouts: [Layouts.TABLE_LAYOUT, Layouts.PIVOT_TABLE, Layouts.CHART],\n"
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.repeated_root_type:
             if layout_type != JsxFileGenPlugin.repeated_root_type:
                 output_str += "                        onChangeMode: onChangeMode,\n"
@@ -286,6 +305,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "            ) : widgetOption.view_layout === Layouts.PIVOT_TABLE ? (\n"
             output_str += "                pivotTable\n"
+            output_str += "            ) : widgetOption.view_layout === Layouts.CHART ? (\n"
+            output_str += "                chart\n"
         else:
             output_str += "            ) : widgetOption.view_layout === Layouts.TREE_LAYOUT ? (\n"
             output_str += "                <TreeWidget\n"
@@ -512,7 +533,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                        onReload: onReload,\n"
         output_str += "                        layout: widgetOption.view_layout,\n"
         output_str += "                        onChangeLayout: onChangeLayout,\n"
-        output_str += "                        supportedLayouts: [Layouts.ABBREVIATED_FILTER_LAYOUT, Layouts.PIVOT_TABLE]\n"
+        output_str += "                        supportedLayouts: [Layouts.ABBREVIATED_FILTER_LAYOUT, Layouts.PIVOT_TABLE, Layouts.CHART]\n"
         output_str += "                    }}\n"
         output_str += "                    name={props.name}\n"
         output_str += "                    mode={mode}\n"
@@ -558,6 +579,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    collectionIndex={" + f"selected{message_name}Id" + "}\n"
         output_str += "                    truncateDateTime={truncateDateTime}\n"
         output_str += "                    onRefreshItems={onRefreshItems}\n"
+        output_str += "                    chartData={props.chartData}\n"
+        output_str += "                    onChartDataChange={props.onChartDataChange}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
@@ -1021,6 +1044,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "    }\n\n"
 
         output_str += "    const onChangeLayout = (layoutType) => {\n"
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "        if ([Layouts.PIVOT_TABLE, Layouts.CHART, Layouts.TABLE].includes(layoutType)) {\n"
+            output_str += "            setMode(Modes.READ_MODE);\n"
+            output_str += "        }\n"
+        elif layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+            output_str += "        if ([Layouts.PIVOT_TABLE, Layouts.CHART].includes(layoutType)) {\n"
+            output_str += "            dispatch(setMode(Modes.READ_MODE));\n"
+            output_str += "        }\n"
         output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
         output_str += "            props.onChangeLayout(props.name, layoutType, "
         if layout_type == JsxFileGenPlugin.repeated_root_type:
@@ -1219,6 +1250,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onCloseFormValidationPopup = () => { }\n\n"
             output_str += "    const onContinueFormEdit = () => { }\n\n"
             output_str += "    const onFormUpdate = () => { }\n\n"
+            output_str += "    const onChangeMode = () => {\n"
+            output_str += "        setMode(Modes.EDIT_MODE);\n"
+            output_str += "    }\n\n"
 
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str += "    const onReload = () => {\n"

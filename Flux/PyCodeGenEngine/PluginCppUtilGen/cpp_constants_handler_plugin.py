@@ -15,7 +15,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlug
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
 
 
-class CppDbHandlerPlugin(BaseProtoPlugin):
+class CppConstantsHandlerPlugin(BaseProtoPlugin):
 
     """
     Plugin to generate DB Handler
@@ -57,6 +57,28 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
             output_content += f'\tconst std::string {field_name}_fld_name = "{field_name}";\n'
         return output_content
 
+    @staticmethod
+    def generate_client_url(message_name_snake_cased: str, class_name_snake_cased: str):
+        output_content: str = ""
+        output_content += f'\tconst std::string get_all_{message_name_snake_cased}_client_url = ' \
+                          f'"/{class_name_snake_cased}/get-all-{message_name_snake_cased}";\n'
+        output_content += f'\tconst std::string create_{message_name_snake_cased}_client_url = ' \
+                          f'"/{class_name_snake_cased}/create-{message_name_snake_cased}";\n'
+        output_content += f'\tconst std::string create_all_{message_name_snake_cased}_client_url = ' \
+                          f'"/{class_name_snake_cased}/create_all-{message_name_snake_cased}";\n'
+        output_content += f'\tconst std::string get_{message_name_snake_cased}_client_url = ' \
+                          f'"/{class_name_snake_cased}/get-{message_name_snake_cased}";\n'
+        output_content += f'\tconst std::string get_{message_name_snake_cased}_max_id_client_url = ' \
+                          f'"/{class_name_snake_cased}/query-get_{message_name_snake_cased}_max_id";\n'
+        output_content += f'\tconst std::string put_{message_name_snake_cased}_client_url = ' \
+                          f'"/{class_name_snake_cased}/put-{message_name_snake_cased}";\n'
+        output_content += f'\tconst std::string patch_{message_name_snake_cased}_client_url = ' \
+                          f'"/{class_name_snake_cased}/patch-{message_name_snake_cased}";\n'
+        output_content += f'\tconst std::string delete_{message_name_snake_cased}_client_url = ' \
+                          f'"/{class_name_snake_cased}/delete-{message_name_snake_cased}";\n\n'
+
+        return output_content
+
     def output_file_generate_handler(self, file: protogen.File):
         # pre-requisite calls
         self.get_all_root_message(file.messages)
@@ -85,6 +107,14 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
         output_content += self.const_string_generate_handler(file)
 
+        for message in self.root_message_list:
+            message_name = message.proto.name
+            message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+            if CppConstantsHandlerPlugin.is_option_enabled(message, CppConstantsHandlerPlugin.flux_msg_json_root):
+                output_content += self.generate_client_url(message_name_snake_cased, class_name_snake_cased)
+
+        output_content += '\tconst std::string max_id_val_key = "max_id_val";\n'
+
         output_content += "\n}"
 
         output_file_name = f"{class_name_snake_cased}_constants.h"
@@ -92,4 +122,4 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
 
 if __name__ == "__main__":
-    main(CppDbHandlerPlugin)
+    main(CppConstantsHandlerPlugin)

@@ -18,6 +18,7 @@ import Cell from './Cell';
 import PivotTable from './PivotTable';
 import classes from './AbbreviatedFilterWidget.module.css';
 import { utils, writeFileXLSX } from 'xlsx';
+import ChartWidget from './ChartWidget';
 
 
 function AbbreviatedFilterWidget(props) {
@@ -242,19 +243,23 @@ function AbbreviatedFilterWidget(props) {
 
     const filteredHeadCells = headCells.filter(cell => commonKeys.filter(c => c.key === cell.key && c.tableTitle === cell.tableTitle).length === 0);
 
+    const dynamicMenu = (
+        <DynamicMenu
+            collections={props.itemCollections}
+            currentSchema={props.itemSchema}
+            data={props.itemsMetadata}
+            filter={filter}
+            onFilterChange={setFilter}
+        />
+    )
+
     let menu = (
         <>
-            <DynamicMenu
-                collections={props.itemCollections}
-                currentSchema={props.itemSchema}
-                data={props.itemsMetadata}
-                filter={filter}
-                onFilterChange={setFilter}
-            />
+            {dynamicMenu}
             <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
             <Icon className={classes.icon} name="Export" title="Export" onClick={exportToExcel}><FileDownload fontSize='small' /></Icon>
             <Select
-                style={{display: showSettings ? 'inherit' : 'none'}}
+                style={{ display: showSettings ? 'inherit' : 'none' }}
                 className={classes.dropdown}
                 open={showSettings}
                 onOpen={onSettingsOpen}
@@ -301,176 +306,209 @@ function AbbreviatedFilterWidget(props) {
     )
 
     return (
-        <WidgetContainer
-            name={props.headerProps.name}
-            title={props.headerProps.title}
-            mode={props.headerProps.mode}
-            menu={menu}
-            onChangeMode={props.headerProps.onChangeMode}
-            onSave={props.headerProps.onSave}
-            onReload={props.headerProps.onReload}
-            commonkeys={commonKeys}
-            layout={props.headerProps.layout}
-            supportedLayouts={props.headerProps.supportedLayouts}
-            onChangeLayout={props.headerProps.onChangeLayout}>
+        <>
             {props.headerProps.layout === Layouts.ABBREVIATED_FILTER_LAYOUT ? (
-                <Fragment>
-                    {!bufferCollection.hide && (
-                        <Box className={classes.dropdown_container}>
-                            <Autocomplete
-                                className={classes.autocomplete_dropdown}
-                                disableClearable
-                                getOptionLabel={(option) => option}
-                                options={props.options}
-                                size='small'
-                                variant='outlined'
-                                value={props.searchValue ? props.searchValue : null}
-                                onChange={props.onChange}
-                                renderInput={(params) => <TextField {...params} label={props.bufferedLabel} />}
-                            />
-                            <Button
-                                className={classes.button}
-                                disabled={props.searchValue ? false : true}
-                                disableElevation
-                                variant='contained'
-                                onClick={props.onLoad}>
-                                <Download fontSize='small' />
-                            </Button>
-                        </Box>
-                    )}
-                    <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
-                    {rows && rows.length > 0 && (
-                        <>
-                            <TableContainer className={classes.container}>
-                                <Table
-                                    className={classes.table}
-                                    size='medium'>
-                                    <TableHead
-                                        prefixCells={1}
-                                        suffixCells={bufferCollection.hide ? 0 : 1}
-                                        headCells={filteredHeadCells}
-                                        mode={Modes.READ_MODE}
-                                        order={order}
-                                        orderBy={orderBy}
-                                        onRequestSort={handleRequestSort}
-                                    />
-                                    <TableBody>
-                                        {
-                                            activeRows.map((row, index) => {
-                                                let selected = row["data-id"] === props.selected;
-                                                let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
-                                                let alertBubbleCount = 0;
-                                                let alertBubbleColor = ColorTypes.INFO;
-                                                if (props.alertBubbleSource) {
-                                                    let alertBubbleData = metadata;
-                                                    if (props.linkedItemsMetadata) {
-                                                        alertBubbleData = props.linkedItemsMetadata.filter(o => _.get(o, DB_ID) === row["data-id"])[0];
-                                                    }
-                                                    alertBubbleCount = getAlertBubbleCount(alertBubbleData, props.alertBubbleSource);
-                                                    if (props.alertBubbleColorSource) {
-                                                        alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
-                                                    }
-                                                }
-                                                let disabled = false;
-                                                const buttonDisable = props.selected !== row["data-id"];
-
-                                                return (
-                                                    <Fragment key={index}>
-                                                        <TableRow
-                                                            selected={selected}
-                                                            onClick={() => onRowSelect(row["data-id"])}>
-                                                            <TableCell className={classes.cell} sx={{ width: 10 }}>
-                                                                {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
-                                                            </TableCell>
-                                                            {filteredHeadCells.map((cell, i) => {
-
-                                                                if (cell.hide) return;
-                                                                let mode = Modes.READ_MODE;
-                                                                let rowindex = row["data-id"];
-                                                                let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
-                                                                if (collection.type === "progressBar") {
-                                                                    collection = _.cloneDeep(collection);
-                                                                    let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
-                                                                    if (typeof (collection.min) === DataTypes.STRING) {
-                                                                        let min = collection.min;
-                                                                        collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
-                                                                    }
-                                                                    if (typeof (collection.max) === DataTypes.STRING) {
-                                                                        let max = collection.max;
-                                                                        collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
-                                                                        collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1))
-                                                                    }
-
-                                                                }
-                                                                let xpath = collection.xpath;
-                                                                let value = row[collection.xpath];
-
-                                                                return (
-                                                                    <Cell
-                                                                        key={i}
-                                                                        mode={mode}
-                                                                        rowindex={rowindex}
-                                                                        name={cell.key}
-                                                                        elaborateTitle={cell.tableTitle}
-                                                                        currentValue={value}
-                                                                        previousValue={value}
-                                                                        collection={collection}
-                                                                        xpath={xpath}
-                                                                        dataxpath={xpath}
-                                                                        dataAdd={false}
-                                                                        dataRemove={false}
-                                                                        disabled={disabled}
-                                                                        buttonDisable={buttonDisable}
-                                                                        ignoreDisable={true}
-                                                                        onUpdate={() => { }}
-                                                                        onDoubleClick={() => { }}
-                                                                        onButtonClick={onButtonClick}
-                                                                        onCheckboxChange={() => { }}
-                                                                        onTextChange={() => { }}
-                                                                        onSelectItemChange={() => { }}
-                                                                        onAutocompleteOptionChange={() => { }}
-                                                                        onDateTimeChange={() => { }}
-                                                                        forceUpdate={collection.type === DataTypes.STRING ? new Boolean(true) : false}
-                                                                        truncateDateTime={props.truncateDateTime}
-                                                                    />
-                                                                )
-                                                            })}
-                                                            {!bufferCollection.hide && (
-                                                                <TableCell className={classes.cell} sx={{ width: 10 }}>
-                                                                    <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
-                                                                        <Delete fontSize='small' />
-                                                                    </Icon>
-                                                                </TableCell>
-                                                            )}
-                                                        </TableRow>
-                                                    </Fragment>
-                                                )
-                                            })
-                                        }
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                            {rows.length > 6 &&
-                                <TablePagination
-                                    rowsPerPageOptions={[25, 50]}
-                                    component="div"
-                                    count={rows.length}
-                                    rowsPerPage={rowsPerPage}
-                                    page={page}
-                                    onPageChange={handleChangePage}
-                                    onRowsPerPageChange={handleChangeRowsPerPage}
+                <WidgetContainer
+                    name={props.headerProps.name}
+                    title={props.headerProps.title}
+                    mode={props.headerProps.mode}
+                    menu={menu}
+                    onChangeMode={props.headerProps.onChangeMode}
+                    onSave={props.headerProps.onSave}
+                    onReload={props.headerProps.onReload}
+                    commonkeys={commonKeys}
+                    layout={props.headerProps.layout}
+                    supportedLayouts={props.headerProps.supportedLayouts}
+                    onChangeLayout={props.headerProps.onChangeLayout}>
+                    <Fragment>
+                        {!bufferCollection.hide && (
+                            <Box className={classes.dropdown_container}>
+                                <Autocomplete
+                                    className={classes.autocomplete_dropdown}
+                                    disableClearable
+                                    getOptionLabel={(option) => option}
+                                    options={props.options}
+                                    size='small'
+                                    variant='outlined'
+                                    value={props.searchValue ? props.searchValue : null}
+                                    onChange={props.onChange}
+                                    renderInput={(params) => <TextField {...params} label={props.bufferedLabel} />}
                                 />
-                            }
-                        </>
-                    )}
-                    {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
-                </Fragment>
+                                <Button
+                                    className={classes.button}
+                                    disabled={props.searchValue ? false : true}
+                                    disableElevation
+                                    variant='contained'
+                                    onClick={props.onLoad}>
+                                    <Download fontSize='small' />
+                                </Button>
+                            </Box>
+                        )}
+                        <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
+                        {rows && rows.length > 0 && (
+                            <>
+                                <TableContainer className={classes.container}>
+                                    <Table
+                                        className={classes.table}
+                                        size='medium'>
+                                        <TableHead
+                                            prefixCells={1}
+                                            suffixCells={bufferCollection.hide ? 0 : 1}
+                                            headCells={filteredHeadCells}
+                                            mode={Modes.READ_MODE}
+                                            order={order}
+                                            orderBy={orderBy}
+                                            onRequestSort={handleRequestSort}
+                                        />
+                                        <TableBody>
+                                            {
+                                                activeRows.map((row, index) => {
+                                                    let selected = row["data-id"] === props.selected;
+                                                    let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
+                                                    let alertBubbleCount = 0;
+                                                    let alertBubbleColor = ColorTypes.INFO;
+                                                    if (props.alertBubbleSource) {
+                                                        let alertBubbleData = metadata;
+                                                        if (props.linkedItemsMetadata) {
+                                                            alertBubbleData = props.linkedItemsMetadata.filter(o => _.get(o, DB_ID) === row["data-id"])[0];
+                                                        }
+                                                        alertBubbleCount = getAlertBubbleCount(alertBubbleData, props.alertBubbleSource);
+                                                        if (props.alertBubbleColorSource) {
+                                                            alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                                                        }
+                                                    }
+                                                    let disabled = false;
+                                                    const buttonDisable = props.selected !== row["data-id"];
+
+                                                    return (
+                                                        <Fragment key={index}>
+                                                            <TableRow
+                                                                selected={selected}
+                                                                onClick={() => onRowSelect(row["data-id"])}>
+                                                                <TableCell className={classes.cell} sx={{ width: 10 }}>
+                                                                    {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
+                                                                </TableCell>
+                                                                {filteredHeadCells.map((cell, i) => {
+
+                                                                    if (cell.hide) return;
+                                                                    let mode = Modes.READ_MODE;
+                                                                    let rowindex = row["data-id"];
+                                                                    let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
+                                                                    if (collection.type === "progressBar") {
+                                                                        collection = _.cloneDeep(collection);
+                                                                        let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
+                                                                        if (typeof (collection.min) === DataTypes.STRING) {
+                                                                            let min = collection.min;
+                                                                            collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
+                                                                        }
+                                                                        if (typeof (collection.max) === DataTypes.STRING) {
+                                                                            let max = collection.max;
+                                                                            collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
+                                                                            collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1))
+                                                                        }
+
+                                                                    }
+                                                                    let xpath = collection.xpath;
+                                                                    let value = row[collection.xpath];
+
+                                                                    return (
+                                                                        <Cell
+                                                                            key={i}
+                                                                            mode={mode}
+                                                                            rowindex={rowindex}
+                                                                            name={cell.key}
+                                                                            elaborateTitle={cell.tableTitle}
+                                                                            currentValue={value}
+                                                                            previousValue={value}
+                                                                            collection={collection}
+                                                                            xpath={xpath}
+                                                                            dataxpath={xpath}
+                                                                            dataAdd={false}
+                                                                            dataRemove={false}
+                                                                            disabled={disabled}
+                                                                            buttonDisable={buttonDisable}
+                                                                            ignoreDisable={true}
+                                                                            onUpdate={() => { }}
+                                                                            onDoubleClick={() => { }}
+                                                                            onButtonClick={onButtonClick}
+                                                                            onCheckboxChange={() => { }}
+                                                                            onTextChange={() => { }}
+                                                                            onSelectItemChange={() => { }}
+                                                                            onAutocompleteOptionChange={() => { }}
+                                                                            onDateTimeChange={() => { }}
+                                                                            forceUpdate={collection.type === DataTypes.STRING ? new Boolean(true) : false}
+                                                                            truncateDateTime={props.truncateDateTime}
+                                                                        />
+                                                                    )
+                                                                })}
+                                                                {!bufferCollection.hide && (
+                                                                    <TableCell className={classes.cell} sx={{ width: 10 }}>
+                                                                        <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
+                                                                            <Delete fontSize='small' />
+                                                                        </Icon>
+                                                                    </TableCell>
+                                                                )}
+                                                            </TableRow>
+                                                        </Fragment>
+                                                    )
+                                                })
+                                            }
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                                {rows.length > 6 &&
+                                    <TablePagination
+                                        rowsPerPageOptions={[25, 50]}
+                                        component="div"
+                                        count={rows.length}
+                                        rowsPerPage={rowsPerPage}
+                                        page={page}
+                                        onPageChange={handleChangePage}
+                                        onRowsPerPageChange={handleChangeRowsPerPage}
+                                    />
+                                }
+                            </>
+                        )}
+                        {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
+                    </Fragment>
+                </WidgetContainer>
             ) : props.headerProps.layout === Layouts.PIVOT_TABLE ? (
-                <Fragment>
+                <WidgetContainer
+                    name={props.headerProps.name}
+                    title={props.headerProps.title}
+                    onReload={props.headerProps.onReload}
+                    layout={props.headerProps.layout}
+                    supportedLayouts={props.headerProps.supportedLayouts}
+                    onChangeLayout={props.headerProps.onChangeLayout}>
                     {rows.length > 0 && <PivotTable pivotData={rows} />}
-                </Fragment>
-            ) : <h1>Unsupported Layout</h1>}
-        </WidgetContainer>
+                </WidgetContainer>
+            ) : props.headerProps.layout === Layouts.CHART ? (
+                <>
+                    {rows.length > 0 &&
+                        <ChartWidget
+                            name={props.headerProps.name}
+                            title={props.headerProps.title}
+                            onReload={props.headerProps.onReload}
+                            layout={props.headerProps.layout}
+                            supportedLayouts={props.headerProps.supportedLayouts}
+                            onChangeLayout={props.headerProps.onChangeLayout}
+                            schema={props.schema}
+                            mode={props.mode}
+                            menu={dynamicMenu}
+                            onChangeMode={props.headerProps.onChangeMode}
+                            rows={rows}
+                            chartData={props.chartData}
+                            onChartDataChange={props.onChartDataChange}
+                            collections={collections}
+                        />
+                    }
+                </>
+            ) : (
+                <WidgetContainer>
+                    <h1>Unsupported Layout</h1>
+                </WidgetContainer>
+            )}
+        </>
     )
 }
 

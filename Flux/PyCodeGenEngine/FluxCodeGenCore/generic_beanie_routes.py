@@ -133,7 +133,8 @@ async def publish_ws_all(pydantic_class_type: Type[DocType], updated_obj_data_li
                 json_str = json.dumps(json_data)
                 await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast(json_str, updated_obj_id,
                                                                                                tasks_list)
-    await execute_tasks_list_with_all_completed(tasks_list, pydantic_class_type)
+    if tasks_list:
+        await execute_tasks_list_with_all_completed(tasks_list, pydantic_class_type)
 
 
 async def execute_update_agg_pipeline(pydantic_class_type: Type[DocType],

@@ -7,16 +7,22 @@ import time
 from abc import abstractmethod
 from pathlib import PurePath
 from enum import auto
-from fastapi_utils.enums import StrEnum
-# project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
+# 3rd party imports
+import protogen
+from fastapi_utils.enums import StrEnum
+
+# project imports
+from FluxPythonUtils.scripts.utility_functions import parse_to_int, YAMLConfigurationManager
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
-import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
+
+
+flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
 
 
 class IdType(StrEnum):
@@ -105,7 +111,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
             # else not required: avoiding other kinds than message or enum
 
-    def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
+    def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message],
+                                                 avoid_non_roots: bool | None = None):
         for message in message_list:
             if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root):
                 json_root_msg_option_val_dict = \
@@ -123,9 +130,10 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     self.root_message_list.append(message)
                 # else not required: avoiding repetition
             else:
-                if message not in self.non_root_message_list:
-                    self.non_root_message_list.append(message)
-                # else not required: avoiding repetition
+                if not avoid_non_roots:
+                    if message not in self.non_root_message_list:
+                        self.non_root_message_list.append(message)
+                    # else not required: avoiding repetition
 
             if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_query):
                 if message not in self.query_message_list:
@@ -135,7 +143,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             self.load_dependency_messages_and_enums_in_dicts(message)
 
     def sort_message_order(self):
-        combined_message_list = self.root_message_list + self.non_root_message_list
+        combined_message_list = list(set(self.root_message_list + self.non_root_message_list + self.query_message_list))
 
         # First adding simple field type messages
         for message in combined_message_list:
@@ -443,6 +451,16 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def output_file_generate_handler(self, file: protogen.File):
         self.assign_required_data_members(file)
         self.load_root_and_non_root_messages_in_dicts(file.messages)
+
+        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        if core_or_util_files is not None:
+            for dependency_file in file.dependencies:
+                if dependency_file.proto.name in core_or_util_files:
+                    self.load_root_and_non_root_messages_in_dicts(dependency_file.messages, avoid_non_roots=True)
+                # else not required: if dependency file name not in core_or_util_files
+                # config list, avoid messages from it
+        # else not required: core_or_util_files key is not in yaml dict config
+
         self.sort_message_order()
 
         output_dict = {

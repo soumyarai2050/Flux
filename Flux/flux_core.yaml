@@ -1,0 +1,8 @@
+# flux proto configs
+options_files:
+  - "flux_options.proto"
+  - "ui_option_utils.proto"
+core_or_util_files:
+  - "ui_core.proto"
+  - "trade_core.proto"
+  - "flux_utils.proto"

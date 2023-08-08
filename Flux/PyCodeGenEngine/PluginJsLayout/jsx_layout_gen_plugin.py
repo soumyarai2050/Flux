@@ -121,6 +121,8 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += f'        <{message.proto.name}\n'
             output_str += f'            name="{message_name_case_styled}"\n'
             output_str += "            options={"+f"layoutsById.{message_name_case_styled}.widget_ui_data"+"}\n"
+            output_str += "            chartData={"+ f"layoutsById.{message_name_case_styled}.chart_data"+"}\n"
+            output_str += "            onChartDataChange={onChartDataChange}\n"
             output_str += "            onChangeLayout={onLayoutTypeChange}\n"
             output_str += '            onOverrideChange={onOverrideChange}\n'
             output_str += f'        />\n'

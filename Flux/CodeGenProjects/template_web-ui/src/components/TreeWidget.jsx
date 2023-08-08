@@ -20,6 +20,8 @@ const TreeWidget = (props) => {
     const [showDataType, setShowDataType] = useState(false);
     const [openShowDropdown, setOpenShowDropdown] = useState(false);
 
+    const topLevel = props.hasOwnProperty('topLevel') ? props.topLevel : true;
+
     useEffect(() => {
         setTreeStructure(generateTreeStructure(cloneDeep(props.schema), props.name, {
             'data': props.data,
@@ -39,7 +41,7 @@ const TreeWidget = (props) => {
             'onFormUpdate': props.onFormUpdate,
             'index': props.index,
             'forceUpdate': props.forceUpdate
-        }))
+        }, topLevel))
         setIsOpen();
     }, [props.schema, props.data, props.mode, props.subtree, props.xpath, isOpen, hide, showDataType])
 

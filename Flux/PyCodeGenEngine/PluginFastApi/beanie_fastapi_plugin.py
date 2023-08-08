@@ -21,6 +21,11 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_routes_file_handler import Fasta
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_launcher_file_handler import FastapiLauncherFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_client_file_handler import FastapiClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+
+
+flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
 
 
 class BeanieFastApiPlugin(FastapiCallbackFileHandler,
@@ -38,8 +43,10 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         self.app_is_router: bool = True
         self.custom_id_primary_key_messages: List[protogen.Message] = []
 
-    def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
+    def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message],
+                                                 avoid_non_roots: bool | None = None):
         for message in message_list:
+            # Adding Json-Root messages
             if self.is_option_enabled(message, BeanieFastApiPlugin.flux_msg_json_root):
                 json_root_msg_option_val_dict = \
                     self.get_complex_option_set_values(message, BeanieFastApiPlugin.flux_msg_json_root)
@@ -60,10 +67,12 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                 if BeanieFastApiPlugin.default_id_field_name in [field.proto.name for field in message.fields]:
                     self.custom_id_primary_key_messages.append(message)
             else:
-                if message not in self.non_root_message_list:
-                    self.non_root_message_list.append(message)
-                # else not required: avoiding repetition
+                if not avoid_non_roots:
+                    if message not in self.non_root_message_list:
+                        self.non_root_message_list.append(message)
+                    # else not required: avoiding repetition
 
+            # Adding query messages
             if self.is_option_enabled(message, BeanieFastApiPlugin.flux_msg_json_query):
                 if message not in self.message_to_query_option_list_dict:
                     self.message_to_query_option_list_dict[message] = self.get_query_option_message_values(message)
@@ -173,6 +182,19 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def output_file_generate_handler(self, file: protogen.File):
         # Pre-code generation initializations
         self.load_root_and_non_root_messages_in_dicts(file.messages)
+        # Adding messages from core proto files having json_root option
+
+        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        if core_or_util_files is not None:
+            for dependency_file in file.dependencies:
+                if dependency_file.proto.name in core_or_util_files:
+                    self.load_root_and_non_root_messages_in_dicts(dependency_file.messages, avoid_non_roots=True)
+                # else not required: if dependency file name not in core_or_util_files
+                # config list, avoid messages from it
+        # else not required: core_or_util_files key is not in yaml dict config
+
+        self.load_root_and_non_root_messages_in_dicts(file.messages)
+
         self.set_req_data_members(file)
 
         output_dict: Dict[str, str] = {

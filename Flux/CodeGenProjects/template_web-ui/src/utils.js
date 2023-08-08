@@ -653,12 +653,17 @@ function sortSchemaProperties(properties) {
     }, {})
 }
 
-export function generateTreeStructure(schema, currentSchemaName, callerProps) {
+export function generateTreeStructure(schema, currentSchemaName, callerProps, topLevel = true) {
     // return if full schema is not present
     let tree = [];
     if (schema === undefined || schema === null || Object.keys(schema).length === 0) return tree;
 
-    let currentSchema = _.get(schema, currentSchemaName);
+    let currentSchema;
+    if (topLevel) {
+        currentSchema = _.get(schema, currentSchemaName);
+    } else {
+        currentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, currentSchemaName]);
+    }
     let childNode;
     if (currentSchema.widget_ui_data_element && currentSchema.widget_ui_data_element.is_repeated) {
         childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.ARRAY, callerProps, currentSchemaName, currentSchemaName);
@@ -2238,3 +2243,123 @@ export function hasOwnProperty(obj, property) {
     }
     return false;
 }
+
+export function getChartOption(chartDataObj) {
+    chartDataObj = cloneDeep(chartDataObj);
+    const xAxis = [];
+    const yAxis = [];
+    const series = [];
+    if (chartDataObj.chart_options && chartDataObj.chart_options.length > 0) {
+        chartDataObj.chart_options.forEach((chartOption, index) => {
+            xAxis.push(chartOption.xAxis);
+            yAxis.push(chartOption.yAxis);
+            chartOption.series.forEach(series => {
+                delete series[DB_ID];
+            })
+            series.push(...chartOption.series);
+        })
+    }
+    return { xAxis, yAxis, series };
+}
+
+const ChartAxisType = {
+    CHART_AXIS_TYPE_UNSPECIFIED: 'CHART_AXIS_TYPE_UNSPECIFIED',
+    CATEGORY: 'category',
+    TIME: 'time',
+    VALUE: 'value'
+}
+
+function getChartAxisTypeAndName(encode, collections) {
+    const collection = collections.find(collection => collection.tableTitle === encode);
+    let name = null;
+    if (collection) {
+        name = collection.title;
+        if (collection.type === DataTypes.STRING) {
+            return [ChartAxisType.CATEGORY, name];
+        } else if (collection.type === DataTypes.NUMBER) {
+            return [ChartAxisType.VALUE, name];
+        } else if (collection.type === DataTypes.DATE_TIME) {
+            return [ChartAxisType.TIME, name];
+        }
+    }
+    return [ChartAxisType.VALUE, name];
+}
+
+export function updateChartDataObj(chartDataObj, collections) {
+    chartDataObj = cloneDeep(chartDataObj);
+
+    chartDataObj.chart_options.forEach((chartOption, index) => {
+        const chartSeries = chartOption.series[0];
+        const xEncode = chartSeries.encode.x;
+        const yEncode = chartSeries.encode.y;
+        const [xAxisType, xAxisName] = getChartAxisTypeAndName(xEncode, collections);
+        const [yAxisType, yAxisName] = getChartAxisTypeAndName(yEncode, collections);
+        // update the series axis grid index
+        chartOption.series.forEach(series => {
+            series.xAxisGridIndex = index;
+            series.yAxisGridIndex = index;
+        })
+
+        if (chartOption.xAxis) {
+            chartOption.xAxis.type = xAxisType;
+            if (!chartOption.xAxis.name) {
+                chartOption.xAxis.name = xAxisName;
+            }
+            chartOption.xAxis.gridIndex = index;
+        } else {
+            chartOption.xAxis = {
+                type: xAxisType,
+                name: xAxisName,
+                gridIndex: index
+            }
+        }
+
+        if (chartOption.yAxis) {
+            chartOption.yAxis.type = yAxisType;
+            if (!chartOption.yAxis.name) {
+                chartOption.yAxis.name = yAxisName;
+            }
+            chartOption.yAxis.gridIndex = index;
+        } else {
+            chartOption.yAxis = {
+                type: yAxisType,
+                name: yAxisName,
+                gridIndex: index
+            }
+        }
+    })
+    return chartDataObj;
+}
+
+function updateChartAttributesInSchema(schema, currentSchema) {
+    if (currentSchema.hasOwnProperty('properties')) {
+        for (const key in currentSchema.properties) {
+            const attributes = currentSchema.properties[key];
+            if (primitiveDataTypes.includes(attributes.type)) {
+                if (key === DB_ID) {
+                    attributes.server_populate = true;
+                } else if (['gridIndex', 'xAxisGridIndex', 'yAxisGridIndex'].includes(key)) {
+                    attributes.hide = true;
+                } else if (key === 'chart_name') {
+                    attributes.orm_no_update = true;
+                }
+            } else if ([DataTypes.OBJECT, DataTypes.ARRAY].includes(attributes.type)) {
+                const ref = attributes.items.$ref.split('/')
+                const nestedSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
+                updateChartAttributesInSchema(schema, nestedSchema);
+            }
+        }
+    }
+}
+
+export function updateChartSchema(schema, collections) {
+    schema = cloneDeep(schema);
+    const chartDataSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
+    updateChartAttributesInSchema(schema, chartDataSchema);
+    const chartEncodeSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_encode']);
+    chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
+    const fldList = collections.map(collection => collection.tableTitle);
+    schema.autocomplete['FldList'] = fldList;
+    return schema;
+}
+

@@ -137,8 +137,7 @@ class ExecutorNLogAnalyzerManager:
         pair_strat_log_analyzer_thread = threading.Thread(target=run_pair_strat_log_analyzer, args=(self,))
         executor_thread.start()
         pair_strat_log_analyzer_thread.start()
-
-        # delay for log_analyzer and executor to get started
+        # delay for executor and log_analyzer to get started and ready
         time.sleep(20)
         return self
 

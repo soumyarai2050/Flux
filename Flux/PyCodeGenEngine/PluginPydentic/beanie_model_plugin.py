@@ -143,6 +143,17 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         #                    PydanticObjectId id implementation
         # auto_gen_id=NO_ID: If id field doesn't exist and msg is non-root type then avoiding any id handling
         auto_gen_id_type: IdType = self._check_id_int_field(message)
+
+        # raising exception if there is some model that is not db root but has int id since int id is
+        # only available for db root models
+        if (auto_gen_id_type == IdType.INT_ID and
+                not BeanieModelPlugin.is_option_enabled(message, BeanieModelPlugin.flux_msg_json_root)):
+            err_str = (f"Non-Db-Root models can't have int type ID field, found in model {message.proto.name}, "
+                       f"use string type id instead")
+            logging.exception(err_str)
+            raise Exception(err_str)
+        # else not required: if msg is not root or msg is root and id not int then proceeding further
+
         if message in self.root_message_list:
             is_msg_root = True
         else:

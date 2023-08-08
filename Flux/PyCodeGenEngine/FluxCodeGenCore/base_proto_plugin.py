@@ -122,6 +122,7 @@ class BaseProtoPlugin(ABC):
     executor_option_executor_key_count_field: str = "ExecutorKeyCounts"
     executor_option_executor_key_sequence_field: str = "ExecutorKeySequence"
     executor_option_log_key_sequence_field: str = "LogKeySequence"
+    flux_fld_PK: str = "FluxFldPk"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: str = "ProtoPackageName"  # to be used in models as proto_package_name variable name
