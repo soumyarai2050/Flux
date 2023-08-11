@@ -322,7 +322,7 @@ message FillsJournal{
   optional float fill_px = 3;
   optional int64 fill_qty = 4;
   optional float fill_notional = 5 [(FluxFldDisplayType) = "int"];
-  optional string fill_symbol = 6 [(FluxFldIndex) = true];
+  optional string fill_symbol = 6 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional Side fill_side = 7;
   required string underlying_account = 8;
   optional string fill_date_time = 9 [(FluxFldValIsDateTime) = true];

@@ -556,16 +556,6 @@ def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: st
     ]}
 
 
-def get_raw_performance_data_from_callable_name_agg_pipeline(callable_name: str):
-    return {"aggregate": [
-        {
-            "$match": {
-                "callable_name": callable_name
-            }
-        }
-    ]}
-
-
 if __name__ == '__main__':
     # with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
     # print(with_symbol_agg_query)

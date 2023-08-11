@@ -12,15 +12,16 @@ message RawPerformanceData{
     DeleteDesc: AggregateType_UNSPECIFIED,
     ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
-    y: 32,
-    w: 8,
-    h: 8,
-    widget_ui_data: {
-      view_layout: UI_TABLE
-    }
-  };
+//  option (FluxMsgWidgetUIDataElement) = {
+//    x: 0,
+//    y: 32,
+//    w: 8,
+//    h: 8,
+//    is_repeated: true,
+//    widget_ui_data: {
+//      view_layout: UI_TABLE
+//    }
+//  };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string callable_name = 2;
   required string call_date_time = 3 [(FluxFldValIsDateTime) = true];
@@ -39,27 +40,40 @@ message RawPerformanceDataOfCallable{
 }
 
 message ProcessedPerformanceAnalysis{
-  option (FluxMsgJsonQuery) = {
-      QueryName: "get_performance_analysis_of_callable",
-      QueryParams: "callable_name",
-      QueryParamsDataType: "str",
-      QueryParams: "start_datetime",
-      QueryParamsDataType: "DateTime",
-      QueryParams: "last_datetime",
-      QueryParamsDataType: "DateTime"
+  option (FluxMsgJsonRoot) = {
+    CreateDesc: AggregateType_UNSPECIFIED,
+    CreateAllDesc: AggregateType_UNSPECIFIED,
+    ReadDesc: AggregateType_UNSPECIFIED,
+    UpdateDesc: AggregateType_UNSPECIFIED,
+    PatchDesc: AggregateType_UNSPECIFIED,
+    PatchAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    DeleteDesc: AggregateType_UNSPECIFIED,
+    ReadWebSocketDesc: AggregateType_UNSPECIFIED
   };
-  optional float min = 1;
-  optional float max = 2;
-  optional float avg = 3;
-  optional float std_dev = 4;
-  optional float per_10 = 5;
-  optional float per_20 = 6;
-  optional float per_30 = 7;
-  optional float per_40 = 8;
-  optional float per_50 = 9;
-  optional float per_60 = 10;
-  optional float per_70 = 11;
-  optional float per_80 = 12;
-  optional float per_90 = 13;
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 40,
+    w: 8,
+    h: 8,
+    is_repeated: true,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional string callable_name = 2;
+  optional float min = 3;
+  optional float max = 4;
+  optional float avg = 5;
+  optional float std_dev = 6;
+  optional float per_10 = 7;
+  optional float per_20 = 8;
+  optional float per_30 = 9;
+  optional float per_40 = 10;
+  optional float per_50 = 11;
+  optional float per_60 = 12;
+  optional float per_70 = 13;
+  optional float per_80 = 14;
+  optional float per_90 = 15;
 }
 

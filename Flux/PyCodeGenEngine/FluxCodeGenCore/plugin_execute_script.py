@@ -1,7 +1,10 @@
+# standard imports
 import logging
 from typing import List
-from Flux.PyCodeGenEngine.FluxCodeGenCore.execute import Execute
 import os
+
+# project imports
+from Flux.PyCodeGenEngine.FluxCodeGenCore.execute import Execute, ProtoGenOutputTypes
 
 
 class PluginExecuteScript:
@@ -44,8 +47,8 @@ class PluginExecuteScript:
             raise Exception(err_str)
 
     def compile_protoc_models(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str],
-                              out_dir: str):
-        Execute.compile_proto_file(proto_file_path_list, proto_files_dir_paths_list, out_dir)
+                              out_dir: str, output_type: ProtoGenOutputTypes | None = None):
+        Execute.compile_proto_file(proto_file_path_list, proto_files_dir_paths_list, out_dir, output_type)
         logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
 
     def import_pb2_scripts(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str], out_dir: str):

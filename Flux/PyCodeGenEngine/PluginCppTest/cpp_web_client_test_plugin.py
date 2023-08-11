@@ -36,7 +36,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
         output += '#include "gtest/gtest.h"\n\n'
         output += f'#include "{file_name}.pb.h"\n'
         output += f'#include "{class_name}_web_client.h"\n'
-        # output += f'#include "{class_name}_max_id_handler.h"\n'
+        output += f'#include "{class_name}_max_id_handler.h"\n'
         output += f'#include "../../cpp_app/include/RandomDataGen.h"\n'
         output += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output
@@ -120,8 +120,8 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
                             output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
 
-                            # output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_{message_name_snake_cased}"
-                            #                    f"_max_id(market_data_web_client);\n")
+                            output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_"
+                                               f"{message_name_snake_cased}_max_id(market_data_web_client);\n")
                             output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
                                               f'{message_name_snake_cased});\n'
                             output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
@@ -225,8 +225,8 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
                             output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
 
-                            # output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_"
-                            #                    f"{message_name_snake_cased}_max_id({class_name_snake_cased}_web_client);\n")
+                            output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_"
+                                               f"{message_name_snake_cased}_max_id({class_name_snake_cased}_web_client);\n")
                             output_content += (f'\t{package_name}_handler::{class_name}PopulateRandomValues::'
                                                f'{message_name_snake_cased}({message_name_snake_cased});\n')
                             output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'

@@ -3,6 +3,7 @@ beanie_host: 127.0.0.1
 beanie_port: '8020'
 cache_host: 127.0.0.1
 cache_port: '8030'
+db_name: "addressbook"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
@@ -19,6 +20,9 @@ strat_alert_config:
 raw_perf_data_config:
   transaction_counts_per_call: 500
   transaction_timeout_secs: 60  # secs
+
+# to be used in loop wait in script to update performance analysis data
+raw_performance_data_processor_loop_wait: 2  # sec
 
 log_mongo_uri: True
 min_refresh_interval: 20

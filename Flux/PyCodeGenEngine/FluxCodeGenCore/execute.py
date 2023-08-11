@@ -1,7 +1,18 @@
+# standard imports
 import logging
 import os
 from typing import List
 from pathlib import PurePath
+from enum import auto
+
+# 3rd party imports
+from fastapi_utils.enums import StrEnum
+
+
+class ProtoGenOutputTypes(StrEnum):
+    Proto_Gen_Py = auto()
+    Proto_Gen_Cc = auto()
+    Proto_Gen_Both = auto()
 
 
 class Execute:
@@ -11,7 +22,7 @@ class Execute:
 
     @staticmethod
     def compile_proto_file(proto_file_paths_list: List[str], proto_import_path_list: List[str],
-                           out_dir: str = "."):
+                           out_dir: str = ".", output_type: ProtoGenOutputTypes | None = None):
         """
         Args:
             proto_file_paths_list: [List[str]]
@@ -23,10 +34,13 @@ class Execute:
             out_dir: [optional] Output Directory path.
                 Outputs in script's directory as default.
 
+            output_type: [optional] Type of output to be generated, currently supports python and cpp type.
         Returns:
             Bool for success
 
         """
+        if output_type is None:
+            output_type = ProtoGenOutputTypes.Proto_Gen_Both
 
         dir_names = ["ProtoGenPy", "ProtoGenCc"]
         for dir_name in dir_names:
@@ -44,18 +58,21 @@ class Execute:
 
             proto_files_str = " ".join(proto_file_paths_list)
 
-            # executing cmd for python output
-            protoc_cmd = f"protoc {proto_path_str} --python_out={PurePath(out_dir) / dir_names[0]} {proto_files_str}"
-            os.system(protoc_cmd)
+            if output_type == ProtoGenOutputTypes.Proto_Gen_Py or output_type == ProtoGenOutputTypes.Proto_Gen_Both:
+                # executing cmd for python output
+                protoc_cmd = f"protoc {proto_path_str} --python_out={PurePath(out_dir) / dir_names[0]} {proto_files_str}"
+                os.system(protoc_cmd)
 
-            # executing cmd for CPP output
-            protoc_cmd = f"protoc {proto_path_str} --cpp_out={PurePath(out_dir) / dir_names[1]} {proto_files_str}"
-            os.system(protoc_cmd)
+            if output_type == ProtoGenOutputTypes.Proto_Gen_Cc or output_type == ProtoGenOutputTypes.Proto_Gen_Both:
+                # executing cmd for CPP output
+                protoc_cmd = f"protoc {proto_path_str} --cpp_out={PurePath(out_dir) / dir_names[1]} {proto_files_str}"
+                os.system(protoc_cmd)
 
-            # Adding python generated dir in PYTHONPATH
-            python_path_env = python_path if ((python_path := os.getenv("PYTHONPATH")) is not None and
-                                              len(python_path)) else ""
-            os.environ["PYTHONPATH"] = python_path_env + ":" + str(PurePath(out_dir) / dir_names[0])
+            if output_type == ProtoGenOutputTypes.Proto_Gen_Py or output_type == ProtoGenOutputTypes.Proto_Gen_Both:
+                # Adding python generated dir in PYTHONPATH
+                python_path_env = python_path if ((python_path := os.getenv("PYTHONPATH")) is not None and
+                                                  len(python_path)) else ""
+                os.environ["PYTHONPATH"] = python_path_env + ":" + str(PurePath(out_dir) / dir_names[0])
 
         except Exception as e:
             err_str = f"Exception occurred while compiling proto model files in proto classes: exception: {e}"

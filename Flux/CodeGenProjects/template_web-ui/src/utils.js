@@ -398,7 +398,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps)
                 let ref = metadata.items.$ref.split('/');
                 let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
 
-                if (!childSchema.server_populate) {
+                if (!childSchema.server_populate && !metadata.server_populate) {
                     let child = generateObjectFromSchema(schema, childSchema);;
                     object[propname] = [];
                     object[propname].push(child);
@@ -1721,11 +1721,12 @@ export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
     return updatedArr;
 }
 
-export function applyFilter(arr, filter) {
+export function applyFilter(arr, filters = []) {
     if (arr && arr.length > 0) {
         let updatedArr = cloneDeep(arr);
-        Object.keys(filter).forEach(key => {
-            let values = filter[key].split(",").map(val => val.trim()).filter(val => val !== "");
+        const filterDict = getFilterDict(filters);
+        Object.keys(filterDict).forEach(key => {
+            let values = filterDict[key].split(",").map(val => val.trim()).filter(val => val !== "");
             updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
         })
         return updatedArr;
@@ -2246,20 +2247,20 @@ export function hasOwnProperty(obj, property) {
 
 export function getChartOption(chartDataObj) {
     chartDataObj = cloneDeep(chartDataObj);
-    const xAxis = [];
-    const yAxis = [];
-    const series = [];
-    if (chartDataObj.chart_options && chartDataObj.chart_options.length > 0) {
-        chartDataObj.chart_options.forEach((chartOption, index) => {
-            xAxis.push(chartOption.xAxis);
-            yAxis.push(chartOption.yAxis);
-            chartOption.series.forEach(series => {
-                delete series[DB_ID];
-            })
-            series.push(...chartOption.series);
+    if (chartDataObj && Object.keys(chartDataObj).length > 0) {
+        chartDataObj.xAxis.forEach(axis => {
+            delete axis[DB_ID];
         })
+        chartDataObj.yAxis.forEach(axis => {
+            delete axis[DB_ID];
+        })
+        chartDataObj.series.forEach(series => {
+            delete series[DB_ID];
+        })
+        return chartDataObj;
+    } else {
+        return { xAxis: [], yAxis: [], series: [] };
     }
-    return { xAxis, yAxis, series };
 }
 
 const ChartAxisType = {
@@ -2285,49 +2286,90 @@ function getChartAxisTypeAndName(encode, collections) {
     return [ChartAxisType.VALUE, name];
 }
 
-export function updateChartDataObj(chartDataObj, collections) {
-    chartDataObj = cloneDeep(chartDataObj);
-
-    chartDataObj.chart_options.forEach((chartOption, index) => {
-        const chartSeries = chartOption.series[0];
-        const xEncode = chartSeries.encode.x;
-        const yEncode = chartSeries.encode.y;
-        const [xAxisType, xAxisName] = getChartAxisTypeAndName(xEncode, collections);
-        const [yAxisType, yAxisName] = getChartAxisTypeAndName(yEncode, collections);
-        // update the series axis grid index
-        chartOption.series.forEach(series => {
-            series.xAxisGridIndex = index;
-            series.yAxisGridIndex = index;
-        })
-
-        if (chartOption.xAxis) {
-            chartOption.xAxis.type = xAxisType;
-            if (!chartOption.xAxis.name) {
-                chartOption.xAxis.name = xAxisName;
-            }
-            chartOption.xAxis.gridIndex = index;
-        } else {
-            chartOption.xAxis = {
-                type: xAxisType,
-                name: xAxisName,
-                gridIndex: index
-            }
-        }
-
-        if (chartOption.yAxis) {
-            chartOption.yAxis.type = yAxisType;
-            if (!chartOption.yAxis.name) {
-                chartOption.yAxis.name = yAxisName;
-            }
-            chartOption.yAxis.gridIndex = index;
-        } else {
-            chartOption.yAxis = {
-                type: yAxisType,
-                name: yAxisName,
-                gridIndex: index
-            }
+function getAxisMax(rows, field, index) {
+    let max = 0;
+    rows.forEach(row => {
+        const value = _.get(row, field);
+        if (value > max) {
+            max = value;
         }
     })
+    max = Math.ceil(max);
+    const scale = 1.5 - 0.25 * index;
+    return max * scale;
+}
+
+export function updateChartDataObj(chartDataObj, collections, rows, datasets, partitionFld) {
+    chartDataObj = cloneDeep(chartDataObj);
+    const xEndodes = [];
+    const yEncodes = [];
+    const xAxis = [];
+    const yAxis = [];
+    const series = [];
+    let prevYEncode;
+    let prevYEncodeIndex = 0;
+    chartDataObj.series.forEach(chartSeries => {
+        const xEncode = chartSeries.encode.x;
+        const yEncode = chartSeries.encode.y;
+        if (!prevYEncode) {
+            prevYEncode = yEncode;
+        } else if (prevYEncode !== yEncode) {
+            prevYEncodeIndex += 1;
+            chartSeries.yAxisIndex = prevYEncodeIndex;
+        }
+        if (!xEndodes.includes(xEncode)) {
+            xEndodes.push(xEncode);
+        }
+        if (!yEncodes.includes(yEncode)) {
+            yEncodes.push(yEncode);
+        }
+        chartSeries.name = yEncode;
+        if (partitionFld) {
+            datasets.forEach((dataset, index) => {
+                const newSeries = cloneDeep(chartSeries);
+                newSeries.datasetIndex = index;
+                newSeries.name = _.get(dataset.source[0], partitionFld) + ' ' + newSeries.encode.y;
+                if (newSeries.type === 'line') {
+                    newSeries.showSymbol = false;
+                }
+                newSeries.animation = false;
+                series.push(newSeries);
+            })
+        } else {
+            series.push(chartSeries);
+        }
+    })
+    xEndodes.forEach((xEncode) => {
+        const [xAxisType, xAxisName] = getChartAxisTypeAndName(xEncode, collections);
+        // only two x-axis is allowed per chart.
+        // if more than 2 x-axis is present, only considers the first 2 x-axis
+        // this limitation is added to avoid unsupported configurations
+        if (xAxis.length === 0) {
+            xAxis.push({
+                type: xAxisType,
+                name: xAxisName
+            })
+        }
+    })
+    yEncodes.forEach((yEncode, index) => {
+        const [yAxisType, yAxisName] = getChartAxisTypeAndName(yEncode, collections);
+        const max = getAxisMax(rows, yEncode, index);
+        // only two y-axis is allowed per chart.
+        // if more than 2 y-axis is present, only considers the first 2 y-axis
+        // this limitation is added to avoid unsupported configurations
+        if (yAxis.length < 2) {
+            yAxis.push({
+                type: yAxisType,
+                name: yAxisName,
+                splitNumber: 5,
+                max: max,
+                interval: max / 5
+            })
+        }
+    })
+    chartDataObj.xAxis = xAxis;
+    chartDataObj.yAxis = yAxis;
+    chartDataObj.series = series;
     return chartDataObj;
 }
 
@@ -2338,7 +2380,7 @@ function updateChartAttributesInSchema(schema, currentSchema) {
             if (primitiveDataTypes.includes(attributes.type)) {
                 if (key === DB_ID) {
                     attributes.server_populate = true;
-                } else if (['gridIndex', 'xAxisGridIndex', 'yAxisGridIndex'].includes(key)) {
+                } else if (['xAxisIndex', 'yAxisIndex', 'datasetIndex', 'max', 'splitNumber', 'interval'].includes(key)) {
                     attributes.hide = true;
                 } else if (key === 'chart_name') {
                     attributes.orm_no_update = true;
@@ -2363,3 +2405,56 @@ export function updateChartSchema(schema, collections) {
     return schema;
 }
 
+
+export function getFilterDict(filters) {
+    const filterDict = {};
+    if (filters) {
+        filters.forEach(filter => {
+            if (filter.fld_value) {
+                filterDict[filter.fld_name] = filter.fld_value;
+            }
+        })
+    }
+    return filterDict;
+}
+
+export function getFiltersFromDict(filterDict) {
+    const filters = [];
+    Object.keys(filterDict).forEach(key => {
+        filters.push({
+            fld_name: key,
+            fld_value: filterDict[key]
+        })
+    })
+    return filters;
+}
+
+export function getChartDatasets(rows, partitionFld) {
+    if (rows.length === 0) {
+        return [];
+    } else {
+        const datasets = [];
+        const dimensions = Object.keys(rows[0]);
+        let groups;
+        if (partitionFld) {
+            const groupsDict = rows.reduce((acc, cur) => {
+                acc[cur[partitionFld]] = [...acc[cur[partitionFld]] || [], cur];
+                return acc;
+            }, {});
+            groups = [];
+            for (const key in groupsDict) {
+                groups.push(groupsDict[key]);
+            }
+        } else {
+            groups = [rows];
+        }
+        groups.forEach(group => {
+            const dateset = {
+                dimensions: dimensions,
+                source: group
+            }
+            datasets.push(dateset);
+        })
+        return datasets;
+    }
+}

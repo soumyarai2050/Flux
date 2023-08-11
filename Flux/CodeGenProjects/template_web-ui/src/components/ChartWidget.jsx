@@ -1,15 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText, } from '@mui/material';
+import React, { useEffect, useRef, useState } from 'react';
+import { Box, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText, Button, RadioGroup, Radio, FormControlLabel, Popover } from '@mui/material';
 import classes from './ChartWidget.module.css';
 import FullScreenModal from './Modal';
 import TreeWidget from './TreeWidget';
-import { Button } from '@mui/base';
-import { Modes, SCHEMA_DEFINITIONS_XPATH } from '../constants';
-import { addxpath, clearxpath, generateObjectFromSchema, getChartOption, updateChartDataObj, updateChartSchema } from '../utils';
+import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH } from '../constants';
+import { addxpath, clearxpath, generateObjectFromSchema, getChartDatasets, getChartOption, updateChartDataObj, updateChartSchema } from '../utils';
 import _, { cloneDeep } from 'lodash';
 import WidgetContainer from './WidgetContainer';
 import { Icon } from './Icon';
-import { Add } from '@mui/icons-material';
+import { Add, AltRoute } from '@mui/icons-material';
 import EChart from './EChart';
 
 const name = 'chart_data';
@@ -22,8 +21,19 @@ function ChartWidget(props) {
     const [openModalPopup, setOpenModalPopup] = useState(false);
     const [mode, setMode] = useState(Modes.READ_MODE);
     const [data, setData] = useState({});
+    const [openPartition, setOpenPartition] = useState(false);
+    const [anchorEl, setAnchorEl] = useState(null);
+    const [chartObj, setChartObj] = useState({});
 
     const schema = updateChartSchema(props.schema, props.collections);
+    const datasets = getChartDatasets(props.rows, props.partitionFld);
+
+    useEffect(() => {
+        if (Object.keys(storedData).length > 0) {
+            const updatedObj = addxpath(cloneDeep(storedData));
+            setChartObj(updateChartDataObj(updatedObj, props.collections, props.rows, datasets, props.partitionFld));
+        }
+    }, [storedData, props.filters, props.partitionFld])
 
     useEffect(() => {
         if (props.chartData && props.chartData.length > 0) {
@@ -66,10 +76,7 @@ function ChartWidget(props) {
         setMode(Modes.READ_MODE);
         setOpen(false);
         setOpenModalPopup(false);
-        let updatedObj = cloneDeep(data);
-        updatedObj = updateChartDataObj(updatedObj, props.collections);
-        setModifiedData(updatedObj);
-        updatedObj = clearxpath(cloneDeep(updatedObj));
+        const updatedObj = clearxpath(cloneDeep(data));
         props.onChartDataChange(props.name, updatedObj);
     }
 
@@ -95,7 +102,7 @@ function ChartWidget(props) {
     }
 
     const onCreate = () => {
-        let updatedObj = generateObjectFromSchema(schema, _.get(schema, [SCHEMA_DEFINITIONS_XPATH, name]));
+        let updatedObj = generateObjectFromSchema(schema, _.get(schema, [SCHEMA_DEFINITIONS_XPATH, name]), null, ['xAxis', 'yAxis']);
         updatedObj = addxpath(updatedObj);
         setModifiedData(updatedObj);
         setData(updatedObj);
@@ -114,20 +121,82 @@ function ChartWidget(props) {
 
     const onSelect = (index) => {
         setSelectedIndex(index);
-    } 
+    }
+
+    const onPartitionOpen = (e) => {
+        setOpenPartition(true);
+        setAnchorEl(e.currentTarget);
+    }
+
+    const onPartitionClose = () => {
+        setOpenPartition(false);
+        setAnchorEl(null);
+    }
+
+    const onPartitionFldChange = (e, value) => {
+        if (value === '') {
+            value = null;
+        }
+        props.onPartitionFldChange(props.name, value);
+        onPartitionClose();
+    }
 
     let createMenu = '';
     if (mode === Modes.READ_MODE) {
         createMenu = <Icon title='Create' name='Create' onClick={onCreate}><Add fontSize='small' /></Icon>;
     }
+    const partitionMenu = (
+        <>
+            <Icon className={classes.icon} name="Partition" title={"Partition: " + props.partitionFld} onClick={onPartitionOpen}><AltRoute fontSize='small' /></Icon>
+            <Popover
+                id={props.name + '_partitionFld'}
+                open={openPartition}
+                anchorEl={anchorEl}
+                anchorOrigin={{
+                    vertical: "bottom",
+                    horizontal: "center"
+                }}
+                onClose={onPartitionClose}>
+                <RadioGroup
+                    defaultValue=''
+                    name="partition_fld"
+                    value={props.partitionFld ? props.partitionFld : ''}
+                    onChange={onPartitionFldChange}>
+                    <FormControlLabel size='small'
+                        sx={{ paddingLeft: 1 }}
+                        label='None'
+                        value=''
+                        control={
+                            <Radio checked={!props.partitionFld} size='small' />
+                        }
+                    />
+                    {props.collections.map(collection => {
+                        if (collection.type === DataTypes.STRING) {
+                            return (
+                                <FormControlLabel size='small' key={collection.tableTitle}
+                                    sx={{ paddingLeft: 1 }}
+                                    label={collection.elaborateTitle ? collection.tableTitle : collection.key}
+                                    value={collection.tableTitle}
+                                    control={
+                                        <Radio checked={props.partitionFld === collection.tableTitle} size='small' />
+                                    }
+                                />
+                            )
+                        }
+                    })}
+                </RadioGroup>
+            </Popover>
+        </>
+    )
     const menu = (
-        <>  
+        <>
             {createMenu}
+            {partitionMenu}
             {props.menu}
         </>
     )
 
-    const options = getChartOption(storedData);
+    const options = getChartOption(clearxpath(cloneDeep(chartObj)));
 
     return (
         <WidgetContainer
@@ -155,17 +224,14 @@ function ChartWidget(props) {
                 </Box>
                 <Divider orientation="vertical" flexItem />
                 <Box className={classes.chart_container}>
-                    {props.rows.length > 0 && 
+                    {props.rows.length > 0 &&
                         <EChart
                             loading={false}
                             theme='light'
                             option={{
                                 legend: {},
-                                tooltip: {},
-                                dataset: [{
-                                    dimensions: Object.keys(props.rows[0]),
-                                    source: [...props.rows]
-                                }],
+                                tooltip: { trigger: 'axis' },
+                                dataset: datasets,
                                 ...options
                             }}
                         />

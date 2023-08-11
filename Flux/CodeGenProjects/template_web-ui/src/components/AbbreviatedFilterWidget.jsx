@@ -27,7 +27,6 @@ function AbbreviatedFilterWidget(props) {
     const [orderBy, setOrderBy] = useState('');
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const [page, setPage] = useState(0);
-    const [filter, setFilter] = useState({});
     const [rows, setRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
     const [showSettings, setShowSettings] = useState(false);
@@ -40,7 +39,7 @@ function AbbreviatedFilterWidget(props) {
             const itemId = getIdFromAbbreviatedKey(props.abbreviated, item);
             const metadata = props.itemsMetadata.find(metadata => _.get(metadata, DB_ID) === itemId);
             if (metadata) {
-                if (applyFilter([metadata], filter).length > 0) {
+                if (applyFilter([metadata], props.filters).length > 0) {
                     return true;
                 }
             } else {
@@ -48,7 +47,7 @@ function AbbreviatedFilterWidget(props) {
             }
             return false;
         })
-    }, [props.items, props.abbreviated, props.itemsMetadata, getIdFromAbbreviatedKey, applyFilter, filter])
+    }, [props.items, props.abbreviated, props.itemsMetadata, getIdFromAbbreviatedKey, applyFilter, props.filters])
 
     const bufferCollection = useMemo(() => {
         return props.collections.filter(col => col.key === props.bufferedKeyName)[0];
@@ -245,11 +244,12 @@ function AbbreviatedFilterWidget(props) {
 
     const dynamicMenu = (
         <DynamicMenu
+            name={props.headerProps.name}
             collections={props.itemCollections}
             currentSchema={props.itemSchema}
             data={props.itemsMetadata}
-            filter={filter}
-            onFilterChange={setFilter}
+            filters={props.filters}
+            onFiltersChange={props.onFiltersChange}
         />
     )
 
@@ -500,6 +500,7 @@ function AbbreviatedFilterWidget(props) {
                             chartData={props.chartData}
                             onChartDataChange={props.onChartDataChange}
                             collections={collections}
+                            filters={props.filters}
                         />
                     }
                 </>

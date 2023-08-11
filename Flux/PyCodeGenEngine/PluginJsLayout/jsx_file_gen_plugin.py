@@ -166,13 +166,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str = '    let menu = (\n'
             output_str += '        <DynamicMenu\n'
+            output_str += '            name={props.name}\n'
             output_str += '            collections={collections}\n'
             output_str += '            currentSchema={currentSchema}\n'
             output_str += '            commonKeyCollections={commonKeyCollections}\n'
             output_str += '            data={modifiedData}\n'
             output_str += '            disabled={mode !== Modes.EDIT_MODE}\n'
-            output_str += '            filter={filter}\n'
-            output_str += '            onFilterChange={setFilter}\n'
+            output_str += '            filters={props.filters}\n'
+            output_str += '            onFiltersChange={props.onFiltersChange}\n'
             output_str += '            onButtonToggle={onButtonToggle}\n'
             output_str += '        />\n'
             output_str += '    )\n\n'
@@ -208,11 +209,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "            chartData={props.chartData}\n"
             output_str += "            onChartDataChange={props.onChartDataChange}\n"
             output_str += "            collections={collections}\n"
+            output_str += "            partitionFld={props.partitionFld}\n"
+            output_str += "            onPartitionFldChange={props.onPartitionFldChange}\n"
+            output_str += "            filters={props.filters}\n"
             output_str += "        />\n"
             output_str += "    )\n\n"
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str = "    let menu = (\n"
-            output_str += "        <DynamicMenu collections={collections} currentSchema={currentSchema} " \
+            output_str += "        <DynamicMenu name={props.name} collections={collections} currentSchema={currentSchema} " \
                           "commonKeyCollections={commonKeyCollections} data={modified" + f"{message_name}" \
                                                                                          "} disabled={mode !== Modes.EDIT_MODE} onButtonToggle={onButtonToggle}>\n"
             output_str += "            {mode === Modes.READ_MODE && _.keys(" + f"{message_name_camel_cased})." \
@@ -222,14 +226,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
         elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-            output_str = "    let menu = <DynamicMenu disabled={mode !== Modes.EDIT_MODE} " \
+            output_str = "    let menu = <DynamicMenu name={props.name} disabled={mode !== Modes.EDIT_MODE} " \
                          "currentSchema={currentSchema} collections=" \
                          "{collections} commonKeyCollections={commonKeyCollections} data={" \
                          f"modified{message_name}" \
                          "} onButtonToggle={onButtonToggle} />;\n"
         else:
             root_msg_name = self.root_message.proto.name
-            output_str = "    let menu = <DynamicMenu disabled={mode !== Modes.EDIT_MODE} " \
+            output_str = "    let menu = <DynamicMenu name={props.name} disabled={mode !== Modes.EDIT_MODE} " \
                          "currentSchema={currentSchema} xpath={currentSchemaXpath} collections=" \
                          "{collections} commonKeyCollections={commonKeyCollections}" \
                          " data={_.get(modified" + f"{root_msg_name}" + \
@@ -402,7 +406,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [formValidation, setFormValidation] = useState({});\n"
                 output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
                 output_str += "    const [openFormValidationPopup, setOpenFormValidationPopup] = useState(false);\n"
-                output_str += "    const [filter, setFilter] = useState({});\n"
                 output_str += "    const [disableWs, setDisableWs] = useState(false);\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
             case JsxFileGenPlugin.root_type:
@@ -581,6 +584,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onRefreshItems={onRefreshItems}\n"
         output_str += "                    chartData={props.chartData}\n"
         output_str += "                    onChartDataChange={props.onChartDataChange}\n"
+        output_str += "                    filters={props.filters}\n"
+        output_str += "                    onFiltersChange={props.onFiltersChange}\n"
+        output_str += "                    partitionFld={props.partitionFld}\n"
+        output_str += "                    onPartitionFldChange={props.onPartitionFldChange}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
@@ -637,7 +644,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const widgetOption = getWidgetOptionById(props.options, null);\n"
                 output_str += "    const title = getWidgetTitle(widgetOption, currentSchema, props.name, null);\n"
                 output_str += "    let uiLimit = currentSchema.ui_get_all_limit;\n"
-                output_str += f"    let originalData = applyFilter({message_name_camel_cased}, filter);\n"
+                output_str += f"    let originalData = applyFilter({message_name_camel_cased}, props.filters);\n"
                 output_str += "    let modifiedData = addxpath(cloneDeep(originalData));\n"
                 output_str += "    let rows = getTableRows(collections, mode, originalData, modifiedData);\n"
             case JsxFileGenPlugin.root_type | JsxFileGenPlugin.abbreviated_dependent_type:

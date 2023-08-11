@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { DataTypes } from '../constants';
-import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType, getValueFromReduxStoreFromXpath, getAlertBubbleCount, getAlertBubbleColor } from '../utils';
+import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType, getValueFromReduxStoreFromXpath, getAlertBubbleCount, getAlertBubbleColor, getFilterDict, getFiltersFromDict } from '../utils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
@@ -17,7 +17,7 @@ import classes from './DynamicMenu.module.css';
 const DynamicMenu = (props) => {
     const state = useSelector(state => state);
     const [showFilter, setShowFilter] = useState(false);
-    const [filter, setFilter] = useState(props.filter ? props.filter : {});
+    const [filter, setFilter] = useState(getFilterDict(props.filters));
 
     const onClick = (e, action, xpath, value) => {
         if (action === 'flux_toggle') {
@@ -44,16 +44,17 @@ const DynamicMenu = (props) => {
 
     const onApplyFilter = () => {
         onFilterToggle();
-        if (props.onFilterChange) {
-            props.onFilterChange(filter);
+        if (props.onFiltersChange) {
+            const filters = getFiltersFromDict(filter);
+            props.onFiltersChange(props.name, filters);
         }
     }
 
     const onClearFilter = () => {
         onFilterToggle();
-        if (props.onFilterChange) {
+        if (props.onFiltersChange) {
             setFilter({});
-            props.onFilterChange({});
+            props.onFiltersChange(props.name, []);
         }
     }
 
@@ -63,12 +64,12 @@ const DynamicMenu = (props) => {
     }
 
     let alertBubble = <></>;
-    let alertBubbleSourceXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_source: undefined;
+    let alertBubbleSourceXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_source : undefined;
     let alertBubbleColorXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_color : undefined;
     if (props.data && alertBubbleSourceXpath && alertBubbleColorXpath) {
         alertBubbleSourceXpath = alertBubbleSourceXpath.substring(alertBubbleSourceXpath.indexOf('.') + 1);
         alertBubbleColorXpath = alertBubbleColorXpath.substring(alertBubbleColorXpath.indexOf('.') + 1);
-        if(props.xpath) {
+        if (props.xpath) {
             alertBubbleSourceXpath = alertBubbleSourceXpath.replace(`${props.xpath}.`, '');
             alertBubbleColorXpath = alertBubbleColorXpath.replace(`${props.xpath}.`, '');
         }
@@ -210,7 +211,7 @@ const DynamicMenu = (props) => {
                     )
                 })
             }
-            {props.filter && filterCollections.length > 0 && (
+            {filterCollections.length > 0 && (
                 <Fragment>
                     <Icon name='Filter' title='Filter' onClick={onFilterToggle}><FilterAlt fontSize='small' /></Icon>
                     <Dialog open={showFilter} onClose={onCloseFilter}>
@@ -237,7 +238,7 @@ const DynamicMenu = (props) => {
                         </DialogContent>
                         <DialogActions>
                             <Button color='error' onClick={onClearFilter} autoFocus>Clear</Button>
-                            <Button  onClick={onApplyFilter} autoFocus>Apply</Button>
+                            <Button onClick={onApplyFilter} autoFocus>Apply</Button>
                         </DialogActions>
                     </Dialog>
                 </Fragment>

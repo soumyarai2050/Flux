@@ -451,7 +451,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                                             f"json({message_name_snake_cased}_update_req_json)\n")
         output_str += " " * indent_count + f"    obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
         output_str += " " * indent_count + f"    if obj_id is None:\n"
-        output_str += " " * indent_count + f'        err_str_ = f"Can not find id key in received response body for ' \
+        output_str += " " * indent_count + f'        err_str_ = f"Can not find _id key in received response body for ' \
                                            f'patch operation of {message.proto.name}, response body: ' + \
                                            '{'+f'{message_name_snake_cased}_update_req_json'+'}"\n'
         output_str += " " * indent_count + f"        raise HTTPException(status_code=503, detail=err_str_)\n"
@@ -618,7 +618,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                                             f"json({message_name_snake_cased}_update_req_json)\n")
         output_str += " " * indent_count + f"        obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
         output_str += " " * indent_count + f"        if obj_id is None:\n"
-        output_str += " " * indent_count + f'            err_str_ = f"Can not find id key in received response ' \
+        output_str += " " * indent_count + f'            err_str_ = f"Can not find _id key in received response ' \
                                            f'body for patch all operation of {message.proto.name}, response body: ' + \
                                            '{'+f'{message_name_snake_cased}_update_req_json_list'+'}"\n'
         output_str += " " * indent_count + f"            raise HTTPException(status_code=503, detail=err_str_)\n"

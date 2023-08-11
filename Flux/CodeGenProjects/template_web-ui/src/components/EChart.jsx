@@ -25,7 +25,7 @@ function EChart({ option, theme, loading }) {
         // Update chart
         if (chartRef.current !== null) {
             const chart = getInstanceByDom(chartRef.current);
-            chart.setOption(option);
+            chart.setOption(option, {replaceMerge: ['series', 'xAxis', 'yAxis']});
         }
     }, [option, theme]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function
 

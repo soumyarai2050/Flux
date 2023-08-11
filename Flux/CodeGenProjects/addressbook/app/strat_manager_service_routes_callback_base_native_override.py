@@ -2433,7 +2433,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     async def get_raw_performance_data_of_callable_query_pre(
             self, raw_performance_data_of_callable_class_type: Type[RawPerformanceDataOfCallable], callable_name: str):
-        from Flux.CodeGenProjects.addressbook.app.aggregate import \
+        from Flux.PyCodeGenEngine.FluxCodeGenCore.aggregate_core import \
             get_raw_performance_data_from_callable_name_agg_pipeline
         from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_routes import \
             underlying_read_raw_performance_data_http

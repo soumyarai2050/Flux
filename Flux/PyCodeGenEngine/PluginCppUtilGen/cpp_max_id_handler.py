@@ -73,7 +73,44 @@ class CppMaxIdHandler(BaseProtoPlugin):
 
         output_content += f"namespace {package_name}_handler {{\n"
 
-        output_content += f"\n\tclass {class_name}MaxIdHandler {{\n"
+        output_content += f"\n\tclass {class_name}MaxIdHandler;\n\n"
+
+        output_content += "\tclass MaxIdHandler {\n"
+        output_content += "\tpublic:\n\n"
+        output_content += "\t\tint32_t get_next_id() {\n"
+        output_content += "\t\t\tstd::lock_guard lg(max_id_mutex);\n"
+        output_content += "\t\t\tmax_used_id++;\n"
+        output_content += "\t\t\treturn max_used_id;\n"
+        output_content += "\t\t}\n\n"
+
+        output_content += "\tprotected:\n\n"
+        output_content += "\t\tvoid update_max_id(const int32_t max_used_id_) {\n"
+        output_content += "\t\t\tmax_used_id = max_used_id_;\n"
+        output_content += "\t\t}\n\n"
+
+        output_content += f"\t\tfriend {class_name}MaxIdHandler;\n"
+        output_content += "\t\tint32_t max_used_id = 0;\n"
+        output_content += "\t\tstd::mutex max_id_mutex{};\n"
+        output_content += "\t};\n\n"
+
+        output_content += f"\tclass {class_name}MaxIdHandler {{\n\n"
+        output_content += "\tpublic:\n\n"
+
+        # for message in self.root_message_list:
+        #     message_name: str = message.proto.name
+        #     message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
+        #     if CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root):
+        #         for field in message.fields:
+        #             if CppMaxIdHandler.is_option_enabled(field, CppMaxIdHandler.flux_fld_PK):
+        #
+        #                 output_content += (f"\t\tstatic void update_{message_name_snake_cased}_max_id(const "
+        #                                    f"{class_name}WebClient &{class_name_snake_cased}_web_client) {{\n")
+        #                 output_content += (f"\t\t\t{message_name_snake_cased}_max_id_handler.update_max_id("
+        #                                    f"{class_name_snake_cased}_web_client.get_{message_name_snake_cased}"
+        #                                    f"_max_id_client());\n")
+        #                 output_content += "\t\t}\n\n"
+        #                 break
+
         output_content += "\tpublic:\n"
 
         for message in self.root_message_list:
@@ -82,26 +119,8 @@ class CppMaxIdHandler(BaseProtoPlugin):
             if CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root):
                 for field in message.fields:
                     if CppMaxIdHandler.is_option_enabled(field, CppMaxIdHandler.flux_fld_PK):
-                        output_content += f"\t\tstatic int32_t get_{message_name_snake_cased}_max_id() {{\n"
-                        output_content += f"\t\t\treturn {message_name_snake_cased}_max_id_;\n"
-                        output_content += "\t\t}\n\n"
-
-                        output_content += (f"\t\tstatic void update_{message_name_snake_cased}_max_id(const "
-                                           f"{class_name}WebClient &{class_name_snake_cased}_web_client) {{\n")
-                        output_content += (f"\t\t\t{message_name_snake_cased}_max_id_ = {class_name_snake_cased}"
-                                           f"_web_client.get_{message_name_snake_cased}_max_id_client();\n")
-                        output_content += "\t\t}\n\n"
-                        break
-
-        output_content += "\tprotected:\n"
-
-        for message in self.root_message_list:
-            message_name: str = message.proto.name
-            message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
-            if CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root):
-                for field in message.fields:
-                    if CppMaxIdHandler.is_option_enabled(field, CppMaxIdHandler.flux_fld_PK):
-                        output_content += f"\t\tstatic inline int32_t {message_name_snake_cased}_max_id_ = 0;\n"
+                        output_content += f"\t\tstatic inline MaxIdHandler {message_name_snake_cased}" \
+                                          f"_max_id_handler{{}};\n"
                         break
 
         output_content += "\t};\n}\n"

@@ -2,7 +2,6 @@ syntax = "proto2";
 
 import "ui_option_utils.proto";
 import "flux_options.proto";
-import "ui_core.proto";
 import "trade_core.proto";
 import "dashboards_core.proto";
 import "market_data_core.proto";

@@ -1082,8 +1082,8 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "\t\t\tif (cur_unused_max_id == 0) {\n"
         output_content += "\t\t\t\tcur_unused_max_id = 1; // we always start with 1\n"
         output_content += "\t\t\t} else {\n"
-        output_content += f"\t\t\t\tcur_unused_max_id = {class_name}MaxIdHandler::get_{message_name_snake_cased}" \
-                          f"_max_id();\n"
+        output_content += f"\t\t\t\tcur_unused_max_id = {class_name}MaxIdHandler::{message_name_snake_cased}_max" \
+                          f"_id_handler.get_next_id();\n"
         output_content += "\t\t\t}\n\t\t}\n\n"
 
         output_content += f"\t\tstatic void update_id_in_document(bsoncxx::builder::basic::document " \
@@ -1109,53 +1109,53 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
         output_content += f"namespace {class_name_snake_cased}_handler {{\n"
 
-        output_content += "\n\tenum class IsUpdateOrPatch {\n"
-        output_content += "\t\tDB_TRUE = true,\n"
-        output_content += "\t\tDB_FALSE = false\n\t};\n\n"
-
-        for message in self.root_message_list:
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
-                for field in message.fields:
-                    field_name: str = field.proto.name
-                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
-                    if CppDbHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
-                        message_name = message.proto.name
-                        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-
-                        output_content += self.generate_class_handler(class_name, message_name, package_name,
-                                                                      message_name_snake_cased, file_name)
-
-                        output_content += self.generate_insert_handler(class_name, message_name, package_name,
-                                                                       message_name_snake_cased, file_name)
-
-                        output_content += self.generate_patch_handler(class_name, message_name, package_name,
-                                                                      message_name_snake_cased, file_name)
-
-                        output_content += self.generate_public_members_handler(class_name, message_name, package_name,
-                                                                               message_name_snake_cased, file_name)
-
-                        output_content += self.generate_bulk_insert_and_update(message_name_snake_cased, message_name,
-                                                                               package_name)
-                        output_content += self.generate_get_data_from_db(message_name, package_name,
-                                                                         message_name_snake_cased, class_name)
-                        output_content += self.generate_delete_from_db_handler(message_name_snake_cased)
-
-                        output_content += self.generate_util_method_handler(message_name, message_name_snake_cased,
-                                                                            class_name)
-
-                        output_content += self.generate_private_members_handler(class_name, package_name,
-                                                                                message_name_snake_cased, file_name)
-                        output_content += self.generate_prepare_doc(message, message_name_snake_cased, package_name,
-                                                                    message_name)
-                        output_content += "\t\t}\n\n"
-                        output_content += self.generate_prepare_docs(message, message_name_snake_cased, package_name,
-                                                                     message_name)
-                        output_content += f"\t\t\t\t{message_name_snake_cased}_document_list.emplace_back(std::move(" \
-                                          f"{message_name_snake_cased}_document));\n"
-                        output_content += "\t\t\t}\n\t\t}\n\n"
-
-                        output_content += "\t};\n\n"
-                        break
+        # output_content += "\n\tenum class IsUpdateOrPatch {\n"
+        # output_content += "\t\tDB_TRUE = true,\n"
+        # output_content += "\t\tDB_FALSE = false\n\t};\n\n"
+        #
+        # for message in self.root_message_list:
+        #     if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
+        #         for field in message.fields:
+        #             field_name: str = field.proto.name
+        #             field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+        #             if CppDbHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
+        #                 message_name = message.proto.name
+        #                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        #
+        #                 output_content += self.generate_class_handler(class_name, message_name, package_name,
+        #                                                               message_name_snake_cased, file_name)
+        #
+        #                 output_content += self.generate_insert_handler(class_name, message_name, package_name,
+        #                                                                message_name_snake_cased, file_name)
+        #
+        #                 output_content += self.generate_patch_handler(class_name, message_name, package_name,
+        #                                                               message_name_snake_cased, file_name)
+        #
+        #                 output_content += self.generate_public_members_handler(class_name, message_name, package_name,
+        #                                                                        message_name_snake_cased, file_name)
+        #
+        #                 output_content += self.generate_bulk_insert_and_update(message_name_snake_cased, message_name,
+        #                                                                        package_name)
+        #                 output_content += self.generate_get_data_from_db(message_name, package_name,
+        #                                                                  message_name_snake_cased, class_name)
+        #                 output_content += self.generate_delete_from_db_handler(message_name_snake_cased)
+        #
+        #                 output_content += self.generate_util_method_handler(message_name, message_name_snake_cased,
+        #                                                                     class_name)
+        #
+        #                 output_content += self.generate_private_members_handler(class_name, package_name,
+        #                                                                         message_name_snake_cased, file_name)
+        #                 output_content += self.generate_prepare_doc(message, message_name_snake_cased, package_name,
+        #                                                             message_name)
+        #                 output_content += "\t\t}\n\n"
+        #                 output_content += self.generate_prepare_docs(message, message_name_snake_cased, package_name,
+        #                                                              message_name)
+        #                 output_content += f"\t\t\t\t{message_name_snake_cased}_document_list.emplace_back(std::move(" \
+        #                                   f"{message_name_snake_cased}_document));\n"
+        #                 output_content += "\t\t\t}\n\t\t}\n\n"
+        #
+        #                 output_content += "\t};\n\n"
+        #                 break
 
         output_content += "}\n"
 

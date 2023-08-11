@@ -250,6 +250,7 @@ function Layout() {
     const onLayoutTypeChange = useCallback((name, layoutType, bindVal = null) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {
+                layout = cloneDeep(layout);
                 if (bindVal) {
                     const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
                     if (widgetUIData) {
@@ -270,6 +271,7 @@ function Layout() {
     const onOverrideChange = useCallback((name, enableOverride, disableOverride, bindVal = null) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {
+                layout = cloneDeep(layout);
                 if (bindVal) {
                     const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
                     if (widgetUIData) {
@@ -292,6 +294,7 @@ function Layout() {
     const onChartDataChange = useCallback((name, chartDataObj) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {
+                layout = cloneDeep(layout);
                 if (layout.chart_data) {
                     const chartData = cloneDeep(layout.chart_data);
                     const index = chartData.map(obj => obj.chart_name).indexOf(chartDataObj.chart_name);
@@ -304,6 +307,28 @@ function Layout() {
                 } else {
                     layout.chart_data = [chartDataObj];
                 }
+            }
+            return layout
+        });
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
+    const onPartitionFldChange = useCallback((name, partitionFld) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                layout.partition_fld = partitionFld;
+            }
+            return layout
+        });
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
+    const onFiltersChange = useCallback((name, filters) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                layout.filters = filters;
             }
             return layout
         });

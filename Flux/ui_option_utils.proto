@@ -74,6 +74,8 @@ message WidgetUIDataElement {
   optional string dynamic_widget_title_fld = 12;
   repeated WidgetUIData widget_ui_data = 13;
   repeated ChartData chart_data = 14;
+  repeated UIFilter filters = 15;
+  optional string partition_fld = 16;
 }
 
 message WidgetUIData{
@@ -110,32 +112,19 @@ message ChartEncode {
   required string y = 2;
 }
 
-message ChartAxis {
-  optional ChartAxisType type = 1;
-  optional string name = 2;
-  optional int32 gridIndex = 3 [default = 0];
-}
-
 message ChartSeries {
   optional string id = 1;
   required ChartType type = 2;
   required ChartEncode encode = 3;
-  // xAxis index if multiple xAxis is present
-  optional int32 xAxisGridIndex = 4 [default = 0];
-  // yAxis index if multiple xAxis is present
-  optional int32 yAxisGridIndex = 5 [default = 0];
-}
-
-message ChartOption {
-  optional string id = 1;
-  required ChartAxis xAxis = 3;
-  required ChartAxis yAxis = 4;
-  // TODO: add grid to handle chart position (top/bottom/right/left) in case of multiple charts (x-y axis)
-  repeated ChartSeries series = 5;
 }
 
 message ChartData {
   optional string id = 1;
   required string chart_name = 2;
-  repeated ChartOption chart_options = 3;
+  repeated ChartSeries series = 3;
+}
+
+message UIFilter {
+  required string fld_name = 1;
+  required string fld_value = 2;
 }

@@ -6,6 +6,7 @@ import numpy as np
 import pendulum
 import pexpect
 import pytest
+import random
 
 # project imports
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
@@ -230,6 +231,30 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
                                                                                 sell_symbol,
                                                                                 last_order_id=sell_ack_order_id)
             sell_ack_order_id = ack_order_journal.order.order_id
+
+
+def test_create_sanity_last_trade(clean_and_set_limits, last_trade_fixture_list):
+    symbols = ["CB_Sec_1", "CB_Sec_2", "CB_Sec_3", "CB_Sec_4"]
+    px_portions = [(40, 55), (56, 70), (71, 85), (86, 100)]
+    total_loops = 600
+    loop_wait = 1   # sec
+
+    for _ in range(total_loops):
+        current_time = DateTime.utcnow()
+        for index, symbol in enumerate(symbols):
+            px_portion = px_portions[index]
+            qty = random.randint(1000, 2000)
+            qty = qty + 400
+
+            last_trade_obj = LastTradeBaseModel(**last_trade_fixture_list[0])
+            last_trade_obj.time = current_time
+            last_trade_obj.symbol = symbol
+            last_trade_obj.px = random.randint(px_portion[0], px_portion[1])
+            last_trade_obj.qty = qty
+
+            market_data_web_client.create_last_trade_client(last_trade_obj)
+
+        time.sleep(loop_wait)
 
 
 def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
