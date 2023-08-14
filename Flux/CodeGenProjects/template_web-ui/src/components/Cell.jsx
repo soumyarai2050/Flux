@@ -141,11 +141,11 @@ const Cell = (props) => {
                 }
             }
         } else if (type === DataTypes.DATE_TIME) {
-        if (props.truncateDateTime) {
-            value = value ? dayjs.utc(value).format('YYYY-MM-DD HH:mm') : null;
-        } else {
-            value = value ? value : null;
-        }
+            if (props.truncateDateTime) {
+                value = value ? dayjs.utc(value).format('YYYY-MM-DD HH:mm') : null;
+            } else {
+                value = value ? value : null;
+            }
         } else if (type === DataTypes.STRING) {
             value = inputValue ? inputValue : inputValue;
         }
@@ -297,6 +297,9 @@ const Cell = (props) => {
                 <>
                     {collection.numberFormat && collection.numberFormat === '%' && (
                         <InputAdornment position='end'>%</InputAdornment>
+                    )}
+                    {collection.numberFormat && collection.numberFormat === 'bps' && (
+                        <InputAdornment position='end'>bps</InputAdornment>
                     )}
                     {validationError.current && (
                         <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>

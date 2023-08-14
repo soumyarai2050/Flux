@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell, TablePagination, Select, MenuItem, FormControlLabel, Checkbox } from '@mui/material';
+import { Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell, TablePagination, Select, MenuItem, FormControlLabel, Checkbox, Tooltip } from '@mui/material';
 import WidgetContainer from './WidgetContainer';
 import { Download, Delete, Settings, FileDownload, LiveHelp } from '@mui/icons-material';
 import PropTypes from 'prop-types';
@@ -29,6 +29,7 @@ function AbbreviatedFilterWidget(props) {
     const [page, setPage] = useState(0);
     const [rows, setRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
+    const [renamedRows, setRenamedRows] = useState([]);
     const [showSettings, setShowSettings] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const [headCells, setHeadCells] = useState([]);
@@ -101,8 +102,9 @@ function AbbreviatedFilterWidget(props) {
     useEffect(() => {
         if (window.Worker) {
             worker.onmessage = (e) => {
-                const [updatedRows, updatedActiveRows] = e.data;
+                const [updatedRows, updatedRenamedRows, updatedActiveRows] = e.data;
                 setRows(updatedRows);
+                setRenamedRows(updatedRenamedRows);
                 setActiveRows(updatedActiveRows);
             }
         }
@@ -281,23 +283,25 @@ function AbbreviatedFilterWidget(props) {
                 </MenuItem>
                 {headCells.map((cell, index) => {
                     return (
-                        <MenuItem key={index} dense={true}>
-                            <FormControlLabel size='small'
-                                label={cell.elaborateTitle ? cell.tableTitle : cell.key}
-                                control={
-                                    <Checkbox
-                                        size='small'
-                                        checked={cell.hide ? false : true}
-                                        onChange={(e) => onSettingsItemChange(e, cell.tableTitle)}
-                                    />
+                        <Tooltip title={cell.tableTitle} key={index}>
+                            <MenuItem dense={true}>
+                                <FormControlLabel size='small'
+                                    label={cell.title ? cell.title : cell.tableTitle}
+                                    control={
+                                        <Checkbox
+                                            size='small'
+                                            checked={cell.hide ? false : true}
+                                            onChange={(e) => onSettingsItemChange(e, cell.tableTitle)}
+                                        />
+                                    }
+                                />
+                                {cell.help &&
+                                    <Icon title={cell.help}>
+                                        <LiveHelp color='primary' />
+                                    </Icon>
                                 }
-                            />
-                            {cell.help &&
-                                <Icon title={cell.help}>
-                                    <LiveHelp color='primary' />
-                                </Icon>
-                            }
-                        </MenuItem>
+                            </MenuItem>
+                        </Tooltip>
                     )
                 })}
             </Select>
@@ -480,30 +484,29 @@ function AbbreviatedFilterWidget(props) {
                     layout={props.headerProps.layout}
                     supportedLayouts={props.headerProps.supportedLayouts}
                     onChangeLayout={props.headerProps.onChangeLayout}>
-                    {rows.length > 0 && <PivotTable pivotData={rows} />}
+                    {renamedRows.length > 0 && <PivotTable pivotData={renamedRows} />}
                 </WidgetContainer>
             ) : props.headerProps.layout === Layouts.CHART ? (
-                <>
-                    {rows.length > 0 &&
-                        <ChartWidget
-                            name={props.headerProps.name}
-                            title={props.headerProps.title}
-                            onReload={props.headerProps.onReload}
-                            layout={props.headerProps.layout}
-                            supportedLayouts={props.headerProps.supportedLayouts}
-                            onChangeLayout={props.headerProps.onChangeLayout}
-                            schema={props.schema}
-                            mode={props.mode}
-                            menu={dynamicMenu}
-                            onChangeMode={props.headerProps.onChangeMode}
-                            rows={rows}
-                            chartData={props.chartData}
-                            onChartDataChange={props.onChartDataChange}
-                            collections={collections}
-                            filters={props.filters}
-                        />
-                    }
-                </>
+                <ChartWidget
+                    name={props.headerProps.name}
+                    title={props.headerProps.title}
+                    onReload={props.headerProps.onReload}
+                    layout={props.headerProps.layout}
+                    supportedLayouts={props.headerProps.supportedLayouts}
+                    onChangeLayout={props.headerProps.onChangeLayout}
+                    schema={props.schema}
+                    mode={props.mode}
+                    menu={dynamicMenu}
+                    onChangeMode={props.headerProps.onChangeMode}
+                    rows={renamedRows}
+                    chartData={props.chartData}
+                    onChartDataChange={props.onChartDataChange}
+                    collections={collections}
+                    partitionFld={props.partitionFld}
+                    onPartitionFldChange={props.onPartitionFldChange}
+                    filters={props.filters}
+                    collectionView={true}
+                />
             ) : (
                 <WidgetContainer>
                     <h1>Unsupported Layout</h1>

@@ -36,3 +36,12 @@
 .cell {
     padding: 4px 8px !important;
 }
+
+.dropdown {
+    width: 0px;
+    display: inherit;
+}
+
+.dropdown :global .MuiSelect-outlined {
+    padding: 0px;
+}

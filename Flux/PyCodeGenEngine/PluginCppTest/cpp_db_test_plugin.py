@@ -42,13 +42,13 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n'
         output_content += f'#include "../../cpp_app/include/{class_name}_mongo_db_handler.h"\n'
         output_content += f'#include "../CppCodec/{class_name}_mongo_db_codec.h"\n'
-        output_content += f'#include "../CppCodec/{class_name}_json_codec.h"\n'
+        output_content += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_key_handler.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output_content
 
     @staticmethod
-    def generate_bulk_patch_for_test(message: protogen.Message, message_name_snake_cased: str, package_name: str,
+    def generate_bulk_patch_for_test(message: protogen.Message, message_name, message_name_snake_cased: str, package_name: str,
                                      class_name: str):
 
         output_content: str = ""
@@ -114,15 +114,16 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += f'\tASSERT_TRUE({message_name_snake_cased}_codec.get_all_data_from_{message_name_snake_cased}' \
                           f'_collection({message_name_snake_cased}_list_from_db));\n\n'
 
-        output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}_list' \
+        output_content += f'\tASSERT_TRUE(RootModelListJsonCodec<market_data::{message_name}List>::encode_model_list' \
                           f'({message_name_snake_cased}_list_from_db, {message_name_snake_cased}_json_from_db));\n'
-        output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}_list(' \
+        output_content += f'\tASSERT_TRUE(RootModelListJsonCodec<market_data::{message_name}List>::encode_model_list(' \
                           f'{message_name_snake_cased}_list, {message_name_snake_cased}_json));\n'
         output_content += f"\tASSERT_EQ({message_name_snake_cased}_json_from_db, {message_name_snake_cased}_json);\n"
 
         return output_content
 
-    def generate_patch_for_test(self, message: protogen.Message, message_name_snake_cased: str, class_name: str):
+    def generate_patch_for_test(self, message: protogen.Message, message_name: str,
+                                message_name_snake_cased: str, class_name: str):
         output_content: str = ""
 
         key_list: List[List[str]] = StratExecutorPlugin.get_executor_key_sequence_list_of_model(message)
@@ -170,22 +171,23 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += f"\t{message_name_snake_cased}_from_db.Clear();\n"
         output_content += f'\n\tASSERT_TRUE({message_name_snake_cased}_codec.patch_{message_name_snake_cased}' \
                           f'({message_name_snake_cased}));\n\n'
-        output_content += self.generate_assert(message_name_snake_cased, class_name, 1)
+        output_content += self.generate_assert(message_name, message_name_snake_cased, class_name, 1)
 
         return output_content
 
     @staticmethod
-    def generate_assert(message_name_snake_cased: str, class_name: str, num_of_tabs: int):
+    def generate_assert(message_name: str, message_name_snake_cased: str, class_name: str, num_of_tabs: int):
         output_content: str = ""
 
         output_content += "\t"*num_of_tabs + f'ASSERT_TRUE({message_name_snake_cased}_codec.get_data_by_id_from_' \
                                              f'{message_name_snake_cased}_collection({message_name_snake_cased}' \
                                              f'_from_db, found->second));\n'
-        output_content += "\t"*num_of_tabs + f"ASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}" \
-                                             f"({message_name_snake_cased}_from_db, {message_name_snake_cased}" \
-                                             f"_json_from_db));\n"
-        output_content += "\t"*num_of_tabs + f"ASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}" \
-                                             f"({message_name_snake_cased}, {message_name_snake_cased}_json));\n"
+        output_content += "\t"*num_of_tabs + f"ASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::" \
+                                             f"encode_model({message_name_snake_cased}_from_db, " \
+                                             f"{message_name_snake_cased}_json_from_db));\n"
+        output_content += "\t"*num_of_tabs + f"ASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::" \
+                                             f"encode_model({message_name_snake_cased}, " \
+                                             f"{message_name_snake_cased}_json));\n"
 
         output_content += "\t"*num_of_tabs + f'ASSERT_EQ({message_name_snake_cased}_json_from_db, ' \
                                              f'{message_name_snake_cased}_json);\n\n'
@@ -216,7 +218,8 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += (f'std::shared_ptr<{package_name}_handler::{class_name}_MongoDBHandler> mongo_db = std::'
                            f'make_shared<{package_name}_handler::{class_name}_MongoDBHandler>(logger);\n\n')
 
-        output_content += f"using {package_name}_handler::{class_name}JSONCodec;\n"
+        output_content += f"using FluxCppCore::RootModelJsonCodec;\n"
+        output_content += "using FluxCppCore::RootModelListJsonCodec;\n"
         output_content += f"using {package_name}_handler::{class_name}KeyHandler;\n"
         output_content += f"using {package_name}_handler::{class_name}PopulateRandomValues;\n"
         for message in self.root_message_list:
@@ -271,14 +274,15 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         output_content += f'\tif (found != {message_name_snake_cased}_codec.{message_name_snake_cased}' \
                                           f'_key_to_db_id.end()) {{\n'
 
-                        output_content += self.generate_assert(message_name_snake_cased, class_name, 2)
+                        output_content += self.generate_assert(message_name, message_name_snake_cased, class_name, 2)
 
                         output_content += f"\t}}\n\n"
 
                         output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n\n"
 
-                        output_content += self.generate_patch_for_test(message, message_name_snake_cased, class_name)
+                        output_content += self.generate_patch_for_test(message, message_name,
+                                                                       message_name_snake_cased, class_name)
 
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n"
                         output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
@@ -314,16 +318,17 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n\n"
 
-                        output_content += f"\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}_list" \
-                                          f"({message_name_snake_cased}_list_from_db, {message_name_snake_cased}" \
-                                          f"_json_from_db));\n"
+                        output_content += f"\tASSERT_TRUE(RootModelListJsonCodec<market_data::{message_name}List>::" \
+                                          f"encode_model_list({message_name_snake_cased}_list_from_db, " \
+                                          f"{message_name_snake_cased}_json_from_db));\n"
 
-                        output_content += f"\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}_list" \
-                                          f"({message_name_snake_cased}_list, {message_name_snake_cased}_json));\n"
+                        output_content += f"\tASSERT_TRUE(RootModelListJsonCodec<market_data::{message_name}List>" \
+                                          f"::encode_model_list({message_name_snake_cased}_list, " \
+                                          f"{message_name_snake_cased}_json));\n"
                         output_content += f"\tASSERT_EQ({message_name_snake_cased}_json_from_db, {message_name_snake_cased}" \
                                           f"_json);\n\n"
 
-                        output_content += self.generate_bulk_patch_for_test(message, message_name_snake_cased, package_name,
+                        output_content += self.generate_bulk_patch_for_test(message, message_name, message_name_snake_cased, package_name,
                                                                             class_name)
                         output_content += f"\n\tASSERT_TRUE({message_name_snake_cased}_codec.delete_all_data_from_" \
                                           f"{message_name_snake_cased}_collection());\n"

@@ -86,7 +86,7 @@ export const CollectionSwitchPopup = (props) => {
         <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
             <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
             <DialogContent className={classes.dialog_body}>
-                <DialogContentText className={classes.dialog_text}>Collection switched while in EDIT mode. Your changes me be lost.</DialogContentText>
+                <DialogContentText className={classes.dialog_text}>Collection switched while in EDIT mode. Your changes may be lost.</DialogContentText>
             </DialogContent>
             <DialogActions>
                 <Button variant='contained' color='error' onClick={props.onClose} startIcon={<Delete />}>Discard Changes</Button>

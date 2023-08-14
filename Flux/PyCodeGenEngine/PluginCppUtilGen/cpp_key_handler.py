@@ -53,14 +53,14 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
 
         output_content: str = ""
 
-        output_content += f"\n\t\tstatic inline void get_{message_name_snake_cased}" \
+        output_content += f"\n\t\tstatic inline void get" \
                           f"_key_list(const {package_name}::{message_name}List &{message_name_snake_cased}_list_obj, " \
                           f"std::vector< std::string > &{message_name_snake_cased}_key_list_out) {{\n"
 
         output_content += f'\t\t\tfor (int i = 0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}_size(); ' \
                           f'++i) {{\n'
         output_content += f'\t\t\t\tstd::string key;\n'
-        output_content += (f'\t\t\t\tget_{message_name_snake_cased}_key_out({message_name_snake_cased}_list_obj.'
+        output_content += (f'\t\t\t\tget_key_out({message_name_snake_cased}_list_obj.'
                            f'{message_name_snake_cased}(i), key);\n')
         output_content += f'\t\t\t\t{message_name_snake_cased}_key_list_out.emplace_back(std::move(key));\n'
         output_content += '\t\t\t}\n'
@@ -131,7 +131,7 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
                     if CppKeyHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
                         # message_name = message.proto.name
-                        output_content += f"\n\t\tstatic inline void get_{message_name_snake_cased}_key_out(const {package_name}::" \
+                        output_content += f"\n\t\tstatic inline void get_key_out(const {package_name}::" \
                                           f"{message_name} &{message_name_snake_cased}_obj, std::string &" \
                                           f"{message_name_snake_cased}_key_out)"
                         output_content += "{\n"

@@ -5,9 +5,9 @@ const FLOAT_POINT_PRECISION = 2;
 
 onmessage = (e) => {
     const { items, itemsData, itemProps, abbreviation, loadedProps, page, pageSize, order, orderBy } = e.data;
-    const rows = getAbbreviatedRows(items, itemsData, itemProps, abbreviation, loadedProps);
+    const [rows, renamedRows] = getAbbreviatedRows(items, itemsData, itemProps, abbreviation, loadedProps);
     const activeRows = getActiveRows(rows, page, pageSize, order, orderBy);
-    postMessage([rows, activeRows]);
+    postMessage([rows, renamedRows, activeRows]);
 }
 
 function stableSort(array, comparator) {
@@ -54,6 +54,13 @@ function getLocalizedValueAndSuffix(metadata, value) {
     if (typeof value !== DataTypes.NUMBER) {
         return [adornment, value];
     }
+    if (metadata.numberFormat) {
+        if (metadata.numberFormat.includes('%')) {
+            adornment = '%';
+        } else if (metadata.numberFormat.includes('bps')) {
+            adornment = 'bps';
+        }
+    }
     if (metadata.numberFormat && metadata.numberFormat.includes('%')) {
         adornment = '%';
     }
@@ -87,15 +94,17 @@ function roundNumber(value, precision = FLOAT_POINT_PRECISION) {
     return value;
 }
 
-function getAbbreviatedRows(items, itemsData, itemFieldProperties, abbreviation, loadedProps) {
+function getAbbreviatedRows(items, itemsData, itemProps, abbreviation, loadedProps) {
     const rows = [];
+    const renamedRows = [];
     if (items) {
         items.map((item, i) => {
             let row = {};
+            let renamedRow = {};
             let id = getIdFromAbbreviatedKey(abbreviation, item);
             let metadata = itemsData.filter(metadata => _.get(metadata, DB_ID) === id)[0];
             row['data-id'] = id;
-            itemFieldProperties.forEach(c => {
+            itemProps.forEach(c => {
                 let value;
                 if (c.xpath.indexOf("-") !== -1) {
                     value = c.xpath.split("-").map(xpath => {
@@ -130,11 +139,13 @@ function getAbbreviatedRows(items, itemsData, itemFieldProperties, abbreviation,
                     value = v;
                 }
                 row[c.xpath] = value;
+                renamedRow[c.title ? c.title : c.xpath] = value;
             })
             rows.push(row);
+            renamedRows.push(renamedRow);
         })
     }
-    return rows;
+    return [rows, renamedRows];
 }
 
 function getActiveRows(rows, page, pageSize, order, orderBy) {
@@ -174,12 +185,11 @@ function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
     })
     if (idIndex !== -1) {
         let abbreviatedKeySplit = abbreviatedKey.split('-');
-        let abbreviatedKeyId = parseInt(abbreviatedKeySplit[idIndex]);
-        return abbreviatedKeyId;
+        return parseInt(abbreviatedKeySplit[idIndex]);
     } else {
         // abbreviated key id not found. returning -1
         return idIndex;
     }
 }
 
-export {};
+export { };

@@ -44,7 +44,7 @@ class CppMaxIdHandler(BaseProtoPlugin):
         output_content: str = ""
         output_content += "#pragma once\n\n"
 
-        output_content += f'#include "{class_name_snake_cased}_web_client.h"\n\n'
+        output_content += f'#include "../../FluxCppCore/include/base_web_client.h"\n\n'
 
         return output_content
 
@@ -96,20 +96,24 @@ class CppMaxIdHandler(BaseProtoPlugin):
         output_content += f"\tclass {class_name}MaxIdHandler {{\n\n"
         output_content += "\tpublic:\n\n"
 
-        # for message in self.root_message_list:
-        #     message_name: str = message.proto.name
-        #     message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
-        #     if CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root):
-        #         for field in message.fields:
-        #             if CppMaxIdHandler.is_option_enabled(field, CppMaxIdHandler.flux_fld_PK):
-        #
-        #                 output_content += (f"\t\tstatic void update_{message_name_snake_cased}_max_id(const "
-        #                                    f"{class_name}WebClient &{class_name_snake_cased}_web_client) {{\n")
-        #                 output_content += (f"\t\t\t{message_name_snake_cased}_max_id_handler.update_max_id("
-        #                                    f"{class_name_snake_cased}_web_client.get_{message_name_snake_cased}"
-        #                                    f"_max_id_client());\n")
-        #                 output_content += "\t\t}\n\n"
-        #                 break
+        for message in self.root_message_list:
+            message_name: str = message.proto.name
+            message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
+            if CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root):
+                for field in message.fields:
+                    if CppMaxIdHandler.is_option_enabled(field, CppMaxIdHandler.flux_fld_PK):
+
+                        output_content += (f"\t\tstatic void update_{message_name_snake_cased}_max_id(const "
+                                           f"FluxCppCore::RootModelWebClient <{package_name}::{message_name}, "
+                                           f"create_{message_name_snake_cased}_client_url, get_"
+                                           f"{message_name_snake_cased}_client_url, get_{message_name_snake_cased}"
+                                           f"_max_id_client_url, put_{message_name_snake_cased}_client_url, patch_"
+                                           f"{message_name_snake_cased}_client_url, delete_{message_name_snake_cased}"
+                                           f"_client_url> &{class_name_snake_cased}_web_client) {{\n")
+                        output_content += (f"\t\t\t{message_name_snake_cased}_max_id_handler.update_max_id("
+                                           f"{class_name_snake_cased}_web_client.get_max_id_client());\n")
+                        output_content += "\t\t}\n\n"
+                        break
 
         output_content += "\tpublic:\n"
 

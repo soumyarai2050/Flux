@@ -54,22 +54,22 @@ class CppDbTestCppPlugin(BaseProtoPlugin):
 
         output_content += self.headers_generate_handler(class_name_snake_cased)
 
-        # for message in self.root_message_list:
-        #     if CppDbTestCppPlugin.is_option_enabled(message, CppDbTestCppPlugin.flux_msg_json_root):
-        #         for field in message.fields:
-        #             field_name: str = field.proto.name
-        #             field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
-        #             if CppDbTestCppPlugin.is_option_enabled(field, CppDbTestCppPlugin.flux_fld_PK):
-        #                 message_name = message.proto.name
-        #                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        #                 output_content += f"std::unordered_map < std::string, int32_t > {package_name}_handler::" \
-        #                                   f"{class_name}MongoDB{message_name}Codec::{message_name_snake_cased}" \
-        #                                   f"_key_to_db_id;\n"
-        #                 output_content += f"std::mutex {package_name}_handler::{class_name}MongoDB" \
-        #                                   f"{message_name}Codec::max_id_mutex;\n"
-        #                 output_content += f"int32_t {package_name}_handler::" \
-        #                                   f"{class_name}MongoDB{message_name}Codec::cur_unused_max_id;\n\n"
-        #                 break
+        for message in self.root_message_list:
+            if CppDbTestCppPlugin.is_option_enabled(message, CppDbTestCppPlugin.flux_msg_json_root):
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppDbTestCppPlugin.is_option_enabled(field, CppDbTestCppPlugin.flux_fld_PK):
+                        message_name = message.proto.name
+                        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+                        output_content += f"std::unordered_map < std::string, int32_t > {package_name}_handler::" \
+                                          f"{class_name}MongoDB{message_name}Codec::{message_name_snake_cased}" \
+                                          f"_key_to_db_id;\n"
+                        output_content += f"std::mutex {package_name}_handler::{class_name}MongoDB" \
+                                          f"{message_name}Codec::max_id_mutex;\n"
+                        output_content += f"int32_t {package_name}_handler::" \
+                                          f"{class_name}MongoDB{message_name}Codec::cur_unused_max_id;\n\n"
+                        break
 
         proto_file_name = str(file.proto.name).split(".")[0]
         output_file_name = f"{class_name_snake_cased}_mongo_db_codec.cpp"

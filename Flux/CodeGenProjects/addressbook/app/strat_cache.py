@@ -36,13 +36,13 @@ class MarketDepthsCont:
             return []
 
     def set_market_depth(self, market_depth: MarketDepthBaseModel):
-        if market_depth.side == TickTypeEnum.BID:
+        if market_depth.side == TickType.BID:
             for bid_market_depth in self.bid_market_depths:
                 if bid_market_depth.position == market_depth.position:
                     bid_market_depth = market_depth
             else:
                 self.bid_market_depths.append(market_depth)
-        elif market_depth.side == TickTypeEnum.ASK:
+        elif market_depth.side == TickType.ASK:
             for ask_market_depth in self.ask_market_depths:
                 if ask_market_depth.position == market_depth.position:
                     ask_market_depth = market_depth

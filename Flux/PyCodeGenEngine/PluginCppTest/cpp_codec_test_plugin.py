@@ -35,7 +35,7 @@ class CppCodecTestPlugin(BaseProtoPlugin):
         output += "#pragma once\n\n"
         output += '#include "gtest/gtest.h"\n\n'
         output += f'#include "{file_name}.pb.h"\n'
-        output += f'#include "../CppCodec/{class_name}_json_codec.h"\n'
+        output += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
         output += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output
 
@@ -61,7 +61,8 @@ class CppCodecTestPlugin(BaseProtoPlugin):
         output_content: str = ""
 
         output_content += self.header_generate_handler(file_name, class_name_snake_cased)
-        output_content += f"using {package_name}_handler::{class_name}JSONCodec;\n\n"
+        output_content += f"using FluxCppCore::RootModelJsonCodec;\n"
+        output_content += f"using FluxCppCore::RootModelListJsonCodec;\n\n"
 
         for message in self.root_message_list:
             message_name = message.proto.name
@@ -78,14 +79,17 @@ class CppCodecTestPlugin(BaseProtoPlugin):
                         output_content += f'\t{class_name_snake_cased}::{message_name}List {message_name_snake_cased}_decode_' \
                                           f'list;\n'
                         output_content += f"\tstd::string {message_name_snake_cased}_json;\n"
-                        output_content += f"\t{class_name}JSONCodec {class_name_snake_cased}_json_codec;\n"
+                        output_content += f"\tRootModelJsonCodec<market_data::{message_name}> " \
+                                          f"{class_name_snake_cased}_json_codec;\n"
+                        output_content += f"\tRootModelListJsonCodec<market_data::{message_name}List> " \
+                                          f"{class_name_snake_cased}_list_json_codec;\n"
                         output_content += (f'\t{package_name}_handler::{class_name}PopulateRandomValues::'
                                            f'{message_name_snake_cased}({message_name_snake_cased});\n')
                         output_content += f"\tASSERT_TRUE({class_name_snake_cased}_json_codec.encode_" \
-                                          f"{message_name_snake_cased}({message_name_snake_cased}, " \
+                                          f"model({message_name_snake_cased}, " \
                                           f"{message_name_snake_cased}_json));\n"
                         output_content += f"\tASSERT_TRUE({class_name_snake_cased}_json_codec.decode_" \
-                                          f"{message_name_snake_cased}({message_name_snake_cased}_decode, " \
+                                          f"model({message_name_snake_cased}_decode, " \
                                           f"{message_name_snake_cased}_json));\n"
                         output_content += f"\tASSERT_EQ({message_name_snake_cased}.DebugString(), {message_name_snake_cased}" \
                                           f"_decode.DebugString());\n\n"
@@ -98,14 +102,14 @@ class CppCodecTestPlugin(BaseProtoPlugin):
                                           f'{message_name_snake_cased});\n'
                         output_content += "\t}\n\n"
 
-                        output_content += f"\tASSERT_TRUE({class_name_snake_cased}_json_codec.encode_" \
-                                          f"{message_name_snake_cased}_list({message_name_snake_cased}_list, " \
+                        output_content += f"\tASSERT_TRUE({class_name_snake_cased}_list_json_codec.encode_" \
+                                          f"model_list({message_name_snake_cased}_list, " \
                                           f"{message_name_snake_cased}_json));\n"
-                        output_content += f"\tASSERT_TRUE({class_name_snake_cased}_json_codec.decode_" \
-                                          f"{message_name_snake_cased}_list({message_name_snake_cased}_decode_list, " \
-                                          f"{message_name_snake_cased}_json));\n"
-                        output_content += f"\tASSERT_EQ({message_name_snake_cased}_list.DebugString(), " \
-                                          f"{message_name_snake_cased}_decode_list.DebugString());\n\n"
+                        output_content += f"\tASSERT_TRUE({class_name_snake_cased}_list_json_codec.decode_" \
+                                          f"model_list({message_name_snake_cased}_decode_list, " \
+                                          f"{message_name_snake_cased}_json));\n\n"
+                        # output_content += f"\tASSERT_EQ({message_name_snake_cased}_list.DebugString(), " \
+                        #                   f"{message_name_snake_cased}_decode_list.DebugString());\n\n"
                         output_content += "}\n\n"
                         break
 

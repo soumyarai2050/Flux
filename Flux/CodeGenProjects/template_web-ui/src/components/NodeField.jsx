@@ -29,6 +29,12 @@ const NodeField = (props) => {
     }, [props.data.forceUpdate])
 
     useEffect(() => {
+        if (props.mode === Modes.READ_MODE) {
+            setInputValue(props.data.value);
+        }
+    }, [props.data.value])
+
+    useEffect(() => {
         if (inputRef.current && focus && cursorPos.current !== null) {
             if (inputRef.current.selectionStart !== cursorPos.current) {
                 inputRef.current.setSelectionRange(cursorPos.current, cursorPos.current);
@@ -201,6 +207,9 @@ const NodeField = (props) => {
             <>
                 {props.data.numberFormat && props.data.numberFormat === '%' && (
                     <InputAdornment position='end'>%</InputAdornment>
+                )}
+                {props.data.numberFormat && props.data.numberFormat === 'bps' && (
+                    <InputAdornment position='end'>bps</InputAdornment>
                 )}
                 {validationError.current && (
                     <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>

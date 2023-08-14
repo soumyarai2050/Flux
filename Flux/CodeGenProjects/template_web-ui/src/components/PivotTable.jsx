@@ -12,8 +12,8 @@ const pivotTableDefaultProps = {
     rows: [],
     cols: [],
     vals: [],
-    aggregatorName: "Count",
-    rendererName: "Table"
+    aggregatorName: 'Count',
+    rendererName: 'Table'
 }
 
 function PivotTable({ pivotData }) {

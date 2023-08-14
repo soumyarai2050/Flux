@@ -28,6 +28,7 @@ file(GLOB CppTest_SRC ${CppTest}/*)
 file(GLOB CppUtilGen_SRC ${CppUtilGen}/*)
 file(GLOB ProtoGenCc_SRC ${ProtoGenCc}/*)
 file(GLOB App_SRC ${App}/*)
+file(GLOB FluxCppCore_SRC ${FluxCppCore}/*)
 
 
 FetchContent_MakeAvailable(googletest)
@@ -49,6 +50,7 @@ set(SRC_FILES
         ${CppUtilGen_SRC}
         ${ProtoGenCc_SRC}
         ${App_SRC}
+        ${FluxCppCore_SRC}
         )
 
 message(SRC_FILES ${SRC_FILES})

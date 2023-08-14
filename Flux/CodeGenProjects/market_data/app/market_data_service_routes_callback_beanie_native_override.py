@@ -62,6 +62,15 @@ class MarketDataServiceRoutesCallbackBeanieNativeOverride(MarketDataServiceRoute
         dash_obj = dash_class_type(**dash)
         return [dash_obj]
 
+    async def get_last_trade_with_symbol_n_start_n_end_time_query_pre(
+            self, time_series_last_trade_class_type: Type[TimeSeriesLastTrade], symbol: str,
+            start_datetime: DateTime, end_datetime: DateTime):
+        from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_routes import (
+            underlying_read_time_series_last_trade_http)
+        from Flux.CodeGenProjects.market_data.app.aggregate import get_last_trade_with_symbol_n_start_n_end_time
+        return await underlying_read_time_series_last_trade_http(
+            get_last_trade_with_symbol_n_start_n_end_time(symbol, start_datetime, end_datetime))
+
 
 def tob_filter_callable(tob_obj_json_str, **kwargs):
     symbols = kwargs.get("symbols")

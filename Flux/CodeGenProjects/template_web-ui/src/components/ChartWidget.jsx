@@ -24,14 +24,21 @@ function ChartWidget(props) {
     const [openPartition, setOpenPartition] = useState(false);
     const [anchorEl, setAnchorEl] = useState(null);
     const [chartObj, setChartObj] = useState({});
+    const [theme, setTheme] = useState('light');
 
-    const schema = updateChartSchema(props.schema, props.collections);
-    const datasets = getChartDatasets(props.rows, props.partitionFld);
+    const schema = updateChartSchema(props.schema, props.collections, props.collectionView);
+    const datasets = getChartDatasets(props.rows, props.partitionFld, chartObj);
+
+    useEffect(() => {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            setTheme('dark');
+        }
+    }, [])
 
     useEffect(() => {
         if (Object.keys(storedData).length > 0) {
             const updatedObj = addxpath(cloneDeep(storedData));
-            setChartObj(updateChartDataObj(updatedObj, props.collections, props.rows, datasets, props.partitionFld));
+            setChartObj(updateChartDataObj(updatedObj, props.collections, props.rows, datasets, props.partitionFld, props.collectionView));
         }
     }, [storedData, props.filters, props.partitionFld])
 
@@ -102,7 +109,7 @@ function ChartWidget(props) {
     }
 
     const onCreate = () => {
-        let updatedObj = generateObjectFromSchema(schema, _.get(schema, [SCHEMA_DEFINITIONS_XPATH, name]), null, ['xAxis', 'yAxis']);
+        let updatedObj = generateObjectFromSchema(schema, _.get(schema, [SCHEMA_DEFINITIONS_XPATH, name]));
         updatedObj = addxpath(updatedObj);
         setModifiedData(updatedObj);
         setData(updatedObj);
@@ -227,7 +234,7 @@ function ChartWidget(props) {
                     {props.rows.length > 0 &&
                         <EChart
                             loading={false}
-                            theme='light'
+                            theme={theme}
                             option={{
                                 legend: {},
                                 tooltip: { trigger: 'axis' },

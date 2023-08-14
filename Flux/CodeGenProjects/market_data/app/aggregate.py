@@ -251,6 +251,37 @@ def get_latest_bar_data_for_each_symbol():
     ]}
 
 
+def get_last_trade_with_symbol_n_start_n_end_time(symbol: str, start_datetime: DateTime, end_datetime: DateTime):
+    agg_pipline = {"aggregate": [
+        {
+            "$match": {
+                "symbol": symbol
+            }
+        },
+        {
+            "$match": {
+                "$and": [
+                    {
+                        '$expr': {
+                            '$gte': [
+                                '$time', start_datetime
+                            ]
+                        }
+                    },
+                    {
+                        '$expr': {
+                            '$lte': [
+                                '$time', end_datetime
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    ]}
+    return agg_pipline
+
+
 # {
 #     "$merge": {
 #         "into": "MarketDepth",

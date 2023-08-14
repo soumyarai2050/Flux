@@ -46,7 +46,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "#include <unordered_map>\n\n"
         output_content += f'#include "../../cpp_app/include/{class_name}_mongo_db_handler.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_key_handler.h"\n'
-        output_content += f'#include "../CppCodec/{class_name}_json_codec.h"\n'
+        output_content += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_max_id_handler.h"\n'
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
         return output_content
@@ -55,16 +55,16 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     def generate_class_handler(class_name: str, message_name: str, package_name: str, message_name_snake_cased: str,
                                file_name: str):
         output_content: str = ""
-        output_content += f"\tclass {class_name}MongoDB{message_name}Codec "
-        output_content += "{\n\n\tpublic:\n\t\t"
-        output_content += (f'explicit {class_name}MongoDB{message_name}Codec(std::shared_ptr<{package_name}_handler::'
-                           f'{class_name}_MongoDBHandler> mongo_db_, quill::Logger* logger) : mongo_db(mongo_db_), '
-                           f'logger_(logger)')
-        output_content += " {\n"
-        output_content += (f'\t\t\t{message_name_snake_cased}_collection = mongo_db->{file_name}_db[{package_name}'
-                           f'_handler::{message_name_snake_cased}_msg_name];\n')
-        output_content += f"\t\t\tinit_next_{message_name_snake_cased}_insert_key();\n"
-        output_content += "\t\t}\n\n"
+        output_content += f"\tclass {class_name}MongoDB{message_name}Codec {{\n\n"
+        # output_content += "{\n\n\tpublic:\n\t\t"
+        # output_content += (f'explicit {class_name}MongoDB{message_name}Codec(std::shared_ptr<{package_name}_handler::'
+        #                    f'{class_name}_MongoDBHandler> mongo_db_, quill::Logger* logger) : mongo_db(mongo_db_), '
+        #                    f'logger_(logger)')
+        # output_content += " {\n"
+        # output_content += (f'\t\t\t{message_name_snake_cased}_collection = mongo_db->{file_name}_db[{package_name}'
+        #                    f'_handler::{message_name_snake_cased}_msg_name];\n')
+        # output_content += f"\t\t\tinit_next_{message_name_snake_cased}_insert_key();\n"
+        # output_content += "}\n\n"
         return output_content
 
     @staticmethod
@@ -280,9 +280,9 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f'\t\t\t}} // else not required: all_{message_name_snake_cased}_data_from_db_json_string is ' \
                           f'empty so need to perform any operation\n'
         output_content += f"\t\t\tif (!all_{message_name_snake_cased}_data_from_db_json_string.empty()) \n"
-        output_content += f"\t\t\t\tstatus = {class_name}JSONCodec::decode_{message_name_snake_cased}_list" \
-                          f"({message_name_snake_cased}_list_obj_out, all_{message_name_snake_cased}_data_from" \
-                          f"_db_json_string);\n"
+        output_content += f"\t\t\t\tstatus = FluxCppCore::RootModelListJsonCodec<market_data::{message_name}List>::" \
+                          f"decode_model_list({message_name_snake_cased}_list_obj_out, all_" \
+                          f"{message_name_snake_cased}_data_from_db_json_string);\n"
 
         output_content += f"\t\t\treturn status;\n"
         output_content += "\t\t}\n"
@@ -301,7 +301,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f'\t\t\t\tsize_t pos = {message_name_snake_cased}_doc.find("_id");\n'
         output_content += "\t\t\t\tif (pos != std::string::npos)\n"
         output_content += f'\t\t\t\t\t{message_name_snake_cased}_doc.erase(pos, 1);\n'
-        output_content += f'\t\t\t\tstatus = {class_name}JSONCodec::decode_{message_name_snake_cased}(' \
+        output_content += f'\t\t\t\tstatus = FluxCppCore::RootModelJsonCodec<market_data::{message_name}>::decode_model(' \
                           f'{message_name_snake_cased}_obj_out, {message_name_snake_cased}_doc);\n'
         output_content += f"\t\t\t\treturn status;\n"
         output_content += "\t\t\t} else {\n"
@@ -913,10 +913,10 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     def generate_prepare_doc(self, message: protogen.Message, message_name_snake_cased: str,
                              package_name: str, message_name: str):
         output_content: str = ""
-        # output_content += f"\tprotected:\n\n"
-        output_content += f"\t\tvoid prepare_{message_name_snake_cased}_doc(const {package_name}::{message_name} " \
+        output_content += f"\tprotected:\n\n"
+        output_content += f"\t\tvoid prepare_doc(const {package_name}::{message_name} " \
                           f"&{message_name_snake_cased}_obj, bsoncxx::builder::basic::document " \
-                          f"&{message_name_snake_cased}_document, const IsUpdateOrPatch is_update_or_patch) const"
+                          f"&{message_name_snake_cased}_document) const"
         output_content += " {\n"
 
         for field in message.fields:
@@ -983,9 +983,9 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                               package_name: str, message_name: str):
 
         output_content: str = ""
-        output_content += f"\t\tvoid prepare_{message_name_snake_cased}_list_doc(const {package_name}::{message_name}List " \
+        output_content += f"\t\tvoid prepare_list_doc(const {package_name}::{message_name}List " \
                           f"&{message_name_snake_cased}_list_obj, std::vector<bsoncxx::builder::basic::document> " \
-                          f"&{message_name_snake_cased}_document_list, const IsUpdateOrPatch is_update_or_patch) const"
+                          f"&{message_name_snake_cased}_document_list) const"
         output_content += " {\n"
         output_content += f"\t\t\tfor (int i =0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}_size(); " \
                           f"++i) {{\n"
@@ -1061,15 +1061,15 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     @staticmethod
     def generate_util_method_handler(message_name: str, message_name_snake_cased: str, class_name: str):
         output_content: str = ""
-        output_content += f"\t\tstd::string {message_name}KeyToDbIdAsString() {{\n"
-        output_content += f'\t\t\tstd::string result = "{message_name_snake_cased}_key_to_db_id: ";\n'
-        output_content += '\t\t\tint index = 1;\n'
-        output_content += f'\t\t\tfor (const auto& entry : {message_name_snake_cased}_key_to_db_id) {{\n'
-        output_content += (f'\t\t\t\tresult += "key " + std::to_string(index) + ":" + entry.first + " ; value " '
-                           f'+ std::to_string(index) + ":" + std::to_string(entry.second);\n')
-        output_content += "\t\t\t\t++index;\n"
-        output_content += "\t\t\t}\n"
-        output_content += "\t\t\treturn result;\n\t\t}\n\n"
+        # output_content += f"\t\tstd::string {message_name}KeyToDbIdAsString() {{\n"
+        # output_content += f'\t\t\tstd::string result = "{message_name_snake_cased}_key_to_db_id: ";\n'
+        # output_content += '\t\t\tint index = 1;\n'
+        # output_content += f'\t\t\tfor (const auto& entry : {message_name_snake_cased}_key_to_db_id) {{\n'
+        # output_content += (f'\t\t\t\tresult += "key " + std::to_string(index) + ":" + entry.first + " ; value " '
+        #                    f'+ std::to_string(index) + ":" + std::to_string(entry.second);\n')
+        # output_content += "\t\t\t\t++index;\n"
+        # output_content += "\t\t\t}\n"
+        # output_content += "\t\t\treturn result;\n\t\t}\n\n"
 
         output_content += f"\t\tstatic int32_t get_next_{message_name_snake_cased}_insert_id() {{\n"
         output_content += "\t\t\tstd::lock_guard<std::mutex> lk(max_id_mutex);\n"
@@ -1112,50 +1112,50 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         # output_content += "\n\tenum class IsUpdateOrPatch {\n"
         # output_content += "\t\tDB_TRUE = true,\n"
         # output_content += "\t\tDB_FALSE = false\n\t};\n\n"
-        #
-        # for message in self.root_message_list:
-        #     if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
-        #         for field in message.fields:
-        #             field_name: str = field.proto.name
-        #             field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
-        #             if CppDbHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
-        #                 message_name = message.proto.name
-        #                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        #
-        #                 output_content += self.generate_class_handler(class_name, message_name, package_name,
-        #                                                               message_name_snake_cased, file_name)
-        #
-        #                 output_content += self.generate_insert_handler(class_name, message_name, package_name,
-        #                                                                message_name_snake_cased, file_name)
-        #
-        #                 output_content += self.generate_patch_handler(class_name, message_name, package_name,
-        #                                                               message_name_snake_cased, file_name)
-        #
-        #                 output_content += self.generate_public_members_handler(class_name, message_name, package_name,
-        #                                                                        message_name_snake_cased, file_name)
-        #
-        #                 output_content += self.generate_bulk_insert_and_update(message_name_snake_cased, message_name,
-        #                                                                        package_name)
-        #                 output_content += self.generate_get_data_from_db(message_name, package_name,
-        #                                                                  message_name_snake_cased, class_name)
-        #                 output_content += self.generate_delete_from_db_handler(message_name_snake_cased)
-        #
-        #                 output_content += self.generate_util_method_handler(message_name, message_name_snake_cased,
-        #                                                                     class_name)
-        #
-        #                 output_content += self.generate_private_members_handler(class_name, package_name,
-        #                                                                         message_name_snake_cased, file_name)
-        #                 output_content += self.generate_prepare_doc(message, message_name_snake_cased, package_name,
-        #                                                             message_name)
-        #                 output_content += "\t\t}\n\n"
-        #                 output_content += self.generate_prepare_docs(message, message_name_snake_cased, package_name,
-        #                                                              message_name)
-        #                 output_content += f"\t\t\t\t{message_name_snake_cased}_document_list.emplace_back(std::move(" \
-        #                                   f"{message_name_snake_cased}_document));\n"
-        #                 output_content += "\t\t\t}\n\t\t}\n\n"
-        #
-        #                 output_content += "\t};\n\n"
-        #                 break
+
+        for message in self.root_message_list:
+            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppDbHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
+                        message_name = message.proto.name
+                        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+                        output_content += self.generate_class_handler(class_name, message_name, package_name,
+                                                                      message_name_snake_cased, file_name)
+                        #
+                        # output_content += self.generate_insert_handler(class_name, message_name, package_name,
+                        #                                                message_name_snake_cased, file_name)
+                        #
+                        # output_content += self.generate_patch_handler(class_name, message_name, package_name,
+                        #                                               message_name_snake_cased, file_name)
+                        #
+                        # output_content += self.generate_public_members_handler(class_name, message_name, package_name,
+                        #                                                        message_name_snake_cased, file_name)
+                        #
+                        # output_content += self.generate_bulk_insert_and_update(message_name_snake_cased, message_name,
+                        #                                                        package_name)
+                        # output_content += self.generate_get_data_from_db(message_name, package_name,
+                        #                                                  message_name_snake_cased, class_name)
+                        # output_content += self.generate_delete_from_db_handler(message_name_snake_cased)
+                        #
+                        # output_content += self.generate_util_method_handler(message_name, message_name_snake_cased,
+                        #                                                     class_name)
+                        #
+                        # output_content += self.generate_private_members_handler(class_name, package_name,
+                        #                                                         message_name_snake_cased, file_name)
+                        output_content += self.generate_prepare_doc(message, message_name_snake_cased, package_name,
+                                                                    message_name)
+                        output_content += "\t\t}\n\n"
+                        output_content += self.generate_prepare_docs(message, message_name_snake_cased, package_name,
+                                                                     message_name)
+                        output_content += f"\t\t\t\t{message_name_snake_cased}_document_list.emplace_back(std::move(" \
+                                          f"{message_name_snake_cased}_document));\n"
+                        output_content += "\t\t\t}\n\t\t}\n\n"
+
+                        output_content += "\t};\n\n"
+                        break
 
         output_content += "}\n"
 

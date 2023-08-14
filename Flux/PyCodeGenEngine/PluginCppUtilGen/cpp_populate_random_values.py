@@ -40,8 +40,6 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
         output_content: str = ""
         output_content += "#pragma once\n\n"
         output_content += f'#include "../../cpp_app/include/RandomDataGen.h"\n'
-        output_content += f'#include "{class_name_snake_cased}_web_client.h"\n'
-        output_content += f'#include "{class_name_snake_cased}_max_id_handler.h"\n'
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
 
         return output_content

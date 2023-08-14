@@ -3,7 +3,7 @@ import "flux_options.proto";
 
 package market_data;
 
-enum TickTypeEnum {
+enum TickType {
   BID_SIZE = 1;
   BID = 2;
   ASK = 3;
@@ -110,16 +110,16 @@ enum TickTypeEnum {
   NOT_SET = 104;
 }
 
-enum LegTypeEnum {
+enum LegType {
   LegType_UNSPECIFIED = 1;
   LegType_EQT_A = 2;
   LegType_CB = 3;
   LegType_EQT_H = 4;
 }
 
-message LegType {
+message Leg {
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required LegTypeEnum leg_type = 2;
+  required LegType leg_type = 2;
 }
 
 message TickAttrib {

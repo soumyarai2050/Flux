@@ -1765,7 +1765,7 @@ def test_update_agg_feature_in_post_put_patch_http_call(clean_and_set_limits):
     Note: since post, put and patch all uses same method call for this feature and currently only
           underlying_create_market_depth_http contains this call, testing it to assume this feature is working
     """
-    for side in [TickTypeEnum.BID, TickTypeEnum.ASK]:
+    for side in [TickType.BID, TickType.ASK]:
         expected_cum_notional = 0
         expected_cum_qty = 0
         for position in range(1, 6):

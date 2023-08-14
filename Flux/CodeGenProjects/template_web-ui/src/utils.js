@@ -102,21 +102,18 @@ function getAutocompleteDict(autocompleteValue) {
 }
 
 function setAutocompleteValue(schema, object, autocompleteDict, propname, usageName) {
-    if (autocompleteDict.hasOwnProperty(propname)) {
-        object[usageName] = autocompleteDict[propname];
-        let autocomplete = autocompleteDict[propname];
-        if (schema.autocomplete.hasOwnProperty(object[usageName])) {
-            object.options = schema.autocomplete[autocomplete];
-        } else {
-            if (autocomplete === 'server_populate') {
-                object.serverPopulate = true;
-                delete object[usageName];
+    for (const path in autocompleteDict) {
+        if (path === propname || object.xpath.endsWith(path)) {
+            object[usageName] = autocompleteDict[path];
+            const autocompleteValue = autocompleteDict[path];
+            if (schema.autocomplete.hasOwnProperty(autocompleteValue)) {
+                object.options = schema.autocomplete[autocompleteValue];
+            } else {
+                if (autocompleteValue === 'server_populate') {
+                    object.serverPopulate = true;
+                    delete object[usageName];
+                }
             }
-            //  else {
-            //     // set enum with default value and prevent reducing the enum options
-            //     // object.options = [autocomplete];
-            //     object.value = autocomplete;
-            // }
         }
     }
 }
@@ -266,7 +263,6 @@ export function createCollections(schema, currentSchema, callerProps, collection
             if (!isRedundant) {
                 collections.push(collection);
             }
-
             if (collection.abbreviated === 'JSON') {
                 const sc = createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
                 collection.subCollections = cloneDeep(sc);
@@ -317,7 +313,6 @@ export function createCollections(schema, currentSchema, callerProps, collection
                     isRedundant = false;
                 }
             }
-
             if (!isRedundant) {
                 collections.push(collection);
             }
@@ -332,7 +327,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
     return collections;
 }
 
-export function generateObjectFromSchema(schema, currentSchema, additionalProps) {
+export function generateObjectFromSchema(schema, currentSchema, additionalProps, xpath) {
     if (additionalProps && additionalProps instanceof Object) {
         for (const key in additionalProps) {
             const prop = complexFieldProps.find(({ usageName }) => usageName === key);
@@ -347,6 +342,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps)
     let object = {};
     Object.keys(currentSchema.properties).map((propname) => {
         let metadata = currentSchema.properties[propname];
+        xpath = xpath ? xpath + '.' + propname : propname;
 
         // do not create fields if populated from server or creation is not allowed on the fields.
         if (metadata.server_populate || metadata.ui_update_only) return;
@@ -357,12 +353,14 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps)
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
                 let autocompleteDict = getAutocompleteDict(autocomplete);
 
-                if (autocompleteDict.hasOwnProperty(propname)) {
-                    if (!schema.autocomplete.hasOwnProperty(autocompleteDict[propname])) {
-                        if (autocompleteDict[propname] === 'server_populate') {
-                            delete object[propname];
-                        } else {
-                            object[propname] = autocompleteDict[propname];
+                for (const path in autocompleteDict) {
+                    if (propname === path || xpath.endsWith(path)) {
+                        if (!schema.autocomplete.hasOwnProperty(autocompleteDict[path])) {
+                            if (autocompleteDict[path] === 'server_populate') {
+                                delete object[propname];
+                            } else {
+                                object[propname] = autocompleteDict[path];
+                            }
                         }
                     }
                 }
@@ -380,12 +378,14 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps)
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
                 let autocompleteDict = getAutocompleteDict(autocomplete);
 
-                if (autocompleteDict.hasOwnProperty(propname)) {
-                    if (!schema.autocomplete.hasOwnProperty(autocompleteDict[propname])) {
-                        if (autocompleteDict[propname] === 'server_populate') {
-                            delete object[propname];
-                        } else {
-                            object[propname] = autocompleteDict[propname];
+                for (const path in autocompleteDict) {
+                    if (propname === path || xpath.endsWith(path)) {
+                        if (!schema.autocomplete.hasOwnProperty(autocompleteDict[path])) {
+                            if (autocompleteDict[path] === 'server_populate') {
+                                delete object[propname];
+                            } else {
+                                object[propname] = autocompleteDict[path];
+                            }
                         }
                     }
                 }
@@ -399,7 +399,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps)
                 let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
 
                 if (!childSchema.server_populate && !metadata.server_populate) {
-                    let child = generateObjectFromSchema(schema, childSchema);;
+                    let child = generateObjectFromSchema(schema, childSchema, null, xpath);
                     object[propname] = [];
                     object[propname].push(child);
                 }
@@ -416,7 +416,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps)
 
             if (!(childSchema.server_populate || childSchema.ui_update_only)) {
                 if (required) {
-                    object[propname] = generateObjectFromSchema(schema, childSchema);
+                    object[propname] = generateObjectFromSchema(schema, childSchema, null, xpath);
                 } else {
                     object[propname] = null;
                 }
@@ -428,7 +428,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps)
 }
 
 function getEnumValues(schema, ref, type) {
-    if (type == DataTypes.ENUM) {
+    if (type === DataTypes.ENUM) {
         return schema[ref[1]][ref[2]]['enum'];
     }
     return schema[ref[1]][ref[2]];
@@ -1854,8 +1854,12 @@ export function getLocalizedValueAndSuffix(metadata, value) {
     if (typeof value !== DataTypes.NUMBER) {
         return [adornment, value];
     }
-    if (metadata.numberFormat && metadata.numberFormat.includes('%')) {
-        adornment = '%';
+    if (metadata.numberFormat) {
+        if (metadata.numberFormat.includes('%')) {
+            adornment = '%';
+        } else if (metadata.numberFormat.includes('bps')) {
+            adornment = 'bps';
+        }
     }
     if (metadata.displayType === DataTypes.INTEGER) {
         return [adornment, floatToInt(value)]
@@ -2138,10 +2142,10 @@ export function getActiveRows(rows, page, pageSize, order, orderBy) {
 export function compareNCheckNewArrayItem(obj1, obj2) {
     for (const key in obj1) {
         if (obj1[key] instanceof Array && obj2[key] instanceof Array) {
-            if (obj1[key].length !== obj2.length) {
+            if (obj1[key].length !== obj2[key].length) {
                 return true;
             }
-            for (let i = 0; obj1[key].length; i++) {
+            for (let i = 0; i < obj1[key].length; i++) {
                 if (obj1[key] instanceof Object) {
                     compareNCheckNewArrayItem(obj1[key], obj2[key]);
                 }
@@ -2270,8 +2274,13 @@ const ChartAxisType = {
     VALUE: 'value'
 }
 
-function getChartAxisTypeAndName(encode, collections) {
-    const collection = collections.find(collection => collection.tableTitle === encode);
+function getChartAxisTypeAndName(encode, collections, collectionView = false) {
+    let collection;
+    if (collectionView) {
+        collection = collections.find(collection => collection.title === encode);
+    } else {
+        collection = collections.find(collection => collection.tableTitle === encode);
+    }
     let name = null;
     if (collection) {
         name = collection.title;
@@ -2299,7 +2308,7 @@ function getAxisMax(rows, field, index) {
     return max * scale;
 }
 
-export function updateChartDataObj(chartDataObj, collections, rows, datasets, partitionFld) {
+export function updateChartDataObj(chartDataObj, collections, rows, datasets, partitionFld, collectionView = false) {
     chartDataObj = cloneDeep(chartDataObj);
     const xEndodes = [];
     const yEncodes = [];
@@ -2340,19 +2349,20 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, pa
         }
     })
     xEndodes.forEach((xEncode) => {
-        const [xAxisType, xAxisName] = getChartAxisTypeAndName(xEncode, collections);
+        const [xAxisType, xAxisName] = getChartAxisTypeAndName(xEncode, collections, collectionView);
         // only two x-axis is allowed per chart.
         // if more than 2 x-axis is present, only considers the first 2 x-axis
         // this limitation is added to avoid unsupported configurations
         if (xAxis.length === 0) {
             xAxis.push({
                 type: xAxisType,
-                name: xAxisName
+                name: xAxisName,
+                encode: xEncode
             })
         }
     })
     yEncodes.forEach((yEncode, index) => {
-        const [yAxisType, yAxisName] = getChartAxisTypeAndName(yEncode, collections);
+        const [yAxisType, yAxisName] = getChartAxisTypeAndName(yEncode, collections, collectionView);
         const max = getAxisMax(rows, yEncode, index);
         // only two y-axis is allowed per chart.
         // if more than 2 y-axis is present, only considers the first 2 y-axis
@@ -2361,6 +2371,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, pa
             yAxis.push({
                 type: yAxisType,
                 name: yAxisName,
+                encode: yEncode,
                 splitNumber: 5,
                 max: max,
                 interval: max / 5
@@ -2380,8 +2391,6 @@ function updateChartAttributesInSchema(schema, currentSchema) {
             if (primitiveDataTypes.includes(attributes.type)) {
                 if (key === DB_ID) {
                     attributes.server_populate = true;
-                } else if (['xAxisIndex', 'yAxisIndex', 'datasetIndex', 'max', 'splitNumber', 'interval'].includes(key)) {
-                    attributes.hide = true;
                 } else if (key === 'chart_name') {
                     attributes.orm_no_update = true;
                 }
@@ -2394,17 +2403,21 @@ function updateChartAttributesInSchema(schema, currentSchema) {
     }
 }
 
-export function updateChartSchema(schema, collections) {
+export function updateChartSchema(schema, collections, collectionView = false) {
     schema = cloneDeep(schema);
     const chartDataSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
     updateChartAttributesInSchema(schema, chartDataSchema);
     const chartEncodeSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_encode']);
     chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
-    const fldList = collections.map(collection => collection.tableTitle);
+    let fldList;
+    if (collectionView) {
+        fldList = collections.map(collection => collection.title);
+    } else {
+        fldList = collections.map(collection => collection.tableTitle);
+    }
     schema.autocomplete['FldList'] = fldList;
     return schema;
 }
-
 
 export function getFilterDict(filters) {
     const filterDict = {};
@@ -2429,7 +2442,7 @@ export function getFiltersFromDict(filterDict) {
     return filters;
 }
 
-export function getChartDatasets(rows, partitionFld) {
+export function getChartDatasets(rows, partitionFld, chartObj) {
     if (rows.length === 0) {
         return [];
     } else {
@@ -2447,6 +2460,12 @@ export function getChartDatasets(rows, partitionFld) {
             }
         } else {
             groups = [rows];
+        }
+        if (chartObj.xAxis) {
+            const axis = chartObj.xAxis[0];
+            groups.forEach(group => {
+                group.sort((a, b) => _.get(a, axis.encode) > _.get(b, axis.encode) ? 1 : _.get(a, axis.encode) < _.get(b, axis.encode) ? -1 : 0);
+            })
         }
         groups.forEach(group => {
             const dateset = {

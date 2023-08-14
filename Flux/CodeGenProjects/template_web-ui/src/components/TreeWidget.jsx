@@ -73,7 +73,6 @@ const TreeWidget = (props) => {
     }
 
     const onDateTimeChange = (dataxpath, xpath, value) => {
-        console.log(value);
         let updatedData = cloneDeep(props.data);
         _.set(updatedData, dataxpath, value);
         props.onUpdate(updatedData);
@@ -118,7 +117,6 @@ const TreeWidget = (props) => {
             }
             // let changesDict = getXpathKeyValuePairFromObject(_.get(updatedData, xpath));
             // props.onUserChange(undefined, undefined, true, changesDict);
-            console.log({ updatedData });
             props.onUpdate(updatedData, 'remove');
         } else if (e.currentTarget.attributes['data-add']) {
             let updatedData = cloneDeep(props.data);
@@ -169,7 +167,6 @@ const TreeWidget = (props) => {
             }
             // let changesDict = getXpathKeyValuePairFromObject(emptyObject);
             // props.onUserChange(undefined, undefined, false, changesDict);
-            console.log({ updatedData });
             props.onUpdate(updatedData, 'add');
         } else {
             let xpath = e.currentTarget.attributes;

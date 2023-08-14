@@ -35,9 +35,10 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
         output += "#pragma once\n\n"
         output += '#include "gtest/gtest.h"\n\n'
         output += f'#include "{file_name}.pb.h"\n'
-        output += f'#include "{class_name}_web_client.h"\n'
         output += f'#include "{class_name}_max_id_handler.h"\n'
         output += f'#include "../../cpp_app/include/RandomDataGen.h"\n'
+        output += '#include "../../FluxCppCore/include/base_web_client.h"\n'
+        output += '#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
         output += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output
 
@@ -66,7 +67,8 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
         output_content += 'const std::string host = "127.0.0.1";\n'
         output_content += 'const std::string port = "8040";\n'
 
-        output_content += f"using {package_name}_handler::{class_name}JSONCodec;\n\n"
+        output_content += f"using FluxCppCore::RootModelWebClient;\n"
+        output_content += "using FluxCppCore::RootModelJsonCodec;\n\n"
 
         for message in self.root_message_list:
             message_name = message.proto.name
@@ -84,23 +86,32 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\tstd::string {message_name_snake_cased}_json;\n'
                             output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
                             output_content += f'\tRandomDataGen random_data_gen;\n'
-                            output_content += (f'\t{package_name}_handler::{class_name}WebClient {class_name_snake_cased}'
-                                               f'_web_client(host, port);\n\n')
+                            # output_content += (f'\t{package_name}_handler::{class_name}WebClient {class_name_snake_cased}'
+                            #                    f'_web_client(host, port);\n\n')
+                            output_content += f"\tRootModelWebClient<{package_name}::{message_name}, " \
+                                              f"{package_name}_handler::create_{message_name_snake_cased}_client_url, " \
+                                              f"{package_name}_handler::get_{message_name_snake_cased}_client_url, " \
+                                              f"{package_name}_handler::get_{message_name_snake_cased}" \
+                                              f"_max_id_client_url, {package_name}_handler::put_" \
+                                              f"{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
+                                              f"{message_name_snake_cased}_client_url, {package_name}_handler::" \
+                                              f"delete_{message_name_snake_cased}_client_url> {class_name_snake_cased}" \
+                                              f"_web_client(host, port);\n\n"
                             output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}' \
                                               f'({message_name_snake_cased});\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
                             output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.create_' \
-                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
+                                              f'client({message_name_snake_cased}_from_server));\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
                                               f'_from_server.cumulative_notional());\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
                                               f'_from_server.cumulative_qty());\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
                                               f'_from_server.cumulative_avg_px());\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
                                               f'_json_from_server, true));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
                             output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
                                               f'{message_name_snake_cased}_json);\n\n'
@@ -108,9 +119,9 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\tauto {message_name_snake_cased}_id = {message_name_snake_cased}.id();\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
                             output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
-                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.get_{message_name_snake_cased}' \
-                                              f'_client({message_name_snake_cased}_from_server, {message_name_snake_cased}_id));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}' \
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.get_' \
+                                              f'client({message_name_snake_cased}_from_server, {message_name_snake_cased}_id));\n'
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model' \
                                               f'({message_name_snake_cased}_from_server, {message_name_snake_cased}' \
                                               f'_json_from_server, true));\n'
                             output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
@@ -120,24 +131,24 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
                             output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
 
-                            output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_"
-                                               f"{message_name_snake_cased}_max_id(market_data_web_client);\n")
+                            # output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_"
+                            #                    f"{message_name_snake_cased}_max_id(market_data_web_client);\n")
                             output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}(' \
                                               f'{message_name_snake_cased});\n'
                             output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n\n'
-                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_{message_name_snake_cased}' \
-                                              f'_client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_' \
+                                              f'client({message_name_snake_cased}_from_server));\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
                                               f'_from_server.cumulative_notional());\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
                                               f'_from_server.cumulative_qty());\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
                                               f'_from_server.cumulative_avg_px());\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
                                               f'_json_from_server, true));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
                             output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
                                               f'{message_name_snake_cased}_json);\n\n'
@@ -163,17 +174,17 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\n\t{message_name_snake_cased}_from_server.CopyFrom(' \
                                               f'{message_name_snake_cased}_for_patch);\n'
                             output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.patch_' \
-                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
+                                              f'client({message_name_snake_cased}_from_server));\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_notional({message_name_snake_cased}' \
                                               f'_from_server.cumulative_notional());\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_qty({message_name_snake_cased}' \
                                               f'_from_server.cumulative_qty());\n'
                             output_content += f'\t{message_name_snake_cased}.set_cumulative_avg_px({message_name_snake_cased}' \
                                               f'_from_server.cumulative_avg_px());\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
                                               f'_json_from_server, true));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
                             output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
                                               f'{message_name_snake_cased}_json);\n\n'
@@ -184,7 +195,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\tjson += R"(}})";\n\n'
 
                             output_content += f'\tauto delete_response = {class_name_snake_cased}_web_client.delete_' \
-                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_id);\n'
+                                              f'client({message_name_snake_cased}_id);\n'
                             output_content += "\tASSERT_EQ(delete_response, json);\n"
                             output_content += "}\n\n"
                         else:
@@ -195,17 +206,26 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\tstd::string {message_name_snake_cased}_json;\n'
                             output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
                             output_content += f'\tRandomDataGen random_data_gen;\n'
-                            output_content += (f'\t{package_name}_handler::{class_name}WebClient '
-                                               f'{class_name_snake_cased}_web_client(host, port);\n\n')
+                            # output_content += (f'\t{package_name}_handler::{class_name}WebClient '
+                            #                    f'{class_name_snake_cased}_web_client(host, port);\n\n')
+                            output_content += f"\tRootModelWebClient<{package_name}::{message_name}, " \
+                                              f"{package_name}_handler::create_{message_name_snake_cased}_client_url, " \
+                                              f"{package_name}_handler::get_{message_name_snake_cased}_client_url, " \
+                                              f"{package_name}_handler::get_{message_name_snake_cased}" \
+                                              f"_max_id_client_url, {package_name}_handler::put_" \
+                                              f"{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
+                                              f"{message_name_snake_cased}_client_url, {package_name}_handler::" \
+                                              f"delete_{message_name_snake_cased}_client_url> {class_name_snake_cased}" \
+                                              f"_web_client(host, port);\n\n"
                             output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}' \
                                               f'({message_name_snake_cased});\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
                             output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.create_' \
-                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
                                               f'_json_from_server, true));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
                             output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
                                               f'{message_name_snake_cased}_json);\n\n'
@@ -213,9 +233,9 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\tauto {message_name_snake_cased}_id = {message_name_snake_cased}.id();\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.Clear();\n'
                             output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
-                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.get_{message_name_snake_cased}' \
-                                              f'_client({message_name_snake_cased}_from_server, {message_name_snake_cased}_id));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}' \
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.get_' \
+                                              f'client({message_name_snake_cased}_from_server, {message_name_snake_cased}_id));\n'
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model' \
                                               f'({message_name_snake_cased}_from_server, {message_name_snake_cased}' \
                                               f'_json_from_server, true));\n'
                             output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
@@ -225,18 +245,18 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\t{message_name_snake_cased}_json_from_server.clear();\n'
                             output_content += f'\t{message_name_snake_cased}_json.clear();\n\n'
 
-                            output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_"
-                                               f"{message_name_snake_cased}_max_id({class_name_snake_cased}_web_client);\n")
+                            # output_content += (f"\t{package_name}_handler::{class_name}MaxIdHandler::update_"
+                            #                    f"{message_name_snake_cased}_max_id({class_name_snake_cased}_web_client);\n")
                             output_content += (f'\t{package_name}_handler::{class_name}PopulateRandomValues::'
                                                f'{message_name_snake_cased}({message_name_snake_cased});\n')
                             output_content += f'\t{message_name_snake_cased}.set_id({message_name_snake_cased}_id);\n'
                             output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n\n'
-                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_{message_name_snake_cased}' \
-                                              f'_client({message_name_snake_cased}_from_server));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.put_' \
+                                              f'client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
                                               f'_json_from_server, true));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
                             output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
                                               f'{message_name_snake_cased}_json);\n\n'
@@ -261,11 +281,11 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\n\t{message_name_snake_cased}_from_server.CopyFrom(' \
                                               f'{message_name_snake_cased}_for_patch);\n'
                             output_content += f'\tASSERT_TRUE({class_name_snake_cased}_web_client.patch_' \
-                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_from_server));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                                              f'client({message_name_snake_cased}_from_server));\n'
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}_from_server, {message_name_snake_cased}' \
                                               f'_json_from_server, true));\n'
-                            output_content += f'\tASSERT_TRUE({class_name}JSONCodec::encode_{message_name_snake_cased}(' \
+                            output_content += f'\tASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::encode_model(' \
                                               f'{message_name_snake_cased}, {message_name_snake_cased}_json, true));\n'
                             output_content += f'\tASSERT_EQ({message_name_snake_cased}_json_from_server, ' \
                                               f'{message_name_snake_cased}_json);\n\n'
@@ -276,7 +296,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                             output_content += f'\tjson += R"(}})";\n\n'
 
                             output_content += f'\tauto delete_response = {class_name_snake_cased}_web_client.delete_' \
-                                              f'{message_name_snake_cased}_client({message_name_snake_cased}_id);\n'
+                                              f'client({message_name_snake_cased}_id);\n'
                             output_content += "\tASSERT_EQ(delete_response, json);\n"
                             output_content += "}\n\n"
                         break

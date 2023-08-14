@@ -5,7 +5,7 @@ import "trade_core.proto";
 
 package market_data;
 
-enum InvertorySource {
+enum InventorySource {
     InventorySource_UNSPECIFIED = 1;
     QFII = 2;
     CONNECT = 3;
@@ -59,11 +59,12 @@ message Inventory {
 message DashLeg {
     optional string exch_id = 1 [(FluxFldServerPopulate) = true];
     required Security sec = 2 [(FluxFldElaborateTitle) = true];
-    optional string company = 3 [(FluxFldServerPopulate) = true];
-    optional float last_px = 4 [(FluxFldServerPopulate) = true];
-    optional float last_px_change = 5 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%"];  // Against yesterday close px
-    optional float market_notional = 6 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int"];  // market current total last trade notional
-    optional float consumed_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int"];  // all mstrat total cb notional (filled)
+    optional Security sedol_sec = 3 [(FluxFldServerPopulate) = true, (FluxFldElaborateTitle) = true, (FluxFldHide) = "True", (FluxFldHelp) = "optional, populated only for CBs"];
+    optional string company = 4 [(FluxFldServerPopulate) = true];
+    optional float last_px = 5 [(FluxFldServerPopulate) = true];
+    optional float last_px_change = 6 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%"];  // Against yesterday close px
+    optional float market_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int"];  // market current total last trade notional
+    optional float consumed_notional = 8 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int"];  // all mstrat total cb notional (filled)
 }
 
 message InventorySummary {
@@ -76,10 +77,20 @@ message InventoryRequest {
     required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     optional string requestor = 2;
     optional StratType strat_type = 3;
-    optional InvertorySource invertory_source = 4;
+    optional InventorySource inventory_source = 4;
     optional int64 update_time = 5 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true];
     optional int64 qty = 6 [(FluxFldServerPopulate) = true];
     optional float max_rate = 7 [(FluxFldNumberFormat) = "%"];
     optional float usd_notional = 8 [(FluxFldDisplayType) = "int"];
     optional string note = 9;
+}
+
+message InventoryCSVRequest {
+    optional string user = 1;
+    optional string strategy = 2;
+    required string ric = 3;
+    optional int64 update_time = 4 [(FluxFldValIsDateTime) = true];
+    optional int64 quantity = 5 [(FluxFldServerPopulate) = true];
+    optional float max_fee = 6 [(FluxFldNumberFormat) = "%"];
+    optional string note = 7;
 }

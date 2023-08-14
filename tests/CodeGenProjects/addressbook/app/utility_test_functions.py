@@ -14,7 +14,7 @@ from csv import writer
 # project imports
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import TopOfBookBaseModel, \
-    QuoteOptional, LastTradeBaseModel, MarketDepthBaseModel, SymbolOverviewBaseModel, TickTypeEnum
+    QuoteOptional, LastTradeBaseModel, MarketDepthBaseModel, SymbolOverviewBaseModel, TickType
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import \
