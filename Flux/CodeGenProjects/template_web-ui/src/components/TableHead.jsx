@@ -12,6 +12,14 @@ const CustomHeadCell = (props) => {
         onRequestSort(event, property);
     };
 
+    const copyColumnHandler = (cell) => {
+        if (props.collectionView) {
+            props.copyColumnHandler(cell.key);
+        } else {
+            props.copyColumnHandler(cell.tableTitle);
+        }
+    }
+
     let emptyPrefixCells;
     if (prefixCells && prefixCells > 0) {
         emptyPrefixCells = Array(prefixCells).fill().map((_, i) => {
@@ -52,7 +60,9 @@ const CustomHeadCell = (props) => {
                             sortDirection={orderBy === cell.tableTitle ? order : false}>
                             {props.copyColumnHandler && (
                                 <Tooltip title="Click to copy column">
-                                    <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cell.tableTitle)}><ContentCopy fontSize='small' /></IconButton>
+                                    <IconButton className={classes.icon} size='small' onClick={() => copyColumnHandler(cell)}>
+                                        <ContentCopy fontSize='small' />
+                                    </IconButton>
                                 </Tooltip>
                             )}
                             <TableSortLabel

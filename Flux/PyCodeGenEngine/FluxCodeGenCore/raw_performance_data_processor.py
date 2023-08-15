@@ -64,7 +64,6 @@ class RawPerformanceDataProcessor:
                                                no_id=False))
 
         raw_perf_data_delta_series: pandas.Series = raw_perf_data_df["delta"]
-        # print(raw_perf_data_delta_series)
         min_val = raw_perf_data_delta_series.min().round(6)
         max_val = raw_perf_data_delta_series.max().round(6)
         avg_val = raw_perf_data_delta_series.mean().round(6)
@@ -84,7 +83,6 @@ class RawPerformanceDataProcessor:
                                                                                  per_70=percentiles[0.7],
                                                                                  per_80=percentiles[0.8],
                                                                                  per_90=percentiles[0.9])
-        print(processed_perf_analysis)
 
         if callable_name in self.callable_names_having_entry_to_id_in_db_dict:
             processed_perf_analysis_json = jsonable_encoder(processed_perf_analysis, by_alias=True, exclude_none=True)

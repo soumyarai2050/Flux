@@ -35,11 +35,18 @@ const DynamicMenu = (props) => {
         setShowFilter(!showFilter);
     }
 
-    const onTextChange = (e, key, value) => {
-        setFilter({
-            ...filter,
-            [key]: value
-        })
+    const onTextChange = (e, collection, value) => {
+        if (props.collectionView) {
+            setFilter({
+                ...filter,
+                [collection.title]: value
+            })
+        } else {
+            setFilter({
+                ...filter,
+                [collection.xpath]: value
+            })
+        }
     }
 
     const onApplyFilter = () => {
@@ -82,6 +89,17 @@ const DynamicMenu = (props) => {
                 <AlertBubble content={count} color={color} />
             )
         }
+    }
+
+    const getFilterCollectionValue = (collection) => {
+        if (props.collectionView) {
+            if (filter[collection.key]) {
+                return filter[collection.key];
+            }
+        } else if (filter[collection.xpath]) {
+            return filter[collection.xpath];
+        }
+        return '';
     }
 
     let filterCollections = props.collections.filter(collection => collection.filterEnable === true);
@@ -219,14 +237,16 @@ const DynamicMenu = (props) => {
                         <DialogContent>
                             {filterCollections.map((collection, index) => (
                                 <Box key={index} className={classes.filter}>
-                                    <span className={classes.filter_name}>{collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}</span>
+                                    <span className={classes.filter_name}>
+                                        {props.collectionView ? collection.key : collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}
+                                    </span>
                                     <TextField
                                         className={classes.text_field}
-                                        id={collection.key}
-                                        name={collection.key}
+                                        id={collection.tableTitle}
+                                        name={collection.tableTitle}
                                         size='small'
-                                        value={filter[collection.xpath] ? filter[collection.xpath] : ""}
-                                        onChange={(e) => onTextChange(e, collection.xpath, e.target.value)}
+                                        value={getFilterCollectionValue(collection)}
+                                        onChange={(e) => onTextChange(e, collection, e.target.value)}
                                         variant='outlined'
                                         placeholder="Comma separated values"
                                         inputProps={{

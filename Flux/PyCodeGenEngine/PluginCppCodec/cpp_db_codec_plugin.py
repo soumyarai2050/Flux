@@ -55,7 +55,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     def generate_class_handler(class_name: str, message_name: str, package_name: str, message_name_snake_cased: str,
                                file_name: str):
         output_content: str = ""
-        output_content += f"\tclass {class_name}MongoDB{message_name}Codec {{\n\n"
+        # output_content += f"\tclass {class_name}MongoDB{message_name}Codec {{\n\n"
         # output_content += "{\n\n\tpublic:\n\t\t"
         # output_content += (f'explicit {class_name}MongoDB{message_name}Codec(std::shared_ptr<{package_name}_handler::'
         #                    f'{class_name}_MongoDBHandler> mongo_db_, quill::Logger* logger) : mongo_db(mongo_db_), '
@@ -490,23 +490,23 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     def generate_repeated_nested_fields(self, message: protogen.Message, field_name, package_name,
                                         message_name_snake_cased, field, initial_parent, num_of_tabs: int | None = None):
         if num_of_tabs is None:
-            num_of_tabs = 6
+            num_of_tabs = 5
 
         output = ""
         parent_field = field.proto.name
 
         if parent_field != field_name:
-            output += f'\t\t\t\tif ({message_name_snake_cased}_obj.{parent_field}().{field_name}_size() > 0) {{\n'
-            output += f'\t\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n'
-            output += f'\t\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_obj.{parent_field}().' \
+            output += f'\t\t\tif ({message_name_snake_cased}_obj.{parent_field}().{field_name}_size() > 0) {{\n'
+            output += f'\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n'
+            output += f'\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_obj.{parent_field}().' \
                       f'{field_name}()) {{\n'
-            output += f'\t\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
+            output += f'\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
         else:
             if initial_parent == parent_field and parent_field == field_name:
-                output += f'\t\t\tif ({message_name_snake_cased}_obj.{parent_field}_size() > 0) {{\n'
-                output += f'\t\t\t\tbsoncxx::builder::basic::array {parent_field}_list;\n'
-                output += f'\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_obj.{parent_field}()) {{\n'
-                output += f'\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
+                output += f'\t\tif ({message_name_snake_cased}_obj.{parent_field}_size() > 0) {{\n'
+                output += f'\t\t\tbsoncxx::builder::basic::array {parent_field}_list;\n'
+                output += f'\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_obj.{parent_field}()) {{\n'
+                output += f'\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
             else:
                 output += "\t"*num_of_tabs + f'if ({initial_parent}_doc.{parent_field}_size() > 0) {{\n'
                 num_of_tabs += 1
@@ -525,40 +525,40 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     if parent_field != field_name:
                         if message_field_name == "id":
                             if field_type == "required":
-                                output += f'\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
+                                output += f'\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
                                           f'_id", {field_name}_doc.{message_field_name}()));\n'
                             else:
-                                output += f'\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
-                                output += f'\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
+                                output += f'\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
+                                output += f'\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
                                           f'_id", {field_name}_doc.{message_field_name}()));\n'
                         else:
                             if field_type == "required":
-                                output += f'\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
+                                output += f'\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
                                           f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc' \
                                           f'.{message_field_name}()));\n'
                             else:
-                                output += f'\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
-                                output += f'\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
+                                output += f'\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
+                                output += f'\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
                                           f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc' \
                                           f'.{message_field_name}()));\n'
                     else:
                         if initial_parent == parent_field and parent_field == field_name:
                             if message_field_name == "id":
                                 if field_type == "required":
-                                    output += f'\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp("' \
+                                    output += f'\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp("' \
                                               f'_id", {parent_field}_doc.{message_field_name}()));\n'
                                 else:
-                                    output += f'\t\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
-                                    output += f'\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp("' \
+                                    output += f'\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += f'\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp("' \
                                               f'_id", {parent_field}_doc.{message_field_name}()));\n'
                             else:
                                 if field_type == "required":
-                                    output += f'\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp(' \
+                                    output += f'\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp(' \
                                               f'{package_name}_handler::{message_field_name}_fld_name, {parent_field}_doc.' \
                                               f'{message_field_name}()));\n'
                                 else:
-                                    output += f'\t\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
-                                    output += f'\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp(' \
+                                    output += f'\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += f'\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp(' \
                                               f'{package_name}_handler::{message_field_name}_fld_name, {parent_field}_doc.' \
                                               f'{message_field_name}()));\n'
                         else:
@@ -588,16 +588,16 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                                        f'{message_field_name}_fld_name, ' \
                                                                        f'{parent_field}_doc.{message_field_name}()));\n'
                 else:
-                    output += f'\t\t\t\t\tif ({parent_field}_doc.{message_field_name}_size() > 0) {{\n'
-                    output += f'\t\t\t\t\t\tbsoncxx::builder::basic::array {message_field_name}_list;\n'
-                    output += f'\t\t\t\t\t\tfor (const auto& {message_field_name}_doc : {parent_field}_doc.' \
+                    output += f'\t\t\t\tif ({parent_field}_doc.{message_field_name}_size() > 0) {{\n'
+                    output += f'\t\t\t\t\tbsoncxx::builder::basic::array {message_field_name}_list;\n'
+                    output += f'\t\t\t\t\tfor (const auto& {message_field_name}_doc : {parent_field}_doc.' \
                               f'{message_field_name}()){{\n'
-                    output += f'\t\t\t\t\t\t\t{message_field_name}_list.append({message_field_name}_doc);\n'
-                    output += "\t\t\t\t\t\t}\n"
-                    output += f'\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp' \
+                    output += f'\t\t\t\t\t\t{message_field_name}_list.append({message_field_name}_doc);\n'
+                    output += "\t\t\t\t\t}\n"
+                    output += f'\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp' \
                               f'({package_name}_handler::{message_field_name}_fld_name, {message_field_name}_array));\n'
 
-                    output += "\t\t\t\t\t}\n"
+                    output += "\t\t\t\t}\n"
 
             elif message_field.message is not None and field_type == "repeated":
                 output += self.generate_repeated_nested_fields(message_field.message, message_field_name,
@@ -606,17 +606,17 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                                num_of_tabs)
 
         if parent_field != field_name:
-            output += f'\t\t\t\t\t\t{field_name}_list.append({field_name}_document);\n'
-            output += "\t\t\t\t\t}\n"
-            output += f"\t\t\t\t\t{parent_field}_doc.append({package_name}_handler::kvp({package_name}_handler::{field_name}_fld_name," \
+            output += f'\t\t\t\t\t{field_name}_list.append({field_name}_document);\n'
+            output += "\t\t\t\t}\n"
+            output += f"\t\t\t\t{parent_field}_doc.append({package_name}_handler::kvp({package_name}_handler::{field_name}_fld_name," \
                       f" {field_name}_list));\n"
-            output += "\n\t\t\t\t}\n"
+            output += "\n\t\t\t}\n"
         else:
             if initial_parent == parent_field and parent_field == field_name:
-                output += f'\t\t\t\t\t{parent_field}_list.append({parent_field}_document);\n'
-                output += f'\t\t\t\t}}\n\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp' \
+                output += f'\t\t\t\t{parent_field}_list.append({parent_field}_document);\n'
+                output += f'\t\t\t}}\n\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp' \
                           f'({package_name}_handler::{parent_field}_fld_name, {parent_field}_list));\n'
-                output += "\t\t\t}\n"
+                output += "\t\t}\n"
             else:
                 output += "\t"*num_of_tabs + f'{parent_field}_list.append({parent_field}_document);\n'
                 num_of_tabs -= 1
@@ -632,26 +632,26 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                             message_name_snake_cased, field, initial_parent,
                                             num_of_tabs: int | None = None):
         if num_of_tabs is None:
-            num_of_tabs = 6
+            num_of_tabs = 5
 
         output = ""
         parent_field = field.proto.name
 
         if parent_field != field_name:
-            output += f'\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
+            output += f'\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
                       f'().{field_name}_size() > 0) {{\n'
-            output += f'\t\t\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n'
-            output += f'\t\t\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_list_obj.' \
+            output += f'\t\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n'
+            output += f'\t\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_list_obj.' \
                       f'{message_name_snake_cased}(i).{parent_field}().{field_name}()) {{\n'
-            output += f'\t\t\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
+            output += f'\t\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
         else:
             if initial_parent == parent_field and parent_field == field_name:
-                output += f'\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
+                output += f'\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
                           f'_size() > 0) {{\n'
-                output += f'\t\t\t\t\tbsoncxx::builder::basic::array {parent_field}_list;\n'
-                output += f'\t\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_list_obj.' \
+                output += f'\t\t\t\tbsoncxx::builder::basic::array {parent_field}_list;\n'
+                output += f'\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_list_obj.' \
                           f'{message_name_snake_cased}(i).{parent_field}()) {{\n'
-                output += f'\t\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
+                output += f'\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
             else:
                 output += "\t"*num_of_tabs + f'if ({initial_parent}_doc.{parent_field}_size() > 0) {{\n'
                 num_of_tabs += 1
@@ -670,40 +670,40 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     if parent_field != field_name:
                         if message_field_name == "id":
                             if field_type == "required":
-                                output += f'\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
+                                output += f'\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
                                           f'_id", {field_name}_doc.{message_field_name}()));\n'
                             else:
-                                output += f'\t\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
-                                output += f'\t\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
+                                output += f'\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
+                                output += f'\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp("' \
                                           f'_id", {field_name}_doc.{message_field_name}()));\n'
                         else:
                             if field_type == "required":
-                                output += f'\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
+                                output += f'\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
                                           f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc.' \
                                           f'{message_field_name}()));\n'
                             else:
-                                output += f'\t\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
-                                output += f'\t\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
+                                output += f'\t\t\t\t\t\tif ({field_name}_doc.has_{message_field_name}())\n'
+                                output += f'\t\t\t\t\t\t\t{field_name}_document.append({package_name}_handler::kvp(' \
                                           f'{package_name}_handler::{message_field_name}_fld_name, {field_name}_doc.' \
                                           f'{message_field_name}()));\n'
                     else:
                         if initial_parent == parent_field and parent_field == field_name:
                             if message_field_name == "id":
                                 if field_type == "required":
-                                    output += f'\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp("' \
+                                    output += f'\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp("' \
                                               f'_id", {parent_field}_doc.{message_field_name}()));\n'
                                 else:
-                                    output += f'\t\t\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
-                                    output += f'\t\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp("' \
+                                    output += f'\t\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += f'\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp("' \
                                               f'_id", {parent_field}_doc.{message_field_name}()));\n'
                             else:
                                 if field_type == "required":
-                                    output += f'\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp' \
+                                    output += f'\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp' \
                                               f'({package_name}_handler::{message_field_name}_fld_name, {parent_field}_doc.' \
                                               f'{message_field_name}()));\n'
                                 else:
-                                    output += f'\t\t\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
-                                    output += f'\t\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp' \
+                                    output += f'\t\t\t\t\tif ({parent_field}_doc.has_{message_field_name}())\n'
+                                    output += f'\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp' \
                                               f'({package_name}_handler::{message_field_name}_fld_name, {parent_field}_doc.' \
                                               f'{message_field_name}()));\n'
                         else:
@@ -732,16 +732,16 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                                          f'{message_field_name}_fld_name, {parent_field}_doc' \
                                                                          f'.{message_field_name}()));\n'
                 else:
-                    output += f'\t\t\t\t\t\tif ({parent_field}_doc.{message_field_name}_size() > 0) {{\n'
-                    output += f'\t\t\t\t\t\t\tbsoncxx::builder::basic::array {message_field_name}_list;\n'
-                    output += f'\t\t\t\t\t\t\tfor (const auto& {message_field_name}_doc : {parent_field}_doc.' \
+                    output += f'\t\t\t\t\tif ({parent_field}_doc.{message_field_name}_size() > 0) {{\n'
+                    output += f'\t\t\t\t\t\tbsoncxx::builder::basic::array {message_field_name}_list;\n'
+                    output += f'\t\t\t\t\t\tfor (const auto& {message_field_name}_doc : {parent_field}_doc.' \
                               f'{message_field_name}()){{\n'
-                    output += f'\t\t\t\t\t\t\t\t{message_field_name}_list.append({message_field_name}_doc);\n'
-                    output += "\t\t\t\t\t\t\t}\n"
-                    output += f'\t\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp' \
+                    output += f'\t\t\t\t\t\t\t{message_field_name}_list.append({message_field_name}_doc);\n'
+                    output += "\t\t\t\t\t\t}\n"
+                    output += f'\t\t\t\t\t\t{parent_field}_document.append({package_name}_handler::kvp' \
                               f'({package_name}_handler::{message_field_name}_fld_name, {message_field_name}_array));\n'
 
-                    output += "\t\t\t\t\t\t}\n"
+                    output += "\t\t\t\t\t}\n"
 
             elif message_field.message is not None and field_type == "repeated":
                 output += self.generate_msg_repeated_nested_fields(message_field.message, message_field_name,
@@ -749,17 +749,17 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                                                    message_field, field_name, num_of_tabs)
 
         if parent_field != field_name:
-            output += f'\t\t\t\t\t\t\t{field_name}_list.append({field_name}_document);\n'
-            output += "\t\t\t\t\t\t}\n"
-            output += f"\t\t\t\t\t\t{parent_field}_doc.append({package_name}_handler::kvp({package_name}_handler::" \
+            output += f'\t\t\t\t\t\t{field_name}_list.append({field_name}_document);\n'
+            output += "\t\t\t\t\t}\n"
+            output += f"\t\t\t\t\t{parent_field}_doc.append({package_name}_handler::kvp({package_name}_handler::" \
                       f"{field_name}_fld_name, {field_name}_list));\n"
-            output += "\n\t\t\t\t}\n"
+            output += "\n\t\t\t}\n"
         else:
             if initial_parent == parent_field and parent_field == field_name:
-                output += f'\t\t\t\t\t\t{parent_field}_list.append({parent_field}_document);\n'
-                output += f'\t\t\t\t\t}}\n\t\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp' \
+                output += f'\t\t\t\t\t{parent_field}_list.append({parent_field}_document);\n'
+                output += f'\t\t\t\t}}\n\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp' \
                           f'({package_name}_handler::{parent_field}_fld_name, {parent_field}_list));\n'
-                output += "\t\t\t\t}\n"
+                output += "\t\t\t}\n"
             else:
                 output += "\t"*num_of_tabs + f'{parent_field}_list.append({parent_field}_document);\n'
                 num_of_tabs -= 1
@@ -785,53 +785,53 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 if field_name != initial_parent_field:
                     if field_name != parent_feild and initial_parent_field != parent_feild:
                         if field_type == "required":
-                            output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                            output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.' \
                                       f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                         else:
-                            output += f"\t\t\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
+                            output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
                                       f"{parent_feild}().{field_name}().has_{message_field_name}())\n"
-                            output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                            output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.' \
                                       f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                     else:
                         if field_type == "required":
-                            output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                            output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.' \
                                       f'{initial_parent_field}().{field_name}().{message_field_name}()));\n'
                         else:
-                            output += f"\t\t\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
+                            output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
                                       f"{field_name}().has_{message_field_name}())\n"
-                            output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                            output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.' \
                                       f'{initial_parent_field}().{field_name}().{message_field_name}()));\n'
                 else:
                     if field_type == "required":
-                        output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                        output += f'\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                   f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.{field_name}' \
                                   f'().{message_field_name}()));\n'
                     else:
-                        output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{field_name}().has_{message_field_name}())\n"
-                        output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                        output += f"\t\t\tif ({message_name_snake_cased}_obj.{field_name}().has_{message_field_name}())\n"
+                        output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                   f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.{field_name}' \
                                   f'().{message_field_name}()));\n'
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field:
-                    output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
+                    output += f"\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
                               f"{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
-                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                    output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += self.generate_nested_fields(message_field.message, message_field_name,
                                                           message_name_snake_cased, package_name, field, field_name)
                 else:
-                    output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{field_name}().has_{message_field_name}()) "
+                    output += f"\t\t\tif ({message_name_snake_cased}_obj.{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
-                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                    output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += self.generate_nested_fields(message_field.message, message_field_name,
                                                           message_name_snake_cased, package_name, field, field_name)
-                output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler::' \
+                output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler::' \
                           f'{message_field_name}_fld_name, {message_field_name}_doc));\n'
-                output += f"\t\t\t\t}}\n"
+                output += f"\t\t\t}}\n"
             elif message_field.message is not None and field_type == "repeated":
                 output += self.generate_repeated_nested_fields(message_field.message, message_field_name, package_name,
                                                                message_name_snake_cased, field, field_name, 5)
@@ -851,40 +851,40 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 if field_name != initial_parent_field:
                     if field_name != parent_feild and initial_parent_field != parent_feild:
                         if field_type == "required":
-                            output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                            output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.' \
                                       f'{message_name_snake_cased}(i).' \
                                       f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                         else:
-                            output += f"\t\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                            output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                       f"{initial_parent_field}().{parent_feild}().{field_name}()." \
                                       f"has_{message_field_name}())\n"
-                            output += f'\t\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                            output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.' \
                                       f'{message_name_snake_cased}(i).' \
                                       f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                     else:
                         if field_type == "required":
-                            output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                            output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.' \
                                       f'{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().' \
                                       f'{message_field_name}()));\n'
                         else:
-                            output += f"\t\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                            output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                       f"{initial_parent_field}().{field_name}().has_{message_field_name}())\n"
-                            output += f'\t\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
+                            output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
                                       f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.' \
                                       f'{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().' \
                                       f'{message_field_name}()));\n'
                 else:
                     if field_type == "required":
-                        output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler' \
+                        output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler' \
                                   f'::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
                                   f'(i).{field_name}().{message_field_name}()));\n'
                     else:
-                        output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                        output += f"\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                   f"{field_name}().has_{message_field_name}())\n"
-                        output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler' \
+                        output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler' \
                                   f'::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
                                   f'(i).{field_name}().{message_field_name}()));\n'
             elif message_field.message is not None and field_type != "repeated":
@@ -892,19 +892,19 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                               f"{initial_parent_field}().{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
-                    output += f"\t\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += self.generate_msg_nested_fields(message_field.message, message_field_name,
                                                               message_name_snake_cased, package_name, field, field_name)
                 else:
-                    output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}()" \
+                    output += f"\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}()" \
                               f".has_{message_field_name}()) "
                     output += f"{{\n"
-                    output += f"\t\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
+                    output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += self.generate_msg_nested_fields(message_field.message, message_field_name,
                                                               message_name_snake_cased, package_name, field, field_name)
-                output += f"\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler::" \
+                output += f"\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler::" \
                           f"{message_field_name}_fld_name, {message_field_name}_doc));\n"
-                output += f"\t\t\t\t\t}}\n"
+                output += f"\t\t\t\t}}\n"
             elif message_field.message is not None and field_type == "repeated":
                 output += self.generate_msg_repeated_nested_fields(message_field.message, message_field_name, package_name,
                                                                    message_name_snake_cased, field, field_name)
@@ -913,10 +913,10 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     def generate_prepare_doc(self, message: protogen.Message, message_name_snake_cased: str,
                              package_name: str, message_name: str):
         output_content: str = ""
-        output_content += f"\tprotected:\n\n"
-        output_content += f"\t\tvoid prepare_doc(const {package_name}::{message_name} " \
+        # output_content += f"\tprotected:\n\n"
+        output_content += f"\tvoid prepare_doc(const {package_name}::{message_name} " \
                           f"&{message_name_snake_cased}_obj, bsoncxx::builder::basic::document " \
-                          f"&{message_name_snake_cased}_document) const"
+                          f"&{message_name_snake_cased}_document) "
         output_content += " {\n"
 
         for field in message.fields:
@@ -929,12 +929,12 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 if field_type != "repeated":
                     if field_name != "id":
                         if field_type == "required":
-                            output_content += (f"\t\t\t{message_name_snake_cased}_document.append({package_name}"
+                            output_content += (f"\t\t{message_name_snake_cased}_document.append({package_name}"
                                                f"_handler::kvp({package_name}_handler::{field_name}_fld_name, "
                                                f"{message_name_snake_cased}_obj.{field_name}()));\n")
                         else:
-                            output_content += f"\t\t\tif ({message_name_snake_cased}_obj.has_{field_name}())\n"
-                            output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
+                            output_content += f"\t\tif ({message_name_snake_cased}_obj.has_{field_name}())\n"
+                            output_content += f"\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
                                               f"{message_name_snake_cased}_obj.{field_name}()));\n"
                     # else:
@@ -951,27 +951,27 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     #                           f'_obj.{field_name}()));\n'
                     #     output_content += "\t\t\t}\n"
                 else:
-                    output_content += f"\t\t\tif ({message_name_snake_cased}_obj.{field_name}_size() > 0)\n"
-                    output_content += f"\t\t\t{{\n"
-                    output_content += f"\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n"
-                    output_content += f"\t\t\t\tfor (int i = 0; i < {message_name_snake_cased}_obj.{field_name}_size(); ++i)\n"
-                    output_content += f"\t\t\t\t\t{field_name}_list.append({message_name_snake_cased}_obj.{field_name}(i));\n"
-                    output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp" \
+                    output_content += f"\t\tif ({message_name_snake_cased}_obj.{field_name}_size() > 0)\n"
+                    output_content += f"\t\t{{\n"
+                    output_content += f"\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n"
+                    output_content += f"\t\t\tfor (int i = 0; i < {message_name_snake_cased}_obj.{field_name}_size(); ++i)\n"
+                    output_content += f"\t\t\t\t{field_name}_list.append({message_name_snake_cased}_obj.{field_name}(i));\n"
+                    output_content += f"\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp" \
                                       f"({package_name}_handler::{field_name}_fld_name, {field_name}_doc_array));\n"
-                    output_content += f"\t\t\t}}\n"
+                    output_content += f"\t\t}}\n"
 
             else:
                 if field_type != "repeated":
-                    output_content += f"\t\t\tif ({message_name_snake_cased}_obj.has_{field_name}())"
+                    output_content += f"\t\tif ({message_name_snake_cased}_obj.has_{field_name}())"
                     output_content += f" {{\n"
-                    output_content += f"\t\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
+                    output_content += f"\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
                     # print(f".............{field.proto.name}...............")
                     output_content += self.generate_nested_fields(field_type_message, field_name,
                                                                   message_name_snake_cased, package_name, field,
                                                                   field_name)
-                    output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp(" \
+                    output_content += f"\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp(" \
                                       f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
-                    output_content += f"\t\t\t}}\n"
+                    output_content += f"\t\t}}\n"
 
                 else:
                     output_content += self.generate_repeated_nested_fields(field_type_message, field_name,
@@ -983,13 +983,13 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                               package_name: str, message_name: str):
 
         output_content: str = ""
-        output_content += f"\t\tvoid prepare_list_doc(const {package_name}::{message_name}List " \
+        output_content += f"\tvoid prepare_list_doc(const {package_name}::{message_name}List " \
                           f"&{message_name_snake_cased}_list_obj, std::vector<bsoncxx::builder::basic::document> " \
-                          f"&{message_name_snake_cased}_document_list) const"
+                          f"&{message_name_snake_cased}_document_list) "
         output_content += " {\n"
-        output_content += f"\t\t\tfor (int i =0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}_size(); " \
+        output_content += f"\t\tfor (int i =0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}_size(); " \
                           f"++i) {{\n"
-        output_content += f"\t\t\t\tbsoncxx::builder::basic::document {message_name_snake_cased}_document;\n"
+        output_content += f"\t\t\tbsoncxx::builder::basic::document {message_name_snake_cased}_document;\n"
 
         for field in message.fields:
             field_name = field.proto.name
@@ -1000,14 +1000,14 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 if field_type != "repeated":
                     if field_name != "id":
                         if field_type == "required":
-                            output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
+                            output_content += f"\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
                                               f"{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                               f"{field_name}()));\n"
                         else:
-                            output_content += f"\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                            output_content += f"\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                               f"has_{field_name}())\n"
-                            output_content += f"\t\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
+                            output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
                                               f"{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                               f"{field_name}()));\n"
@@ -1026,31 +1026,31 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     #                           f'{message_name_snake_cased}(i).{field_name}()));\n'
                     #     output_content += "\t\t\t\t}\n"
                 else:
-                    output_content += f"\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                    output_content += f"\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                       f"{field_name}_size() > 0)\n"
-                    output_content += f"\t\t\t\t{{\n"
-                    output_content += f"\t\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n"
-                    output_content += f"\t\t\t\t\tfor (int i = 0; i < {message_name_snake_cased}_list_obj." \
+                    output_content += f"\t\t\t{{\n"
+                    output_content += f"\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n"
+                    output_content += f"\t\t\t\tfor (int i = 0; i < {message_name_snake_cased}_list_obj." \
                                       f"{message_name_snake_cased}(i).{field_name}_size(); ++i)\n"
-                    output_content += f"\t\t\t\t\t\t{field_name}_list.append({message_name_snake_cased}_list_obj." \
+                    output_content += f"\t\t\t\t\t{field_name}_list.append({message_name_snake_cased}_list_obj." \
                                       f"{message_name_snake_cased}(i).{field_name}(i));\n"
-                    output_content += f"\t\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp" \
+                    output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp" \
                                       f"({package_name}_handler::{field_name}_fld_name, {field_name}_doc_array));\n"
-                    output_content += f"\t\t\t\t}}\n"
+                    output_content += f"\t\t\t}}\n"
 
             else:
                 if field_type != "repeated":
-                    output_content += f"\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                    output_content += f"\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                       f"has_{field_name}())"
                     output_content += f" {{\n"
-                    output_content += f"\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
+                    output_content += f"\t\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
                     # print(f".............{field.proto.name}...............")
                     output_content += self.generate_msg_nested_fields(field_type_message, field_name,
                                                                       message_name_snake_cased, package_name, field,
                                                                       field_name)
-                    output_content += f"\t\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp(" \
+                    output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp(" \
                                       f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
-                    output_content += f"\t\t\t\t}}\n"
+                    output_content += f"\t\t\t}}\n"
 
                 else:
                     output_content += self.generate_msg_repeated_nested_fields(field_type_message, field_name,
@@ -1122,8 +1122,8 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                         message_name = message.proto.name
                         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
-                        output_content += self.generate_class_handler(class_name, message_name, package_name,
-                                                                      message_name_snake_cased, file_name)
+                        # output_content += self.generate_class_handler(class_name, message_name, package_name,
+                        #                                               message_name_snake_cased, file_name)
                         #
                         # output_content += self.generate_insert_handler(class_name, message_name, package_name,
                         #                                                message_name_snake_cased, file_name)
@@ -1147,14 +1147,14 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                         #                                                         message_name_snake_cased, file_name)
                         output_content += self.generate_prepare_doc(message, message_name_snake_cased, package_name,
                                                                     message_name)
-                        output_content += "\t\t}\n\n"
+                        output_content += "\t}\n\n"
                         output_content += self.generate_prepare_docs(message, message_name_snake_cased, package_name,
                                                                      message_name)
-                        output_content += f"\t\t\t\t{message_name_snake_cased}_document_list.emplace_back(std::move(" \
+                        output_content += f"\t\t\t{message_name_snake_cased}_document_list.emplace_back(std::move(" \
                                           f"{message_name_snake_cased}_document));\n"
-                        output_content += "\t\t\t}\n\t\t}\n\n"
+                        output_content += "\t\t}\n\t}\n\n"
 
-                        output_content += "\t};\n\n"
+                        # output_content += "\t};\n\n"
                         break
 
         output_content += "}\n"

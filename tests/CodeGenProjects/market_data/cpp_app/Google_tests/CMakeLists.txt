@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_STANDARD 23)
-list(APPEND CMAKE_MODULE_PATH "../cmake")
+list(APPEND CMAKE_MODULE_PATH "../cmake/")
 message (WARNING ${CMAKE_MODULE_PATH})
 find_package(Mongo REQUIRED)
 find_package(Protobuf REQUIRED)

@@ -1,41 +1,81 @@
+#pragma once
+
 #include "../../CodeGenProjects/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
+#include "market_data_json_codec.h"
 
 using namespace market_data_handler;
 
 namespace FluxCppCore {
 
 template <typename RootModelType, typename RootModelListType>
-class MongoDBCodec {
+    class MongoDBCodec {
 
     public:
-        explicit MongoDBCodec(std::shared_ptr<market_data_handler::MarketData_MongoDBHandler> mongo_db_, mongocxx::collection mongo_db_collection_,
-                                            quill::Logger *logger) : mongo_db(mongo_db_), mongo_db_collection(mongo_db_collection_), logger_(logger) {
+        explicit MongoDBCodec(std::shared_ptr<market_data_handler::MarketData_MongoDBHandler> sp_mongo_db_,
+                              quill::Logger *p_logger = quill::get_logger())
+                              :m_sp_mongo_db(sp_mongo_db_),
+                              m_mongo_db_collection(m_sp_mongo_db->market_data_service_db[get_root_model_name()]),
+                              m_p_logger_(p_logger) {}
+
+        bool insert(bsoncxx::builder::basic::document &r_bson_doc, const std::string &root_model_key,
+                    int32_t &new_generated_id_out) {
+            new_generated_id_out = get_next_insert_id();
+            update_id_in_document(r_bson_doc, new_generated_id_out);
+            auto insert_result = m_mongo_db_collection.insert_one(r_bson_doc.view());
+            auto inserted_id = insert_result->inserted_id().get_int32().value;
+            if (inserted_id == new_generated_id_out) {
+                m_root_model_key_to_db_id[root_model_key] = new_generated_id_out;
+                return true;
+            } else {
+                return false;
+            }
         }
 
-        /**
-         * Insert or update the dash data
-        */
-        bool insert_or_update(const RootModelType &r_root_model_obj, int32_t &new_generated_id_out) {
-            if (!r_root_model_obj.IsInitialized()) {
-                LOG_ERROR(logger_, "Reuired fields is not initialized in {} obj: {}",
-                          RootModelType::GetDescriptor()->name(), r_root_model_obj.DebugString());
-            } // else not required: code continues here for cases where the r_root_model_obj is initialized and has all the required fields
-            std::string r_model_key;
-            MarketDataKeyHandler::get_key_out(r_root_model_obj, r_model_key);
-            bool status = insert_or_update(r_root_model_obj, r_model_key, new_generated_id_out);
-            return status;
+        bool bulk_insert(const RootModelListType &r_root_model_list_obj,
+                         const std::vector<std::string> &r_root_model_key_list,
+                         std::vector<int32_t> &r_new_generated_id_list_out) {
+            size_t size = r_root_model_key_list.size();
+            std::vector<bsoncxx::builder::basic::document> bson_doc_list;
+            bson_doc_list.reserve(size);
+            r_new_generated_id_list_out.reserve(size);
+            prepare_list_doc(r_root_model_list_obj, bson_doc_list);
+            for (int i = 0; i < bson_doc_list.size(); ++i) {
+                r_new_generated_id_list_out.push_back(get_next_insert_id());
+                update_id_in_document(bson_doc_list[i], r_new_generated_id_list_out[i]);
+            }
+            auto insert_results = m_mongo_db_collection.insert_many(bson_doc_list);
+            for (int i = 0; i < bson_doc_list.size(); ++i) {
+                auto inserted_id = insert_results->inserted_ids().at(i).get_int32().value;
+                assert(r_new_generated_id_list_out[i] == inserted_id);  // assert useful - avoids if in release
+                m_root_model_key_to_db_id[r_root_model_key_list[i]] = r_new_generated_id_list_out[i];
+            }
+
+            if (insert_results->inserted_count() == bson_doc_list.size()) {
+                return true;
+            } else {
+                return false;
+            }
         }
 
-        bool insert_or_update(const RootModelType &r_root_model_obj, std::string &r_model_key_in_n_out,
-                                   int32_t &new_generated_id_out) {
+        // Insert or update the data
+        bool insert_or_update(const RootModelType &r_root_model_obj, int32_t &r_new_generated_id_out) {
+            std::string root_model_key;
+            if(CheckInitializedAndGetKey(r_root_model_obj, root_model_key)){
+                return insert_or_update(r_root_model_obj, root_model_key, r_new_generated_id_out);
+            }
+            return false; // not initialized or missing required fields
+        }
+
+        bool insert_or_update(const RootModelType &r_root_model_obj, std::string &r_root_model_key_in_n_out,
+                              int32_t &r_new_generated_id_out) {
             bool status = false;
             bsoncxx::builder::basic::document bson_doc{};
 
-            auto found = r_model_key_to_db_id.find(r_model_key_in_n_out);
-            if (found == r_model_key_to_db_id.end()) {
+            auto found = m_root_model_key_to_db_id.find(r_root_model_key_in_n_out);
+            if (found == m_root_model_key_to_db_id.end()) {
                 // Key does not exist, so it's a new object. Insert it into the database
                 prepare_doc(r_root_model_obj, bson_doc);
-                status = insert(bson_doc, r_model_key_in_n_out, new_generated_id_out);
+                status = insert(bson_doc, r_root_model_key_in_n_out, r_new_generated_id_out);
             } else {
                 // Key already exists, so update the existing object in the database
                 prepare_doc(r_root_model_obj, bson_doc);
@@ -44,74 +84,54 @@ class MongoDBCodec {
             return status;
         }
 
-        /**
-         * Patch the dash data (update specific document)
-        */
+        //Patch the data (update specific document)
         bool patch(const RootModelType &r_root_model_obj) {
-            // Check if the object is initialized and has all the required fields
-            if (!r_root_model_obj.IsInitialized()) {
-                LOG_ERROR(logger_, "Required fields is not initialized in {} obj: {}", 
-                          RootModelType::GetDescriptor()->name(), r_root_model_obj.DebugString());
-                return false;
-            } // else not required: code continues here for cases where the r_root_model_obj is initialized and has all the required fields
-            std::string r_model_key;
-            MarketDataKeyHandler::get_key_out(r_root_model_obj, r_model_key);
-            bool status = patch(r_root_model_obj, r_model_key);
-            return status;
+            std::string root_model_key;
+            if(CheckInitializedAndGetKey(r_root_model_obj, root_model_key)){
+                return patch(r_root_model_obj, root_model_key);
+            }
+            return false; // not initialized or missing required fields
         }
 
-        bool patch(const RootModelType &r_root_model_obj, std::string r_model_key_in_n_out) {
+        bool patch(const RootModelType &r_root_model_obj, std::string r_root_model_key_in_n_out) {
             bool status = false;
-            bsoncxx::builder::basic::document prepare_list_document{};
-            if (!r_model_key_in_n_out.empty()) {
-                prepare_doc(r_root_model_obj, prepare_list_document);
-                status = update_or_patch(r_model_key_to_db_id.at(r_model_key_in_n_out), prepare_list_document);
+            bsoncxx::builder::basic::document bson_doc{};
+            if (!r_root_model_key_in_n_out.empty()) {
+                prepare_doc(r_root_model_obj, bson_doc);
+                status = update_or_patch(m_root_model_key_to_db_id.at(r_root_model_key_in_n_out), bson_doc);
             } else {
-                MarketDataKeyHandler::get_key_out(r_root_model_obj, r_model_key_in_n_out);
-                auto found = r_model_key_to_db_id.find(r_model_key_in_n_out);
-                if (found != r_model_key_to_db_id.end()) {
-                    prepare_doc(r_root_model_obj, prepare_list_document);
-                    status = update_or_patch(found->second, prepare_list_document);
-                } else {
-                    LOG_ERROR(logger_, "patch failed - {} key not found in r_model_key_to_db_id map;;; {}: {} map: {}",
-                              RootModelType::GetDescriptor()->name(), RootModelType::GetDescriptor()->name(), 
-                              r_root_model_obj.DebugString(), KeyToDbIdAsString());
-                }
+                MarketDataKeyHandler::get_key_out(r_root_model_obj, r_root_model_key_in_n_out);
+                auto found = get_db_id_from_key(r_root_model_key_in_n_out, r_root_model_obj);
+                prepare_doc(r_root_model_obj, bson_doc);
+                status = update_or_patch(found->second, bson_doc);
             }
             return status;
         }
 
-        /**
-         * Patch the dash data (update specific document) and retrieve the updated object
-        */
-        bool patch(const RootModelType &r_root_model_obj, market_data::Dash &r_root_model_obj_out) {
-            // Check if the object is initialized and has all the required fields
-            if (!r_root_model_obj.IsInitialized()) {
-                LOG_ERROR(logger_, "Required fields is not initialized in {} obj: {}", 
-                          RootModelType::GetDescriptor()->name(), r_root_model_obj.DebugString());
-                return false;
-            } // else not required: code continues here for cases where the r_root_model_obj is initialized and has all the required fields
-            std::string r_model_key;
-            MarketDataKeyHandler::get_key_out(r_root_model_obj, r_model_key);
-            bool status = patch(r_root_model_obj, r_root_model_obj_out, r_model_key);
-            return status;
+        //Patch the data (update specific document) and retrieve the updated object
+        bool patch(const RootModelType &r_root_model_obj, RootModelType &r_root_model_obj_out) {
+            std::string root_model_key;
+            if(CheckInitializedAndGetKey(r_root_model_obj, root_model_key)){
+                return patch(r_root_model_obj, r_root_model_obj_out, root_model_key);
+            }
+            return false; // not initialized or missing required fields
         }
 
-        bool
-        patch(const RootModelType &r_root_model_obj, market_data::Dash &r_root_model_obj_out, std::string &r_model_key_in_n_out) {
-            bool status = patch(r_root_model_obj, r_model_key_in_n_out);
+        bool patch(const RootModelType &r_root_model_obj, RootModelType &r_root_model_obj_out,
+                   std::string &r_root_model_key_in_n_out) {
+            bool status = patch(r_root_model_obj, r_root_model_key_in_n_out);
             if (status) {
-                auto r_model_doc_id = r_model_key_to_db_id.at(r_model_key_in_n_out);
+                auto r_model_doc_id = m_root_model_key_to_db_id.at(r_root_model_key_in_n_out);
                 status = get_data_by_id_from_collection(r_root_model_obj_out, r_model_doc_id);
             }
             return status;
         }
 
-        bool update_or_patch(const int32_t &r_model_doc_id, const bsoncxx::builder::basic::document &prepare_list_document) {
+        bool update_or_patch(const int32_t &r_model_doc_id, const bsoncxx::builder::basic::document &r_bson_doc) {
             auto update_filter = market_data_handler::make_document(market_data_handler::kvp("_id", r_model_doc_id));
             auto update_document = market_data_handler::make_document(
-                    market_data_handler::kvp("$set", prepare_list_document.view()));
-            auto result = mongo_db_collection.update_one(update_filter.view(), update_document.view());
+                    market_data_handler::kvp("$set", r_bson_doc.view()));
+            auto result = m_mongo_db_collection.update_one(update_filter.view(), update_document.view());
             if (result->modified_count() > 0) {
                 return true;
             } else {
@@ -119,122 +139,53 @@ class MongoDBCodec {
             }
         }
 
-        bool insert(bsoncxx::builder::basic::document &prepare_list_document, const std::string &r_model_key,
-                         int32_t &new_generated_id_out) {
-            new_generated_id_out = get_next_insert_id();
-            update_id_in_document(prepare_list_document, new_generated_id_out);
-            auto prepare_list_docinsert_result = mongo_db_collection.insert_one(prepare_list_document.view());
-            auto prepare_list_docinserted_id = prepare_list_docinsert_result->inserted_id().get_int32().value;
-            assert(prepare_list_docinserted_id == new_generated_id_out);
-
-            if (prepare_list_docinserted_id == new_generated_id_out) {
-                r_model_key_to_db_id[r_model_key] = new_generated_id_out;
-                return true;
-            } else {
-                return false;
-            }
-
-        }
-
-        bool bulk_insert(const RootModelListType &r_root_model_list_obj, const std::vector<std::string> &r_model_key_list,
-                              std::vector<int32_t> &new_generated_id_list_out) {
-            std::vector<bsoncxx::builder::basic::document> prepare_list_document_list;
-            prepare_list_document_list.reserve(r_root_model_list_obj.prepare_list_docsize());
-            new_generated_id_list_out.reserve(r_root_model_list_obj.prepare_list_docsize());
-            prepare_list_doc(r_root_model_list_obj, prepare_list_document_list);
-            for (int i = 0; i < prepare_list_document_list.size(); ++i) {
-                new_generated_id_list_out.emplace_back(std::move(get_next_insert_id()));
-                update_id_in_document(prepare_list_document_list[i], new_generated_id_list_out[i]);
-            }
-            auto prepare_list_docinsert_results = mongo_db_collection.insert_many(prepare_list_document_list);
-            for (int i = 0; i < prepare_list_document_list.size(); ++i) {
-                auto prepare_list_docinserted_id = prepare_list_docinsert_results->inserted_ids().at(i).get_int32().value;
-                assert(new_generated_id_list_out[i] == prepare_list_docinserted_id);
-                r_model_key_to_db_id[r_model_key_list[i]] = new_generated_id_list_out[i];
-            }
-
-            if (prepare_list_docinsert_results->inserted_count() == prepare_list_document_list.size()) {
-                return true;
-            } else {
-                return false;
-            }
-        }
-
-        /**
-         * Bulk patch the dash data (update specific document)
-        */
+        // Bulk patch the data (update specific documents)
         bool bulk_patch(const RootModelListType &r_root_model_list_obj) {
-            auto size = r_root_model_list_obj.prepare_list_docsize();
-            std::vector<bsoncxx::builder::basic::document> prepare_list_document_list;
-            prepare_list_document_list.reserve(size);
-            std::vector<std::string> r_model_key_list;
-            r_model_key_list.reserve(size);
-            MarketDataKeyHandler::get_key_list(r_root_model_list_obj, r_model_key_list);
-            std::vector<int32_t> r_model_doc_ids;
-            r_model_doc_ids.reserve(size);
+            std::vector<bsoncxx::builder::basic::document> bson_doc_list;
+            std::vector<std::string> root_model_key_list;
+            MarketDataKeyHandler::get_key_list(r_root_model_list_obj, root_model_key_list);
+            std::vector<int32_t> root_model_doc_ids;
+            root_model_doc_ids.reserve(root_model_key_list.size());
 
-            for (int i = 0; i < r_root_model_list_obj.prepare_list_docsize(); ++i) {
-                if (!r_root_model_list_obj.dash(i).IsInitialized()) {
-                    continue;
-                } // else not required: code continues here for cases where the r_root_model_obj is initialized and has all the required fields
-
-                auto found = r_model_key_to_db_id.find(r_model_key_list[i]);
-                if (found == r_model_key_to_db_id.end()) {
-                    const std::string error =
-                            "bulk_patch failed - dash key not found in r_model_key_to_db_id map;;; r_root_model_list_obj: " +
-                            r_root_model_list_obj.DebugString() + "map: " + KeyToDbIdAsString();
-                    throw std::runtime_error(error);
-                } else {
-                    r_model_doc_ids.emplace_back(std::move(r_model_key_to_db_id.at(r_model_key_list[i])));
-                }
+            for (int i = 0; i < root_model_key_list.size(); ++i) {
+                auto found = get_db_id_from_key(root_model_key_list[i], r_root_model_list_obj);
+                root_model_doc_ids.emplace_back(std::move(found->second));
             }
-            prepare_list_doc(r_root_model_list_obj, prepare_list_document_list);
-            bool status = bulk_update_or_patch_collection(r_model_doc_ids, prepare_list_document_list);
+            prepare_list_doc(r_root_model_list_obj, bson_doc_list);
+            bool status = bulk_update_or_patch_collection(root_model_doc_ids, bson_doc_list);
             return status;
         }
 
-        /**
-         * Bulk patch the dash data (update specific document) and retrieve the updated object
-        */
-        bool bulk_patch(const RootModelListType &r_root_model_list_obj, market_data::DashList &r_root_model_list_obj_out) {
-            auto size = r_root_model_list_obj.prepare_list_docsize();
-            std::vector<bsoncxx::builder::basic::document> prepare_list_document_list;
-            prepare_list_document_list.reserve(size);
-            std::vector<std::string> r_model_key_list;
-            r_model_key_list.reserve(size);
-            MarketDataKeyHandler::get_key_list(r_root_model_list_obj, r_model_key_list);
+        // Bulk patch the data (update specific documents) and retrieve the updated objects
+        bool bulk_patch(const RootModelListType &r_root_model_list_obj,
+                        RootModelListType &r_root_model_list_obj_out) {
+            std::vector<bsoncxx::builder::basic::document> bson_doc_list;
+            std::vector<std::string> root_model_key_list;
+            MarketDataKeyHandler::get_key_list(r_root_model_list_obj, root_model_key_list);
             std::vector<int32_t> r_model_doc_ids;
-            r_model_doc_ids.reserve(size);
 
-            for (int i = 0; i < r_root_model_list_obj.prepare_list_docsize(); ++i) {
-                if (!r_root_model_list_obj.dash(i).IsInitialized())
-                    continue;
-
-                auto found = r_model_key_to_db_id.find(r_model_key_list[i]);
-                if (found == r_model_key_to_db_id.end()) {
-                    const std::string error =
-                            "bulk_patch failed - dash key not found in r_model_key_to_db_id map;;; r_root_model_list_obj: " +
-                            r_root_model_list_obj.DebugString() + "map: " + KeyToDbIdAsString();
-                    throw std::runtime_error(error);
-                } else {
-                    r_model_doc_ids.emplace_back(std::move(r_model_key_to_db_id.at(r_model_key_list[i])));
-                }
+            int i = 0;
+            for (const auto& root_model_obj : r_root_model_list_obj) {
+                auto found = get_db_id_from_key(root_model_key_list[i], root_model_obj);
+                r_model_doc_ids.emplace_back(std::move(found->second));
+                ++i;
             }
-            prepare_list_doc(r_root_model_list_obj, prepare_list_document_list);
-            bool status = bulk_update_or_patch_collection(r_model_doc_ids, prepare_list_document_list);
+            prepare_list_doc(r_root_model_list_obj, bson_doc_list);
+            bool status = bulk_update_or_patch_collection(r_model_doc_ids, bson_doc_list);
             if (status) {
                 get_all_data_from_collection(r_root_model_list_obj_out);
             } // else not required: Retrieve updated data if the update or patch was successful
             return status;
         }
 
-        bool bulk_update_or_patch_collection(const std::vector<int32_t> &r_model_doc_ids,
-                                                  const std::vector<bsoncxx::builder::basic::document> &prepare_list_document_list) {
-            auto bulk_write = mongo_db_collection.create_bulk_write();
+        bool
+        bulk_update_or_patch_collection(const std::vector<int32_t> &r_model_doc_ids,
+                                        const std::vector<bsoncxx::builder::basic::document> &r_bson_doc_list) {
+            auto bulk_write = m_mongo_db_collection.create_bulk_write();
             for (int i = 0; i < r_model_doc_ids.size(); ++i) {
                 auto update_filter = market_data_handler::make_document(market_data_handler::kvp("_id", r_model_doc_ids[i]));
                 auto update_document = market_data_handler::make_document(
-                        market_data_handler::kvp("$set", prepare_list_document_list[i]));
+                        market_data_handler::kvp("$set", r_bson_doc_list[i]));
                 mongocxx::model::update_one updateOne(update_filter.view(), update_document.view());
                 updateOne.upsert(false);
                 bulk_write.append(updateOne);
@@ -255,36 +206,37 @@ class MongoDBCodec {
         bool get_all_data_from_collection(RootModelListType &r_root_model_list_obj_out) {
             bool status = false;
             std::string all_data_from_db_json_string;
-            auto cursor = mongo_db_collection.find({});
+            auto cursor = m_mongo_db_collection.find({});
 
-            for (const auto &prepare_list_docdoc: cursor) {
-                std::string prepare_list_docview = bsoncxx::to_json(prepare_list_docdoc);
-                size_t pos = prepare_list_docview.find("_id");
+            for (const auto &bson_doc: cursor) {
+                std::string doc_view = bsoncxx::to_json(bson_doc);
+                size_t pos = doc_view.find("_id");
                 if (pos != std::string::npos)
-                    prepare_list_docview.erase(pos, 1);
-                all_data_from_db_json_string += prepare_list_docview;
+                    doc_view.erase(pos, 1);
+                all_data_from_db_json_string += doc_view;
                 all_data_from_db_json_string += ",";
             }
             if (all_data_from_db_json_string.back() == ',') {
                 all_data_from_db_json_string.pop_back();
             } // else not required: all_data_from_db_json_string is empty so need to perform any operation
+            r_root_model_list_obj_out.Clear();
             if (!all_data_from_db_json_string.empty())
-                status = FluxCppCore::RootModelListJsonCodec<market_data::DashList>::decode_model_list(
+                status = FluxCppCore::RootModelListJsonCodec<RootModelListType>::decode_model_list(
                         r_root_model_list_obj_out, all_data_from_db_json_string);
             return status;
         }
 
-        bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &r_model_doc_id) {
+        bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &r_root_model_doc_id) {
             bool status = false;
-            auto cursor = mongo_db_collection.find(
-                    bsoncxx::builder::stream::document{} << "_id" << r_model_doc_id << bsoncxx::builder::stream::finalize);
+            auto cursor = m_mongo_db_collection.find(
+                    bsoncxx::builder::stream::document{} << "_id" << r_root_model_doc_id << bsoncxx::builder::stream::finalize);
             if (cursor.begin() != cursor.end()) {
                 auto &&doc = *cursor.begin();
-                std::string prepare_list_docdoc = bsoncxx::to_json(doc);
-                size_t pos = prepare_list_docdoc.find("_id");
+                std::string bson_doc = bsoncxx::to_json(doc);
+                size_t pos = bson_doc.find("_id");
                 if (pos != std::string::npos)
-                    prepare_list_docdoc.erase(pos, 1);
-                status = FluxCppCore::RootModelJsonCodec<market_data::Dash>::decode_model(r_root_model_obj_out, prepare_list_docdoc);
+                    bson_doc.erase(pos, 1);
+                status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, bson_doc);
                 return status;
             } else {
                 return status;
@@ -293,7 +245,7 @@ class MongoDBCodec {
 
 
         bool delete_all_data_from_collection() {
-            auto result = mongo_db_collection.delete_many({});
+            auto result = m_mongo_db_collection.delete_many({});
             if (result) {
                 return true;
             } else {
@@ -301,14 +253,8 @@ class MongoDBCodec {
             }
         }
 
-    static int32_t get_next_insert_id() {
-        std::lock_guard<std::mutex> lk(max_id_mutex);
-        cur_unused_max_id++;
-        return cur_unused_max_id -1 ;
-    }
-
         bool delete_data_by_id_from_collection(const int32_t &r_model_doc_id) {
-            auto result = mongo_db_collection.delete_one(
+            auto result = m_mongo_db_collection.delete_one(
                     bsoncxx::builder::stream::document{} << "_id" << r_model_doc_id << bsoncxx::builder::stream::finalize);
             if (result) {
                 return true;
@@ -317,41 +263,72 @@ class MongoDBCodec {
             }
         }
 
+        std::unordered_map<std::string, int32_t> m_root_model_key_to_db_id;
+
+    protected:
+        template <typename ProtoModelType>
+        auto get_db_id_from_key(const std::string &key, const ProtoModelType &proto_model_obj){
+            auto found = m_root_model_key_to_db_id.find(key);
+            if (found == m_root_model_key_to_db_id.end()) {
+                const std::string error = "Error!" + get_root_model_name() +
+                        "key not found in m_root_model_key_to_db_id map;;; r_root_model_obj: "
+                        + proto_model_obj.DebugString() + "map: " + KeyToDbIdAsString();
+                throw std::runtime_error(error);
+            }
+            return found;
+        }
+
         std::string KeyToDbIdAsString() {
-            std::string result = "r_model_key_to_db_id: ";
+            std::string result = "m_root_model_key_to_db_id: ";
             int index = 1;
-            for (const auto &entry: r_model_key_to_db_id) {
-                result +=
-                        "key " + std::to_string(index) + ":" + entry.first + " ; value " + std::to_string(index) + ":" +
-                        std::to_string(entry.second);
+            for (const auto &entry: m_root_model_key_to_db_id) {
+                result += "key " + std::to_string(index) + ":" + entry.first + " ; value " +
+                          std::to_string(index) + ":" + std::to_string(entry.second);
                 ++index;
             }
             return result;
         }
 
-
-        static void
-        update_id_in_document(bsoncxx::builder::basic::document &prepare_list_document, const int32_t new_generated_id) {
-            prepare_list_document.append(kvp("_id", new_generated_id));
+        static auto get_root_model_name() {
+            return RootModelType::GetDescriptor()->name();
         }
 
-        static std::unordered_map<std::string, int32_t> r_model_key_to_db_id;
+        bool IsInitialized(const RootModelType &r_root_model_obj) const{
+            // return true, if the object is initialized and has all the required fields (false otherwise)
+            if (!r_root_model_obj.IsInitialized()) {
+                LOG_ERROR(m_p_logger_, "Required fields is not initialized in {} obj: {}",
+                          get_root_model_name(), r_root_model_obj.DebugString());
+                return false;
+            } else {
+                return true;
+            }
+        }
 
-    protected:
-        std::shared_ptr<market_data_handler::MarketData_MongoDBHandler> mongo_db;
-        quill::Logger* logger_;
-        mongocxx::collection mongo_db_collection;
-        static  std::mutex max_id_mutex;
-        static int32_t cur_unused_max_id;
+        bool CheckInitializedAndGetKey(const RootModelType &r_root_model_obj, std::string &root_model_key_out) const{
+            // populate root_model_key_out and return true, if the object is initialized and has all required fields
+            if(IsInitialized(r_root_model_obj)){
+                MarketDataKeyHandler::get_key_out(r_root_model_obj, root_model_key_out);
+                return true;
+            } else {
+                return false; // false otherwise
+            }
+        }
+
+        static void update_id_in_document(bsoncxx::builder::basic::document &bson_doc, const int32_t new_generated_id) {
+            bson_doc.append(kvp("_id", new_generated_id));
+        }
+
+        static int32_t get_next_insert_id() {
+            static std::mutex max_id_mutex;
+            std::lock_guard<std::mutex> lk(max_id_mutex);
+            m_cur_unused_max_id++;
+            return m_cur_unused_max_id -1 ;
+        }
+
+        std::shared_ptr<market_data_handler::MarketData_MongoDBHandler> m_sp_mongo_db;
+        quill::Logger* m_p_logger_;
+        mongocxx::collection m_mongo_db_collection;
+        static inline int32_t m_cur_unused_max_id = 1;
     };
-
-    template<>
-    std::unordered_map < std::string, int32_t > MongoDBCodec<market_data::Dash, market_data::DashList>::r_model_key_to_db_id;
-
-    template<>
-    std::mutex MongoDBCodec<market_data::Dash, market_data::DashList>::max_id_mutex;
-
-    template<>
-    int32_t MongoDBCodec<market_data::Dash, market_data::DashList>::cur_unused_max_id;
 
 }

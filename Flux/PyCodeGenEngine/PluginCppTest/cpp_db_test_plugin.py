@@ -41,7 +41,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += f'#include "gtest/gtest.h"\n'
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n'
         output_content += f'#include "../../cpp_app/include/{class_name}_mongo_db_handler.h"\n'
-        output_content += f'#include "../CppCodec/{class_name}_mongo_db_codec.h"\n'
+        output_content += f'#include "../../FluxCppCore/include/mongo_db_codec.h"\n'
         output_content += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_key_handler.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
@@ -109,9 +109,9 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += f"\t{message_name_snake_cased}_json.clear();\n\t{message_name_snake_cased}_json_from_db" \
                           f".clear();\n\t{message_name_snake_cased}_list_from_db.Clear();\n\n"
 
-        output_content += f'\t{message_name_snake_cased}_codec.bulk_patch_{message_name_snake_cased}' \
-                          f'({message_name_snake_cased}_list);\n'
-        output_content += f'\tASSERT_TRUE({message_name_snake_cased}_codec.get_all_data_from_{message_name_snake_cased}' \
+        output_content += f'\tASSERT_TRUE({message_name_snake_cased}_codec.bulk_patch' \
+                          f'({message_name_snake_cased}_list));\n'
+        output_content += f'\tASSERT_TRUE({message_name_snake_cased}_codec.get_all_data_from' \
                           f'_collection({message_name_snake_cased}_list_from_db));\n\n'
 
         output_content += f'\tASSERT_TRUE(RootModelListJsonCodec<market_data::{message_name}List>::encode_model_list' \
@@ -169,7 +169,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                                               f'PopulateRandomValues::get_utc_time());\n'
 
         output_content += f"\t{message_name_snake_cased}_from_db.Clear();\n"
-        output_content += f'\n\tASSERT_TRUE({message_name_snake_cased}_codec.patch_{message_name_snake_cased}' \
+        output_content += f'\n\tASSERT_TRUE({message_name_snake_cased}_codec.patch' \
                           f'({message_name_snake_cased}));\n\n'
         output_content += self.generate_assert(message_name, message_name_snake_cased, class_name, 1)
 
@@ -180,7 +180,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content: str = ""
 
         output_content += "\t"*num_of_tabs + f'ASSERT_TRUE({message_name_snake_cased}_codec.get_data_by_id_from_' \
-                                             f'{message_name_snake_cased}_collection({message_name_snake_cased}' \
+                                             f'collection({message_name_snake_cased}' \
                                              f'_from_db, found->second));\n'
         output_content += "\t"*num_of_tabs + f"ASSERT_TRUE(RootModelJsonCodec<market_data::{message_name}>::" \
                                              f"encode_model({message_name_snake_cased}_from_db, " \
@@ -215,23 +215,24 @@ class CppDbTestPlugin(BaseProtoPlugin):
 
         output_content += "quill::Logger* logger = quill::get_logger();\n"
 
-        output_content += (f'std::shared_ptr<{package_name}_handler::{class_name}_MongoDBHandler> mongo_db = std::'
+        output_content += (f'std::shared_ptr<{package_name}_handler::{class_name}_MongoDBHandler> sp_mongo_db = std::'
                            f'make_shared<{package_name}_handler::{class_name}_MongoDBHandler>(logger);\n\n')
 
         output_content += f"using FluxCppCore::RootModelJsonCodec;\n"
         output_content += "using FluxCppCore::RootModelListJsonCodec;\n"
+        output_content += "using FluxCppCore::MongoDBCodec;\n"
         output_content += f"using {package_name}_handler::{class_name}KeyHandler;\n"
         output_content += f"using {package_name}_handler::{class_name}PopulateRandomValues;\n"
-        for message in self.root_message_list:
-
-            if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root):
-                for field in message.fields:
-                    field_name: str = field.proto.name
-                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
-                    if CppDbTestPlugin.is_option_enabled(field, "FluxFldPk"):
-                        message_name = message.proto.name
-                        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-                        output_content += f"using {class_name_snake_cased}_handler::{class_name}MongoDB{message_name}Codec;\n"
+        # for message in self.root_message_list:
+        #
+        #     if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root):
+        #         for field in message.fields:
+        #             field_name: str = field.proto.name
+        #             field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+        #             if CppDbTestPlugin.is_option_enabled(field, "FluxFldPk"):
+        #                 message_name = message.proto.name
+        #                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        #                 output_content += f"using {class_name_snake_cased}_handler::{class_name}MongoDB{message_name}Codec;\n"
 
         for message in self.root_message_list:
 
@@ -245,8 +246,10 @@ class CppDbTestPlugin(BaseProtoPlugin):
                     if CppDbTestPlugin.is_option_enabled(field, CppDbTestPlugin.flux_fld_PK):
 
                         output_content += f"\nTEST({class_name}{message_name}TestSuite, DBTest) {{\n\t"
-                        output_content += (f"{class_name}MongoDB{message_name}Codec {message_name_snake_cased}_codec("
-                                           f"mongo_db, logger);\n")
+                        # output_content += (f"{class_name}MongoDB{message_name}Codec {message_name_snake_cased}_codec("
+                        #                    f"mongo_db, logger);\n")
+                        output_content += f"MongoDBCodec<{package_name}::{message_name}, {package_name}::" \
+                                          f"{message_name}List> {message_name_snake_cased}_codec(sp_mongo_db, logger);\n"
                         output_content += f'\t{package_name}::{message_name} {message_name_snake_cased};\n'
                         output_content += f'\t{package_name}::{message_name} {message_name_snake_cased}_from_db;\n'
                         output_content += f'\t{package_name}::{message_name}List {message_name_snake_cased}_list;\n'
@@ -261,18 +264,18 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         output_content += f'\t{class_name}PopulateRandomValues::{message_name_snake_cased}' \
                                           f'({message_name_snake_cased});\n\n'
 
-                        output_content += f'\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_out(' \
+                        output_content += f'\t{class_name}KeyHandler::get_key_out(' \
                                           f'{message_name_snake_cased}, {message_name_snake_cased}_key);\n\n'
 
-                        output_content += f"\t{message_name_snake_cased}_codec.insert_or_update_{message_name_snake_cased}" \
+                        output_content += f"\t{message_name_snake_cased}_codec.insert_or_update" \
                                           f"({message_name_snake_cased}, new_generated_id);\n"
                         output_content += f"\t{message_name_snake_cased}.set_id(new_generated_id);\n\n"
 
-                        output_content += f'\tauto found = {message_name_snake_cased}_codec.{message_name_snake_cased}' \
-                                          f'_key_to_db_id.find({message_name_snake_cased}_key);\n'
+                        output_content += f'\tauto found = {message_name_snake_cased}_codec.' \
+                                          f'm_root_model_key_to_db_id.find({message_name_snake_cased}_key);\n'
 
-                        output_content += f'\tif (found != {message_name_snake_cased}_codec.{message_name_snake_cased}' \
-                                          f'_key_to_db_id.end()) {{\n'
+                        output_content += f'\tif (found != {message_name_snake_cased}_codec.' \
+                                          f'm_root_model_key_to_db_id.end()) {{\n'
 
                         output_content += self.generate_assert(message_name, message_name_snake_cased, class_name, 2)
 
@@ -290,9 +293,9 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         output_content += f"\t{message_name_snake_cased}_from_db.Clear();\n\n"
 
                         output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.delete_data_by_id_from_" \
-                                          f"{message_name_snake_cased}_collection(found->second));\n"
+                                          f"collection(found->second));\n"
                         output_content += f"\tASSERT_FALSE({message_name_snake_cased}_codec.get_data_by_id_from_" \
-                                          f"{message_name_snake_cased}_collection({message_name_snake_cased}_from_db," \
+                                          f"collection({message_name_snake_cased}_from_db," \
                                           f" found->second));\n\n"
 
                         output_content += "\tfor (int i = 0; i <= 5; ++i) {\n"
@@ -302,10 +305,10 @@ class CppDbTestPlugin(BaseProtoPlugin):
                                           f"({message_name_snake_cased});\n"
                         output_content += "\t}\n\n"
 
-                        output_content += f'\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_list(' \
+                        output_content += f'\t{class_name}KeyHandler::get_key_list(' \
                                           f'{message_name_snake_cased}_list, {message_name_snake_cased}_key_list);\n'
-                        output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.bulk_insert_" \
-                                          f"{message_name_snake_cased}({message_name_snake_cased}_list, " \
+                        output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.bulk_insert" \
+                                          f"({message_name_snake_cased}_list, " \
                                           f"{message_name_snake_cased}_key_list, new_generated_id_list));\n\n"
 
                         output_content += "\tfor (int i = 0; i <= 5; ++i) {\n"
@@ -314,7 +317,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         output_content += "\t}\n\n"
 
                         output_content += f"\tASSERT_TRUE({message_name_snake_cased}_codec.get_all_data_from_" \
-                                          f"{message_name_snake_cased}_collection({message_name_snake_cased}_list_from_db));\n"
+                                          f"collection({message_name_snake_cased}_list_from_db));\n"
                         output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n\n"
 
@@ -331,14 +334,14 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         output_content += self.generate_bulk_patch_for_test(message, message_name, message_name_snake_cased, package_name,
                                                                             class_name)
                         output_content += f"\n\tASSERT_TRUE({message_name_snake_cased}_codec.delete_all_data_from_" \
-                                          f"{message_name_snake_cased}_collection());\n"
+                                          f"collection());\n"
                         output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n"
                         output_content += f"\t{message_name_snake_cased}_list.Clear();\n"
                         output_content += f'\t{message_name_snake_cased}_list_from_db.Clear();\n\n'
 
                         output_content += f'\tASSERT_FALSE({message_name_snake_cased}_codec.get_all_data_from_' \
-                                          f'{message_name_snake_cased}_collection({message_name_snake_cased}_list_from_db));\n'
+                                          f'collection({message_name_snake_cased}_list_from_db));\n'
 
                         output_content += "}\n"
                         break

@@ -3,12 +3,18 @@ import logging
 import os
 from typing import List, Callable, Dict
 import protogen
+from pathlib import PurePath
+from abc import ABC
+from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case, convert_to_camel_case,
+                                                       YAMLConfigurationManager)
 # below main is imported to be accessible to derived classes
-from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, convert_to_camel_case
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main  # required import
+
+flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
 
 
-class BaseJSLayoutPlugin(BaseProtoPlugin):
+class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
     """
     Plugin script to generate jsx file for ORM root messages
     """
@@ -39,7 +45,20 @@ class BaseJSLayoutPlugin(BaseProtoPlugin):
         self.case_style_convert_method: Callable[[str], str] | None = None
 
     def load_root_message_to_data_member(self, file: protogen.File):
-        for message in file.messages:
+        message_list: List[protogen.Message] = file.messages
+
+        # Adding messages from core proto files having json_root option
+        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        if core_or_util_files is not None:
+            for dependency_file in file.dependencies:
+                if dependency_file.proto.name in core_or_util_files:
+                    message_list.extend(dependency_file.messages)
+                # else not required: if dependency file name not in core_or_util_files
+                # config list, avoid messages from it
+        # else not required: core_or_util_files key is not in yaml dict config
+
+        # handling current file
+        for message in set(message_list):
             if self.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_json_root):
                 self.root_msg_list.append(message)
             # else not required: Avoiding non ORM root messages

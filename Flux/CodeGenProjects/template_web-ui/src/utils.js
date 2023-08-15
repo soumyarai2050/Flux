@@ -1391,14 +1391,18 @@ export function hasxpath(data, xpath) {
     return false;
 }
 
-export function getTableColumns(collections, mode, enableOverride = [], disableOverride = []) {
+export function getTableColumns(collections, mode, enableOverride = [], disableOverride = [], collectionView = false) {
     let columns = collections
         .map(collection => Object.assign({}, collection))
         .map(collection => {
-            if (enableOverride.includes(collection.tableTitle)) {
+            let fieldName = collection.tableTitle;
+            if (collectionView) {
+                fieldName = collection.key;
+            }
+            if (enableOverride.includes(fieldName)) {
                 collection.hide = true;
             }
-            if (disableOverride.includes(collection.tableTitle)) {
+            if (disableOverride.includes(fieldName)) {
                 collection.hide = false;
             }
             return collection;
@@ -1433,11 +1437,15 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
                     return;
                 }
             }
-
+            let fieldName = column.tableTitle;
+            if (collectionView) {
+                fieldName = column.key;
+            }
             let found = true;
             for (let i = 0; i < rows.length - 1; i++) {
-                if (!_.isEqual(rows[i][column.tableTitle], rows[i + 1][column.tableTitle])) {
-                    const values = [rows[i][column.tableTitle], rows[i + 1][column.tableTitle]];
+
+                if (!_.isEqual(rows[i][fieldName], rows[i + 1][fieldName])) {
+                    const values = [rows[i][fieldName], rows[i + 1][fieldName]];
                     for (let i = 0; i < values.length; i++) {
                         let val = values[i];
                         if (val) {
@@ -1457,7 +1465,7 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
             }
             if (found) {
                 let collection = column;
-                collection.value = rows[0][column.tableTitle];
+                collection.value = rows[0][fieldName];
                 commonKeyCollections.push(collection);
             }
             return column;
@@ -1721,12 +1729,16 @@ export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
     return updatedArr;
 }
 
-export function applyFilter(arr, filters = []) {
+export function applyFilter(arr, filters = [], collectionView = false, collections) {
     if (arr && arr.length > 0) {
         let updatedArr = cloneDeep(arr);
         const filterDict = getFilterDict(filters);
         Object.keys(filterDict).forEach(key => {
             let values = filterDict[key].split(",").map(val => val.trim()).filter(val => val !== "");
+            if (collectionView) {
+                const collection = collections.find(collection => collection.key === key);
+                key = collection.tableTitle;
+            }
             updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
         })
         return updatedArr;
@@ -2277,7 +2289,7 @@ const ChartAxisType = {
 function getChartAxisTypeAndName(encode, collections, collectionView = false) {
     let collection;
     if (collectionView) {
-        collection = collections.find(collection => collection.title === encode);
+        collection = collections.find(collection => collection.key === encode);
     } else {
         collection = collections.find(collection => collection.tableTitle === encode);
     }
@@ -2354,11 +2366,16 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, pa
         // if more than 2 x-axis is present, only considers the first 2 x-axis
         // this limitation is added to avoid unsupported configurations
         if (xAxis.length === 0) {
-            xAxis.push({
+            const axis = {
                 type: xAxisType,
                 name: xAxisName,
                 encode: xEncode
-            })
+            }
+            if (axis.type === ChartAxisType.VALUE) {
+                const max = getAxisMax(rows, xEncode, 0);
+                axis.max = max;
+            }
+            xAxis.push(axis);
         }
     })
     yEncodes.forEach((yEncode, index) => {

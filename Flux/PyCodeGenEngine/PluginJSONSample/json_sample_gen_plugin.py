@@ -7,6 +7,7 @@ from random import randint, choices, getrandbits, choice, random
 import string
 import time
 from datetime import datetime
+from pathlib import PurePath
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
@@ -17,7 +18,12 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, convert_to_camel_case
+from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case, convert_to_camel_case,
+                                                       YAMLConfigurationManager)
+
+
+flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
 
 
 class JsonSampleGenPlugin(BaseProtoPlugin):
@@ -53,7 +59,19 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         # value of __is_req_autocomplete data member where required
 
     def __load_root_json_msg(self, file: protogen.File):
-        for message in file.messages:
+        message_list: List[protogen.Message] = file.messages
+
+        # Adding messages from core proto files having json_root option
+        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        if core_or_util_files is not None:
+            for dependency_file in file.dependencies:
+                if dependency_file.proto.name in core_or_util_files:
+                    message_list.extend(dependency_file.messages)
+                # else not required: if dependency file name not in core_or_util_files
+                # config list, avoid messages from it
+        # else not required: core_or_util_files key is not in yaml dict config
+
+        for message in set(message_list):
             if self.is_option_enabled(message, JsonSampleGenPlugin.flux_msg_json_root):
                 self.root_msg_list.append(message)
             # else not required: avoiding non-json msg append to list

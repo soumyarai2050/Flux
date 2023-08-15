@@ -5,9 +5,9 @@ const FLOAT_POINT_PRECISION = 2;
 
 onmessage = (e) => {
     const { items, itemsData, itemProps, abbreviation, loadedProps, page, pageSize, order, orderBy } = e.data;
-    const [rows, renamedRows] = getAbbreviatedRows(items, itemsData, itemProps, abbreviation, loadedProps);
+    const rows = getAbbreviatedRows(items, itemsData, itemProps, abbreviation, loadedProps);
     const activeRows = getActiveRows(rows, page, pageSize, order, orderBy);
-    postMessage([rows, renamedRows, activeRows]);
+    postMessage([rows, activeRows]);
 }
 
 function stableSort(array, comparator) {
@@ -95,12 +95,17 @@ function roundNumber(value, precision = FLOAT_POINT_PRECISION) {
 }
 
 function getAbbreviatedRows(items, itemsData, itemProps, abbreviation, loadedProps) {
+    /* 
+        items: list of abbreviated keys built from it's abbreviated dependent fields
+        itemsData: list of abbreviated dependent data for each abbreviated keys
+        itemProps: list of abbreviated dependent fields and their attributes
+        abbreviation: abbreviation syntax
+    */
     const rows = [];
-    const renamedRows = [];
     if (items) {
         items.map((item, i) => {
             let row = {};
-            let renamedRow = {};
+            // integer id field of item
             let id = getIdFromAbbreviatedKey(abbreviation, item);
             let metadata = itemsData.filter(metadata => _.get(metadata, DB_ID) === id)[0];
             row['data-id'] = id;
@@ -138,14 +143,12 @@ function getAbbreviatedRows(items, itemsData, itemProps, abbreviation, loadedPro
                     let [, v] = getLocalizedValueAndSuffix(c, value);
                     value = v;
                 }
-                row[c.xpath] = value;
-                renamedRow[c.title ? c.title : c.xpath] = value;
+                row[c.key] = value;
             })
             rows.push(row);
-            renamedRows.push(renamedRow);
         })
     }
-    return [rows, renamedRows];
+    return rows;
 }
 
 function getActiveRows(rows, page, pageSize, order, orderBy) {

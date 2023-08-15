@@ -1,15 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Box, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText, Button, RadioGroup, Radio, FormControlLabel, Popover } from '@mui/material';
-import classes from './ChartWidget.module.css';
-import FullScreenModal from './Modal';
-import TreeWidget from './TreeWidget';
-import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH } from '../constants';
-import { addxpath, clearxpath, generateObjectFromSchema, getChartDatasets, getChartOption, updateChartDataObj, updateChartSchema } from '../utils';
+import React, { useEffect, useState } from 'react';
+import { 
+    Box, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, 
+    ListItem, ListItemButton, ListItemText, Button, RadioGroup, Radio, FormControlLabel, Popover 
+} from '@mui/material';
 import _, { cloneDeep } from 'lodash';
+import { Add, AltRoute } from '@mui/icons-material';
+import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH } from '../constants';
+import { 
+    addxpath, clearxpath, generateObjectFromSchema, getChartDatasets, getChartOption, 
+    updateChartDataObj, updateChartSchema 
+} from '../utils';
 import WidgetContainer from './WidgetContainer';
 import { Icon } from './Icon';
-import { Add, AltRoute } from '@mui/icons-material';
+import FullScreenModal from './Modal';
+import TreeWidget from './TreeWidget';
 import EChart from './EChart';
+import classes from './ChartWidget.module.css';
 
 const name = 'chart_data';
 
@@ -179,13 +185,19 @@ function ChartWidget(props) {
                     />
                     {props.collections.map(collection => {
                         if (collection.type === DataTypes.STRING) {
+                            let label = collection.elaborateTitle ? collection.tableTitle : collection.title;
+                            let value = collection.tableTitle;
+                            if (props.collectionView) {
+                                label = collection.key;
+                                value = collection.key;
+                            }
                             return (
-                                <FormControlLabel size='small' key={collection.tableTitle}
+                                <FormControlLabel size='small' key={label}
                                     sx={{ paddingLeft: 1 }}
-                                    label={collection.elaborateTitle ? collection.tableTitle : collection.key}
-                                    value={collection.tableTitle}
+                                    label={label}
+                                    value={value}
                                     control={
-                                        <Radio checked={props.partitionFld === collection.tableTitle} size='small' />
+                                        <Radio checked={props.partitionFld === value} size='small' />
                                     }
                                 />
                             )
@@ -237,7 +249,15 @@ function ChartWidget(props) {
                             theme={theme}
                             option={{
                                 legend: {},
-                                tooltip: { trigger: 'axis' },
+                                tooltip: { 
+                                    trigger: 'axis',
+                                    axisPointer: {
+                                        type: 'cross'
+                                    } 
+                                },
+                                dataZoom: {
+                                    type: 'inside'
+                                },
                                 dataset: datasets,
                                 ...options
                             }}

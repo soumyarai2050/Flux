@@ -1,5 +1,8 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell, TablePagination, Select, MenuItem, FormControlLabel, Checkbox, Tooltip } from '@mui/material';
+import { 
+    Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell, 
+    TablePagination, Select, MenuItem, FormControlLabel, Checkbox, Tooltip, Snackbar, Alert 
+} from '@mui/material';
 import WidgetContainer from './WidgetContainer';
 import { Download, Delete, Settings, FileDownload, LiveHelp } from '@mui/icons-material';
 import PropTypes from 'prop-types';
@@ -29,18 +32,69 @@ function AbbreviatedFilterWidget(props) {
     const [page, setPage] = useState(0);
     const [rows, setRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
-    const [renamedRows, setRenamedRows] = useState([]);
     const [showSettings, setShowSettings] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const [headCells, setHeadCells] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
+    const [toastMessage, setToastMessage] = useState(null);
+    const [clipboardText, setClipboardText] = useState(null);
+
+    const collections = useMemo(() => {
+        let collections = [];
+        if (props.abbreviated && props.itemCollections.length > 0) {
+            props.abbreviated.split('^').forEach(field => {
+                let title;
+                let source = field;
+                // title is collection view is always expected to be present
+                if (source.indexOf(":") !== -1) {
+                    title = field.split(":")[0];
+                    source = field.split(":")[1];
+                } else {
+                    throw new Error('no title found in abbreviated split. expected title followed by colon (:)')
+                }
+                // expected all the fields in abbreviated is from its abbreviated dependent source
+                let xpath = source.split("-").map(path => path = path.substring(path.indexOf(".") + 1));
+                xpath = xpath.join("-");
+                let subCollections = xpath.split("-").map(path => {
+                    return props.itemCollections.map(col => Object.assign({}, col))
+                        .filter(col => col.tableTitle === path)[0];
+                })
+                // if a single field has values from multiple source separated by hyphen, then
+                // attributes of first field is considered as field attributes
+                source = xpath.split("-")[0];
+                const collectionsCopy = props.itemCollections.map(col => Object.assign({}, col));
+                const collection = collectionsCopy.find(col => col.tableTitle === source);
+                if (collection) {
+                    // create a custom collection object
+                    collection.key = title;
+                    collection.title = title;
+                    // TODO: check the scenario in which xpath and tableTitle are different
+                    collection.tableTitle = xpath;
+                    collection.xpath = xpath;
+                    // remove default properties set on the fields
+                    collection.elaborateTitle = false;
+                    collection.hide = false;
+                    collection.subCollections = subCollections;
+                    // if field has values from multiple source, it's data-type is considered STRING
+                    if (xpath.indexOf('-') !== -1) {
+                        collection.type = DataTypes.STRING;
+                    }
+                    collections.push(collection);
+                } else {
+                    throw new Error('no collection (field attributes) found for field with xpath ' + source);
+                }
+            })
+        }
+        return collections
+    }, [props.abbreviated, props.itemCollections])
 
     const items = useMemo(() => {
         return props.items.filter(item => {
             const itemId = getIdFromAbbreviatedKey(props.abbreviated, item);
             const metadata = props.itemsMetadata.find(metadata => _.get(metadata, DB_ID) === itemId);
             if (metadata) {
-                if (applyFilter([metadata], props.filters).length > 0) {
+                // TODO: update applyFilter to support collection view
+                if (applyFilter([metadata], props.filters, true, collections).length > 0) {
                     return true;
                 }
             } else {
@@ -58,53 +112,27 @@ function AbbreviatedFilterWidget(props) {
         return props.collections.filter(col => col.key === props.loadedKeyName)[0];
     }, [props.collections, props.loadedKeyName])
 
-    const collections = useMemo(() => {
-        let collections = [];
-        if (props.abbreviated && props.itemCollections.length > 0) {
-            props.abbreviated.split('^').forEach(field => {
-                let title;
-                let source = field;
-                if (source.indexOf(":") !== -1) {
-                    title = field.split(":")[0];
-                    source = field.split(":")[1];
-                }
-                let xpath = source.split("-").map(path => path = path.substring(path.indexOf(".") + 1));
-                xpath = xpath.join("-");
-                let subCollections = xpath.split("-").map(path => {
-                    return props.itemCollections.map(col => Object.assign({}, col))
-                        .filter(col => col.tableTitle === path)[0];
-                })
-                source = xpath.split("-")[0];
-                let collection = props.itemCollections.map(col => Object.assign({}, col)).filter(col => col.tableTitle === source)[0];
-                collection.xpath = xpath;
-                collection.tableTitle = xpath;
-                collection.elaborateTitle = false;
-                collection.hide = false;
-                collection.subCollections = subCollections;
-                if (xpath.indexOf('-') !== -1) {
-                    collection.type = DataTypes.STRING;
-                }
-                if (title) {
-                    collection.title = title;
-                }
-                collections.push(collection);
-            })
-        }
-        return collections
-    }, [props.abbreviated, props.itemCollections])
-
     useEffect(() => {
         if (window.Worker) {
-            worker.postMessage({ items, itemsData: props.itemsMetadata, itemProps: collections, abbreviation: props.abbreviated, loadedProps: loadedCollection, page, pageSize: rowsPerPage, order, orderBy });
+            worker.postMessage({
+                items,
+                itemsData: props.itemsMetadata,
+                itemProps: collections,
+                abbreviation: props.abbreviated,
+                loadedProps: loadedCollection,
+                page,
+                pageSize: rowsPerPage,
+                order,
+                orderBy
+            });
         }
     }, [items, props.itemsMetadata, page, rowsPerPage, order, orderBy])
 
     useEffect(() => {
         if (window.Worker) {
             worker.onmessage = (e) => {
-                const [updatedRows, updatedRenamedRows, updatedActiveRows] = e.data;
+                const [updatedRows, updatedActiveRows] = e.data;
                 setRows(updatedRows);
-                setRenamedRows(updatedRenamedRows);
                 setActiveRows(updatedActiveRows);
             }
         }
@@ -114,7 +142,7 @@ function AbbreviatedFilterWidget(props) {
     }, [worker])
 
     useEffect(() => {
-        const tableColumns = getTableColumns(collections, Modes.READ_MODE, props.enableOverride, props.disableOverride);
+        const tableColumns = getTableColumns(collections, Modes.READ_MODE, props.enableOverride, props.disableOverride, true);
         setHeadCells(tableColumns);
     }, [props.enableOverride, props.disableOverride])
 
@@ -196,9 +224,9 @@ function AbbreviatedFilterWidget(props) {
         if (hide) {
             setSelectAll(false);
         }
-        let updatedHeadCells = headCells.map((cell) => cell.tableTitle === key ? { ...cell, hide: hide } : cell)
+        let updatedHeadCells = headCells.map(cell => cell.key === key ? { ...cell, hide: hide } : cell)
         setHeadCells(updatedHeadCells);
-        let collection = collections.filter(c => c.tableTitle === key)[0];
+        let collection = collections.filter(c => c.key === key)[0];
         let enableOverride = cloneDeep(props.enableOverride);
         let disableOverride = cloneDeep(props.disableOverride);
         if (hide) {
@@ -242,16 +270,37 @@ function AbbreviatedFilterWidget(props) {
         setHeadCells(updatedHeadCells);
     }
 
-    const filteredHeadCells = headCells.filter(cell => commonKeys.filter(c => c.key === cell.key && c.tableTitle === cell.tableTitle).length === 0);
+    const copyColumnHandler = (xpath) => {
+        let columnName = xpath.split('.').pop();
+        let values = [columnName];
+        rows.map(row => {
+            values.push(row[xpath]);
+        })
+        const text = values.join('\n');
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text);
+        } else {
+            setClipboardText(text);
+        }
+        setToastMessage("column copied to clipboard: " + columnName);
+    }
+
+    const onCloseToastMessage = () => {
+        setClipboardText(null);
+        setToastMessage(null);
+    }
+
+    const filteredHeadCells = headCells.filter(cell => commonKeys.filter(c => c.key === cell.key).length === 0);
 
     const dynamicMenu = (
         <DynamicMenu
             name={props.headerProps.name}
-            collections={props.itemCollections}
+            collections={collections}
             currentSchema={props.itemSchema}
             data={props.itemsMetadata}
             filters={props.filters}
             onFiltersChange={props.onFiltersChange}
+            collectionView={true}
         />
     )
 
@@ -283,15 +332,15 @@ function AbbreviatedFilterWidget(props) {
                 </MenuItem>
                 {headCells.map((cell, index) => {
                     return (
-                        <Tooltip title={cell.tableTitle} key={index}>
+                        <Tooltip title={cell.key} key={index}>
                             <MenuItem dense={true}>
                                 <FormControlLabel size='small'
-                                    label={cell.title ? cell.title : cell.tableTitle}
+                                    label={cell.key}
                                     control={
                                         <Checkbox
                                             size='small'
                                             checked={cell.hide ? false : true}
-                                            onChange={(e) => onSettingsItemChange(e, cell.tableTitle)}
+                                            onChange={(e) => onSettingsItemChange(e, cell.key)}
                                         />
                                     }
                                 />
@@ -363,6 +412,8 @@ function AbbreviatedFilterWidget(props) {
                                             order={order}
                                             orderBy={orderBy}
                                             onRequestSort={handleRequestSort}
+                                            copyColumnHandler={copyColumnHandler}
+                                            collectionView={true}
                                         />
                                         <TableBody>
                                             {
@@ -397,7 +448,7 @@ function AbbreviatedFilterWidget(props) {
                                                                     if (cell.hide) return;
                                                                     let mode = Modes.READ_MODE;
                                                                     let rowindex = row["data-id"];
-                                                                    let collection = collections.filter(c => c.tableTitle === cell.tableTitle)[0];
+                                                                    let collection = collections.filter(c => c.key === cell.key)[0];
                                                                     if (collection.type === "progressBar") {
                                                                         collection = _.cloneDeep(collection);
                                                                         let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
@@ -413,7 +464,7 @@ function AbbreviatedFilterWidget(props) {
 
                                                                     }
                                                                     let xpath = collection.xpath;
-                                                                    let value = row[collection.xpath];
+                                                                    let value = row[collection.key];
 
                                                                     return (
                                                                         <Cell
@@ -474,6 +525,11 @@ function AbbreviatedFilterWidget(props) {
                             </>
                         )}
                         {props.error && <AlertErrorMessage open={props.error ? true : false} onClose={props.onResetError} severity='error' error={props.error} />}
+                        {toastMessage && (
+                            <Snackbar open={toastMessage !== null} autoHideDuration={2000} onClose={onCloseToastMessage}>
+                                <Alert onClose={onCloseToastMessage} severity="success">{toastMessage}</Alert>
+                            </Snackbar>
+                        )}
                     </Fragment>
                 </WidgetContainer>
             ) : props.headerProps.layout === Layouts.PIVOT_TABLE ? (
@@ -484,7 +540,7 @@ function AbbreviatedFilterWidget(props) {
                     layout={props.headerProps.layout}
                     supportedLayouts={props.headerProps.supportedLayouts}
                     onChangeLayout={props.headerProps.onChangeLayout}>
-                    {renamedRows.length > 0 && <PivotTable pivotData={renamedRows} />}
+                    {rows.length > 0 && <PivotTable pivotData={rows} />}
                 </WidgetContainer>
             ) : props.headerProps.layout === Layouts.CHART ? (
                 <ChartWidget
@@ -498,7 +554,7 @@ function AbbreviatedFilterWidget(props) {
                     mode={props.mode}
                     menu={dynamicMenu}
                     onChangeMode={props.headerProps.onChangeMode}
-                    rows={renamedRows}
+                    rows={rows}
                     chartData={props.chartData}
                     onChartDataChange={props.onChartDataChange}
                     collections={collections}

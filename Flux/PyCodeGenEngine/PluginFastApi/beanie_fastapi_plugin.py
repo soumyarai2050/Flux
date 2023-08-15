@@ -182,8 +182,8 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def output_file_generate_handler(self, file: protogen.File):
         # Pre-code generation initializations
         self.load_root_and_non_root_messages_in_dicts(file.messages)
-        # Adding messages from core proto files having json_root option
 
+        # Adding messages from core proto files having json_root option
         core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
         if core_or_util_files is not None:
             for dependency_file in file.dependencies:
@@ -192,8 +192,6 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                 # else not required: if dependency file name not in core_or_util_files
                 # config list, avoid messages from it
         # else not required: core_or_util_files key is not in yaml dict config
-
-        self.load_root_and_non_root_messages_in_dicts(file.messages)
 
         self.set_req_data_members(file)
 

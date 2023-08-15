@@ -5,6 +5,7 @@ import os
 from typing import List, Callable, Dict, Tuple, Any
 import time
 import re
+from pathlib import PurePath
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
@@ -15,7 +16,12 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, convert_to_camel_case
+from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case, convert_to_camel_case,
+                                                       YAMLConfigurationManager)
+
+
+flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
 
 
 class JsonSchemaConvertPlugin(BaseProtoPlugin):
@@ -142,8 +148,20 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             # else not required: If AutoComplete option is not set then __add_autocomplete_dict's default
             # value will be used while generation check
 
-    def __load_json_layout_and_non_layout_messages_in_dicts(self, message_list: List[protogen.Message]):
-        for message in message_list:
+    def __load_json_layout_and_non_layout_messages_in_dicts(self, file: protogen.File):
+        message_list: List[protogen.Message] = file.messages
+
+        # Adding messages from core proto files having json_root option
+        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        if core_or_util_files is not None:
+            for dependency_file in file.dependencies:
+                if dependency_file.proto.name in core_or_util_files:
+                    message_list.extend(dependency_file.messages)
+                # else not required: if dependency file name not in core_or_util_files
+                # config list, avoid messages from it
+        # else not required: core_or_util_files key is not in yaml dict config
+
+        for message in set(message_list):
             if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
                 widget_ui_data_option_value_dict = \
                     self.get_complex_option_set_values(message,
@@ -833,7 +851,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     def output_file_generate_handler(self, file: protogen.File):
         # Performing Recursion to messages (including nested type) to get json layout, non-layout and enums and
         # adding to their respective data-member
-        self.__load_json_layout_and_non_layout_messages_in_dicts(file.messages)
+        self.__load_json_layout_and_non_layout_messages_in_dicts(file)
         if self.__response_field_case_style.lower() == "snake":
             self.__case_style_convert_method = convert_camel_case_to_specific_case
         elif self.__response_field_case_style.lower() == "camel":
