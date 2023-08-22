@@ -47,6 +47,10 @@ python gen_proto2_to_proto3.py
 python gen_cpp_build_and_run_test.py
 python gen_cpp_max_id_handler.py
 #python gen_cpp_db_test_cpp_plugin.py
+python gen_cpp_project_includes.py
+python gen_cpp_web_socket_server.py
+python gen_web_socket_server_util.py
+python gen_cpp_web_socket_test.py
 python gen_cpp_proto2_model.py
 cd ../../
 "$PWD"/gen_web_project.sh "$PROJECT_NAME"

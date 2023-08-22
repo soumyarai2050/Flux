@@ -1,6 +1,6 @@
 import os
 import time
-from typing import List, Dict
+from typing import List, Dict, Tuple
 import json
 from abc import ABC
 import logging
@@ -23,6 +23,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
+        self.json_sample_loaded_json: Dict | None = None
 
     def _handle_field_data_manipulation(self, json_content: Dict, message: protogen.Message, id_str: str | None = None,
                                         get_all_fields: bool | None = None, specify_message_name: str | None = None):
@@ -274,6 +275,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
             output_str += "    # models in db, some are used to get processed data from db, so specific impl must \n"
             output_str += "    # be implemented in main callback override file present in app dir of project\n"
             output_str += f"\n"
+
         for message in self.message_to_query_option_list_dict:
             msg_name = message.proto.name
             msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
@@ -341,6 +343,192 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                         logging.exception(err_str)
                         raise Exception(err_str)
 
+        # Projection handling
+        projection_query_filter_func_req_query_name_n_message: List[Tuple[str, protogen.Message,
+                                                                    List[Tuple[str, protogen.Field]]]] = []
+        for message in self.root_message_list:
+            if FastapiCallbackOverrideFileHandler.is_option_enabled(
+                    message, FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series):
+                for field in message.fields:
+                    if FastapiCallbackOverrideFileHandler.is_option_enabled(
+                            field, FastapiCallbackOverrideFileHandler.flux_fld_projections):
+                        break
+                else:
+                    # If no field is found having projection enabled
+                    continue
+
+                for field in message.fields:
+                    if self.is_bool_option_enabled(field,
+                                                   FastapiCallbackOverrideFileHandler.flux_fld_val_time_field):
+                        time_field_name = field.proto.name
+                        break
+                else:
+                    err_str = (f"Could not find any time field in {message.proto.name} message having "
+                               f"{FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series} option")
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+
+                for field in message.fields:
+                    if self.is_bool_option_enabled(field, FastapiCallbackOverrideFileHandler.flux_fld_val_meta_field):
+                        meta_field = field
+                        break
+                else:
+                    err_str = (f"Could not find any time field in {message.proto.name} message having "
+                               f"{FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series} option")
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+
+                projection_val_to_fields_dict = (
+                    FastapiCallbackOverrideFileHandler.get_projection_option_value_to_fields(message))
+                projection_val_to_query_name_dict = (
+                    FastapiCallbackOverrideFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(message))
+                query_name_to_param_str_n_field_tuple_list_dict: Dict[str, List[Tuple[str, protogen.Field]]] = (
+                    self.get_projection_query_name_to_param_field_n_field_obj_tuple_list_dict(message))
+                for projection_option_val, query_name in projection_val_to_query_name_dict.items():
+                    msg_name = message.proto.name
+                    msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
+                    field_name_list: List[str] = []
+                    field_name_set = projection_val_to_fields_dict[projection_option_val]
+                    for field_name in field_name_set:
+                        if "." in field_name:
+                            field_name_list.append("_".join(field_name.split(".")))
+                        else:
+                            field_name_list.append(field_name)
+                    field_names_str = "_n_".join(field_name_list)
+                    field_names_str_camel_cased = convert_to_capitalized_camel_case(field_names_str)
+                    projection_model_name = f"{message.proto.name}ProjectionFor{field_names_str_camel_cased}"
+
+                    query_param_field_str_n_field_tuple_list = (
+                        query_name_to_param_str_n_field_tuple_list_dict.get(projection_option_val))
+
+                    query_param_with_type_str = ""
+                    if query_param_field_str_n_field_tuple_list:
+                        for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
+                            query_param_with_type_str += f"{field.proto.name}: {self.proto_to_py_datatype(field)}, "
+                    query_param_with_type_str += ("start_date_time: DateTime | None = None, "
+                                                  "end_date_time: DateTime | None = None")
+
+                    # handling projection http query
+                    output_str += (
+                        f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: "
+                        f"Type[{msg_name}], {query_param_with_type_str}):\n")
+                    routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
+                                                                       self.routes_file_name)
+                    output_str += f"        from {routes_import_path} import " \
+                                  f"underlying_read_{msg_name_snake_cased}_http\n"
+                    query_param_dict_str = ""
+                    if query_param_field_str_n_field_tuple_list:
+                        for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
+                            query_param_dict_str += f'"{query_param_field_str}": {field.proto.name}'
+                            if query_param_field_str != list(query_param_field_str_n_field_tuple_list)[-1]:
+                                query_param_dict_str += ", "
+                    if not query_param_dict_str:
+                        output_str += "        projection_filter: Dict = {}\n"
+                    else:
+                        output_str += "        projection_filter: Dict = {"+f"{query_param_dict_str}"+"}\n"
+                    output_str += f"        if start_date_time and not end_date_time:\n"
+                    output_str += '            projection_filter["'+f'{time_field_name}'+('"] = '
+                                                                                          '{"$gt": start_date_time}\n')
+                    output_str += f"        elif not start_date_time and end_date_time:\n"
+                    output_str += '            projection_filter["'+f'{time_field_name}'+('"] = '
+                                                                                          '{"$lt": end_date_time}\n')
+                    output_str += f"        elif start_date_time and end_date_time:\n"
+                    output_str += '            projection_filter["'+f'{time_field_name}'+('"] = '
+                                                                    '{"$gt": start_date_time, "$lt": end_date_time}\n')
+                    output_str += (f"        {msg_name_snake_cased}_projection_list = await underlying_read_"
+                                   f"{msg_name_snake_cased}_http(projection_model={projection_model_name}, "
+                                   f"projection_filter=projection_filter)\n")
+                    container_model_name = f"{message.proto.name}ProjectionContainerFor{field_names_str_camel_cased}"
+                    message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+                    meta_data_field_json = self.json_sample_loaded_json.get(message_name_snake_cased)
+                    if meta_data_field_json is None:
+                        err_str = (f"Can't Find Model name {message_name_snake_cased} in json "
+                                   f"sample plugin generated file")
+                        logging.exception(err_str)
+                        raise Exception(err_str)
+                    if meta_field.message:
+                        output_str += f"        {meta_field.proto.name} = {meta_field.message.proto.name}Optional()\n"
+                        for param_name_str, field in query_param_field_str_n_field_tuple_list:
+                            output_str += f"        {param_name_str} = {field.proto.name}\n"
+                    else:
+                        if len(query_param_field_str_n_field_tuple_list) == 1:
+                            param_name_str, field = query_param_field_str_n_field_tuple_list[0]
+                            if field != meta_field:
+                                err_str = ""
+                                logging.exception(err_str)
+                                raise Exception(err_str)
+                        else:
+                            err_str = ("Since meta field is of simple type, each query can have only one query param, "
+                                       f"found {len(query_param_field_str_n_field_tuple_list)}")
+                            logging.exception(err_str)
+                            raise Exception(err_str)
+                        output_str += f"        {meta_field.proto.name} = {param_name_str}"
+                    output_str += (f"        container_model = {container_model_name}("
+                                   f"{meta_field.proto.name}={meta_field.proto.name}, projection_models="
+                                   f"{msg_name_snake_cased}_projection_list)\n")
+                    output_str += f"        return [container_model]\n\n"
+
+                    # handling projection ws query
+                    output_str += f"    async def {query_name}_query_ws_pre(self):\n"
+                    output_str += f"        return {query_name}_filter_callable\n\n"
+                    projection_query_filter_func_req_query_name_n_message.append(
+                        (query_name, message, query_param_field_str_n_field_tuple_list))
+
+        # handling projection ws query filter functions
+        for query_name, message, query_param_field_str_n_field_tuple_list in (
+                projection_query_filter_func_req_query_name_n_message):
+            for field in message.fields:
+                if self.is_bool_option_enabled(field,
+                                               FastapiCallbackOverrideFileHandler.flux_fld_val_time_field):
+                    time_field_name = field.proto.name
+                    break
+            else:
+                err_str = (f"Could not find any time field in {message.proto.name} message having "
+                           f"{FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series} option")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            output_str += "\n"
+            message_name = message.proto.name
+            msg_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+            output_str += f"def {query_name}_filter_callable({msg_name_snake_cased}_obj_json_str: str, **kwargs):\n"
+            output_str += f'    start_date_time = kwargs.get("start_date_time")\n'
+            output_str += f'    end_date_time = kwargs.get("end_date_time")\n'
+            output_str += f'    obj_json = json.loads({msg_name_snake_cased}_obj_json_str)\n'
+            if query_param_field_str_n_field_tuple_list:
+                for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
+                    output_str += f'    {field.proto.name}_param = kwargs.get("{field.proto.name}")\n'
+
+                    query_param_field_str_dot_sep = query_param_field_str.split(".")
+                    indent_count = 1
+                    last_field_str = "obj_json"
+                    for index, param_field_str in enumerate(query_param_field_str_dot_sep):
+                        output_str += ('    ' * indent_count +
+                                       f'{param_field_str} = {last_field_str}.get("{param_field_str}")\n')
+                        output_str += '    ' * indent_count + f'if {param_field_str} is None:\n'
+                        indent_count += 1
+                        output_str += '    ' * indent_count + f'return False\n'
+                        indent_count -= 1
+                        output_str += '    ' * indent_count + f'else:\n'
+                        indent_count += 1
+                        if index+1 == len(query_param_field_str_dot_sep):
+                            output_str += '    ' * indent_count + f'if {param_field_str} != {field.proto.name}_param:\n'
+                            indent_count += 1
+                            output_str += '    ' * indent_count + f'return False\n'
+                        else:
+                            last_field_str = param_field_str
+                            continue
+            output_str += f'    time_field_val_str = obj_json.get("{time_field_name}")\n'
+            output_str += f'    time_field_val = pendulum.parse(time_field_val_str)\n'
+            output_str += f'    if start_date_time and not end_date_time:\n'
+            output_str += f'        return start_date_time < time_field_val\n'
+            output_str += f'    elif not start_date_time and end_date_time:\n'
+            output_str += f'        return end_date_time > time_field_val\n'
+            output_str += f'    elif start_date_time and end_date_time:\n'
+            output_str += f'        return start_date_time < time_field_val < end_date_time\n'
+            output_str += f'    else:\n'
+            output_str += f'        return True\n\n'
+
         return output_str
 
     def handle_callback_override_file_gen(self) -> str:
@@ -352,7 +540,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
             logging.exception(err_str)
             raise Exception(err_str)
         with open(json_sample_file_path) as json_sample:
-            json_sample_content = json.load(json_sample)
+            self.json_sample_loaded_json = json.load(json_sample)
         if (total_root_msg := len(self.root_message_list)) >= 4:
             required_root_msg: List[protogen.Message] = self.root_message_list[:4]
         else:
@@ -377,16 +565,16 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         # example 1 of 5
         if len(required_root_msg) >= 1:
             output_str += self._handle_callback_example_1(first_msg_name, first_msg_name_snake_cased,
-                                                          json_sample_content, required_root_msg)
+                                                          self.json_sample_loaded_json, required_root_msg)
         # example 2 of 5
         if len(required_root_msg) >= 2:
             output_str += self._handle_callback_example_2(first_msg_name, first_msg_name_snake_cased,
-                                                          json_sample_content, required_root_msg)
+                                                          self.json_sample_loaded_json, required_root_msg)
 
         # example 3 of 5
         if len(required_root_msg) >= 3:
             output_str += self._handle_callback_example_3(first_msg_name, first_msg_name_snake_cased,
-                                                          json_sample_content, required_root_msg)
+                                                          self.json_sample_loaded_json, required_root_msg)
 
         if len(required_root_msg) >= 4:
             # example 4 of 5

@@ -109,9 +109,9 @@ class CppMaxIdHandler(BaseProtoPlugin):
                                            f"{message_name_snake_cased}_client_url, get_{message_name_snake_cased}"
                                            f"_max_id_client_url, put_{message_name_snake_cased}_client_url, patch_"
                                            f"{message_name_snake_cased}_client_url, delete_{message_name_snake_cased}"
-                                           f"_client_url> &{class_name_snake_cased}_web_client) {{\n")
-                        output_content += (f"\t\t\t{message_name_snake_cased}_max_id_handler.update_max_id("
-                                           f"{class_name_snake_cased}_web_client.get_max_id_client());\n")
+                                           f"_client_url> &kr_{class_name_snake_cased}_web_client) {{\n")
+                        output_content += (f"\t\t\tc_{message_name_snake_cased}_max_id_handler.update_max_id("
+                                           f"kr_{class_name_snake_cased}_web_client.get_max_id_client());\n")
                         output_content += "\t\t}\n\n"
                         break
 
@@ -123,8 +123,7 @@ class CppMaxIdHandler(BaseProtoPlugin):
             if CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root):
                 for field in message.fields:
                     if CppMaxIdHandler.is_option_enabled(field, CppMaxIdHandler.flux_fld_PK):
-                        output_content += f"\t\tstatic inline MaxIdHandler {message_name_snake_cased}" \
-                                          f"_max_id_handler{{}};\n"
+                        output_content += f"\t\tstatic inline MaxIdHandler c_{message_name_snake_cased}_max_id_handler{{}};\n"
                         break
 
         output_content += "\t};\n}\n"

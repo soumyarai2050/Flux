@@ -2,7 +2,7 @@ import os
 import time
 from abc import ABC
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
@@ -111,6 +111,15 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "        pass\n\n"
         return output_str
 
+    def handle_DELETE_all_callback_methods_gen(self, message: protogen.Message, id_field_type: str | None = None) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"    async def delete_all_{message_name_snake_cased}_pre(self):\n"
+        output_str += "        pass\n\n"
+        output_str += f"    async def delete_all_{message_name_snake_cased}_post(self, " \
+                      f"delete_web_response):\n"
+        output_str += "        pass\n\n"
+        return output_str
+
     def handle_read_by_id_WEBSOCKET_callback_methods_gen(self, message: protogen.Message,
                                                          id_field_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
@@ -213,9 +222,13 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
     def handle_callback_methods_output(self) -> str:
         output_str = ""
         for message in self.root_message_list:
-            option_value_dict = \
-                self.get_complex_option_set_values(message,
-                                                   FastapiCallbackFileHandler.flux_msg_json_root)
+            if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root):
+                option_value_dict = (
+                    self.get_complex_option_value_from_proto(message, FastapiCallbackFileHandler.flux_msg_json_root))
+            else:
+                option_value_dict = (
+                    self.get_complex_option_value_from_proto(message,
+                                                             FastapiCallbackFileHandler.flux_msg_json_root_time_series))
 
             crud_field_name_to_method_call_dict = {
                 FastapiCallbackFileHandler.flux_json_root_create_field: self.handle_POST_callback_methods_gen,
@@ -226,6 +239,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                 FastapiCallbackFileHandler.flux_json_root_patch_field: self.handle_PATCH_callback_methods_gen,
                 FastapiCallbackFileHandler.flux_json_root_patch_all_field: self.handle_PATCH_all_callback_methods_gen,
                 FastapiCallbackFileHandler.flux_json_root_delete_field: self.handle_DELETE_callback_methods_gen,
+                FastapiCallbackFileHandler.flux_json_root_delete_all_field: self.handle_DELETE_all_callback_methods_gen,
                 FastapiCallbackFileHandler.flux_json_root_read_websocket_field:
                     self.handle_read_by_id_WEBSOCKET_callback_methods_gen
             }
@@ -249,9 +263,9 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         return output_str
 
     def _handle_callback_http_query_method_output(self, message: protogen.Message, query_name: str,
-                                                  agg_params_with_type_str: str, route_type: str) -> str:
+                                                  agg_params_with_type_str: str, route_type: str | None = None) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        if route_type == FastapiCallbackFileHandler.flux_json_query_route_get_type_field_val:
+        if route_type is None or route_type == FastapiCallbackFileHandler.flux_json_query_route_get_type_field_val:
             if agg_params_with_type_str is not None:
                 output_str = f"    async def {query_name}_query_pre(self, " \
                               f"{message_name_snake_cased}_class_type: Type[{message.proto.name}], " \
@@ -282,9 +296,19 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"        return None\n\n"
         return output_str
 
-    def handle_callback_query_methods_output(self) -> str:
+    def handle_query_filter_func_output(self, msg_name_n_ws_query_name_tuple_list) -> str:
         output_str = ""
-        msg_name_n_ws_query_name_tuple_list: List[Tuple[str, str]] = []
+        for msg_name, query_name in msg_name_n_ws_query_name_tuple_list:
+            msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
+            output_str += f"def {query_name}_filter_callable({msg_name_snake_cased}_obj_json_str: str, **args):\n"
+            output_str += f"    logging.error('WS Query option found for message {msg_name} but filter callable " \
+                          f"is not overridden/defined for query pre to be returned, currently using code generated " \
+                          f"implementation')\n"
+            output_str += f"    return True\n\n\n"
+        return output_str
+
+    def handle_callback_query_methods_output(self, msg_name_n_ws_query_name_tuple_list: List[Tuple[str, str]]) -> str:
+        output_str = ""
 
         for message in self.message_to_query_option_list_dict:
             aggregate_value_list = self.message_to_query_option_list_dict[message]
@@ -323,13 +347,45 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                     raise Exception(err_str)
 
         output_str += "\n"
-        for msg_name, query_name in msg_name_n_ws_query_name_tuple_list:
-            msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
-            output_str += f"def {query_name}_filter_callable({msg_name_snake_cased}_obj_json_str: str, **args):\n"
-            output_str += f"    logging.error('WS Query option found for message {msg_name} but filter callable " \
-                          f"is not overridden/defined for query pre to be returned, currently using code generated " \
-                          f"implementation')\n"
-            output_str += f"    return True\n\n\n"
+
+        return output_str
+
+    def handle_callback_projection_query_methods_output(self,
+                                                        msg_name_n_ws_query_name_tuple_list: List[Tuple[str, str]]
+                                                        ) -> str:
+        output_str = ""
+
+        for message in self.root_message_list:
+            if FastapiCallbackFileHandler.is_option_enabled(message,
+                                                            FastapiCallbackFileHandler.flux_msg_json_root_time_series):
+                for field in message.fields:
+                    if FastapiCallbackFileHandler.is_option_enabled(field,
+                                                                    FastapiCallbackFileHandler.flux_fld_projections):
+                        break
+                else:
+                    # If no field is found having projection enabled
+                    continue
+
+                query_name_to_param_str_n_field_tuple_list_dict: Dict[str, List[Tuple[str, protogen.Field]]] = (
+                    self.get_projection_query_name_to_param_field_n_field_obj_tuple_list_dict(message))
+                projection_val_to_query_name_dict = (
+                    FastapiCallbackFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(message))
+                for projection_option_val, query_name in projection_val_to_query_name_dict.items():
+                    query_param_field_str_n_field_tuple_list = (
+                        query_name_to_param_str_n_field_tuple_list_dict.get(projection_option_val))
+
+                    query_param_with_type_str = ""
+                    if query_param_field_str_n_field_tuple_list:
+                        for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
+                            query_param_with_type_str += f"{field.proto.name}: {self.proto_to_py_datatype(field)}, "
+                    query_param_with_type_str += ("start_date_time: DateTime | None = None, "
+                                                  "end_date_time: DateTime | None = None")
+                    # http
+                    output_str += self._handle_callback_http_query_method_output(message, query_name,
+                                                                                 query_param_with_type_str)
+                    # WS
+                    output_str += self._handle_callback_ws_query_method_output(query_name)
+                    msg_name_n_ws_query_name_tuple_list.append((message.proto.name, query_name))
 
         return output_str
 
@@ -346,6 +402,10 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += "\n"
 
         output_str += self.handle_callback_methods_output()
-        output_str += self.handle_callback_query_methods_output()
+
+        msg_name_n_ws_query_name_tuple_list: List = []      # to be populated in below calls
+        output_str += self.handle_callback_query_methods_output(msg_name_n_ws_query_name_tuple_list)
+        output_str += self.handle_callback_projection_query_methods_output(msg_name_n_ws_query_name_tuple_list)
+        output_str += self.handle_query_filter_func_output(msg_name_n_ws_query_name_tuple_list)
 
         return output_str

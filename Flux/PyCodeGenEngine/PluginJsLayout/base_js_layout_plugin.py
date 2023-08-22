@@ -59,14 +59,15 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
 
         # handling current file
         for message in set(message_list):
-            if self.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_json_root):
+            if (BaseJSLayoutPlugin.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_json_root) or
+                    BaseJSLayoutPlugin.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_json_root_time_series)):
                 self.root_msg_list.append(message)
             # else not required: Avoiding non ORM root messages
 
             if self.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
                 widget_ui_data_option_value_dict = \
-                    self.get_complex_option_set_values(message,
-                                                       BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+                    self.get_complex_option_value_from_proto(message,
+                                                             BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                 widget_ui_data_list = (
                     widget_ui_data_option_value_dict.get(
                         BaseJSLayoutPlugin.flux_msg_widget_ui_data_element_widget_ui_data_field))
@@ -96,8 +97,8 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                             fld_abbreviated_option_value = None
                             for field in message.fields:
                                 fld_abbreviated_option_value = \
-                                    self.get_non_repeated_valued_custom_option_value(field,
-                                                                                     BaseJSLayoutPlugin.flux_fld_abbreviated)
+                                    self.get_simple_option_value_from_proto(field,
+                                                                            BaseJSLayoutPlugin.flux_fld_abbreviated)
                                 if fld_abbreviated_option_value is not None:
                                     break
                             else:
@@ -128,9 +129,9 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                         for field in msg.fields:
                             if self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_abbreviated_link):
                                 abb_link_option_val = \
-                                    self.get_non_repeated_valued_custom_option_value(field,
-                                                                                     BaseJSLayoutPlugin.flux_fld_abbreviated_link)
-                                dependent_abb_msg_name = abb_link_option_val.split(".")[0][1:]
+                                    self.get_simple_option_value_from_proto(field,
+                                                                            BaseJSLayoutPlugin.flux_fld_abbreviated_link)
+                                dependent_abb_msg_name = abb_link_option_val.split(".")[0]
                                 self.parent_abb_msg_name_to_linked_abb_msg_name_dict[abb_msg_name] = dependent_abb_msg_name
                                 parent_abb_msg_name_list.append(abb_msg_name)
                                 break

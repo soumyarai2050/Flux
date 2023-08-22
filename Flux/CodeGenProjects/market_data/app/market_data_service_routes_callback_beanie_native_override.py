@@ -62,14 +62,75 @@ class MarketDataServiceRoutesCallbackBeanieNativeOverride(MarketDataServiceRoute
         dash_obj = dash_class_type(**dash)
         return [dash_obj]
 
-    async def get_last_trade_with_symbol_n_start_n_end_time_query_pre(
-            self, time_series_last_trade_class_type: Type[TimeSeriesLastTrade], symbol: str,
-            start_datetime: DateTime, end_datetime: DateTime):
-        from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_routes import (
-            underlying_read_time_series_last_trade_http)
-        from Flux.CodeGenProjects.market_data.app.aggregate import get_last_trade_with_symbol_n_start_n_end_time
-        return await underlying_read_time_series_last_trade_http(
-            get_last_trade_with_symbol_n_start_n_end_time(symbol, start_datetime, end_datetime))
+    async def get_vwap_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData], symbol: str,
+                                                          start_date_time: DateTime | None = None,
+                                                          end_date_time: DateTime | None = None):
+        from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_routes import \
+            underlying_read_bar_data_http
+        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, }
+        if start_date_time and not end_date_time:
+            projection_filter["start_time"] = {"$gt": start_date_time}
+        elif not start_date_time and end_date_time:
+            projection_filter["start_time"] = {"$lt": end_date_time}
+        elif start_date_time and end_date_time:
+            projection_filter["start_time"] = {"$gt": start_date_time, "$lt": end_date_time}
+        bar_data_projection_list = await underlying_read_bar_data_http(projection_model=BarDataProjectionForVwap,
+                                                                       projection_filter=projection_filter)
+        symbol_n_exch_id = SymbolNExchIdOptional()
+        symbol_n_exch_id.symbol = symbol
+        container_model = BarDataProjectionContainerForVwap(symbol_n_exch_id=symbol_n_exch_id,
+                                                            projection_models=bar_data_projection_list)
+        return [container_model]
+
+    async def get_vwap_n_vwap_change_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData],
+                                                                        symbol: str,
+                                                                        start_date_time: DateTime | None = None,
+                                                                        end_date_time: DateTime | None = None):
+        from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_routes import \
+            underlying_read_bar_data_http
+        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, }
+        if start_date_time and not end_date_time:
+            projection_filter["start_time"] = {"$gt": start_date_time}
+        elif not start_date_time and end_date_time:
+            projection_filter["start_time"] = {"$lt": end_date_time}
+        elif start_date_time and end_date_time:
+            projection_filter["start_time"] = {"$gt": start_date_time, "$lt": end_date_time}
+        bar_data_projection_list = await underlying_read_bar_data_http(
+            projection_model=BarDataProjectionForVwapNVwapChange, projection_filter=projection_filter)
+        symbol_n_exch_id = SymbolNExchIdOptional()
+        symbol_n_exch_id.symbol = symbol
+        container_model = BarDataProjectionContainerForVwapNVwapChange(symbol_n_exch_id=symbol_n_exch_id,
+                                                                       projection_models=bar_data_projection_list)
+        return [container_model]
+
+    async def get_vwap_change_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData], symbol: str,
+                                                                 start_date_time: DateTime | None = None,
+                                                                 end_date_time: DateTime | None = None):
+        from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_routes import \
+            underlying_read_bar_data_http
+        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, }
+        if start_date_time and not end_date_time:
+            projection_filter["start_time"] = {"$gt": start_date_time}
+        elif not start_date_time and end_date_time:
+            projection_filter["start_time"] = {"$lt": end_date_time}
+        elif start_date_time and end_date_time:
+            projection_filter["start_time"] = {"$gt": start_date_time, "$lt": end_date_time}
+        bar_data_projection_list = await underlying_read_bar_data_http(projection_model=BarDataProjectionForVwapChange,
+                                                                       projection_filter=projection_filter)
+        symbol_n_exch_id = SymbolNExchIdOptional()
+        symbol_n_exch_id.symbol = symbol
+        container_model = BarDataProjectionContainerForVwapChange(symbol_n_exch_id=symbol_n_exch_id,
+                                                                  projection_models=bar_data_projection_list)
+        return [container_model]
+
+    async def get_vwap_projection_from_bar_data_query_ws_pre(self):
+        return get_vwap_projection_from_bar_data_filter_callable
+
+    async def get_vwap_n_vwap_change_projection_from_bar_data_query_ws_pre(self):
+        return get_vwap_n_vwap_change_projection_from_bar_data_filter_callable
+
+    async def get_vwap_change_projection_from_bar_data_query_ws_pre(self):
+        return get_vwap_change_projection_from_bar_data_filter_callable
 
 
 def tob_filter_callable(tob_obj_json_str, **kwargs):
@@ -79,3 +140,85 @@ def tob_filter_callable(tob_obj_json_str, **kwargs):
     if tob_symbol in symbols:
         return True
     return False
+
+
+def get_vwap_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+    start_date_time = kwargs.get("start_date_time")
+    end_date_time = kwargs.get("end_date_time")
+    obj_json = json.loads(bar_data_obj_json_str)
+    symbol_param = kwargs.get("symbol")
+    symbol_n_exch_id = obj_json.get("symbol_n_exch_id")
+    if symbol_n_exch_id is None:
+        return False
+    else:
+        symbol = symbol_n_exch_id.get("symbol")
+        if symbol is None:
+            return False
+        else:
+            if symbol != symbol_param:
+                return False
+    time_field_val_str = obj_json.get("start_time")
+    time_field_val = pendulum.parse(time_field_val_str)
+    if start_date_time and not end_date_time:
+        return start_date_time < time_field_val
+    elif not start_date_time and end_date_time:
+        return end_date_time > time_field_val
+    elif start_date_time and end_date_time:
+        return start_date_time < time_field_val < end_date_time
+    else:
+        return True
+
+
+def get_vwap_n_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+    start_date_time = kwargs.get("start_date_time")
+    end_date_time = kwargs.get("end_date_time")
+    obj_json = json.loads(bar_data_obj_json_str)
+    symbol_param = kwargs.get("symbol")
+    symbol_n_exch_id = obj_json.get("symbol_n_exch_id")
+    if symbol_n_exch_id is None:
+        return False
+    else:
+        symbol = symbol_n_exch_id.get("symbol")
+        if symbol is None:
+            return False
+        else:
+            if symbol != symbol_param:
+                return False
+    time_field_val_str = obj_json.get("start_time")
+    time_field_val = pendulum.parse(time_field_val_str)
+    if start_date_time and not end_date_time:
+        return start_date_time < time_field_val
+    elif not start_date_time and end_date_time:
+        return end_date_time > time_field_val
+    elif start_date_time and end_date_time:
+        return start_date_time < time_field_val < end_date_time
+    else:
+        return True
+
+
+def get_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+    start_date_time = kwargs.get("start_date_time")
+    end_date_time = kwargs.get("end_date_time")
+    obj_json = json.loads(bar_data_obj_json_str)
+    symbol_param = kwargs.get("symbol")
+    symbol_n_exch_id = obj_json.get("symbol_n_exch_id")
+    if symbol_n_exch_id is None:
+        return False
+    else:
+        symbol = symbol_n_exch_id.get("symbol")
+        if symbol is None:
+            return False
+        else:
+            if symbol != symbol_param:
+                return False
+    time_field_val_str = obj_json.get("start_time")
+    time_field_val = pendulum.parse(time_field_val_str)
+    if start_date_time and not end_date_time:
+        return start_date_time < time_field_val
+    elif not start_date_time and end_date_time:
+        return end_date_time > time_field_val
+    elif start_date_time and end_date_time:
+        return start_date_time < time_field_val < end_date_time
+    else:
+        return True
+

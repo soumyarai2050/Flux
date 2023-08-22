@@ -13,8 +13,7 @@ from csv import writer
 
 # project imports
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import TopOfBookBaseModel, \
-    QuoteOptional, LastTradeBaseModel, MarketDepthBaseModel, SymbolOverviewBaseModel, TickType
+from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_web_client import \
     StratManagerServiceWebClient
 from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import \
@@ -1210,13 +1209,13 @@ def run_last_trade(buy_symbol: str, sell_symbol: str, last_trade_json_list: List
     symbol_list = [buy_symbol, sell_symbol]
     for index, last_trade_json in enumerate(last_trade_json_list):
         for _ in range(create_counts_per_side):
-            last_trade_obj = LastTradeBaseModel(**last_trade_json)
-            last_trade_obj.symbol = symbol_list[index]
-            last_trade_obj.time = DateTime.utcnow()
+            last_trade_obj: LastTradeBaseModel = LastTradeBaseModel(**last_trade_json)
+            last_trade_obj.symbol_n_exch_id.symbol = symbol_list[index]
+            last_trade_obj.exch_time = DateTime.utcnow()
             created_last_trade_obj = market_data_web_client.create_last_trade_client(last_trade_obj)
             created_last_trade_obj.id = None
             created_last_trade_obj.market_trade_volume.id = last_trade_obj.market_trade_volume.id
-            created_last_trade_obj.time = last_trade_obj.time
+            created_last_trade_obj.exch_time = last_trade_obj.exch_time
             assert created_last_trade_obj == last_trade_obj, \
                 f"Mismatch last_trade: expected {last_trade_obj}, received {created_last_trade_obj}"
 

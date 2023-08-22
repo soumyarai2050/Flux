@@ -52,11 +52,15 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
         for message_field in field_type_message.fields:
             message_field_name = message_field.proto.name
             field_type = message_field.cardinality.name.lower()
+            enums = message_field.enum
+            enum_value = ""
+            if enums is not None:
+                for x in enums.values:
+                    enum_value = x.proto.name
             if message_field.message is None:
                 if field_name != initial_parent_field:
-                    if field_name != parent_field and initial_parent_field != parent_field and message_field.kind.\
-                            name.lower() != "enum":
-                        if field_type != "repeated":
+                    if field_name != parent_field and initial_parent_field != parent_field:
+                        if field_type != "repeated" and message_field.kind.name.lower() != "enum":
                             if CppPopulateRandomValueHandlerPlugin.is_option_enabled\
                             (message_field, CppPopulateRandomValueHandlerPlugin.flux_fld_val_is_datetime):
                                 output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->" \
@@ -66,10 +70,14 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                                 output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->" \
                                           f"mutable_{parent_field}()->mutable_{field_name}()->set_{message_field_name}" \
                                           f"(random_data_gen.get_random_{message_field.kind.name.lower()}());\n"
-                        else:
+                        elif message_field.kind.name.lower() != "enum":
                             output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->mutable_{parent_field}()." \
                                       f"mutable_{field_name}()->add_{message_field_name}(random_data_gen.get_random_" \
                                       f"{message_field.kind.name.lower()}());\n"
+                        else:
+                            output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->mutable_{parent_field}()->" \
+                                      f"mutable_{field_name}()->set_{message_field_name}({package_name}::" \
+                                      f"{enums.proto.name}::{enum_value});\n"
                     elif message_field.kind.name.lower() != "enum":
                         if field_type != "repeated":
                             output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->mutable_{field_name}()->" \

@@ -36,7 +36,7 @@ class TemplatePlugin(BaseProtoPlugin):
                                   f"{TemplatePlugin.is_option_enabled(message, TemplatePlugin.flux_msg_json_root)}\n"
             json_sample_output += \
                 f"    option value if present: " \
-                f"{TemplatePlugin.get_complex_option_set_values(message, TemplatePlugin.flux_msg_json_root)}\n"
+                f"{TemplatePlugin.get_complex_option_value_from_proto(message, TemplatePlugin.flux_msg_json_root)}\n"
             for field in message.fields:
                 json_sample_output += f"    Field Name: {field.proto.name}\n"
                 json_sample_output += f"        default value (if any): {self.get_field_default_value(field)}\n"
@@ -48,7 +48,7 @@ class TemplatePlugin(BaseProtoPlugin):
                                       f"{TemplatePlugin.is_option_enabled(field, TemplatePlugin.flux_fld_help)}\n"
                 json_sample_output += \
                     f"        option value if is set: " \
-                    f"{TemplatePlugin.get_non_repeated_valued_custom_option_value(field, TemplatePlugin.flux_fld_help)}\n"
+                    f"{TemplatePlugin.get_simple_option_value_from_proto(field, TemplatePlugin.flux_fld_help)}\n"
                 json_sample_output += "\n"
             json_sample_output += "\n"
         json_sample_output += f'"""'

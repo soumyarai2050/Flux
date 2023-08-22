@@ -54,7 +54,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
     def get_executor_key_sequence_list_of_model(message: protogen.Message) -> List[List[str]] | None:
         if BaseProtoPlugin.is_option_enabled(message, BaseProtoPlugin.flux_msg_executor_options):
             option_dict = \
-                BaseProtoPlugin.get_complex_option_set_values(message, BaseProtoPlugin.flux_msg_executor_options)
+                BaseProtoPlugin.get_complex_option_value_from_proto(message, BaseProtoPlugin.flux_msg_executor_options)
             key_sequence_option_val: List[str] | str | None = \
                 option_dict.get(BaseProtoPlugin.executor_option_executor_key_sequence_field)
             if key_sequence_option_val is not None:
@@ -75,7 +75,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
     def get_log_key_sequence_list_of_model(message: protogen.Message):
         if BaseProtoPlugin.is_option_enabled(message, BaseProtoPlugin.flux_msg_executor_options):
             option_dict = \
-                BaseProtoPlugin.get_complex_option_set_values(message, BaseProtoPlugin.flux_msg_executor_options)
+                BaseProtoPlugin.get_complex_option_value_from_proto(message, BaseProtoPlugin.flux_msg_executor_options)
             log_key_sequence_option_val: List[str] | str | None = \
                 option_dict.get(BaseProtoPlugin.executor_option_log_key_sequence_field)
             if log_key_sequence_option_val is not None:
@@ -103,8 +103,8 @@ class StratExecutorPlugin(BaseProtoPlugin):
         for message in file.messages:
             if StratExecutorPlugin.is_option_enabled(message, StratExecutorPlugin.flux_msg_executor_options):
                 option_value_dict = \
-                    StratExecutorPlugin.get_complex_option_set_values(message,
-                                                                      StratExecutorPlugin.flux_msg_executor_options)
+                    StratExecutorPlugin.get_complex_option_value_from_proto(message,
+                                                                            StratExecutorPlugin.flux_msg_executor_options)
                 if option_value_dict.get(StratExecutorPlugin.executor_option_is_websocket_model_field):
                     self.ws_manager_required_messages.append(message)
                 if option_value_dict.get(StratExecutorPlugin.executor_option_is_top_lvl_model_field):
@@ -331,8 +331,8 @@ class StratExecutorPlugin(BaseProtoPlugin):
         for message in self.ws_manager_required_messages:
             message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
             option_dict = \
-                StratExecutorPlugin.get_complex_option_set_values(message,
-                                                                  StratExecutorPlugin.flux_msg_executor_options)
+                StratExecutorPlugin.get_complex_option_value_from_proto(message,
+                                                                        StratExecutorPlugin.flux_msg_executor_options)
             notify_all_option_val = option_dict.get(StratExecutorPlugin.executor_option_enable_notify_all_field)
             content_str += f'\t\tself.{message_name_snake_cased}_ws_cont = WSReader(f"' + \
                            '{self.' + f'{file.proto.package}' + '_base_url}' + \

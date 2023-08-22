@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import logging
 import os
-from typing import List, Callable, Dict, ClassVar
+from typing import List, Callable, Dict, ClassVar, Tuple
 import time
 from abc import abstractmethod
 
@@ -74,7 +74,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                     self.enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if self.is_option_enabled(field.message, BaseFastapiPlugin.flux_msg_json_root):
+                if (self.is_option_enabled(field.message, BaseFastapiPlugin.flux_msg_json_root) or
+                        self.is_option_enabled(field.message, BaseFastapiPlugin.flux_msg_json_root_time_series)):
                     if field.message not in self.root_message_list:
                         self.root_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -94,9 +95,14 @@ class BaseFastapiPlugin(BaseProtoPlugin):
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
         for message in message_list:
-            if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root):
-                json_root_msg_option_val_dict = \
-                    self.get_complex_option_set_values(message, BaseFastapiPlugin.flux_msg_json_root)
+            if ((is_json_root := self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root)) or
+                    self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root_time_series)):
+                if is_json_root:
+                    json_root_msg_option_val_dict = \
+                        self.get_complex_option_value_from_proto(message, BaseFastapiPlugin.flux_msg_json_root)
+                else:
+                    json_root_msg_option_val_dict = \
+                        self.get_complex_option_value_from_proto(message, BaseFastapiPlugin.flux_msg_json_root_time_series)
                 if (is_reentrant_required := json_root_msg_option_val_dict.get(
                         BaseFastapiPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
                     if not is_reentrant_required:
@@ -132,7 +138,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     def get_query_option_message_values(self, message: protogen.Message) -> List[Dict]:
         list_of_agg_value_dict = []
         options_list_of_dict = \
-            self.get_complex_option_set_values(message, BaseFastapiPlugin.flux_msg_json_query, is_option_repeated=True)
+            self.get_complex_option_value_from_proto(message, BaseFastapiPlugin.flux_msg_json_query, is_option_repeated=True)
         for option_dict in options_list_of_dict:
             agg_value_dict = {}
             agg_value_dict[BaseFastapiPlugin.query_name_key] = \
@@ -195,6 +201,38 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 # else not required: Avoiding field if not id
         # else not required: Avoid if message does not have custom id field
         return id_field_type
+
+    def get_projection_query_name_to_param_field_n_field_obj_tuple_list_dict(self, message: protogen.Message):
+        query_name_to_param_str_n_field_tuple_list_dict: Dict[str, List[Tuple[str, protogen.Field]]] = {}
+        for field in message.fields:
+            if BaseFastapiPlugin.is_option_enabled(field, BaseFastapiPlugin.flux_fld_mapping_projection_query_field):
+                query_name_mapping_list = \
+                    BaseFastapiPlugin.get_simple_option_value_from_proto(
+                        field, BaseFastapiPlugin.flux_fld_mapping_projection_query_field, is_repeated=True)
+
+                for query_name_mapping in query_name_mapping_list:
+                    if ":" not in query_name_mapping:
+                        query_name = query_name_mapping
+                        query_name_n_field_tuple = (field.proto.name, field)
+                    else:
+                        query_name_mapping_colan_sep = query_name_mapping.split(":")
+                        query_name: str = query_name_mapping_colan_sep[0]
+                        query_param_name: str = query_name_mapping_colan_sep[-1]
+                        nested_field: protogen.Field = self.get_nested_field_proto_object(field, query_param_name)
+                        query_name_n_field_tuple = (query_param_name, nested_field)
+                    if query_name_mapping not in query_name_to_param_str_n_field_tuple_list_dict:
+                        query_name_to_param_str_n_field_tuple_list_dict[query_name] = [query_name_n_field_tuple]
+                    else:
+                        query_name_to_param_str_n_field_tuple_list_dict[query_name].append(
+                            query_name_n_field_tuple)
+
+        if query_name_to_param_str_n_field_tuple_list_dict:
+            return query_name_to_param_str_n_field_tuple_list_dict
+        else:
+            err_str = (f"Couldn't find any field having {BaseFastapiPlugin.flux_fld_mapping_projection_query_field}"
+                       f"option set in message {message.proto.name}")
+            logging.exception(err_str)
+            raise Exception(err_str)
 
     @abstractmethod
     def handle_fastapi_initialize_file_gen(self):

@@ -65,6 +65,11 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
         output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(get_all_{message_name_snake_cased}' \
                           f'_client_url)> get_all_{message_name_snake_cased}_client_url_(get_all_' \
                           f'{message_name_snake_cased}_client_url);\n'
+        output_content += f'\tconstexpr char get_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/get-{message_name_snake_cased}";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(get_{message_name_snake_cased}_client_url)> ' \
+                          f'get_{message_name_snake_cased}_client_url_(get_{message_name_snake_cased}_client_url);\n'
+
         output_content += f'\tconstexpr char create_{message_name_snake_cased}_client_url[] = ' \
                           f'"/{class_name_snake_cased}/create-{message_name_snake_cased}";\n'
         output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(create_{message_name_snake_cased}' \
@@ -75,24 +80,33 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
         output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(create_all_{message_name_snake_cased}' \
                           f'_client_url)> create_all_{message_name_snake_cased}_client_url_(create_all_' \
                           f'{message_name_snake_cased}_client_url);\n'
-        output_content += f'\tconstexpr char get_{message_name_snake_cased}_client_url[] = ' \
-                          f'"/{class_name_snake_cased}/get-{message_name_snake_cased}";\n'
-        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(get_{message_name_snake_cased}_client_url)> ' \
-                          f'get_{message_name_snake_cased}_client_url_(get_{message_name_snake_cased}_client_url);\n'
+
         output_content += f'\tconstexpr char get_{message_name_snake_cased}_max_id_client_url[] = ' \
                           f'"/{class_name_snake_cased}/query-get_{message_name_snake_cased}_max_id";\n'
         output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(get_{message_name_snake_cased}' \
                           f'_max_id_client_url)> get_{message_name_snake_cased}_max_id_client_url_(get_' \
                           f'{message_name_snake_cased}_max_id_client_url);\n'
+
         output_content += f'\tconstexpr char put_{message_name_snake_cased}_client_url[] = ' \
                           f'"/{class_name_snake_cased}/put-{message_name_snake_cased}";\n'
         output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(put_{message_name_snake_cased}_client_url)> ' \
                           f'put_{message_name_snake_cased}_client_url_(put_{message_name_snake_cased}_client_url);\n'
+        output_content += f'\tconstexpr char put_all_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/put_all-{message_name_snake_cased}";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(put_all_{message_name_snake_cased}_client_url)> ' \
+                          f'put_all_{message_name_snake_cased}_client_url_(put_all_{message_name_snake_cased}_client_url);\n'
+
         output_content += f'\tconstexpr char patch_{message_name_snake_cased}_client_url[] = ' \
                           f'"/{class_name_snake_cased}/patch-{message_name_snake_cased}";\n'
         output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(patch_{message_name_snake_cased}' \
                           f'_client_url)> patch_{message_name_snake_cased}_client_url_(patch_' \
                           f'{message_name_snake_cased}_client_url);\n'
+        output_content += f'\tconstexpr char patch_all_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/patch_all-{message_name_snake_cased}";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(patch_all_{message_name_snake_cased}' \
+                          f'_client_url)> patch_all_{message_name_snake_cased}_client_url_(patch_all_' \
+                          f'{message_name_snake_cased}_client_url);\n'
+
         output_content += f'\tconstexpr char delete_{message_name_snake_cased}_client_url[] = ' \
                           f'"/{class_name_snake_cased}/delete-{message_name_snake_cased}";\n'
         output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(delete_{message_name_snake_cased}' \

@@ -13,7 +13,7 @@ from pathlib import PurePath
 import functools
 
 # other package imports
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
 from beanie.odm.bulk import BulkWriter
 from fastapi.encoders import jsonable_encoder
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
@@ -26,6 +26,7 @@ from beanie.operators import In
 
 # project specific imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
+from Flux.PyCodeGenEngine.FluxCodeGenCore.ws_connection_manager import WSData
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, compare_n_patch_dict, \
     parse_to_int, YAMLConfigurationManager, compare_n_patch_list, execute_tasks_list_with_all_completed, \
@@ -57,6 +58,7 @@ def get_beanie_host_n_port(project_name: str):
 def generic_perf_benchmark(func_callable):
     @functools.wraps(func_callable)
     async def benchmarker(*args, **kwargs):
+        call_date_time = pendulum.DateTime.utcnow()
         start_time = timeit.default_timer()
         pydantic_model_type = None
         if args and isinstance(args[0], ModelMetaclass):
@@ -66,8 +68,7 @@ def generic_perf_benchmark(func_callable):
         delta = parse_to_float(f"{(end_time - start_time):.6f}")
 
         if log_generic_timings is not None and log_generic_timings == 1:
-            pattern_str = get_time_it_log_pattern(func_callable.__name__, pendulum.DateTime.utcnow(),
-                                                  start_time, end_time, delta)
+            pattern_str = get_time_it_log_pattern(func_callable.__name__, call_date_time, delta)
             pattern_str += f" pydantic_model: {pydantic_model_type}"
             logging.timing(pattern_str)
         return return_val
@@ -84,55 +85,128 @@ def validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type: Type[Do
         raise Exception(err)
 
 
-async def publish_ws(pydantic_class_type: Type[DocType], updated_obj_data: DocType,
-                     update_ws_with_id: bool | None = None):
-    validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type)
+async def broadcast_all_from_active_ws_data_set(active_ws_data_set: Set[WSData], pydantic_class_type,
+                                                pydantic_obj_id_list: List[Any],
+                                                broadcast_callable: Callable,
+                                                tasks_list: List[asyncio.Task],
+                                                dummy_pydantic_model=None,
+                                                filter_agg_pipeline: Dict | None = None,
+                                                has_links: bool | None = None):
+    for ws_data in active_ws_data_set:
+        projection_model = ws_data.projection_model
 
-    broadcast_has_active_ws: bool = pydantic_class_type.read_ws_path_ws_connection_manager.has_activ_ws()
-    active_ws_n_filter_callable_tuple_set: \
-        Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]] | None = None
-    updated_obj_id: Any = None
-    if update_ws_with_id:
-        updated_obj_id = updated_obj_data.id
-        active_ws_n_filter_callable_tuple_set = \
-            pydantic_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_set(updated_obj_id)
-    if broadcast_has_active_ws or active_ws_n_filter_callable_tuple_set:
-        json_data = jsonable_encoder(updated_obj_data, by_alias=True)
+        if dummy_pydantic_model is not None:
+            # if call is for delete operation
+            pydantic_obj_list: List = []
+            for pydantic_obj_id in pydantic_obj_id_list:
+                pydantic_obj_list.append(dummy_pydantic_model(id=pydantic_obj_id))
+        else:
+            # if call is for update/create operation
+            pydantic_obj_list = await get_obj_list(pydantic_class_type, pydantic_obj_id_list,
+                                                   filter_agg_pipeline=filter_agg_pipeline,
+                                                   has_links=has_links, projection_model=projection_model)
+        json_data = jsonable_encoder(pydantic_obj_list, by_alias=True)
         json_str = json.dumps(json_data)
-        tasks_list: List[asyncio.Task] = []
-        if broadcast_has_active_ws:
-            await pydantic_class_type.read_ws_path_ws_connection_manager.broadcast(json_str, tasks_list)
-        if active_ws_n_filter_callable_tuple_set:
-            await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast(json_str, updated_obj_id,
-                                                                                           tasks_list)
+        await broadcast_callable(json_str, ws_data, tasks_list)
+
+
+async def broadcast_from_active_ws_data_set(active_ws_data_set: Set[WSData], pydantic_class_type,
+                                            pydantic_obj_id: Any,
+                                            broadcast_callable: Callable,
+                                            tasks_list: List[asyncio.Task],
+                                            broadcast_with_id: bool | None = None,
+                                            dummy_pydantic_model=None,
+                                            filter_agg_pipeline: Dict | None = None,
+                                            has_links: bool | None = None):
+    for ws_data in active_ws_data_set:
+        projection_model = ws_data.projection_model
+
+        if dummy_pydantic_model is not None:
+            # if call is for delete operation
+            pydantic_obj: dummy_pydantic_model = dummy_pydantic_model(id=pydantic_obj_id)
+        else:
+            # if call is for update/create operation
+            pydantic_obj = await get_obj(pydantic_class_type, pydantic_obj_id,
+                                         filter_agg_pipeline=filter_agg_pipeline,
+                                         has_links=has_links, projection_model=projection_model)
+        json_data = jsonable_encoder(pydantic_obj, by_alias=True)
+        json_str = json.dumps(json_data)
+        if broadcast_with_id:
+            await broadcast_callable(json_str, pydantic_obj_id, ws_data, tasks_list)
+        else:
+            await broadcast_callable(json_str, ws_data, tasks_list)
+
+
+async def publish_ws(pydantic_class_type: Type[DocType], pydantic_obj_id: Any, filter_agg_pipeline: Dict | None = None,
+                     has_links: bool | None = None, update_ws_with_id: bool | None = None, dummy_pydantic_model=None):
+    """
+    :param pydantic_class_type: Document Class Type
+    :param pydantic_obj_id: pydantic_obj_id for create/update/delete
+    :param filter_agg_pipeline: filter aggregation pipeline
+    :param has_links: bool for has_links
+    :param update_ws_with_id: [Optional] bool to update ws with id
+    :param dummy_pydantic_model: [Optional] dummy pydantic basemodel for delete case
+    """
+    validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type)
+    tasks_list: List[asyncio.Task] = []
+    active_ws_data_set: Set[WSData] = pydantic_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_set()
+    if active_ws_data_set:
+        async with pydantic_class_type.read_ws_path_ws_connection_manager.rlock:
+            await broadcast_from_active_ws_data_set(active_ws_data_set, pydantic_class_type, pydantic_obj_id,
+                                                    pydantic_class_type.read_ws_path_ws_connection_manager.broadcast,
+                                                    tasks_list, dummy_pydantic_model=dummy_pydantic_model,
+                                                    filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
+    if update_ws_with_id:
+        active_ws_data_set_for_id: Set[WSData] = \
+            pydantic_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_set_with_id(
+                pydantic_obj_id)
+
+        if active_ws_data_set_for_id:
+            async with pydantic_class_type.read_ws_path_with_id_ws_connection_manager.rlock:
+                await broadcast_from_active_ws_data_set(
+                    active_ws_data_set_for_id, pydantic_class_type, pydantic_obj_id,
+                    pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast,
+                    tasks_list, broadcast_with_id=True, dummy_pydantic_model=dummy_pydantic_model,
+                    filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
+    if tasks_list:
         await execute_tasks_list_with_all_completed(tasks_list, pydantic_class_type)
 
 
-async def publish_ws_all(pydantic_class_type: Type[DocType], updated_obj_data_list: List[DocType],
-                         update_ws_with_id: bool | None = None):
+async def publish_ws_all(pydantic_class_type: Type[DocType], pydantic_obj_id_list: List[Any],
+                         filter_agg_pipeline: Dict | None = None, has_links: bool | None = None,
+                         update_ws_with_id: bool | None = None, dummy_pydantic_model=None):
+    """
+    :param pydantic_class_type: Document Class Type
+    :param pydantic_obj_id_list: List of pydantic_obj_ids for create/update/delete
+    :param filter_agg_pipeline: filter aggregation pipeline
+    :param has_links: bool for has_links
+    :param update_ws_with_id: bool to update ws with id
+    :param dummy_pydantic_model: [Optional] dummy pydantic basemodel for delete case
+    """
     validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type)
-
-    broadcast_has_active_ws: bool = pydantic_class_type.read_ws_path_ws_connection_manager.has_activ_ws()
-
     tasks_list: List[asyncio.Task] = []
-    if broadcast_has_active_ws:
-        json_data = jsonable_encoder(updated_obj_data_list, by_alias=True)
-        json_str = json.dumps(json_data)
-        await pydantic_class_type.read_ws_path_ws_connection_manager.broadcast(json_str, tasks_list)
+
+    active_ws_data_set: Set[WSData] = pydantic_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_set()
+    if active_ws_data_set:
+        async with pydantic_class_type.read_ws_path_ws_connection_manager.rlock:
+            await broadcast_all_from_active_ws_data_set(active_ws_data_set, pydantic_class_type,
+                                                        pydantic_obj_id_list,
+                                                        pydantic_class_type.read_ws_path_ws_connection_manager.broadcast,
+                                                        tasks_list, dummy_pydantic_model)
     # TODO: this can be optimized by sending array of messages to ws instead of sending one message at a time per ws
-    # in most use-case the consumer of one id is interested in all ids.
+    #       in most use-case the consumer of one id is interested in all ids.
     if update_ws_with_id:
-        for updated_obj_data in updated_obj_data_list:
-            updated_obj_id = updated_obj_data.id
-            active_ws_n_filter_callable_tuple_set: \
-                Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]] | None
-            active_ws_n_filter_callable_tuple_set = \
-                pydantic_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_set(updated_obj_id)
-            if active_ws_n_filter_callable_tuple_set:
-                json_data = jsonable_encoder(updated_obj_data, by_alias=True)
-                json_str = json.dumps(json_data)
-                await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast(json_str, updated_obj_id,
-                                                                                               tasks_list)
+        for pydantic_obj_id in pydantic_obj_id_list:
+            active_ws_data_set_for_id: Set[WSData] = \
+                pydantic_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_set_with_id(
+                    pydantic_obj_id)
+
+            if active_ws_data_set_for_id:
+                async with pydantic_class_type.read_ws_path_with_id_ws_connection_manager.rlock:
+                    await broadcast_from_active_ws_data_set(
+                        active_ws_data_set_for_id, pydantic_class_type, pydantic_obj_id,
+                        pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast,
+                        tasks_list, broadcast_with_id=True, dummy_pydantic_model=dummy_pydantic_model)
     if tasks_list:
         await execute_tasks_list_with_all_completed(tasks_list, pydantic_class_type)
 
@@ -144,16 +218,17 @@ async def execute_update_agg_pipeline(pydantic_class_type: Type[DocType],
         aggregated_pydantic_list = await generic_read_http(pydantic_class_type, proto_package_name,
                                                            filter_agg_pipeline=update_agg_pipeline)
         async with BulkWriter() as bulk_writer:
+            id_list = []
             for aggregated_pydantic_obj in aggregated_pydantic_list:
+                id_list.append(aggregated_pydantic_obj.id)
                 request_obj = {'$set': aggregated_pydantic_obj.dict().items()}
                 await aggregated_pydantic_obj.update(request_obj, bulk_writer=bulk_writer)
-        for aggregated_pydantic_obj in aggregated_pydantic_list:
-            await publish_ws(pydantic_class_type, aggregated_pydantic_obj)
+        await publish_ws_all(pydantic_class_type, id_list, update_ws_with_id=True)
 
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_post_http(pydantic_class_type, proto_package_name: str, pydantic_obj,
+async def generic_post_http(pydantic_class_type: Type[DocType], proto_package_name: str, pydantic_obj,
                             filter_agg_pipeline: Any = None,
                             update_agg_pipeline: Any = None, has_links: bool = False):
 
@@ -163,7 +238,7 @@ async def generic_post_http(pydantic_class_type, proto_package_name: str, pydant
         new_pydantic_obj: pydantic_class_type = await pydantic_obj.save(link_rule=WriteRules.WRITE)
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
     updated_stored_obj = await get_obj(pydantic_class_type, new_pydantic_obj.id, filter_agg_pipeline, has_links)
-    await publish_ws(pydantic_class_type, updated_stored_obj)
+    await publish_ws(pydantic_class_type, updated_stored_obj.id, filter_agg_pipeline, has_links)
     return updated_stored_obj
 
 
@@ -182,7 +257,7 @@ async def generic_post_all_http(pydantic_class_type: Type[DocType], proto_packag
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
     updated_stored_obj_list = await get_obj_list(pydantic_class_type, new_pydantic_obj_list.inserted_ids,
                                                  filter_agg_pipeline, has_links)
-    await publish_ws_all(pydantic_class_type, updated_stored_obj_list)
+    await publish_ws_all(pydantic_class_type, new_pydantic_obj_list.inserted_ids, filter_agg_pipeline, has_links)
     return updated_stored_obj_list
 
 
@@ -215,7 +290,7 @@ async def _underlying_patch_n_put(pydantic_class_type: Type[DocType], proto_pack
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
     stored_obj = await get_obj(pydantic_class_type, _id,
                                filter_agg_pipeline, has_links)
-    await publish_ws(pydantic_class_type, stored_obj, True)
+    await publish_ws(pydantic_class_type, stored_obj.id, filter_agg_pipeline, has_links, update_ws_with_id=True)
     return stored_obj
 
 
@@ -241,7 +316,7 @@ async def _underlying_patch_n_put_all(pydantic_class_type: Type[DocType], proto_
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
     stored_obj_list = await get_obj_list(pydantic_class_type, updated_obj_id_list,
                                          filter_agg_pipeline, has_links)
-    await publish_ws_all(pydantic_class_type, stored_obj_list, update_ws_with_id=True)
+    await publish_ws_all(pydantic_class_type, stored_obj_list, filter_agg_pipeline, has_links, update_ws_with_id=True)
     return stored_obj_list
 
 
@@ -291,7 +366,7 @@ async def generic_put_all_http(pydantic_class_type: Type[DocType], proto_package
                                              update_agg_pipeline, has_links)
 
 
-def assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json: Dict,
+def assign_missing_ids_n_handle_date_time_type(pydantic_class_type: Type[DocType], pydantic_obj_update_json: Dict,
                                                ignore_root_id_check: bool | None = True,
                                                ignore_handling_datetime: bool | None = False):
     """
@@ -337,7 +412,7 @@ def assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_patch_http(pydantic_class_type, proto_package_name: str, stored_pydantic_obj,
+async def generic_patch_http(pydantic_class_type: Type[DocType], proto_package_name: str, stored_pydantic_obj,
                              pydantic_obj_update_json, filter_agg_pipeline: Any = None,
                              update_agg_pipeline: Any = None, has_links: bool = False):
     assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json)
@@ -390,7 +465,7 @@ async def generic_patch_all_http(pydantic_class_type: Type[DocType], proto_packa
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_delete_http(pydantic_class_type, proto_package_name: str, pydantic_dummy_model,
+async def generic_delete_http(pydantic_class_type: Type[DocType], proto_package_name: str, pydantic_dummy_model,
                               pydantic_obj, update_agg_pipeline: Any = None, has_links: bool = False):
     id_is_int_type = isinstance(pydantic_obj.id, int)
 
@@ -403,10 +478,45 @@ async def generic_delete_http(pydantic_class_type, proto_package_name: str, pyda
         pydantic_base_model: pydantic_dummy_model = pydantic_dummy_model(id=pydantic_obj.id)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
-    await publish_ws(pydantic_class_type, pydantic_base_model, True)  # update_ws_with_id sent as True
+    await publish_ws(pydantic_class_type, pydantic_base_model.id, has_links=has_links, update_ws_with_id=True,
+                     dummy_pydantic_model=pydantic_dummy_model)
     del_success.id = pydantic_obj.id
 
-    # Setting back incremental is to 0 if collection gets empty
+    # Setting back incremental id to 0 if collection gets empty
+    if id_is_int_type:
+        pydantic_objs_count = await pydantic_class_type.count()
+        if pydantic_objs_count == 0:
+            pydantic_class_type.init_max_id(0)
+        # else not required: all good
+    # else not required: if id is not int then it must be of PydanticObjectId so no handling required
+
+    return del_success
+
+
+@http_except_n_log_error(status_code=500)
+@generic_perf_benchmark
+async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_package_name: str, pydantic_dummy_model):
+    id_is_int_type = (pydantic_class_type.__fields__.get("id").type_ == int)
+
+    try:
+        stored_pydantic_obj_list: List[pydantic_dummy_model] = await pydantic_class_type.find_all().to_list()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    pydantic_obj_list = []
+    # preparing success message
+    del_success.id = []
+    for pydantic_obj in stored_pydantic_obj_list:
+        pydantic_obj_list.append(pydantic_dummy_model(id=pydantic_obj.id))
+        del_success.id.append(pydantic_obj.id)
+
+    await publish_ws_all(pydantic_class_type, pydantic_obj_list, update_ws_with_id=True,
+                         dummy_pydantic_model=pydantic_dummy_model)
+
+    # deleting all
+    await pydantic_class_type.delete_all()
+
+    # Setting back incremental id to 0 if collection gets empty
     if id_is_int_type:
         pydantic_objs_count = await pydantic_class_type.count()
         if pydantic_objs_count == 0:
@@ -420,11 +530,13 @@ async def generic_delete_http(pydantic_class_type, proto_package_name: str, pyda
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_read_http(pydantic_class_type, proto_package_name: str, filter_agg_pipeline: Any = None,
-                            has_links: bool = False, read_ids_list: List[Any] | None = None):
+                            has_links: bool = False, read_ids_list: List[Any] | None = None, projection_model=None,
+                            projection_filter: Dict | None = None):
     pydantic_list: List[pydantic_class_type]
     pydantic_list = \
         await get_obj_list(pydantic_class_type, read_ids_list,
-                           filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
+                           filter_agg_pipeline=filter_agg_pipeline, has_links=has_links,
+                           projection_model=projection_model, projection_filter=projection_filter)
     return pydantic_list
 
 
@@ -514,11 +626,14 @@ async def generic_read_ws(ws: WebSocket, project_name: str,
 
 @http_except_n_log_error(status_code=500)
 async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type,
-                           filter_callable: Callable[..., Any] | None = None, call_kwargs: Dict[Any, Any] | None = None):
-    if call_kwargs is None:
-        call_kwargs = {}
+                           filter_callable: Callable[..., Any] | None = None,
+                           filter_callable_kwargs: Dict[Any, Any] | None = None,
+                           projection_model=None):
+    if filter_callable_kwargs is None:
+        filter_callable_kwargs = {}
     is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws, filter_callable,
-                                                                                           call_kwargs)
+                                                                                           filter_callable_kwargs,
+                                                                                           projection_model)
     logging.debug(f"websocket client requested to connect: {ws.client}")
     host, port = get_beanie_host_n_port(project_name)
     logging.debug(f"connected to websocket: "
@@ -646,30 +761,55 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, pydantic_class
                           f"{get_by_id_ws_url(host, port, project_name, pydantic_class_type, pydantic_obj_id)}")
 
 
-async def get_obj(pydantic_class_type, pydantic_obj_id, filter_agg_pipeline: Any = None, has_links: bool = False):
+async def get_obj(pydantic_class_type, pydantic_obj_id, filter_agg_pipeline: Any = None, has_links: bool = False,
+                  projection_model=None):
     fetched_pydantic_obj: pydantic_class_type
-    if filter_agg_pipeline is None:
-        fetched_pydantic_obj = await pydantic_class_type.get(pydantic_obj_id, fetch_links=has_links)
+    if projection_model:
+        if filter_agg_pipeline is None:
+            fetched_pydantic_obj = \
+                await pydantic_class_type.find((pydantic_class_type.id == pydantic_obj_id),
+                                               fetch_links=has_links).project(projection_model).to_list()
+        else:
+            fetched_pydantic_obj = await get_filtered_obj(filter_agg_pipeline, pydantic_class_type,
+                                                          pydantic_obj_id, has_links, projection_model)
     else:
-        fetched_pydantic_obj = await get_filtered_obj(filter_agg_pipeline, pydantic_class_type,
-                                                      pydantic_obj_id, has_links)
+        if filter_agg_pipeline is None:
+            fetched_pydantic_obj = await pydantic_class_type.get(pydantic_obj_id, fetch_links=has_links)
+        else:
+            fetched_pydantic_obj = await get_filtered_obj(filter_agg_pipeline, pydantic_class_type,
+                                                          pydantic_obj_id, has_links)
     return fetched_pydantic_obj
 
 
 async def get_obj_list(pydantic_class_type, find_ids: List[Any] | None = None,
-                       filter_agg_pipeline: Any = None, has_links: bool = False):
+                       filter_agg_pipeline: Any = None, has_links: bool = False, projection_model=None,
+                       projection_filter: Dict | None = None):
     pydantic_list: List[pydantic_class_type]
     try:
         if filter_agg_pipeline is None:
-            if find_ids is None:
-                pydantic_list = await pydantic_class_type.find_all(fetch_links=has_links).to_list()
+            if projection_model:
+                if find_ids is None:
+                    pydantic_list = \
+                        await pydantic_class_type.find(projection_filter,
+                                                       fetch_links=has_links).project(projection_model).to_list()
+                else:
+                    pydantic_list = \
+                        await pydantic_class_type.find((In(pydantic_class_type.id, find_ids), projection_filter),
+                                                       fetch_links=has_links).project(projection_model).to_list()
             else:
-                pydantic_list = await pydantic_class_type.find(In(pydantic_class_type.id, find_ids),
-                                                               fetch_links=has_links).to_list()
+                if find_ids is None:
+                    pydantic_list = await pydantic_class_type.find_all(fetch_links=has_links).to_list()
+                else:
+                    pydantic_list = await pydantic_class_type.find(In(pydantic_class_type.id, find_ids),
+                                                                   fetch_links=has_links).to_list()
         else:
-            # find_ids if none: will be handled inside get_filtered_obj_list implicitly
-            pydantic_list = await get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, find_ids,
-                                                        has_links=has_links)
+            if projection_model:
+                pydantic_list = await get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, find_ids,
+                                                            has_links=has_links, projection_model=projection_model)
+            else:
+                # find_ids if none: will be handled inside get_filtered_obj_list implicitly
+                pydantic_list = await get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, find_ids,
+                                                            has_links=has_links)
         return pydantic_list
     except ValidationError as e:
         logging.exception(f"Pydantic validation error: {e}")
@@ -677,7 +817,7 @@ async def get_obj_list(pydantic_class_type, find_ids: List[Any] | None = None,
 
 
 async def get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, pydantic_obj_id_list: List | None = None,
-                                has_links: bool = False):
+                                has_links: bool = False, projection_model=None):
     # prevent polluting caller provided filter_agg_pipeline
     filter_agg_pipeline_copy = deepcopy(filter_agg_pipeline)
     if pydantic_obj_id_list is not None:
@@ -687,7 +827,10 @@ async def get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, pydant
         else:
             filter_agg_pipeline_copy["match"] = [(pydantic_obj_id_field, pydantic_obj_id_list)]
     agg_pipeline = get_aggregate_pipeline(filter_agg_pipeline_copy)
-    find_all_resp = pydantic_class_type.find(fetch_links=has_links)
+    if projection_model is None:
+        find_all_resp = pydantic_class_type.find(fetch_links=has_links)
+    else:
+        find_all_resp = pydantic_class_type.find(fetch_links=has_links).project(projection_model)
     pydantic_list = await find_all_resp.aggregate(
         aggregation_pipeline=agg_pipeline,
         projection_model=pydantic_class_type,
@@ -697,8 +840,10 @@ async def get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, pydant
     return pydantic_list
 
 
-async def get_filtered_obj(filter_agg_pipeline, pydantic_class_type, pydantic_obj_id, has_links: bool = False):
-    pydantic_list = await get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, [pydantic_obj_id], has_links)
+async def get_filtered_obj(filter_agg_pipeline, pydantic_class_type, pydantic_obj_id, has_links: bool = False,
+                           projection_model=None):
+    pydantic_list = await get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type,
+                                                [pydantic_obj_id], has_links, projection_model)
     if pydantic_list:
         return pydantic_list[0]
     else:

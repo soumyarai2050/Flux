@@ -233,7 +233,7 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
             sell_ack_order_id = ack_order_journal.order.order_id
 
 
-def test_create_sanity_last_trade(clean_and_set_limits, last_trade_fixture_list):
+def test_create_sanity_last_trade(static_data_, clean_and_set_limits, last_trade_fixture_list):
     symbols = ["CB_Sec_1", "CB_Sec_2", "CB_Sec_3", "CB_Sec_4"]
     px_portions = [(40, 55), (56, 70), (71, 85), (86, 100)]
     total_loops = 600
@@ -253,6 +253,65 @@ def test_create_sanity_last_trade(clean_and_set_limits, last_trade_fixture_list)
             last_trade_obj.qty = qty
 
             market_data_web_client.create_last_trade_client(last_trade_obj)
+
+        time.sleep(loop_wait)
+
+
+def test_sanity_underlying_time_series(static_data_, clean_and_set_limits, dash_, dash_filter_, bar_data_):
+    symbol_pair_list = [("CB_Sec_1", "EQT_Sec_1"), ("CB_Sec_2", "EQT_Sec_2"), ("CB_Sec_3", "EQT_Sec_3")]
+    leg1_px_portions = [(140, 150), (120, 130), (100, 115)]
+    leg2_px_portions = [(9, 12), (8, 10), (7, 11)]
+    leg1_px_change = (0, 3)
+    leg2_px_change = (0, 1)
+    dash_ids: List[str] = []
+    # create all dashes
+    for index, symbol_pair in enumerate(symbol_pair_list):
+        dash_obj: DashBaseModel = DashBaseModel(**dash_)
+        dash_obj.rt_dash.leg1.sec.sec_id = symbol_pair[0]
+        dash_obj.rt_dash.leg2.sec.sec_id = symbol_pair[1]
+        stored_dash_obj: DashBaseModel = market_data_web_client.create_dash_client(dash_obj)
+        dash_ids.append(stored_dash_obj.id)
+    # create dash filters and dashboards
+    dash_filters_obj: DashFiltersBaseModel = DashFiltersBaseModel(**dash_filter_)
+    stored_dash_filters_obj = market_data_web_client.create_dash_filters_client(dash_filters_obj)
+    dash_filters_collection_obj = DashFiltersCollectionBaseModel(loaded_dash_filters=[stored_dash_filters_obj.id],
+                                                                 buffered_dash_filters=[])
+    market_data_web_client.create_dash_filters_collection_client(dash_filters_collection_obj)
+    dash_collection_obj = DashCollectionBaseModel(id=stored_dash_filters_obj.id,
+                                                  dash_name=stored_dash_filters_obj.dash_name, loaded_dashes=dash_ids,
+                                                  buffered_dashes=[])
+    market_data_web_client.create_dash_collection_client(dash_collection_obj)
+
+    total_loops = 600
+    loop_wait = 1  # sec
+    volume = 1_000
+
+    for _ in range(total_loops):
+        current_time = DateTime.utcnow()
+        for index, symbol_pair in enumerate(symbol_pair_list):
+            leg1_px_portion = leg1_px_portions[index]
+            leg2_px_portion = leg2_px_portions[index]
+
+            leg1_bar_data = BarDataBaseModel(**bar_data_)
+            leg1_bar_data.start_time = current_time
+            leg1_bar_data.end_time = current_time.add(seconds=1)
+            leg1_bar_data.symbol_n_exch_id.symbol = symbol_pair[0]
+            leg1_bar_data.vwap = random.randint(leg1_px_portion[0], leg1_px_portion[1])
+            leg1_bar_data.vwap_change = random.randint(leg1_px_change[0], leg1_px_change[1])
+            volume_change = random.randint(0, 1_000)
+            leg1_bar_data.volume = volume + volume_change
+
+            leg2_bar_data = BarDataBaseModel(**bar_data_)
+            leg2_bar_data.start_time = current_time
+            leg2_bar_data.end_time = current_time.add(seconds=1)
+            leg2_bar_data.symbol_n_exch_id.symbol = symbol_pair[1]
+            leg2_bar_data.vwap = random.randint(leg2_px_portion[0], leg2_px_portion[1])
+            leg2_bar_data.vwap_change = random.randint(leg1_px_change[0], leg1_px_change[1])
+            volume_change = random.randint(0, 1_000)
+            leg2_bar_data.volume = volume + volume_change
+
+            market_data_web_client.create_bar_data_client(leg1_bar_data)
+            market_data_web_client.create_bar_data_client(leg2_bar_data)
 
         time.sleep(loop_wait)
 

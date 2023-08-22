@@ -19,6 +19,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
+from FluxPythonUtils.scripts.utility_functions import convert_to_capitalized_camel_case
 
 
 flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
@@ -75,18 +76,6 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 logging.exception(err_str)
                 raise Exception(err_str)
 
-    def proto_to_py_datatype(self, field: protogen.Field) -> str:
-        match field.kind.name.lower():
-            case "message":
-                return field.message.proto.name
-            case "enum":
-                return field.enum.proto.name
-            case other:
-                if self.is_bool_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_is_datetime):
-                    return "pendulum.DateTime"
-                else:
-                    return BasePydanticModelPlugin.proto_type_to_py_type_dict[field.kind.name.lower()]
-
     def load_dependency_messages_and_enums_in_dicts(self, message: protogen.Message):
         for field in message.fields:
             if field.kind.name.lower() == "enum":
@@ -94,7 +83,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     self.enum_list.append(field.enum)
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
-                if self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root):
+                if (self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root) or
+                        self.is_option_enabled(field.message, BasePydanticModelPlugin.flux_msg_json_root_time_series)):
                     if field.message not in self.root_message_list:
                         self.root_message_list.append(field.message)
                     # else not required: avoiding repetition
@@ -114,9 +104,15 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message],
                                                  avoid_non_roots: bool | None = None):
         for message in message_list:
-            if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root):
-                json_root_msg_option_val_dict = \
-                    self.get_complex_option_set_values(message, BasePydanticModelPlugin.flux_msg_json_root)
+            if ((is_json_root := self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root)) or
+                    self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series)):
+                if is_json_root:
+                    json_root_msg_option_val_dict = \
+                        self.get_complex_option_value_from_proto(message, BasePydanticModelPlugin.flux_msg_json_root)
+                else:
+                    json_root_msg_option_val_dict = \
+                        self.get_complex_option_value_from_proto(message,
+                                                                 BasePydanticModelPlugin.flux_msg_json_root_time_series)
                 # taking first obj since json root is of non-repeated option
                 if (is_reentrant_required := json_root_msg_option_val_dict.get(
                         BasePydanticModelPlugin.flux_json_root_set_reentrant_lock_field)) is not None:
@@ -266,9 +262,14 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def _handle_ws_connection_manager_data_members_override(self, message: protogen.Message) -> str:
         output_str = "    read_ws_path_ws_connection_manager: " \
                      "ClassVar[PathWSConnectionManager] = PathWSConnectionManager()\n"
-        options_value_dict = \
-            self.get_complex_option_set_values(message,
-                                               BasePydanticModelPlugin.flux_msg_json_root)
+        if BasePydanticModelPlugin.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root):
+            options_value_dict = \
+                self.get_complex_option_value_from_proto(message,
+                                                         BasePydanticModelPlugin.flux_msg_json_root)
+        else:
+            options_value_dict = \
+                self.get_complex_option_value_from_proto(message,
+                                                         BasePydanticModelPlugin.flux_msg_json_root_time_series)
         if BasePydanticModelPlugin.flux_json_root_read_websocket_field in options_value_dict:
             output_str += "    read_ws_path_with_id_ws_connection_manager: " \
                           "ClassVar[PathWithIdWSConnectionManager] = PathWithIdWSConnectionManager()\n"
@@ -327,12 +328,108 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 output_str += "    @validator('date', pre=True)\n"
                 output_str += "    def time_validate(cls, v):\n"
                 date_time_format = \
-                    self.get_non_repeated_valued_custom_option_value(field,
-                                                                     BasePydanticModelPlugin.flux_fld_date_time_format)
+                    self.get_simple_option_value_from_proto(field,
+                                                            BasePydanticModelPlugin.flux_fld_date_time_format)
                 output_str += f"        return validate_pendulum_datetime(v, {date_time_format})\n"
                 break
             # else not required: if date_time option is not set to any field of message then
             # avoiding datetime validation
+        return output_str
+
+    def handle_projection_models_output(self, message: protogen.Message):
+        output_str = ""
+        if BasePydanticModelPlugin.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
+            for field in message.fields:
+                if BasePydanticModelPlugin.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_projections):
+                    break
+            else:
+                # If no field is found having projection enabled
+                return output_str
+
+            for field in message.fields:
+                if self.is_bool_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_time_field):
+                    time_field_name = field.proto.name
+                    break
+            else:
+                err_str = (f"Could not find any time field in {message.proto.name} message having "
+                           f"{BasePydanticModelPlugin.flux_msg_json_root_time_series} option")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            for field in message.fields:
+                if self.is_bool_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_meta_field):
+                    meta_field_name = field.proto.name
+                    meta_field = field
+                    meta_field_type = self.proto_to_py_datatype(field)
+                    break
+            else:
+                err_str = (f"Could not find any time field in {message.proto.name} message having "
+                           f"{BasePydanticModelPlugin.flux_msg_json_root_time_series} option")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            projection_val_to_fields_dict = BaseProtoPlugin.get_projection_option_value_to_fields(message)
+
+            for projection_option_val, field_names in projection_val_to_fields_dict.items():
+                field_name_list: List[str] = []
+                for field_name in field_names:
+                    if "." in field_name:
+                        field_name_list.append("_".join(field_name.split(".")))
+                    else:
+                        field_name_list.append(field_name)
+                field_names_str = "_n_".join(field_name_list)
+                field_names_str_camel_cased = convert_to_capitalized_camel_case(field_names_str)
+                output_str += f"class {message.proto.name}ProjectionFor{field_names_str_camel_cased}(BaseModel):\n"
+                output_str += " " * 4 + f"{time_field_name}: pendulum.DateTime\n"
+
+                field_name_to_type_dict: Dict = {}
+                for field_name in field_names:
+                    if "." in field_name:
+                        field_type = self.get_nested_field_proto_to_py_datatype(field, field_name)
+                        field_name_to_type_dict[field_name] = field_type
+                    else:
+                        for field in message.fields:
+                            if field.proto.name == field_name:
+                                field_type = self.proto_to_py_datatype(field)
+                                field_name_to_type_dict[field_name] = field_type
+
+                has_nested_field = False
+                for field_name in field_names:
+                    field_type = field_name_to_type_dict.get(field_name)
+                    if field_type is None:
+                        err_str = ("Could not find type for field_name from field_name_to_type_dict, "
+                                   "probably bug in field_name_to_type_dict generation/population")
+                        logging.exception(err_str)
+                        raise Exception(err_str)
+
+                    if "." in field_name:
+                        has_nested_field = True
+                        output_str += " "*4 + f"{field_name.split('.')[0]}: {field_type}\n"
+                    else:
+                        output_str += " "*4 + f"{field_name}: {field_type}\n"
+
+                if has_nested_field:
+                    output_str += "\n"
+                    output_str += " " * 4 + f"class Settings:\n"
+                    projection_dict = {}
+                    for index, field_name in enumerate(field_names):
+                        if "." in field_name:
+                            projection_dict[field_name.split('.')[0]] = f"${field_name}"
+                        else:
+                            projection_dict[field_name] = index + 1
+                    output_str += " "*8 + f"projection = {projection_dict}\n"
+                output_str += "\n\n"
+
+                # container class for projection model
+                output_str += (f"class {message.proto.name}ProjectionContainerFor"
+                               f"{field_names_str_camel_cased}(BaseModel):\n")
+                if meta_field.message:
+                    output_str += f"    {meta_field_name}: {meta_field_type}Optional\n"
+                else:
+                    output_str += f"    {meta_field_name}: {meta_field_type}\n"
+                output_str += (f"    projection_models: List[{message.proto.name}ProjectionFor"
+                               f"{field_names_str_camel_cased}]\n\n\n")
+
         return output_str
 
     def _handle_config_class_and_other_root_class_versions(self, message: protogen.Message,
@@ -342,8 +439,71 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         if auto_gen_id_type not in ["NO_ID", "DEFAULT"]:
             output_str += "\n"
             output_str += self._add_config_class()
-        output_str += "\n"
-        output_str += self._add_datetime_validator(message)
+        datetime_validator_str = self._add_datetime_validator(message)
+        if datetime_validator_str:
+            output_str += "\n"
+            output_str += datetime_validator_str
+
+        if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
+            option_value_dict = (
+                self.get_complex_option_value_from_proto(message, BasePydanticModelPlugin.flux_msg_json_root_time_series))
+            time_series_version = option_value_dict.get(BasePydanticModelPlugin.flux_json_root_ts_mongo_version_field)
+            if time_series_version != 5.0:
+                err_str = (f"Time Series is supported with mongo version 5.0 only, received version: "
+                           f"{time_series_version} in {BasePydanticModelPlugin.flux_msg_json_root_time_series} "
+                           f"option for message {message.proto.name}")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            # getting time_field
+            for field in message.fields:
+                if BasePydanticModelPlugin.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_time_field):
+                    time_field = field.proto.name
+                    break
+            else:
+                err_str = (f"Couldn't find any field with {BasePydanticModelPlugin.flux_fld_val_time_field} option "
+                           f"set for message {message.proto.name} having "
+                           f"{BasePydanticModelPlugin.flux_msg_json_root_time_series} option")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            # getting meta_field
+            meta_field: str | None = None
+            for field in message.fields:
+                if BasePydanticModelPlugin.is_option_enabled(field,
+                                                             BasePydanticModelPlugin.flux_fld_val_meta_field):
+                    meta_field = field.proto.name
+                    break
+
+            granularity = option_value_dict.get(BasePydanticModelPlugin.flux_json_root_ts_granularity_field)
+            match granularity:
+                case "Sec":
+                    granularity_str = "Granularity.seconds"
+                case "Min":
+                    granularity_str = "Granularity.minutes"
+                case "Hrs":
+                    granularity_str = "Granularity.hours"
+                case other:
+                    err_str = (f"Unsupported granularity type: {other} in TimeSeries option value in "
+                               f"message {message.proto.name}")
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+            expire_after_sec = option_value_dict.get(BasePydanticModelPlugin.flux_json_root_ts_expire_after_sec_field)
+
+            output_str += "\n"
+            output_str += "    class Settings:\n"
+            output_str += "        timeseries = TimeSeriesConfig(\n"
+            output_str += f'            time_field="{time_field}"'
+            if meta_field:
+                output_str += ",\n"
+                output_str += f'            meta_field="{meta_field}"'
+            if granularity:
+                output_str += ",\n"
+                output_str += f'            granularity={granularity_str}'
+            if expire_after_sec:
+                output_str += ",\n"
+                output_str += f'            expire_after_seconds={expire_after_sec}\n'
+            output_str += '        )\n'
 
         output_str += "\n\n"
 
@@ -352,6 +512,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         if message in self.root_message_list+list(self.query_message_list):
             output_str += self.handle_dummy_message_gen(message)
         # If message is not root then no need to add message with optional fields
+
+        # handling projections
+        output_str += self.handle_projection_models_output(message)
 
         return output_str
 
@@ -372,6 +535,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         for message in self.ordered_message_list:
             output_str += self.handle_message_output(message)
 
+        # adding class to be used by max if query for models having int type of id
         output_str += f"class MaxId(BaseModel):\n"
         output_str += f"    max_id_val: int\n\n"
 

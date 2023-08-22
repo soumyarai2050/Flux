@@ -42,7 +42,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n'
         output_content += f'#include "../../cpp_app/include/{class_name}_mongo_db_handler.h"\n'
         output_content += f'#include "../../FluxCppCore/include/mongo_db_codec.h"\n'
-        output_content += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
+        output_content += f'#include "../../FluxCppCore/include/json_codec.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_key_handler.h"\n'
         output_content += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output_content

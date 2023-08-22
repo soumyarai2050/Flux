@@ -10,8 +10,7 @@ os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import LastTradeBaseModel
 from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import \
     MarketDataServiceWebClient
-
-market_data_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient()
+from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
 
 
 def test_last_trade_total_qty_sum(last_trade_fixture_list):

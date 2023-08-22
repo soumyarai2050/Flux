@@ -47,9 +47,14 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                                                  avoid_non_roots: bool | None = None):
         for message in message_list:
             # Adding Json-Root messages
-            if self.is_option_enabled(message, BeanieFastApiPlugin.flux_msg_json_root):
-                json_root_msg_option_val_dict = \
-                    self.get_complex_option_set_values(message, BeanieFastApiPlugin.flux_msg_json_root)
+            if ((is_json_root := self.is_option_enabled(message, BeanieFastApiPlugin.flux_msg_json_root)) or
+                    self.is_option_enabled(message, BeanieFastApiPlugin.flux_msg_json_root_time_series)):
+                if is_json_root:
+                    json_root_msg_option_val_dict = \
+                        self.get_complex_option_value_from_proto(message, BeanieFastApiPlugin.flux_msg_json_root)
+                else:
+                    json_root_msg_option_val_dict = \
+                        self.get_complex_option_value_from_proto(message, BeanieFastApiPlugin.flux_msg_json_root_time_series)
                 # taking first obj since json root is of non-repeated option
                 if (is_reentrant_required := json_root_msg_option_val_dict.get(
                         BeanieFastApiPlugin.flux_json_root_set_reentrant_lock_field)) is not None:

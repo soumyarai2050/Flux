@@ -32,7 +32,7 @@ class FilterProtoPlugin(BaseProtoPlugin):
 
     def is_field_having_filter_option(self, field: protogen.Field) -> bool:
         if self.is_option_enabled(field, FilterProtoPlugin.flux_fld_filter) and \
-                "true" == self.get_non_repeated_valued_custom_option_value(field, FilterProtoPlugin.flux_fld_filter):
+                "true" == self.get_simple_option_value_from_proto(field, FilterProtoPlugin.flux_fld_filter):
             return True
         else:
             return False

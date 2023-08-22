@@ -112,11 +112,11 @@ message StratStatus{
 // Widget - 4
 message OrderJournal{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+    CreateOp: AggregateType_FilterAggregate,
+    ReadOp: AggregateType_FilterAggregate,
+    PatchOp: AggregateType_FilterAggregate,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_FilterAggregate
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -164,12 +164,12 @@ message OrderJournal{
 
 message OrderSnapshot{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    UpdateDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+    CreateOp: AggregateType_FilterAggregate,
+    ReadOp: AggregateType_FilterAggregate,
+    UpdateOp: AggregateType_FilterAggregate,
+    PatchOp: AggregateType_FilterAggregate,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_FilterAggregate
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 6,
@@ -222,12 +222,12 @@ message OrderSnapshot{
 
 message SymbolSideSnapshot{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_snapshot_from_symbol_side",
@@ -276,11 +276,11 @@ message SymbolSideSnapshot{
 // Widget - 5
 message FillsJournal{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+    CreateOp: AggregateType_FilterAggregate,
+    ReadOp: AggregateType_FilterAggregate,
+    PatchOp: AggregateType_FilterAggregate,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_FilterAggregate
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 11,
@@ -359,15 +359,15 @@ message StratLimits{
 //Widget - 7
 message OrderLimits{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    CreateAllDesc: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    UpdateAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
-    PatchDesc: AggregateType_UNSPECIFIED,
-    PatchAllDesc: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
@@ -398,14 +398,14 @@ message OrderLimits{
 //Widget - 8
 message PortfolioLimits{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    CreateAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    PatchAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 7,
@@ -435,13 +435,13 @@ message PortfolioLimits{
 //Widget - 9
 message PortfolioStatus{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    UpdateDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
-    PatchAllDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+    CreateOp: AggregateType_FilterAggregate,
+    ReadOp: AggregateType_FilterAggregate,
+    UpdateOp: AggregateType_FilterAggregate,
+    PatchOp: AggregateType_FilterAggregate,
+    PatchAllOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_FilterAggregate
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 11,
@@ -487,13 +487,13 @@ message PortfolioStatus{
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
 message PairStrat{
     option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    UpdateDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
-    PatchAllDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+    CreateOp: AggregateType_FilterAggregate,
+    ReadOp: AggregateType_FilterAggregate,
+    UpdateOp: AggregateType_FilterAggregate,
+    PatchOp: AggregateType_FilterAggregate,
+    PatchAllOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_FilterAggregate
   };
     option (FluxMsgJsonQuery) = {
       QueryName: "get_pair_strat_sec_filter_json",
@@ -552,11 +552,11 @@ message PairStrat{
 // Widget - 1
 message StratCollection{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -580,11 +580,11 @@ message StratCollection{
 
 message UILayout{
     option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
 
     //Server generated unique Id
@@ -596,12 +596,12 @@ message UILayout{
 
 message StratBrief{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -664,12 +664,12 @@ message PairSideTradingBrief{
 
 message TestSample{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED,
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED,
     SetReentrantLock: false
   };
 
@@ -692,9 +692,9 @@ message TradeBrief{
 
 message NewOrder{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -711,10 +711,10 @@ message NewOrder{
 
 message CancelOrder{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -731,9 +731,9 @@ message CancelOrder{
 
 message CommandRequest{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string command = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
@@ -744,9 +744,9 @@ message CommandRequest{
 
 message CommandResponse{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string command = 2 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
@@ -810,9 +810,9 @@ message ExecutorCheckSnapshot{
 
 message CommandNControl {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required CommandType command_type = 2;
@@ -823,12 +823,12 @@ message CommandNControl {
 
 message Window{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
-    UpdateDesc: AggregateType_UNSPECIFIED
-    PatchDesc: AggregateType_UNSPECIFIED
-    DeleteDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
+    UpdateOp: AggregateType_UNSPECIFIED
+    PatchOp: AggregateType_UNSPECIFIED
+    DeleteOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required int32 x = 2;
@@ -837,12 +837,12 @@ message Window{
 
 message Door{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
-    UpdateDesc: AggregateType_UNSPECIFIED
-    PatchDesc: AggregateType_UNSPECIFIED
-    DeleteDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
+    UpdateOp: AggregateType_UNSPECIFIED
+    PatchOp: AggregateType_UNSPECIFIED
+    DeleteOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required int32 x = 2;
@@ -851,12 +851,12 @@ message Door{
 
 message House{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
-    UpdateDesc: AggregateType_UNSPECIFIED
-    PatchDesc: AggregateType_UNSPECIFIED
-    DeleteDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
+    UpdateOp: AggregateType_UNSPECIFIED
+    PatchOp: AggregateType_UNSPECIFIED
+    DeleteOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string name = 2;

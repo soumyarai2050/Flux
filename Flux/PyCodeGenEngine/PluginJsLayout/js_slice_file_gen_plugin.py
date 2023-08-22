@@ -72,7 +72,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         for message in self.root_msg_list:
             if self.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element):
                 widget_ui_data_option_value_dict = \
-                    self.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element)
+                    self.get_complex_option_value_from_proto(message, JsSliceFileGenPlugin.flux_msg_widget_ui_data_element)
                 message_layout_is_repeated = widget_ui_data_option_value_dict.get("is_repeated")
                 if message_layout_is_repeated is not None and message_layout_is_repeated:
                     self.repeated_layout_msg_name_list.append(message.proto.name)
@@ -83,8 +83,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                     # If field of message datatype of this message is found having widget_ui_data option
                     # with layout field then collecting those messages in dependent_message_list
                     widget_ui_data_option_value_dict = \
-                        self.get_complex_option_set_values(field.message,
-                                                           JsSliceFileGenPlugin.flux_msg_widget_ui_data_element)
+                        self.get_complex_option_value_from_proto(field.message,
+                                                                 JsSliceFileGenPlugin.flux_msg_widget_ui_data_element)
                     widget_ui_data_list = (
                         widget_ui_data_option_value_dict.get(
                             BaseJSLayoutPlugin.flux_msg_widget_ui_data_element_widget_ui_data_field))
@@ -102,8 +102,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 # Checking abbreviated dependent relation
                 if self.is_option_enabled(field, JsSliceFileGenPlugin.flux_fld_abbreviated):
                     abbreviated_option_value = \
-                        self.get_non_repeated_valued_custom_option_value(field,
-                                                                         JsSliceFileGenPlugin.flux_fld_abbreviated)
+                        self.get_simple_option_value_from_proto(field,
+                                                                JsSliceFileGenPlugin.flux_fld_abbreviated)
                     if any(special_char in abbreviated_option_value for special_char in [":", ".", "-"]):
                         dependent_message_name = abbreviated_option_value.split(".")[0][1:]
                         if ":" in dependent_message_name:
@@ -271,7 +271,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const update{message_name} = createAsyncThunk('{message_name_camel_cased}/update', " \
                      "async (payload, { rejectWithValue }) => "+"{\n"
-        option_val_dict = self.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_json_root)
+        option_val_dict = self.get_complex_option_value_from_proto(message, JsSliceFileGenPlugin.flux_msg_json_root)
 
         native_url = get_native_url_js_layout_var_name()
         if JsSliceFileGenPlugin.flux_json_root_patch_field in option_val_dict:
@@ -385,8 +385,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += f"            state.modified{message_name} = " \
                       f"addxpath(cloneDeep(state.{message_name_camel_cased}));\n"
         option_value_dict_list = \
-            JsSliceFileGenPlugin.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_json_query,
-                                                               is_option_repeated=True)
+            JsSliceFileGenPlugin.get_complex_option_value_from_proto(message, JsSliceFileGenPlugin.flux_msg_json_query,
+                                                                     is_option_repeated=True)
         if option_value_dict_list:
             for option_value_dict in option_value_dict_list:
                 if option_value_dict.get(JsSliceFileGenPlugin.flux_json_query_require_js_slice_changes_field):
@@ -419,8 +419,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name_camel_cased = capitalized_to_camel_case(message_name)
         if message_name not in self.repeated_layout_msg_name_list:
             option_value_dict_list = \
-                JsSliceFileGenPlugin.get_complex_option_set_values(message, JsSliceFileGenPlugin.flux_msg_json_query,
-                                                                   is_option_repeated=True)
+                JsSliceFileGenPlugin.get_complex_option_value_from_proto(message, JsSliceFileGenPlugin.flux_msg_json_query,
+                                                                         is_option_repeated=True)
             if option_value_dict_list:
                 for option_value_dict in option_value_dict_list:
                     if option_value_dict.get(JsSliceFileGenPlugin.flux_json_query_require_js_slice_changes_field):

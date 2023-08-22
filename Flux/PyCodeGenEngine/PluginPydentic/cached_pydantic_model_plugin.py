@@ -135,7 +135,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         return output_str
 
     def handle_imports(self) -> str:
-        output_str = "from pydantic import Field, BaseModel, validator\n"
+        output_str = "from pydantic import Field, BaseModel, validator, TimeSeriesConfig, Granularity\n"
         output_str += "import pendulum\n"
         output_str += "from typing import Dict, List, ClassVar, Any\n"
         ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",

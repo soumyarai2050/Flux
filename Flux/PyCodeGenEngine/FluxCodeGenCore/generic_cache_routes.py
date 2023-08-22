@@ -216,7 +216,9 @@ async def generic_delete_http(pydantic_class_type, project_name: str, pydantic_d
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_read_http(pydantic_class_type, project_name: str, filter_agg_pipeline: Any = None,
-                            has_links: bool = False, read_ids_list: List[Any] | None = None):
+                            has_links: bool = False, read_ids_list: List[Any] | None = None, projection_model=None,
+                            projection_filter: Dict | None = None):
+    # todo: projection handling in cache
     with pydantic_class_type._mutex:
         if read_ids_list is None:
             obj_list = list(pydantic_class_type._cache_obj_id_to_obj_dict.values())

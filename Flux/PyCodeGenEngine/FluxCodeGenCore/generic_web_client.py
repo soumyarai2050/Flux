@@ -109,6 +109,13 @@ def generic_http_delete_client(url: str, query_param: Any):
     return response_json
 
 
+@log_n_except
+def generic_http_delete_all_client(url: str):
+    response: requests.Response = requests.delete(url)
+    response_json = response.json()
+    return response_json
+
+
 async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Callable):
     class PydanticClassTypeList(BaseModel):
         __root__: List[pydantic_type]

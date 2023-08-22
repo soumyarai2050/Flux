@@ -116,12 +116,15 @@ message ChartSeries {
   optional string id = 1;
   required ChartType type = 2;
   required ChartEncode encode = 3;
+  optional bool underlying_time_series = 4 [default = false];
 }
 
 message ChartData {
   optional string id = 1;
   required string chart_name = 2;
-  repeated ChartSeries series = 3;
+  repeated UIFilter filters = 3;
+  repeated ChartSeries series = 4;
+  optional string partition_fld = 5;
 }
 
 message UIFilter {

@@ -4,12 +4,10 @@
 #include "market_data_web_client_test.h"
 #include "market_data_mongo_db_test.h"
 #include "market_data_codec_test.h"
-//#include "mongo_db_codec.h"
+#include "market_data_web_socket_test.h"
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-
-
 

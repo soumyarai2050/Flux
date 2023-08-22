@@ -72,7 +72,8 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         # else not required: core_or_util_files key is not in yaml dict config
 
         for message in set(message_list):
-            if self.is_option_enabled(message, JsonSampleGenPlugin.flux_msg_json_root):
+            if (self.is_option_enabled(message, JsonSampleGenPlugin.flux_msg_json_root) or
+                    self.is_option_enabled(message, JsonSampleGenPlugin.flux_msg_json_root_time_series)):
                 self.root_msg_list.append(message)
             # else not required: avoiding non-json msg append to list
 
@@ -186,7 +187,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
             if self.is_option_enabled(field, JsonSampleGenPlugin.flux_fld_auto_complete):
                 option_value = \
-                    self.get_non_repeated_valued_custom_option_value(field, JsonSampleGenPlugin.flux_fld_auto_complete)
+                    self.get_simple_option_value_from_proto(field, JsonSampleGenPlugin.flux_fld_auto_complete)
                 if self.__response_field_case_style == "camel":
                     field_name_case_styled = convert_to_camel_case(field.proto.name)
                 else:

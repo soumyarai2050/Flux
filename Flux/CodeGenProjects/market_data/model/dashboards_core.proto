@@ -61,10 +61,10 @@ message DashLeg {
     required Security sec = 2 [(FluxFldElaborateTitle) = true];
     optional Security sedol_sec = 3 [(FluxFldServerPopulate) = true, (FluxFldElaborateTitle) = true, (FluxFldHide) = "True", (FluxFldHelp) = "optional, populated only for CBs"];
     optional string company = 4 [(FluxFldServerPopulate) = true];
-    optional float last_px = 5 [(FluxFldServerPopulate) = true];
-    optional float last_px_change = 6 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%"];  // Against yesterday close px
-    optional float market_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int"];  // market current total last trade notional
-    optional float consumed_notional = 8 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int"];  // all mstrat total cb notional (filled)
+    optional float vwap = 5 [(FluxFldServerPopulate) = true];
+    optional float vwap_change = 6 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against yesterday close px"];
+    optional float market_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "market current total last trade notional"];
+    optional float consumed_notional = 8 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "all strat total leg filled notional"];
 }
 
 message InventorySummary {

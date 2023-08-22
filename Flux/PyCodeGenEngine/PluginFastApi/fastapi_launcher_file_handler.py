@@ -35,15 +35,15 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_launch_file_gen(self, file: protogen.File) -> str:
         if self.is_option_enabled(file, FastapiLauncherFileHandler.flux_file_crud_host):
-            host = self.get_non_repeated_valued_custom_option_value(file,
-                                                                    FastapiLauncherFileHandler.flux_file_crud_host)
+            host = self.get_simple_option_value_from_proto(file,
+                                                           FastapiLauncherFileHandler.flux_file_crud_host)
         else:
             host = '"127.0.0.1"'
 
         if self.is_option_enabled(file, FastapiLauncherFileHandler.flux_file_crud_port_offset):
             port_offset = \
-                self.get_non_repeated_valued_custom_option_value(file,
-                                                                 FastapiLauncherFileHandler.flux_file_crud_port_offset)
+                self.get_simple_option_value_from_proto(file,
+                                                        FastapiLauncherFileHandler.flux_file_crud_port_offset)
             port = 8000 + int(port_offset)
         else:
             port = 8000

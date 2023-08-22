@@ -2,15 +2,14 @@ syntax = "proto2";
 import 'flux_options.proto';
 
 message RawPerformanceData{
-  option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    CreateAllDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    PatchAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  option (FluxMsgJsonRootTimeSeries) = {
+    MongoVersion: 5.0,
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED,
+    Granularity: Sec,
+    ExpireAfterSeconds: 5
   };
 //  option (FluxMsgWidgetUIDataElement) = {
 //    x: 0,
@@ -23,10 +22,8 @@ message RawPerformanceData{
 //    }
 //  };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required string callable_name = 2;
-  required string call_date_time = 3 [(FluxFldValIsDateTime) = true];
-  required float start_time_it_val = 4;
-  required float end_time_it_val = 5;
+  required string callable_name = 2 [(FluxFldValMetaField) = true];
+  required string start_time = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
   required float delta = 6;
 }
 
@@ -41,14 +38,14 @@ message RawPerformanceDataOfCallable{
 
 message ProcessedPerformanceAnalysis{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    CreateAllDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    PatchAllDesc: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,

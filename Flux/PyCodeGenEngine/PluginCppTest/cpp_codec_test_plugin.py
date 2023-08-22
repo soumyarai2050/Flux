@@ -35,7 +35,7 @@ class CppCodecTestPlugin(BaseProtoPlugin):
         output += "#pragma once\n\n"
         output += '#include "gtest/gtest.h"\n\n'
         output += f'#include "{file_name}.pb.h"\n'
-        output += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
+        output += f'#include "../../FluxCppCore/include/json_codec.h"\n'
         output += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output
 

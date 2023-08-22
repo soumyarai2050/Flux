@@ -84,8 +84,8 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
             output_str += f' = Field('
 
             if has_alias:
-                alias_name = self.get_non_repeated_valued_custom_option_value(field,
-                                                                              BeanieModelPlugin.flux_fld_alias)
+                alias_name = self.get_simple_option_value_from_proto(field,
+                                                                     BeanieModelPlugin.flux_fld_alias)
                 output_str += f'alias={alias_name}'
 
             if leading_comments := field.location.leading_comments:
@@ -147,7 +147,8 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         # raising exception if there is some model that is not db root but has int id since int id is
         # only available for db root models
         if (auto_gen_id_type == IdType.INT_ID and
-                not BeanieModelPlugin.is_option_enabled(message, BeanieModelPlugin.flux_msg_json_root)):
+                not (BeanieModelPlugin.is_option_enabled(message, BeanieModelPlugin.flux_msg_json_root) or
+                     BeanieModelPlugin.is_option_enabled(message, BeanieModelPlugin.flux_msg_json_root_time_series))):
             err_str = (f"Non-Db-Root models can't have int type ID field, found in model {message.proto.name}, "
                        f"use string type id instead")
             logging.exception(err_str)
@@ -221,7 +222,7 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
             return ""
 
     def handle_imports(self) -> str:
-        output_str = "from beanie import Indexed, Document, PydanticObjectId, Link\n"
+        output_str = "from beanie import Indexed, Document, PydanticObjectId, Link, TimeSeriesConfig, Granularity\n"
         output_str += "from pydantic import BaseModel, Field, validator\n"
         output_str += "import pendulum\n"
         output_str += "from typing import List, ClassVar, Dict\n"

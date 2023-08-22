@@ -97,7 +97,7 @@ def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
             "$match": {
                 "$expr": {
                     "$gte": [
-                        "$time",
+                        "$exch_time",
                         {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
                     ]
                 }
@@ -105,14 +105,14 @@ def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
         },
         {
             "$match": {
-                "symbol": symbol
+                "symbol_n_exch_id.symbol": symbol
             }
         },
         {
             # add match for time to reduce
             "$setWindowFields": {
                 "sortBy": {
-                    "time": 1.0
+                    "exch_time": 1.0
                 },
                 "output": {
                     "market_trade_volume.participation_period_last_trade_qty_sum": {
@@ -130,7 +130,7 @@ def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
         },
         # Sorting in descending order since limit only takes first n objects
         {
-            "$sort": {"time": -1}
+            "$sort": {"exch_time": -1}
         },
         {
             "$limit": 1

@@ -50,17 +50,45 @@ message UsageParamNameOption{
 }
 
 message MessageJsonRoot{
-  optional AggregateType CreateDesc = 1;
-  optional AggregateType CreateAllDesc = 2;
-  optional AggregateType ReadDesc = 3;
-  optional AggregateType UpdateDesc = 4;
-  optional AggregateType UpdateAllDesc = 5;
-  optional AggregateType PatchDesc = 6;
-  optional AggregateType PatchAllDesc = 7;
-  optional AggregateType DeleteDesc = 8;
-  optional AggregateType ReadWebSocketDesc = 9;
-  optional AggregateType UpdateWebSocketDesc = 10;
-  optional bool SetReentrantLock = 11 [default=true];
+  optional AggregateType CreateOp = 1;
+  optional AggregateType CreateAllOp = 2;
+  optional AggregateType ReadOp = 3;
+  optional AggregateType UpdateOp = 4;
+  optional AggregateType UpdateAllOp = 5;
+  optional AggregateType PatchOp = 6;
+  optional AggregateType PatchAllOp = 7;
+  optional AggregateType DeleteOp = 8;
+  optional AggregateType DeleteAllOp = 9;
+  optional AggregateType ReadWebSocketOp = 10;
+  optional AggregateType UpdateWebSocketOp = 11;
+  optional bool SetReentrantLock = 12 [default=true];
+}
+
+enum TimeSeriesGranularityType{
+  Sec = 0;
+  Min = 1;
+  Hrs = 2;
+    }
+
+message MessageJsonRootTimeSeries{
+  required float MongoVersion = 1;   // currently supports 5.0
+  // allowed for v5.0
+  optional AggregateType CreateOp = 2;
+  optional AggregateType CreateAllOp = 3;
+  optional AggregateType ReadOp = 4;
+  optional AggregateType ReadWebSocketOp = 5;
+  optional AggregateType DeleteAllOp = 6;
+  // Pending to be impl with above version
+  optional AggregateType UpdateOp = 7;
+  optional AggregateType UpdateAllOp = 8;
+  optional AggregateType PatchOp = 9;
+  optional AggregateType PatchAllOp = 10;
+  optional AggregateType DeleteOp = 11;
+
+  optional TimeSeriesGranularityType Granularity = 14 [default=Sec];
+  optional int64 ExpireAfterSeconds = 15;
+  optional string SecondaryField = 16;  // not supported yet
+  optional bool SetReentrantLock = 17 [default=true];
 }
 
 enum QueryTypeEnum{
@@ -179,6 +207,7 @@ extend google.protobuf.MessageOptions
   repeated MessageJsonQuery FluxMsgJsonQuery = 55256;
   optional string FluxMsgCRUDSharedLock = 55257; // Name of shared lock to be used in multiple models in CRUD operations
   optional string FluxMsgUIGetAllLimit = 55258;
+  optional MessageJsonRootTimeSeries FluxMsgJsonRootTimeSeries = 55259;
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;
@@ -217,6 +246,7 @@ extend google.protobuf.FieldOptions
   //ORM options - 551
   optional bool FluxFldOrmNoUpdate = 55151;  //The field that gets persisted in create to ORM and subsequently can't be updated has this option set
   optional string FluxFldAbbreviatedLink = 55152;  // Use to connect Data Tables that are not DB connected but share common key
+  repeated string FluxFldProjections = 55153; // Use to indicate generated field in subset projection models from source model, Nested Usage: "vwap.vwap_px:1", where left of colan is nested field and right is projection id or name
 
   //UI option 552
   optional string FluxFldAbbreviated = 55251; // Use this to "Abbreviate" msg and show compressed single val
@@ -257,8 +287,15 @@ extend google.protobuf.FieldOptions
   optional int32 FluxFldValSortWeight = 59156;
   optional int32 FluxFldSizeMax = 59157; // for str fields: use in DBs/other generators where max length cap is required
   optional bool FluxFldValIsDateTime = 59158;
+  optional bool FluxFldValTimeField = 59159; // to indicate if the field is a time series collection's time field
+  optional bool FluxFldValMetaField = 59160; // to indicate if the field is a time series collection's Meta field
+
 
   //Mapping Options - 60
-  optional string FluxFldMappingSrcType = 60151;
+  repeated string FluxFldMappingSrc = 60151;
+  optional string FluxFldMappingSrcType = 60152;
+  optional string FluxFldMappingUnderlyingSeries = 60153;
+  repeated string FluxFldMappingUnderlyingMetaField = 60154;
+  repeated string FluxFldMappingProjectionQueryField = 60155; // mapping of projection query name to query field, if top-lvl field requires query_name as key and nothing after colan ex-"query_name:", if nested field requires dot seperated path to field after colan
 }
 

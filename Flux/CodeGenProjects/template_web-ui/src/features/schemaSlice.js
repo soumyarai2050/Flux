@@ -28,21 +28,30 @@ const schemaSlice = createSlice({
         [getSchema.fulfilled]: (state, action) => {
             state.schema = action.payload;
             state.loading = false;
-            Object.keys(state.schema).map(schemaName => {
-                if ([SCHEMA_AUTOCOMPLETE_XPATH, SCHEMA_DEFINITIONS_XPATH].includes(schemaName)) return;
+            Object.keys(state.schema).forEach(schemaName => {
+                if ([SCHEMA_AUTOCOMPLETE_XPATH].includes(schemaName)) return;
                 let schema = state.schema;
                 let currentSchema = _.get(schema, schemaName);
                 let isJsonRoot = currentSchema.json_root ? currentSchema.json_root : false;
                 let xpath;
                 let callerProps = {};
-                if (!isJsonRoot) {
-                    xpath = schemaName;
-                    callerProps.xpath = xpath;
-                    callerProps.parentSchema = getParentSchema(schema, schemaName);
-                    callerProps.mode = Modes.READ_MODE;
+                if (schemaName === SCHEMA_DEFINITIONS_XPATH) {
+                    const schemaDefinitions = state.schema[SCHEMA_DEFINITIONS_XPATH]
+                    for (const messageName in schemaDefinitions) {
+                        const messageAttributes = schemaDefinitions[messageName];
+                        if (messageAttributes.hasOwnProperty('json_root')) {
+                            state.schemaCollections[messageName] = createCollections(schema, messageAttributes, callerProps, undefined, undefined, xpath);
+                        }
+                    }
+                } else {
+                    if (!isJsonRoot) {
+                        xpath = schemaName;
+                        callerProps.xpath = xpath;
+                        callerProps.parentSchema = getParentSchema(schema, schemaName);
+                        callerProps.mode = Modes.READ_MODE;
+                    }
+                    state.schemaCollections[schemaName] = createCollections(schema, currentSchema, callerProps, undefined, undefined, xpath);
                 }
-                state.schemaCollections[schemaName] = createCollections(schema, currentSchema, callerProps, undefined, undefined, xpath);
-                return;
             });
         },
         [getSchema.rejected]: (state, action) => {

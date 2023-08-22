@@ -2,9 +2,20 @@ from typing import Dict, Set, List, Any, ClassVar, Tuple, Callable
 from fastapi import WebSocket, WebSocketDisconnect
 import logging
 import asyncio
+from pydantic import BaseModel
 
 # Project imports
 from FluxPythonUtils.scripts.async_rlock import AsyncRLock
+
+
+class WSData(BaseModel):
+    ws_object: WebSocket
+    filter_callable: Callable[..., Any] | None = None
+    filter_callable_kwargs: Dict[Any, Any] | None = None
+    projection_model: BaseModel | None = None
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class WSConnectionManager:
@@ -77,30 +88,27 @@ class WSConnectionManager:
 class PathWSConnectionManager(WSConnectionManager):
     def __init__(self):
         super().__init__()
-        self.active_ws_callable_n_kwargs_tuple_set: \
-            Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]] = set()
+        self.active_ws_data_set: Set[WSData] = set()
 
     def __str__(self):
         ret_str = "active_ws_set: "
         with self.rlock:
-            for ws in self.active_ws_set:
-                ret_str += str(ws)
+            for ws_data in self.active_ws_data_set:
+                ret_str += str(ws_data.ws_object)
             return ret_str + "\n" + str(super)
 
     async def connect(self, ws: WebSocket, filter_callable: Callable[..., Any] | None = None,
-                      callable_kwargs: Dict[Any, Any] | None = None) -> bool:
-        if callable_kwargs is not None:
-            callable_kwargs_tuple = self.verify_n_cast_callable_kwargs(callable_kwargs)
-        else:
-            callable_kwargs_tuple = None
+                      callable_kwargs: Dict[Any, Any] | None = None, projection_model=None) -> bool:
 
         async with self.rlock:
             is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
             # if ws not in self.active_ws_n_callable_tuple_set:
             if not any(ws in active_ws_callable_tuple
-                       for active_ws_callable_tuple in self.active_ws_callable_n_kwargs_tuple_set):
+                       for active_ws_callable_tuple in self.active_ws_data_set):
                 # old or new ws does not matter - may have been added to master via a different path
-                self.active_ws_callable_n_kwargs_tuple_set.add((ws, filter_callable, callable_kwargs_tuple))
+                self.active_ws_data_set.add(WSData(ws_object=ws, filter_callable=filter_callable,
+                                                   filter_callable_kwargs=callable_kwargs,
+                                                   projection_model=projection_model))
                 return True
             elif is_new_ws:
                 raise Exception(f"Unexpected! ws: {ws} is in active_ws_n_callable_tuple_set "
@@ -115,106 +123,21 @@ class PathWSConnectionManager(WSConnectionManager):
 
     async def disconnect(self, ws: WebSocket):
         async with self.rlock:
-            for fetched_ws, filter_callable, kwargs_tuple in self.active_ws_callable_n_kwargs_tuple_set:
-                if fetched_ws == ws:
-                    self.active_ws_callable_n_kwargs_tuple_set.remove((fetched_ws, filter_callable, kwargs_tuple))
+            for fetched_ws_data in self.active_ws_data_set:
+                if fetched_ws_data.ws_object == ws:
+                    self.active_ws_data_set.remove(fetched_ws_data)
                     break
             else:
                 logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_n_callable_tuple_set: {str(self)}")
             await WSConnectionManager.remove_from_master_ws_set(ws)
 
-    async def broadcast(self, json_str: str, task_list: List[asyncio.Task]):
+    async def broadcast(self, json_str: str, ws_data: WSData, task_list: List[asyncio.Task]):
+        remove_websocket: WebSocket | None = None
         try:
             async with self.rlock:
-                for ws, filter_callable, kwargs_tuple in self.active_ws_callable_n_kwargs_tuple_set:
-                    # somehow this was found as a string
-                    if filter_callable is None:
-                        create_task = True
-                    else:
-                        kwargs = {k: v for k, v in kwargs_tuple}
-                        create_task = filter_callable(json_str, **kwargs)
-                        # else not required: ignore task creation if callable not allows
-                    if create_task:
-                        task = asyncio.create_task(ws.send_text(json_str), name=f"{len(task_list)}")
-                        task_list.append(task)
-        except Exception as e:
-            logging.exception(f"await asyncio.wait raised exception: {e}")
-
-    def has_activ_ws(self):
-        return True if len(self.active_ws_callable_n_kwargs_tuple_set) > 0 else False
-
-
-class PathWithIdWSConnectionManager(WSConnectionManager):
-    def __init__(self):
-        super().__init__()
-        self.id_to_active_ws_n_filter_callable_set_dict: \
-            Dict[Any, Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]]] = dict()
-
-    def __str__(self):
-        ret_str = "active_ws_set: "
-        with self.rlock:
-            for obj_id, active_ws_n_filter_callable_tuple_set in self.id_to_active_ws_n_filter_callable_set_dict.items():
-                set_as_str = "".join([str(ws) for ws, _, _ in active_ws_n_filter_callable_tuple_set])
-                ret_str += f"obj_id: {obj_id} set: {set_as_str}\n"
-            return ret_str + "\n" + str(super)
-
-    async def connect(self, ws: WebSocket, obj_id: Any, filter_callable: Callable[..., Any] | None = None,
-                      callable_kwargs: Dict[Any, Any] | None = None) -> bool:
-        if callable_kwargs is not None:
-            callable_kwargs_tuple = self.verify_n_cast_callable_kwargs(callable_kwargs)
-        else:
-            callable_kwargs_tuple = None
-
-        async with self.rlock:
-            is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
-            # new or not, if id is not in dict, it's new for this path
-            if obj_id not in self.id_to_active_ws_n_filter_callable_set_dict:
-                self.id_to_active_ws_n_filter_callable_set_dict[obj_id] = set()
-                self.id_to_active_ws_n_filter_callable_set_dict[obj_id].add((ws, filter_callable, callable_kwargs_tuple))
-            elif is_new_ws:  # we have the obj_id in our dict but master did not have this websocket
-                active_ws_n_filter_callable_tuple_set: \
-                    Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]] = \
-                    self.id_to_active_ws_n_filter_callable_set_dict[obj_id]
-                if not any(ws in active_ws_callable_tuple
-                           for active_ws_callable_tuple in active_ws_n_filter_callable_tuple_set):
-                    self.id_to_active_ws_n_filter_callable_set_dict[obj_id].add((ws, filter_callable, callable_kwargs_tuple))
-                    logging.debug("new client web-socket connect called on a pre-added obj_id-web-path")
-                else:
-                    raise Exception(
-                        f"Unexpected! ws: {ws} for id: {obj_id} found in active_ws_n_filter_callable_tuple_set but not in master: {str(self)}, likely a bug")
-            else:
-                pass
-        return is_new_ws
-
-    async def disconnect(self, ws: WebSocket, obj_id: Any):
-        async with self.rlock:
-            for fetched_ws, filter_callable, kwargs_tuple in self.id_to_active_ws_n_filter_callable_set_dict[obj_id]:
-                if fetched_ws == ws:
-                    self.id_to_active_ws_n_filter_callable_set_dict[obj_id].remove((ws, filter_callable, kwargs_tuple))
-                    break
-            else:
-                logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_n_callable_tuple_set "
-                              f"for obj_id {obj_id}: {str(self)}")
-            if len(self.id_to_active_ws_n_filter_callable_set_dict[obj_id]) == 0:
-                del self.id_to_active_ws_n_filter_callable_set_dict[obj_id]
-            await WSConnectionManager.remove_from_master_ws_set(ws)
-
-    # async def receive_in_json(self, websocket: WebSocket):
-    #     cleaned_json_data_str = await websocket.receive_json()
-    #     if type(cleaned_json_data_str).__name__ == 'str':
-    #         return json.loads(cleaned_json_data_str)
-    #     else:
-    #         return cleaned_json_data_str
-
-    async def broadcast_to_ws_tuple_set(self,
-                                  active_ws_n_filter_callable_tuple_set: Set[Tuple[WebSocket, Callable[..., Any] | None,
-                                                                                   Tuple[Tuple[Any, Any]] | None]],
-                                  json_str: str, obj_id, task_list: List[asyncio.Task]):
-        active_ws = None
-        remove_websocket_list: List[WebSocket] = list()
-        for ws, filter_callable, kwargs_tuple in active_ws_n_filter_callable_tuple_set:
-            try:
-                active_ws = ws
+                ws = ws_data.ws_object
+                filter_callable = ws_data.filter_callable
+                kwargs_tuple = ws_data.filter_callable_kwargs
                 # somehow this was found as a string
                 if filter_callable is None:
                     create_task = True
@@ -225,31 +148,114 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                 if create_task:
                     task = asyncio.create_task(ws.send_text(json_str), name=f"{len(task_list)}")
                     task_list.append(task)
-            except WebSocketDisconnect as e:
-                remove_websocket_list.append(ws)
-                logging.exception(
-                    f"WebSocketDisconnect: encountered while broadcasting, exception: {e}, ws: {active_ws}")
-            except RuntimeError as e:
-                remove_websocket_list.append(active_ws)
-                logging.exception(f"RuntimeError: encountered while broadcasting, exception: {e}, ws: {active_ws}")
-            except Exception as e:
-                remove_websocket_list.append(ws)
-                logging.exception(f"Exception: {e}, ws: {active_ws}")
-            finally:
-                for ws in remove_websocket_list:
-                    if ws in self.id_to_active_ws_n_filter_callable_set_dict[obj_id]:
-                        await self.disconnect(ws, obj_id)
+        except WebSocketDisconnect as e:
+            remove_websocket = ws_data.ws_object
+            logging.exception(
+                f"WebSocketDisconnect: encountered while broadcasting, exception: {e}, ws: {ws_data.ws_object}")
+        except RuntimeError as e:
+            remove_websocket = ws_data.ws_object
+            logging.exception(f"RuntimeError: encountered while broadcasting, exception: {e}, ws: {ws_data.ws_object}")
+        except Exception as e:
+            remove_websocket = ws_data.ws_object
+            logging.exception(f"Exception: {e}, ws: {ws_data.ws_object}")
+        finally:
+            if remove_websocket is not None:
+                await self.disconnect(remove_websocket)
 
-    def get_activ_ws_tuple_set(self, obj_id) -> \
-            Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]] | None:
-        return self.id_to_active_ws_n_filter_callable_set_dict.get(obj_id)
+    def get_activ_ws_data_set(self) -> Set[WSData]:
+        return self.active_ws_data_set
 
-    async def broadcast(self, json_str, obj_id: Any, task_list: List[asyncio.Task]):
+
+class PathWithIdWSConnectionManager(WSConnectionManager):
+    def __init__(self):
+        super().__init__()
+        self.id_to_active_ws_data_set_dict: Dict[Any, Set[WSData]] = dict()
+
+    def __str__(self):
+        ret_str = "active_ws_set: "
+        with self.rlock:
+            for obj_id, active_ws_data_set in self.id_to_active_ws_data_set_dict.items():
+                set_as_str = "".join([str(ws_data.ws_object) for ws_data in active_ws_data_set])
+                ret_str += f"obj_id: {obj_id} set: {set_as_str}\n"
+            return ret_str + "\n" + str(super)
+
+    async def connect(self, ws: WebSocket, obj_id: Any, filter_callable: Callable[..., Any] | None = None,
+                      callable_kwargs: Dict[Any, Any] | None = None, projection_model=None) -> bool:
+
         async with self.rlock:
-            active_ws_n_filter_callable_tuple_set: \
-                Set[Tuple[WebSocket, Callable[..., Any] | None, Tuple[Tuple[Any, Any]] | None]]
-            if active_ws_n_filter_callable_tuple_set := self.get_activ_ws_tuple_set(obj_id):
-                await self.broadcast_to_ws_tuple_set(active_ws_n_filter_callable_tuple_set, json_str, obj_id, task_list)
+            is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
+            # new or not, if id is not in dict, it's new for this path
+            if obj_id not in self.id_to_active_ws_data_set_dict:
+                self.id_to_active_ws_data_set_dict[obj_id] = set()
+                self.id_to_active_ws_data_set_dict[obj_id].add(
+                    WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
+                           projection_model=projection_model))
+            elif is_new_ws:  # we have the obj_id in our dict but master did not have this websocket
+                active_ws_n_filter_callable_tuple_set: Set[WSData] = \
+                    self.id_to_active_ws_data_set_dict[obj_id]
+                if not (ws in [ws_data.ws_object for ws_data in active_ws_n_filter_callable_tuple_set]):
+                    self.id_to_active_ws_data_set_dict[obj_id].add(
+                        WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
+                               projection_model=projection_model))
+                    logging.debug("new client web-socket connect called on a pre-added obj_id-web-path")
+                else:
+                    raise Exception(
+                        f"Unexpected! ws: {ws} for id: {obj_id} found in active_ws_n_filter_callable_tuple_set "
+                        f"but not in master: {str(self)}, likely a bug")
             else:
-                logging.error(f"Unexpected: no registered websocket found for broadcast call with id: {obj_id}")
+                pass
+        return is_new_ws
+
+    async def disconnect(self, ws: WebSocket, obj_id: Any):
+        async with self.rlock:
+            for fetched_ws_data in self.id_to_active_ws_data_set_dict[obj_id]:
+                if fetched_ws_data.ws_object == ws:
+                    self.id_to_active_ws_data_set_dict[obj_id].remove(fetched_ws_data)
+                    break
+            else:
+                logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_n_callable_tuple_set "
+                              f"for obj_id {obj_id}: {str(self)}")
+            if len(self.id_to_active_ws_data_set_dict[obj_id]) == 0:
+                del self.id_to_active_ws_data_set_dict[obj_id]
+            await WSConnectionManager.remove_from_master_ws_set(ws)
+
+    # async def receive_in_json(self, websocket: WebSocket):
+    #     cleaned_json_data_str = await websocket.receive_json()
+    #     if type(cleaned_json_data_str).__name__ == 'str':
+    #         return json.loads(cleaned_json_data_str)
+    #     else:
+    #         return cleaned_json_data_str
+
+    def get_activ_ws_tuple_set_with_id(self, obj_id) -> Set[WSData] | None:
+        return self.id_to_active_ws_data_set_dict.get(obj_id)
+
+    async def broadcast(self, json_str, obj_id: Any, ws_data: WSData, task_list: List[asyncio.Task]):
+        async with self.rlock:
+            remove_websocket: WebSocket | None = None
+            try:
+                filter_callable = ws_data.filter_callable
+                filter_callable_kwargs = ws_data.filter_callable_kwargs
+                # somehow this was found as a string
+                if filter_callable is None:
+                    create_task = True
+                else:
+                    create_task = filter_callable(json_str, **filter_callable_kwargs)
+
+                if create_task:
+                    task = asyncio.create_task(ws_data.ws_object.send_text(json_str), name=f"{len(task_list)}")
+                    task_list.append(task)
+            except WebSocketDisconnect as e:
+                remove_websocket = ws_data.ws_object
+                logging.exception(
+                    f"WebSocketDisconnect: encountered while broadcasting, exception: {e}, ws: {remove_websocket}")
+            except RuntimeError as e:
+                remove_websocket = ws_data.ws_object
+                logging.exception(f"RuntimeError: encountered while broadcasting, exception: {e}, ws: {remove_websocket}")
+            except Exception as e:
+                remove_websocket = ws_data.ws_object
+                logging.exception(f"Exception: {e}, ws: {remove_websocket}")
+            finally:
+                if remove_websocket is not None:
+                    if remove_websocket in self.id_to_active_ws_data_set_dict[obj_id]:
+                        await self.disconnect(remove_websocket, obj_id)
 

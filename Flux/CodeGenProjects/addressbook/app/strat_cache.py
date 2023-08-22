@@ -219,7 +219,7 @@ class StratCache(StratManagerServiceBaseStratCache, MarketDataServiceBaseStratCa
                 _market_depths_cont = MarketDepthsCont(market_depth.symbol)
                 _market_depths_cont.set_market_depth(market_depth)
                 self._market_depths_conts.append(_market_depths_cont)
-        self._market_depths_update_date_time = market_depth.time
+        self._market_depths_update_date_time = market_depth.exch_time
         return self._market_depths_update_date_time
 
     def set_has_unack_leg1(self, has_unack: bool):

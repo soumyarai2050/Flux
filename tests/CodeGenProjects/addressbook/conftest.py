@@ -12,7 +12,8 @@ from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_m
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_verify_limits, \
     create_n_verify_portfolio_status, create_fx_symbol_overview, clean_all_collections_ignoring_ui_layout, \
-    get_ps_n_md_db_names, test_config_file_path, clean_today_activated_ticker_dict, clear_cache_in_model
+    get_ps_n_md_db_names, test_config_file_path, clean_today_activated_ticker_dict, clear_cache_in_model, \
+    ps_config_yaml_dict
 from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, config_file_path
 from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
 
@@ -70,6 +71,12 @@ def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, exp
     # creating symbol_override for fx
     create_fx_symbol_overview()
 
+    # time for override get refreshed
+    min_refresh_interval = ps_config_yaml_dict.get("min_refresh_interval")
+    if min_refresh_interval is None:
+        min_refresh_interval = 30
+    time.sleep(min_refresh_interval)
+
 
 @pytest.fixture()
 def market_depth_basemodel_list():
@@ -80,7 +87,8 @@ def market_depth_basemodel_list():
             input_data.extend([
                 {
                     "symbol": symbol,
-                    "time": "2023-02-13T20:30:30.165Z",
+                    "exch_time": "2023-02-13T20:30:30.165Z",
+                    "arrival_time": "2023-02-13T20:30:30.165Z",
                     "side": side,
                     "px": px,
                     "qty": qty+10,
@@ -90,7 +98,8 @@ def market_depth_basemodel_list():
                 },
                 {
                     "symbol": symbol,
-                    "time": "2023-02-13T20:30:31.165Z",
+                    "exch_time": "2023-02-13T20:30:30.165Z",
+                    "arrival_time": "2023-02-13T20:30:30.165Z",
                     "side": side,
                     "px": px+(dev*1),
                     "qty": qty-20,
@@ -100,7 +109,8 @@ def market_depth_basemodel_list():
                 },
                 {
                     "symbol": symbol,
-                    "time": "2023-02-13T20:30:32.165Z",
+                    "exch_time": "2023-02-13T20:30:30.165Z",
+                    "arrival_time": "2023-02-13T20:30:30.165Z",
                     "side": side,
                     "px": px+(dev*2),
                     "qty": qty+10,
@@ -110,7 +120,8 @@ def market_depth_basemodel_list():
                 },
                 {
                     "symbol": symbol,
-                    "time": "2023-02-13T20:30:31.165Z",
+                    "exch_time": "2023-02-13T20:30:30.165Z",
+                    "arrival_time": "2023-02-13T20:30:30.165Z",
                     "side": side,
                     "px": px+(dev*3),
                     "qty": qty-20,
@@ -120,7 +131,8 @@ def market_depth_basemodel_list():
                 },
                 {
                     "symbol": symbol,
-                    "time": "2023-02-13T20:30:32.165Z",
+                    "exch_time": "2023-02-13T20:30:30.165Z",
+                    "arrival_time": "2023-02-13T20:30:30.165Z",
                     "side": side,
                     "px": px+(dev*4),
                     "qty": qty+20,
@@ -185,20 +197,19 @@ def last_trade_fixture_list():
     for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
         input_data.extend([
             {
-                "symbol": symbol,
-                "time": "2023-03-10T09:19:12.019Z",
+                "symbol_n_exch_id": {
+                    "symbol": symbol,
+                    "exch_id": "Exch"
+                },
+                "exch_time": "2023-03-10T09:19:12.019Z",
+                "arrival_time": "2023-03-10T09:19:12.019Z",
                 "px": 116,
                 "qty": 150,
-                "exchange": "Exch",
-                "special_conditions": "none",
-                "past_limit": False,
-                "unreported": False,
                 "market_trade_volume": {
                     "participation_period_last_trade_qty_sum": 0,
                     "applicable_period_seconds": 0
                 }
             }
-
         ])
     yield input_data
 
@@ -616,3 +627,56 @@ def cb_eqt_security_records_(buy_sell_symbol_list) -> List[List[any]] | None:
 @pytest.fixture()
 def static_data_(cb_eqt_security_records_):
     yield
+
+
+@pytest.fixture()
+def dash_filter_():
+    dash_filter_json = {
+        "dash_name": "Dashboard 1",
+        "required_legs": [{
+            "leg_type": "LegType_CB"
+        }]
+    }
+    yield dash_filter_json
+
+
+@pytest.fixture()
+def dash_():
+    dash_json = {
+        "rt_dash": {
+            "leg1": {
+                "sec": {
+                    "sec_id": "CB_Sec_1",
+                    "sec_type": "TICKER"
+                },
+                "vwap": 150,
+                "vwap_change": 2.5
+            },
+            "leg2": {
+                "sec": {
+                    "sec_id": "EQT_Sec_1",
+                    "sec_type": "TICKER"
+                },
+                "vwap": 10,
+                "vwap_change": 0.5
+            }
+        }
+    }
+    yield dash_json
+
+
+@pytest.fixture()
+def bar_data_():
+    current_time = DateTime.utcnow()
+    bar_data_json = {
+        "symbol_n_exch_id": {
+            "symbol": "CB_Sec_1",
+            "exch_id": "Exchange"
+        },
+        "start_time": current_time,
+        "end_time": current_time.add(seconds=1),
+        "vwap": 150,
+        "vwap_change": 2.5,
+        "volume": 1_000
+    }
+    yield bar_data_json

@@ -51,7 +51,7 @@ set(SRC_FILES
         ${ProtoGenCc_SRC}
         ${App_SRC}
         ${FluxCppCore_SRC}
-        )
+)
 
 message(SRC_FILES ${SRC_FILES})
 

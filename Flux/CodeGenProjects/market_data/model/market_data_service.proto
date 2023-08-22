@@ -24,7 +24,7 @@ message RTDash {
     }
   };
 
-  optional DashLeg leg1 = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "cb", (FluxFldAutoComplete) = "sec_id:CB_List, sec_type=TICKER", (FluxFldHelp) = "CB Tickers"]; // wont be set for non CB strat
+  optional DashLeg leg1 = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "cb", (FluxFldAutoComplete) = "sec_id:CB_List, sec_type=TICKER", (FluxFldHelp) = "CB Tickers", (FluxFldMappingUnderlyingMetaField) = "sec.sec_id:BarData.symbol_n_exch_id.symbol",  (FluxFldMappingUnderlyingMetaField) = "exch_id:BarData.symbol_n_exch_id.exch_id", (FluxFldMappingSrc) = "vwap:BarData.vwap", (FluxFldMappingSrc) = "vwap_change:BarData.vwap_change"]; // wont be set for non CB strat
   optional DashLeg leg2 = 2 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "A", (FluxFldAutoComplete) = "sec.sec_id:EQT_List, sec.sec_type=TICKER", (FluxFldHelp) = "A Shares Tickers"];
   optional DashLeg leg3 = 3 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "H", (FluxFldHelp) = "H Shares Tickers"]; // wont be set for non AH/HA strat
   optional float max_buy_notional = 4 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldDisplayType) = "int"];
@@ -50,12 +50,15 @@ message RTDash {
 
 message Dash {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "search_n_update_dash",
@@ -66,17 +69,17 @@ message Dash {
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required RTDash rt_dash = 2[(FluxFldPk) = "leg2.sec.sec_id"];
+  required RTDash rt_dash = 2 [(FluxFldPk) = "leg2.sec.sec_id"];
   optional bool cached = 3;
 }
 
 message DashCollection {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
@@ -94,7 +97,7 @@ message DashCollection {
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string dash_name = 2;
-  repeated string loaded_dashes = 3 [(FluxFldMicroSeparator) = "@", (FluxFldAbbreviated) = "Id:Dash.id^CB:Dash.rt_dash.leg1.sec.sec_id^Company:Dash.rt_dash.leg1.company^CBLastPx:Dash.rt_dash.leg1.last_px^CBLastPxChng %:Dash.rt_dash.leg1.last_px_change^CBMkt $:Dash.rt_dash.leg1.market_notional^CBOur $:Dash.rt_dash.leg1.consumed_notional^MaxBuy $:Dash.rt_dash.max_buy_notional^MaxSell $:Dash.rt_dash.max_sell_notional^Premium %:Dash.rt_dash.mkt_premium^PremiumChng %:Dash.rt_dash.mkt_premium_change^EQT:Dash.rt_dash.leg2.sec.sec_id^Company:Dash.rt_dash.leg2.company^EQTLastPx:Dash.rt_dash.leg2.last_px^EQTLastPxChng %:Dash.rt_dash.leg2.last_px_change^EQTMkt $:Dash.rt_dash.leg2.market_notional^EQTOur $:Dash.rt_dash.leg2.consumed_notional^Indicative %:Dash.rt_dash.indicative_summary.avg_rate^Indicative $:Dash.rt_dash.indicative_summary.usd_notional^LReqstStrat:Dash.rt_dash.cum_strat^LReqstMax %:Dash.rt_dash.avg_max_rate^LReqst $:Dash.rt_dash.cum_usd_notional^LReqstTime:Dash.rt_dash.last_update_time^LReqstNote:Dash.rt_dash.notes^Locate %:Dash.rt_dash.locate_summary.avg_rate^Locate $:Dash.rt_dash.locate_summary.usd_notional^PTH %:Dash.rt_dash.pth_summary.avg_rate^PTH $:Dash.rt_dash.pth_summary.usd_notional^SOD %:Dash.rt_dash.sod_summary.avg_rate^SOD $:Dash.rt_dash.sod_summary.usd_notional"];
+  repeated string loaded_dashes = 3 [(FluxFldMicroSeparator) = "@", (FluxFldAbbreviated) = "Id:Dash.id^CB:Dash.rt_dash.leg1.sec.sec_id^CBCompany:Dash.rt_dash.leg1.company^CBLastPx:Dash.rt_dash.leg1.vwap^CBLastPxChng %:Dash.rt_dash.leg1.vwap_change^CBMkt $:Dash.rt_dash.leg1.market_notional^CBOur $:Dash.rt_dash.leg1.consumed_notional^MaxBuy $:Dash.rt_dash.max_buy_notional^MaxSell $:Dash.rt_dash.max_sell_notional^Premium %:Dash.rt_dash.mkt_premium^PremiumChng %:Dash.rt_dash.mkt_premium_change^EQT:Dash.rt_dash.leg2.sec.sec_id^EQTCompany:Dash.rt_dash.leg2.company^EQTLastPx:Dash.rt_dash.leg2.vwap^EQTLastPxChng %:Dash.rt_dash.leg2.vwap_change^EQTMkt $:Dash.rt_dash.leg2.market_notional^EQTOur $:Dash.rt_dash.leg2.consumed_notional^Indicative %:Dash.rt_dash.indicative_summary.avg_rate^Indicative $:Dash.rt_dash.indicative_summary.usd_notional^LReqstStrat:Dash.rt_dash.cum_strat^LReqstMax %:Dash.rt_dash.avg_max_rate^LReqst $:Dash.rt_dash.cum_usd_notional^LReqstTime:Dash.rt_dash.last_update_time^LReqstNote:Dash.rt_dash.notes^Locate %:Dash.rt_dash.locate_summary.avg_rate^Locate $:Dash.rt_dash.locate_summary.usd_notional^PTH %:Dash.rt_dash.pth_summary.avg_rate^PTH $:Dash.rt_dash.pth_summary.usd_notional^SOD %:Dash.rt_dash.sod_summary.avg_rate^SOD $:Dash.rt_dash.sod_summary.usd_notional"];
   //Any dashes that don't match user desired filter move to buffered
   repeated string buffered_dashes = 4 [(FluxFldHide) = "True"];
 }
@@ -102,12 +105,12 @@ message DashCollection {
 // equiv of pair strat param but operates as root widget
 message DashFilters {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -135,11 +138,11 @@ message DashFilters {
 // Widget - 1
 message DashFiltersCollection {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -160,14 +163,15 @@ message DashFiltersCollection {
 
 message TopOfBook {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    CreateAllDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    UpdateAllDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -212,19 +216,19 @@ message TopOfBook {
 
 message SideSpecificMarketDataBrief{
   optional float allowed_px_by_max_basis_points = 1 [(FluxFldHelp) = "(bbo_aggressive / 100) * (max_basis_points/100) + bbo_aggressive"];
-  optional float allowed_px_by_max_deviation = 2 [(FluxFldHelp) = "last_px (+/-) (last_px/100 * max_px_deviation) : Sell Order use - , buy + "];
+  optional float allowed_px_by_max_deviation = 2 [(FluxFldHelp) = "vwap (+/-) (vwap/100 * max_px_deviation) : Sell Order use - , buy + "];
   optional float allowed_px_by_max_level = 3 [(FluxFldHelp) = "Price at max level in order book (capped at depth level availability - 10) "];
   optional float allowed_max_px = 4 [(FluxFldHelp) = "Min/Max of allowed_px_by_basis_point_limit, allowed_px_by_deviation_limit, allowed_px_by_level_limit depending on buy or sell"];
 }
 
 message MarketDataBrief{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   required int32 id = 1;
   required Security security = 2;
@@ -236,12 +240,15 @@ message MarketDataBrief{
 
 message SymbolOverview{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -284,76 +291,66 @@ message SymbolOverview{
   optional bool force_publish = 15 [(FluxFldHide) = "True"];
 }
 
+
+message SymbolNExchId{
+  required string symbol = 1;
+  required string exch_id = 2;
+}
+
+
 message BarData {
-  option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    CreateAllDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    UpdateAllDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  option (FluxMsgJsonRootTimeSeries) = {
+    MongoVersion: 5.0,
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED,
+    Granularity: Sec,
+    ExpireAfterSeconds: 5
   };
   required int32 id = 1;
-  required string symbol = 2 [(FluxFldIndex) = true];
-  optional string datetime = 3 [(FluxFldValIsDateTime) = true];
-  optional float open = 4;
-  optional float high = 5;
-  optional float low = 6;
-  optional float close = 7;
-  optional int32 volume = 8;
-  optional int32 bar_count = 9;
-  optional float dividends = 10;
-  optional float stock_splits = 11;
+  required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldMappingProjectionQueryField) = "1:symbol_n_exch_id.symbol", (FluxFldMappingProjectionQueryField) = "2:symbol_n_exch_id.symbol", (FluxFldMappingProjectionQueryField) = "3:symbol_n_exch_id.symbol"];
+  required string start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required string end_time = 4 [(FluxFldValIsDateTime) = true];
+  optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3"];
+  optional float vwap_change = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3", (FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
+  optional float open = 7;
+  optional float high = 8;
+  optional float low = 9;
+  optional float close = 10;
+  optional int32 volume = 11;
+  optional int32 bar_count = 12;
 }
 
-message BBO {
-  option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+message TickByTickBBO {
+  option (FluxMsgJsonRootTimeSeries) = {
+    MongoVersion: 5.0,
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED,
+    Granularity: Sec,
+    ExpireAfterSeconds: 5
   };
   required int32 id = 1;
-  required string symbol = 2 [(FluxFldIndex) = true];
-  required TickType tick_type = 3;
-  required string date_time = 4 [(FluxFldValIsDateTime) = true];
-  optional float px = 5;
-  optional int64 qty = 6;
+  required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true];
+  required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required TickType tick_type = 4;
+  required string arrival_time = 5 [(FluxFldValIsDateTime) = true];
+  optional float px = 6;
+  optional int64 qty = 7;
 }
 
-message TickByTickBidAsk {
-  option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    UpdateDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
-  };
-  option (FluxMsgUIGetAllLimit) = "-100";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
-
-  required int32 id = 1;
-  required string symbol = 2 [(FluxFldIndex) = true];
-  required string time = 3 [(FluxFldValIsDateTime) = true];
-  required float bid_px = 4;
-  required float ask_px = 5;
-  required int64 bid_qty = 6;
-  required int64 ask_qty = 7;
-}
 
 message LastTrade {
-  option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    UpdateDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
+  option (FluxMsgJsonRootTimeSeries) = {
+    MongoVersion: 5.0,
+    CreateOp: AggregateType_FilterAggregate,
+    ReadOp: AggregateType_FilterAggregate,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_FilterAggregate,
+    Granularity: Sec,
+    ExpireAfterSeconds: 5
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -365,64 +362,17 @@ message LastTrade {
       view_layout: UI_TABLE
     }
   };
+
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
   required int32 id = 1;
-  required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
-  required string time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
-  required float px = 4;
-  required int64 qty = 5;
-  optional float premium = 6;
-  optional string exchange = 7;
-  optional string special_conditions = 8;
-  optional bool past_limit = 9;
-  optional bool unreported = 10;
-  optional MarketTradeVolume market_trade_volume = 11;
-}
-
-message TimeSeriesLastTrade {
-  option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_FilterAggregate,
-    ReadDesc: AggregateType_FilterAggregate,
-    UpdateDesc: AggregateType_FilterAggregate,
-    PatchDesc: AggregateType_FilterAggregate,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_FilterAggregate
-  };
-  option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
-    y: 55,
-    w: 18,
-    h: 11,
-    is_repeated: true,
-    widget_ui_data: {
-      view_layout: UI_TABLE
-    }
-  };
-  option (FluxMsgJsonQuery) = {
-    QueryName: "get_last_trade_with_symbol_n_start_n_end_time",
-    AggregateVarName: "get_last_trade_with_symbol_n_start_n_end_time",
-    QueryParams: "symbol",
-    QueryParams: "start_datetime",
-    QueryParams: "end_datetime",
-    QueryParamsDataType: "str",
-    QueryParamsDataType: "DateTime"
-    QueryParamsDataType: "DateTime"
-  };
-  option (FluxMsgUIGetAllLimit) = "-100";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
-
-  required int32 id = 1;
-  required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
-  required string time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
-  required float px = 4;
-  required int64 qty = 5;
-  optional float premium = 6;
-  optional string exchange = 7;
-  optional string special_conditions = 8;
-  optional bool past_limit = 9;
-  optional bool unreported = 10;
+  required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];
+  required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required string arrival_time = 4 [(FluxFldValIsDateTime) = true];
+  required float px = 5;
+  required int64 qty = 6;
+  optional float premium = 7;
   optional MarketTradeVolume market_trade_volume = 11;
 }
 
@@ -440,12 +390,15 @@ message LastNSecMarketTradeVol{
 
 message MarketDepth {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UpdateAggregate,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UpdateAggregate,
-    PatchDesc: AggregateType_UpdateAggregate,
-    DeleteDesc: AggregateType_UpdateAggregate,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -468,17 +421,18 @@ message MarketDepth {
   };
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
-  required string time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
-  required TickType side = 4;
-  optional float px = 5;
-  optional int64 qty = 6;
-  optional float premium = 7;
-  required int32 position = 8[(FluxFldPk) = "true"];
-  optional string market_maker = 9;
-  optional bool is_smart_depth = 10;
-  optional float cumulative_notional = 11 [(FluxFldDynamicAggUpdate)=true];
-  optional int64 cumulative_qty = 12 [(FluxFldDynamicAggUpdate)=true];
-  optional float cumulative_avg_px = 13 [(FluxFldDynamicAggUpdate)=true];
+  required string exch_time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  required string arrival_time = 4 [(FluxFldValIsDateTime) = true];
+  required TickType side = 5;
+  optional float px = 6;
+  optional int64 qty = 7;
+  optional float premium = 8;
+  required int32 position = 9 [(FluxFldPk) = "true"];
+  optional string market_maker = 10;
+  optional bool is_smart_depth = 11;
+  optional float cumulative_notional = 12 [(FluxFldDynamicAggUpdate)=true];
+  optional int64 cumulative_qty = 13 [(FluxFldDynamicAggUpdate)=true];
+  optional float cumulative_avg_px = 14 [(FluxFldDynamicAggUpdate)=true];
 }
 
 message MarketTradeVolume{
@@ -488,33 +442,33 @@ message MarketTradeVolume{
 }
 
 message RawMarketDepthHistory {
-  option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+  option (FluxMsgJsonRootTimeSeries) = {
+    MongoVersion: 5.0,
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED,
+    Granularity: Sec,
+    ExpireAfterSeconds: 5
   };
   required int32 id = 1;
-  required string symbol = 2 [(FluxFldIndex) = true];
-  required string time = 3 [(FluxFldValIsDateTime) = true];
-  required int32 position = 4;
-  required int32 operation = 5;
-  required TickType side = 6;
-  required float px = 7;
-  required int64 qty = 8;
-  optional string market_maker = 9;
-  optional bool is_smart_depth = 10;
+  required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true];
+  required string exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required string arrival_time = 4 [(FluxFldValIsDateTime) = true];
+  required int32 position = 5;
+  required int32 operation = 6;
+  required TickType side = 7;
+  required float px = 8;
+  required int64 qty = 9;
 }
 
 message UILayout{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
 
     //Server generated unique Id
@@ -531,12 +485,12 @@ message RollingMaxOrderCount{
 
 message PortfolioLimits{
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    PatchDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
 
   //Server generated unique Id
@@ -551,13 +505,15 @@ message PortfolioLimits{
   optional int64 eligible_brokers_update_count = 8;
 }
 
+// model to be deleted if/when Severity + InventoryCSVRequest is used anywhere else in md model (these are internal
+// app dependency - without this model these don't get generated)
 message Dummy {
   option (FluxMsgJsonRoot) = {
-    CreateDesc: AggregateType_UNSPECIFIED,
-    ReadDesc: AggregateType_UNSPECIFIED,
-    UpdateDesc: AggregateType_UNSPECIFIED,
-    DeleteDesc: AggregateType_UNSPECIFIED,
-    ReadWebSocketDesc: AggregateType_UNSPECIFIED
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -596,8 +552,4 @@ message LastTradeList {
 
 message DashList {
   repeated Dash dash = 1 [(FluxFldPk) = "true"];
-}
-
-message TimeSeriesLastTradeList {
-  repeated TimeSeriesLastTrade time_series_last_trade = 1 [(FluxFldPk) = "true"];
 }

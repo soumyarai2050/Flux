@@ -215,7 +215,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
         return output_str
 
     def handle_CRUD_for_message(self, message: protogen.Message) -> str:
-        option_value_dict = self.get_complex_option_set_values(message, SQLModelFastApiPlugin.flux_msg_json_root)
+        option_value_dict = self.get_complex_option_value_from_proto(message, SQLModelFastApiPlugin.flux_msg_json_root)
 
         crud_field_name_to_method_call_dict = {
             SQLModelFastApiPlugin.flux_json_root_create_field: self.handle_POST_gen,

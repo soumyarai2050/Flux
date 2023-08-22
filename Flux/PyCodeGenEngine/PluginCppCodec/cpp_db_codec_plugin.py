@@ -74,41 +74,41 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
         output_content += f"\t\t/**\n\t\t * Insert or update the {message_name_snake_cased} data\n\t\t*/\n"
         output_content += f"\t\tbool insert_or_update_{message_name_snake_cased}(const {package_name}::" \
-                          f"{message_name} &{message_name_snake_cased}_obj, int32_t &new_generated_id_out) "
+                          f"{message_name} &kr_{message_name_snake_cased}_obj, int32_t &new_generated_id_out) "
         output_content += "{\n\t\t\t"
-        output_content += (f'if (!{message_name_snake_cased}_obj.IsInitialized()) {{\n\t\t\t\tLOG_ERROR(logger_, '
-                           f'"Reuired fields is not initialized in TopOfBook obj: {{}}", {message_name_snake_cased}_obj.'
+        output_content += (f'if (!kr_{message_name_snake_cased}_obj.IsInitialized()) {{\n\t\t\t\tLOG_ERROR(logger_, '
+                           f'"Reuired fields is not initialized in TopOfBook obj: {{}}", kr_{message_name_snake_cased}_obj.'
                            f'DebugString());\n\t\t\t}} // else not required: code continues here for'
-                           f' cases where the {message_name_snake_cased}_obj is initialized and has all the required'
+                           f' cases where the kr_{message_name_snake_cased}_obj is initialized and has all the required'
                            f' fields\n\t\t\t')
         output_content += f"std::string {message_name_snake_cased}_key;\n"
         output_content += (f"\t\t\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_out("
-                           f"{message_name_snake_cased}_obj, {message_name_snake_cased}_key);\n")
+                           f"kr_{message_name_snake_cased}_obj, {message_name_snake_cased}_key);\n")
         output_content += (f"\t\t\tbool status = insert_or_update_{message_name_snake_cased}("
-                           f"{message_name_snake_cased}_obj, {message_name_snake_cased}_key, new_generated_id_out);\n")
+                           f"kr_{message_name_snake_cased}_obj, {message_name_snake_cased}_key, new_generated_id_out);\n")
         output_content += "\t\t\treturn status;\n"
         output_content += "\t\t}\n\n"
 
         output_content += (f"\t\tbool insert_or_update_{message_name_snake_cased}(const {package_name}::" \
-                          f"{message_name} &{message_name_snake_cased}_obj, std::string &{message_name_snake_cased}"
+                          f"{message_name} &kr_{message_name_snake_cased}_obj, std::string &{message_name_snake_cased}"
                            f"_key_in_n_out, int32_t &new_generated_id_out) {{\n")
         output_content += f"\t\t\tbool status = false;\n\t\t\t"
-        output_content += f"bsoncxx::builder::basic::document {message_name_snake_cased}_document"
+        output_content += f"bsoncxx::builder::basic::document r_{message_name_snake_cased}_document"
         output_content += "{};\n\t\t\t"
 
         output_content += f'\n\t\t\tauto found = {message_name_snake_cased}_key_to_db_id.find' \
                           f'({message_name_snake_cased}_key_in_n_out);\n\t\t\t'
         output_content += f'if (found == {message_name_snake_cased}_key_to_db_id.end()) '
         output_content += "{\n\t\t\t\t// Key does not exist, so it's a new object. Insert it into the database"
-        output_content += f"\n\t\t\t\tprepare_{message_name_snake_cased}_doc({message_name_snake_cased}_obj, " \
-                          f"{message_name_snake_cased}_document, IsUpdateOrPatch::DB_FALSE);\n"
-        output_content += f'\t\t\t\tstatus = insert_{message_name_snake_cased}({message_name_snake_cased}_document, ' \
+        output_content += f"\n\t\t\t\tprepare_{message_name_snake_cased}_doc(kr_{message_name_snake_cased}_obj, " \
+                          f"r_{message_name_snake_cased}_document, IsUpdateOrPatch::DB_FALSE);\n"
+        output_content += f'\t\t\t\tstatus = insert_{message_name_snake_cased}(r_{message_name_snake_cased}_document, ' \
                           f'{message_name_snake_cased}_key_in_n_out, new_generated_id_out);\n\t\t\t'
         output_content += '} else {\n\t\t\t\t// Key already exists, so update the existing object in the database'
-        output_content += f"\n\t\t\t\tprepare_{message_name_snake_cased}_doc({message_name_snake_cased}_obj, " \
-                          f"{message_name_snake_cased}_document, IsUpdateOrPatch::DB_TRUE);\n"
+        output_content += f"\n\t\t\t\tprepare_{message_name_snake_cased}_doc(kr_{message_name_snake_cased}_obj, " \
+                          f"r_{message_name_snake_cased}_document, IsUpdateOrPatch::DB_TRUE);\n"
         output_content += f"\t\t\t\tstatus = update_or_patch_{message_name_snake_cased}(found->second, " \
-                          f"{message_name_snake_cased}_document);\n\t\t\t"
+                          f"r_{message_name_snake_cased}_document);\n\t\t\t"
         output_content += "}\n\t\t\treturn status;\n\t\t}\n\n"
         return output_content
 
@@ -119,72 +119,72 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += (f"\t\t/**\n\t\t * Patch the {message_name_snake_cased} data (update specific document)"
                            f"\n\t\t*/\n")
         output_content += f"\t\tbool patch_{message_name_snake_cased}(const {package_name}::{message_name} " \
-                          f"&{message_name_snake_cased}_obj)"
+                          f"&kr_{message_name_snake_cased}_obj)"
         output_content += "{\n\t\t\t"
         output_content += "// Check if the object is initialized and has all the required fields\n\t\t\t"
-        output_content += (f'if (!{message_name_snake_cased}_obj.IsInitialized()) {{\n\t\t\t\tLOG_ERROR(logger_, '
-                           f'"Required fields is not initialized in TopOfBook obj: {{}}", {message_name_snake_cased}_obj.'
+        output_content += (f'if (!kr_{message_name_snake_cased}_obj.IsInitialized()) {{\n\t\t\t\tLOG_ERROR(logger_, '
+                           f'"Required fields is not initialized in TopOfBook obj: {{}}", kr_{message_name_snake_cased}_obj.'
                            f'DebugString());\n\t\t\t\treturn false;\n\t\t\t}} // else not required: code continues here for'
-                           f' cases where the {message_name_snake_cased}_obj is initialized and has all the required'
+                           f' cases where the kr_{message_name_snake_cased}_obj is initialized and has all the required'
                            f' fields\n\t\t\t')
         output_content += f"std::string {message_name_snake_cased}_key;\n"
         output_content += (f"\t\t\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_out("
-                           f"{message_name_snake_cased}_obj, {message_name_snake_cased}_key);\n")
-        output_content += (f"\t\t\tbool status = patch_{message_name_snake_cased}({message_name_snake_cased}_obj, "
+                           f"kr_{message_name_snake_cased}_obj, {message_name_snake_cased}_key);\n")
+        output_content += (f"\t\t\tbool status = patch_{message_name_snake_cased}(kr_{message_name_snake_cased}_obj, "
                            f"{message_name_snake_cased}_key);\n")
         output_content += "\t\t\treturn status;\n"
         output_content += "\t\t}\n\n"
 
         output_content += f"\t\tbool patch_{message_name_snake_cased}(const {package_name}::{message_name} " \
-                          f"&{message_name_snake_cased}_obj, std::string {message_name_snake_cased}_key_in_n_out)"
+                          f"&kr_{message_name_snake_cased}_obj, std::string {message_name_snake_cased}_key_in_n_out)"
         output_content += "{\n\t\t\t"
         output_content += "bool status = false;\n"
-        output_content += f"\t\t\tbsoncxx::builder::basic::document {message_name_snake_cased}_document{{}};\n"
+        output_content += f"\t\t\tbsoncxx::builder::basic::document r_{message_name_snake_cased}_document{{}};\n"
         output_content += f"\t\t\tif (!{message_name_snake_cased}_key_in_n_out.empty()) {{\n"
-        output_content += (f"\t\t\t\tprepare_{message_name_snake_cased}_doc({message_name_snake_cased}_obj, "
-                           f"{message_name_snake_cased}_document, IsUpdateOrPatch::DB_TRUE);\n")
+        output_content += (f"\t\t\t\tprepare_{message_name_snake_cased}_doc(kr_{message_name_snake_cased}_obj, "
+                           f"r_{message_name_snake_cased}_document, IsUpdateOrPatch::DB_TRUE);\n")
         output_content += (f"\t\t\t\tstatus = update_or_patch_{message_name_snake_cased}({message_name_snake_cased}"
                            f"_key_to_db_id.at({message_name_snake_cased}_key_in_n_out), "
-                           f"{message_name_snake_cased}_document);\n")
+                           f"r_{message_name_snake_cased}_document);\n")
         output_content += f"\t\t\t}} else {{\n"
         output_content += (f"\t\t\t\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_out("
-                           f"{message_name_snake_cased}_obj, {message_name_snake_cased}_key_in_n_out);\n")
+                           f"kr_{message_name_snake_cased}_obj, {message_name_snake_cased}_key_in_n_out);\n")
         output_content += (f"\t\t\t\tauto found = {message_name_snake_cased}_key_to_db_id.find("
                            f"{message_name_snake_cased}_key_in_n_out);\n")
         output_content += f"\t\t\t\tif (found != {message_name_snake_cased}_key_to_db_id.end()) {{\n"
-        output_content += (f"\t\t\t\t\tprepare_{message_name_snake_cased}_doc({message_name_snake_cased}_obj,"
-                           f" {message_name_snake_cased}_document, IsUpdateOrPatch::DB_TRUE);\n")
+        output_content += (f"\t\t\t\t\tprepare_{message_name_snake_cased}_doc(kr_{message_name_snake_cased}_obj,"
+                           f" r_{message_name_snake_cased}_document, IsUpdateOrPatch::DB_TRUE);\n")
         output_content += (f"\t\t\t\t\tstatus = update_or_patch_{message_name_snake_cased}(found->second, "
-                           f"{message_name_snake_cased}_document);\n")
+                           f"r_{message_name_snake_cased}_document);\n")
         output_content += "\t\t\t\t} else {\n"
         output_content += (f'\t\t\t\t\tLOG_ERROR(logger_, "patch_{message_name_snake_cased} failed - '
                            f'{message_name_snake_cased} key not found in {message_name_snake_cased}_key_to_db_id map;;; '
-                           f'{message_name_snake_cased}: {{}} map: {{}}", {message_name_snake_cased}_obj.DebugString'
+                           f'{message_name_snake_cased}: {{}} map: {{}}", kr_{message_name_snake_cased}_obj.DebugString'
                            f'(), {message_name}KeyToDbIdAsString());\n')
         output_content += "\t\t\t\t}\n\t\t\t}\n\t\t\treturn status;\n\t\t}\n\n"
 
         output_content += (f"\t\t/**\n\t\t * Patch the {message_name_snake_cased} data (update specific document)"
                            f" and retrieve the updated object\n\t\t*/\n")
         output_content += (f"\t\tbool patch_{message_name_snake_cased}(const {package_name}::{message_name} "
-                           f"&{message_name_snake_cased}_obj, {package_name}::{message_name} "
+                           f"&kr_{message_name_snake_cased}_obj, {package_name}::{message_name} "
                            f"&{message_name_snake_cased}_obj_out)")
         output_content += "{\n\t\t\t"
         output_content += "// Check if the object is initialized and has all the required fields\n\t\t\t"
-        output_content += (f'if (!{message_name_snake_cased}_obj.IsInitialized()) {{\n\t\t\t\tLOG_ERROR(logger_, '
-                           f'"Required fields is not initialized in TopOfBook obj: {{}}", {message_name_snake_cased}_obj.'
+        output_content += (f'if (!kr_{message_name_snake_cased}_obj.IsInitialized()) {{\n\t\t\t\tLOG_ERROR(logger_, '
+                           f'"Required fields is not initialized in TopOfBook obj: {{}}", kr_{message_name_snake_cased}_obj.'
                            f'DebugString());\n\t\t\t\treturn false;\n\t\t\t}} // else not required: code continues here for'
-                           f' cases where the {message_name_snake_cased}_obj is initialized and has all the required'
+                           f' cases where the kr_{message_name_snake_cased}_obj is initialized and has all the required'
                            f' fields\n\t\t\t')
         output_content += f"std::string {message_name_snake_cased}_key;\n"
         output_content += (f"\t\t\t{class_name}KeyHandler::get_{message_name_snake_cased}_key_out("
-                           f"{message_name_snake_cased}_obj, {message_name_snake_cased}_key);\n")
-        output_content += (f"\t\t\tbool status = patch_{message_name_snake_cased}({message_name_snake_cased}_obj, "
+                           f"kr_{message_name_snake_cased}_obj, {message_name_snake_cased}_key);\n")
+        output_content += (f"\t\t\tbool status = patch_{message_name_snake_cased}(kr_{message_name_snake_cased}_obj, "
                            f"{message_name_snake_cased}_obj_out, {message_name_snake_cased}_key);\n")
         output_content += "\t\t\treturn status;\n"
         output_content += "\t\t}\n\n"
 
         output_content += (f"\t\tbool patch_{message_name_snake_cased}(const {package_name}::{message_name} "
-                           f"&{message_name_snake_cased}_obj, {package_name}::{message_name} "
+                           f"&kr_{message_name_snake_cased}_obj, {package_name}::{message_name} "
                            f"&{message_name_snake_cased}_obj_out, std::string &{message_name_snake_cased}"
                            f"_key_in_n_out)")
         output_content += " {\n"
@@ -208,12 +208,12 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
         output_content += f"\t\tbool update_or_patch_{message_name_snake_cased}(const int32_t " \
                           f"&{message_name_snake_cased}_id, const bsoncxx::builder::basic::document " \
-                          f"&{message_name_snake_cased}_document)"
+                          f"&r_{message_name_snake_cased}_document)"
         output_content += "{\n\t\t\t"
         output_content += f'auto update_filter = {package_name}_handler::make_document({package_name}' \
                           f'_handler::kvp("_id", {message_name_snake_cased}_id));\n\t\t\t'
         output_content += f'auto update_document = {package_name}_handler::make_document({package_name}' \
-                          f'_handler::kvp("$set", {message_name_snake_cased}_document.view()));\n\t\t\t'
+                          f'_handler::kvp("$set", r_{message_name_snake_cased}_document.view()));\n\t\t\t'
         output_content += f'auto result = {message_name_snake_cased}_collection.update_one(update_filter.view(), ' \
                           f'update_document.view());\n\t\t'
         output_content += "\tif (result->modified_count() > 0) {\n"
@@ -223,13 +223,13 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "\t\t}\n\n"
 
         output_content += f"\t\tbool insert_{message_name_snake_cased} (bsoncxx::builder::basic::document " \
-                          f"&{message_name_snake_cased}_document, const std::string &{message_name_snake_cased}_key, " \
+                          f"&r_{message_name_snake_cased}_document, const std::string &{message_name_snake_cased}_key, " \
                           f"int32_t &new_generated_id_out) "
         output_content += "{\n\t\t\t"
         output_content += f"new_generated_id_out = get_next_{message_name_snake_cased}_insert_id();\n"
-        output_content += f"\t\t\tupdate_id_in_document({message_name_snake_cased}_document, new_generated_id_out);\n"
+        output_content += f"\t\t\tupdate_id_in_document(r_{message_name_snake_cased}_document, new_generated_id_out);\n"
         output_content += f"\t\t\tauto {message_name_snake_cased}_insert_result = {message_name_snake_cased}" \
-                          f"_collection.insert_one({message_name_snake_cased}_document.view());\n\t\t\t"
+                          f"_collection.insert_one(r_{message_name_snake_cased}_document.view());\n\t\t\t"
         output_content += f"auto {message_name_snake_cased}_inserted_id = {message_name_snake_cased}" \
                           f"_insert_result->inserted_id().get_int32().value;\n"
         output_content += f"\t\t\tassert({message_name_snake_cased}_inserted_id == new_generated_id_out);\n\n"
@@ -336,30 +336,30 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content: str = ""
 
         output_content += f"\n\n\t\tbool bulk_insert_{message_name_snake_cased} (const {package_name}::" \
-                          f"{message_name}List &{message_name_snake_cased}_list_obj, const std::vector <std::string>" \
+                          f"{message_name}List &r_{message_name_snake_cased}_list_obj, const std::vector <std::string>" \
                           f" &{message_name_snake_cased}_key_list, std::vector<int32_t> &new_generated_id_list_out) {{\n"
 
-        output_content += f"\t\t\tstd::vector<bsoncxx::builder::basic::document> {message_name_snake_cased}_document_list;\n"
-        output_content += (f"\t\t\t{message_name_snake_cased}_document_list.reserve({message_name_snake_cased}_list_obj"
+        output_content += f"\t\t\tstd::vector<bsoncxx::builder::basic::document> r_{message_name_snake_cased}_document_list;\n"
+        output_content += (f"\t\t\tr_{message_name_snake_cased}_document_list.reserve(r_{message_name_snake_cased}_list_obj"
                            f".{message_name_snake_cased}_size());\n")
 
-        output_content += f"\t\t\tnew_generated_id_list_out.reserve({message_name_snake_cased}_list_obj." \
+        output_content += f"\t\t\tnew_generated_id_list_out.reserve(r_{message_name_snake_cased}_list_obj." \
                           f"{message_name_snake_cased}_size());\n"
 
-        output_content += f"\t\t\tprepare_{message_name_snake_cased}_list_doc({message_name_snake_cased}_list_obj, " \
-                          f"{message_name_snake_cased}_document_list, IsUpdateOrPatch::DB_FALSE);\n"
+        output_content += f"\t\t\tprepare_{message_name_snake_cased}_list_doc(r_{message_name_snake_cased}_list_obj, " \
+                          f"r_{message_name_snake_cased}_document_list, IsUpdateOrPatch::DB_FALSE);\n"
 
-        output_content += f"\t\t\tfor (int i = 0; i < {message_name_snake_cased}_document_list.size(); ++i) {{\n"
+        output_content += f"\t\t\tfor (int i = 0; i < r_{message_name_snake_cased}_document_list.size(); ++i) {{\n"
         output_content += f"\t\t\t\tnew_generated_id_list_out.emplace_back(std::move(get_next_{message_name_snake_cased}" \
                           "_insert_id()));\n"
-        output_content += f"\t\t\t\tupdate_id_in_document({message_name_snake_cased}_document_list[i], " \
+        output_content += f"\t\t\t\tupdate_id_in_document(r_{message_name_snake_cased}_document_list[i], " \
                           f"new_generated_id_list_out[i]);\n"
         output_content += "\t\t\t}\n"
 
         output_content += f"\t\t\tauto {message_name_snake_cased}_insert_results = {message_name_snake_cased}_" \
-                          f"collection.insert_many({message_name_snake_cased}_document_list);\n"
+                          f"collection.insert_many(r_{message_name_snake_cased}_document_list);\n"
 
-        output_content += f"\t\t\tfor (int i = 0; i < {message_name_snake_cased}_document_list.size(); ++i) {{\n"
+        output_content += f"\t\t\tfor (int i = 0; i < r_{message_name_snake_cased}_document_list.size(); ++i) {{\n"
         output_content += f"\t\t\t\tauto {message_name_snake_cased}_inserted_id = {message_name_snake_cased}" \
                           f"_insert_results->inserted_ids().at(i).get_int32().value;\n"
         output_content += f"\t\t\t\tassert(new_generated_id_list_out[i] == {message_name_snake_cased}_inserted_id);\n"
@@ -368,7 +368,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f'\t\t\t}}\n\n'
 
         output_content += (f"\t\t\tif ({message_name_snake_cased}_insert_results->inserted_count() == "
-                           f"{message_name_snake_cased}_document_list.size()) {{\n")
+                           f"r_{message_name_snake_cased}_document_list.size()) {{\n")
         output_content += "\t\t\t\treturn true;\n\t\t\t} else {\n"
         output_content += "\t\t\t\treturn false;\n\t\t\t}\n"
         output_content += "\t\t}\n\n"
@@ -376,30 +376,30 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += (f"\t\t/**\n\t\t * Bulk patch the {message_name_snake_cased} data (update specific document)"
                            f"\n\t\t*/\n")
         output_content += f"\t\tbool bulk_patch_{message_name_snake_cased}(const {package_name}::{message_name}List " \
-                          f"&{message_name_snake_cased}_list_obj){{\n"
-        output_content += f"\t\t\tauto size = {message_name_snake_cased}_list_obj.{message_name_snake_cased}_size();\n"
+                          f"&r_{message_name_snake_cased}_list_obj){{\n"
+        output_content += f"\t\t\tauto size = r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_size();\n"
         output_content += f'\t\t\tstd::vector< bsoncxx::builder::basic::document > {message_name_snake_cased}' \
                           f'_document_list;\n'
-        output_content += f"\t\t\t{message_name_snake_cased}_document_list.reserve(size);\n"
+        output_content += f"\t\t\tr_{message_name_snake_cased}_document_list.reserve(size);\n"
         output_content += f"\t\t\tstd::vector< std::string > {message_name_snake_cased}_key_list;\n"
         output_content += f"\t\t\t{message_name_snake_cased}_key_list.reserve(size);\n"
         output_content += f'\t\t\tMarketDataKeyHandler::get_{message_name_snake_cased}_key_list(' \
-                          f'{message_name_snake_cased}_list_obj, {message_name_snake_cased}_key_list);\n'
+                          f'r_{message_name_snake_cased}_list_obj, {message_name_snake_cased}_key_list);\n'
         output_content += f'\t\t\tstd::vector<int32_t> {message_name_snake_cased}_ids;\n'
         output_content += f'\t\t\t{message_name_snake_cased}_ids.reserve(size);\n\n'
 
-        output_content += f'\t\t\tfor (int i = 0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
+        output_content += f'\t\t\tfor (int i = 0; i < r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
                           f'_size(); ++i) {{\n'
-        output_content += f'\t\t\t\tif (!{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).' \
+        output_content += f'\t\t\t\tif (!r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).' \
                           f'IsInitialized()) {{\n'
         output_content += (f'\t\t\t\t\tcontinue;\n\t\t\t\t}} // else not required: code continues here for cases where '
-                           f'the {message_name_snake_cased}_obj is initialized and has all the required fields\n\n')
+                           f'the kr_{message_name_snake_cased}_obj is initialized and has all the required fields\n\n')
         output_content += f'\t\t\t\tauto found = {message_name_snake_cased}_key_to_db_id.find(' \
                           f'{message_name_snake_cased}_key_list[i]);\n'
         output_content += f'\t\t\t\tif (found == {message_name_snake_cased}_key_to_db_id.end()) {{\n'
         output_content += (f'\t\t\t\t\tconst std::string error = "bulk_patch_{message_name_snake_cased} failed - '
                            f'{message_name_snake_cased} key not found in {message_name_snake_cased}_key_to_db_id '
-                           f'map;;; {message_name_snake_cased}_list_obj: " + {message_name_snake_cased}_list_obj'
+                           f'map;;; r_{message_name_snake_cased}_list_obj: " + r_{message_name_snake_cased}_list_obj'
                            f'.DebugString() + "map: " + {message_name}KeyToDbIdAsString();\n')
         output_content += f'\t\t\t\t\tthrow std::runtime_error(error);\n'
         output_content += f'\t\t\t\t}} else {{\n'
@@ -407,31 +407,31 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                            f'_key_to_db_id.at({message_name_snake_cased}_key_list[i])));\n')
         output_content += "\t\t\t\t}\n"
         output_content += "\t\t\t}\n"
-        output_content += f'\t\t\tprepare_{message_name_snake_cased}_list_doc({message_name_snake_cased}_list_obj,' \
-                          f' {message_name_snake_cased}_document_list, IsUpdateOrPatch::DB_TRUE);\n'
+        output_content += f'\t\t\tprepare_{message_name_snake_cased}_list_doc(r_{message_name_snake_cased}_list_obj,' \
+                          f' r_{message_name_snake_cased}_document_list, IsUpdateOrPatch::DB_TRUE);\n'
         output_content += f"\t\t\tbool status = bulk_update_or_patch_{message_name_snake_cased}_collection(" \
-                          f"{message_name_snake_cased}_ids, {message_name_snake_cased}_document_list);\n"
+                          f"{message_name_snake_cased}_ids, r_{message_name_snake_cased}_document_list);\n"
         output_content += "\t\t\treturn status;\n"
         output_content += "\t\t}\n\n"
 
         output_content += (f"\t\t/**\n\t\t * Bulk patch the {message_name_snake_cased} data (update specific document)"
                            f" and retrieve the updated object\n\t\t*/\n")
         output_content += f"\t\tbool bulk_patch_{message_name_snake_cased}(const {package_name}::{message_name}List " \
-                          f"&{message_name_snake_cased}_list_obj, {package_name}::{message_name}List " \
+                          f"&r_{message_name_snake_cased}_list_obj, {package_name}::{message_name}List " \
                           f"&{message_name_snake_cased}_list_obj_out){{\n"
-        output_content += f"\t\t\tauto size = {message_name_snake_cased}_list_obj.{message_name_snake_cased}_size();\n"
+        output_content += f"\t\t\tauto size = r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_size();\n"
         output_content += f'\t\t\tstd::vector< bsoncxx::builder::basic::document > {message_name_snake_cased}' \
                           f'_document_list;\n'
-        output_content += f"\t\t\t{message_name_snake_cased}_document_list.reserve(size);\n"
+        output_content += f"\t\t\tr_{message_name_snake_cased}_document_list.reserve(size);\n"
         output_content += f"\t\t\tstd::vector< std::string > {message_name_snake_cased}_key_list;\n"
         output_content += f"\t\t\t{message_name_snake_cased}_key_list.reserve(size);\n"
         output_content += f'\t\t\tMarketDataKeyHandler::get_{message_name_snake_cased}_key_list(' \
-                          f'{message_name_snake_cased}_list_obj, {message_name_snake_cased}_key_list);\n'
+                          f'r_{message_name_snake_cased}_list_obj, {message_name_snake_cased}_key_list);\n'
         output_content += f'\t\t\tstd::vector<int32_t> {message_name_snake_cased}_ids;\n'
         output_content += f"\t\t\t{message_name_snake_cased}_ids.reserve(size);\n\n"
-        output_content += f'\t\t\tfor (int i = 0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
+        output_content += f'\t\t\tfor (int i = 0; i < r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
                           f'_size(); ++i) {{\n'
-        output_content += f'\t\t\t\tif (!{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).' \
+        output_content += f'\t\t\t\tif (!r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).' \
                           f'IsInitialized()) \n'
         output_content += f'\t\t\t\t\tcontinue;\n\n'
         output_content += f'\t\t\t\tauto found = {message_name_snake_cased}_key_to_db_id.find(' \
@@ -439,7 +439,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f'\t\t\t\tif (found == {message_name_snake_cased}_key_to_db_id.end()) {{\n'
         output_content += (f'\t\t\t\t\tconst std::string error = "bulk_patch_{message_name_snake_cased} failed -'
                            f' {message_name_snake_cased} key not found in {message_name_snake_cased}_key_to_db_id '
-                           f'map;;; {message_name_snake_cased}_list_obj: " + {message_name_snake_cased}_list_obj.'
+                           f'map;;; r_{message_name_snake_cased}_list_obj: " + r_{message_name_snake_cased}_list_obj.'
                            f'DebugString() + "map: " + {message_name}KeyToDbIdAsString();\n')
         output_content += f'\t\t\t\t\tthrow std::runtime_error(error);\n'
         output_content += f'\t\t\t\t}} else {{\n'
@@ -447,10 +447,10 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                            f'_key_to_db_id.at({message_name_snake_cased}_key_list[i])));\n')
         output_content += "\t\t\t\t}"
         output_content += "\n\t\t\t}\n"
-        output_content += f'\t\t\tprepare_{message_name_snake_cased}_list_doc({message_name_snake_cased}_list_obj,' \
-                          f' {message_name_snake_cased}_document_list, IsUpdateOrPatch::DB_TRUE);\n'
+        output_content += f'\t\t\tprepare_{message_name_snake_cased}_list_doc(r_{message_name_snake_cased}_list_obj,' \
+                          f' r_{message_name_snake_cased}_document_list, IsUpdateOrPatch::DB_TRUE);\n'
         output_content += f"\t\t\tbool status = bulk_update_or_patch_{message_name_snake_cased}_collection(" \
-                          f"{message_name_snake_cased}_ids, {message_name_snake_cased}_document_list);\n"
+                          f"{message_name_snake_cased}_ids, r_{message_name_snake_cased}_document_list);\n"
         output_content += f"\t\t\tif (status) {{\n"
         output_content += (f"\t\t\t\tget_all_data_from_{message_name_snake_cased}_collection(" \
                           f"{message_name_snake_cased}_list_obj_out);\n\t\t\t}} // else not required: Retrieve updated data"
@@ -467,7 +467,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += f'\t\t\t\tauto update_filter = {package_name}_handler::make_document({package_name}' \
                           f'_handler::kvp("_id", {message_name_snake_cased}_ids[i]));\n'
         output_content += f'\t\t\t\tauto update_document = {package_name}_handler::make_document({package_name}' \
-                          f'_handler::kvp("$set", {message_name_snake_cased}_document_list[i]));\n'
+                          f'_handler::kvp("$set", r_{message_name_snake_cased}_document_list[i]));\n'
         output_content += '\t\t\t\tmongocxx::model::update_one updateOne(update_filter.view(), ' \
                           'update_document.view());\n'
         output_content += "\t\t\t\tupdateOne.upsert(false);\n"
@@ -496,16 +496,16 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         parent_field = field.proto.name
 
         if parent_field != field_name:
-            output += f'\t\t\tif ({message_name_snake_cased}_obj.{parent_field}().{field_name}_size() > 0) {{\n'
+            output += f'\t\t\tif (kr_{message_name_snake_cased}_obj.{parent_field}().{field_name}_size() > 0) {{\n'
             output += f'\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n'
-            output += f'\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_obj.{parent_field}().' \
+            output += f'\t\t\t\tfor (const auto& {field_name}_doc : kr_{message_name_snake_cased}_obj.{parent_field}().' \
                       f'{field_name}()) {{\n'
             output += f'\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
         else:
             if initial_parent == parent_field and parent_field == field_name:
-                output += f'\t\tif ({message_name_snake_cased}_obj.{parent_field}_size() > 0) {{\n'
+                output += f'\t\tif (kr_{message_name_snake_cased}_obj.{parent_field}_size() > 0) {{\n'
                 output += f'\t\t\tbsoncxx::builder::basic::array {parent_field}_list;\n'
-                output += f'\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_obj.{parent_field}()) {{\n'
+                output += f'\t\t\tfor (const auto& {field_name}_doc : kr_{message_name_snake_cased}_obj.{parent_field}()) {{\n'
                 output += f'\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
             else:
                 output += "\t"*num_of_tabs + f'if ({initial_parent}_doc.{parent_field}_size() > 0) {{\n'
@@ -614,7 +614,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         else:
             if initial_parent == parent_field and parent_field == field_name:
                 output += f'\t\t\t\t{parent_field}_list.append({parent_field}_document);\n'
-                output += f'\t\t\t}}\n\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp' \
+                output += f'\t\t\t}}\n\t\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::kvp' \
                           f'({package_name}_handler::{parent_field}_fld_name, {parent_field}_list));\n'
                 output += "\t\t}\n"
             else:
@@ -638,18 +638,18 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         parent_field = field.proto.name
 
         if parent_field != field_name:
-            output += f'\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
+            output += f'\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
                       f'().{field_name}_size() > 0) {{\n'
             output += f'\t\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n'
-            output += f'\t\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_list_obj.' \
+            output += f'\t\t\t\t\tfor (const auto& {field_name}_doc : r_{message_name_snake_cased}_list_obj.' \
                       f'{message_name_snake_cased}(i).{parent_field}().{field_name}()) {{\n'
             output += f'\t\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
         else:
             if initial_parent == parent_field and parent_field == field_name:
-                output += f'\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
+                output += f'\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{parent_field}' \
                           f'_size() > 0) {{\n'
                 output += f'\t\t\t\tbsoncxx::builder::basic::array {parent_field}_list;\n'
-                output += f'\t\t\t\tfor (const auto& {field_name}_doc : {message_name_snake_cased}_list_obj.' \
+                output += f'\t\t\t\tfor (const auto& {field_name}_doc : r_{message_name_snake_cased}_list_obj.' \
                           f'{message_name_snake_cased}(i).{parent_field}()) {{\n'
                 output += f'\t\t\t\t\tbsoncxx::builder::basic::document {field_name}_document;\n'
             else:
@@ -757,7 +757,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         else:
             if initial_parent == parent_field and parent_field == field_name:
                 output += f'\t\t\t\t\t{parent_field}_list.append({parent_field}_document);\n'
-                output += f'\t\t\t\t}}\n\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp' \
+                output += f'\t\t\t\t}}\n\t\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::kvp' \
                           f'({package_name}_handler::{parent_field}_fld_name, {parent_field}_list));\n'
                 output += "\t\t\t}\n"
             else:
@@ -786,45 +786,45 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     if field_name != parent_feild and initial_parent_field != parent_feild:
                         if field_type == "required":
                             output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.' \
+                                      f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.' \
                                       f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                         else:
-                            output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
+                            output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
                                       f"{parent_feild}().{field_name}().has_{message_field_name}())\n"
                             output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.' \
+                                      f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.' \
                                       f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                     else:
                         if field_type == "required":
                             output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.' \
+                                      f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.' \
                                       f'{initial_parent_field}().{field_name}().{message_field_name}()));\n'
                         else:
-                            output += f"\t\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
+                            output += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
                                       f"{field_name}().has_{message_field_name}())\n"
                             output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.' \
+                                      f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.' \
                                       f'{initial_parent_field}().{field_name}().{message_field_name}()));\n'
                 else:
                     if field_type == "required":
                         output += f'\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                  f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.{field_name}' \
+                                  f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.{field_name}' \
                                   f'().{message_field_name}()));\n'
                     else:
-                        output += f"\t\t\tif ({message_name_snake_cased}_obj.{field_name}().has_{message_field_name}())\n"
+                        output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}().has_{message_field_name}())\n"
                         output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                  f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_obj.{field_name}' \
+                                  f'_handler::{message_field_name}_fld_name, kr_{message_name_snake_cased}_obj.{field_name}' \
                                   f'().{message_field_name}()));\n'
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field:
-                    output += f"\t\t\tif ({message_name_snake_cased}_obj.{initial_parent_field}()." \
+                    output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{initial_parent_field}()." \
                               f"{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
                     output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += self.generate_nested_fields(message_field.message, message_field_name,
                                                           message_name_snake_cased, package_name, field, field_name)
                 else:
-                    output += f"\t\t\tif ({message_name_snake_cased}_obj.{field_name}().has_{message_field_name}()) "
+                    output += f"\t\t\tif (kr_{message_name_snake_cased}_obj.{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
                     output += f"\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += self.generate_nested_fields(message_field.message, message_field_name,
@@ -852,51 +852,51 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     if field_name != parent_feild and initial_parent_field != parent_feild:
                         if field_type == "required":
                             output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.' \
+                                      f'_handler::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.' \
                                       f'{message_name_snake_cased}(i).' \
                                       f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                         else:
-                            output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                            output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                       f"{initial_parent_field}().{parent_feild}().{field_name}()." \
                                       f"has_{message_field_name}())\n"
                             output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.' \
+                                      f'_handler::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.' \
                                       f'{message_name_snake_cased}(i).' \
                                       f'{initial_parent_field}().{parent_feild}().{field_name}().{message_field_name}()));\n'
                     else:
                         if field_type == "required":
                             output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.' \
+                                      f'_handler::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.' \
                                       f'{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().' \
                                       f'{message_field_name}()));\n'
                         else:
-                            output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                            output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                       f"{initial_parent_field}().{field_name}().has_{message_field_name}())\n"
                             output += f'\t\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}' \
-                                      f'_handler::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.' \
+                                      f'_handler::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.' \
                                       f'{message_name_snake_cased}(i).{initial_parent_field}().{field_name}().' \
                                       f'{message_field_name}()));\n'
                 else:
                     if field_type == "required":
                         output += f'\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler' \
-                                  f'::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
+                                  f'::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
                                   f'(i).{field_name}().{message_field_name}()));\n'
                     else:
-                        output += f"\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                        output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                   f"{field_name}().has_{message_field_name}())\n"
                         output += f'\t\t\t\t\t{field_name}_doc.append({package_name}_handler::kvp({package_name}_handler' \
-                                  f'::{message_field_name}_fld_name, {message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
+                                  f'::{message_field_name}_fld_name, r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}' \
                                   f'(i).{field_name}().{message_field_name}()));\n'
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field:
-                    output += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                    output += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                               f"{initial_parent_field}().{field_name}().has_{message_field_name}()) "
                     output += f"{{\n"
                     output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
                     output += self.generate_msg_nested_fields(message_field.message, message_field_name,
                                                               message_name_snake_cased, package_name, field, field_name)
                 else:
-                    output += f"\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}()" \
+                    output += f"\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i).{field_name}()" \
                               f".has_{message_field_name}()) "
                     output += f"{{\n"
                     output += f"\t\t\t\t\tbsoncxx::builder::basic::document {message_field_name}_doc;\n"
@@ -915,8 +915,8 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content: str = ""
         # output_content += f"\tprotected:\n\n"
         output_content += f"\tvoid prepare_doc(const {package_name}::{message_name} " \
-                          f"&{message_name_snake_cased}_obj, bsoncxx::builder::basic::document " \
-                          f"&{message_name_snake_cased}_document) "
+                          f"&kr_{message_name_snake_cased}_obj, bsoncxx::builder::basic::document " \
+                          f"&r_{message_name_snake_cased}_document) "
         output_content += " {\n"
 
         for field in message.fields:
@@ -929,47 +929,47 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 if field_type != "repeated":
                     if field_name != "id":
                         if field_type == "required":
-                            output_content += (f"\t\t{message_name_snake_cased}_document.append({package_name}"
+                            output_content += (f"\t\tr_{message_name_snake_cased}_document.append({package_name}"
                                                f"_handler::kvp({package_name}_handler::{field_name}_fld_name, "
-                                               f"{message_name_snake_cased}_obj.{field_name}()));\n")
+                                               f"kr_{message_name_snake_cased}_obj.{field_name}()));\n")
                         else:
-                            output_content += f"\t\tif ({message_name_snake_cased}_obj.has_{field_name}())\n"
-                            output_content += f"\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
+                            output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}())\n"
+                            output_content += f"\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                              f"{message_name_snake_cased}_obj.{field_name}()));\n"
+                                              f"kr_{message_name_snake_cased}_obj.{field_name}()));\n"
                     # else:
                     #     if field_type == "required":
                     #         output_content += "\t\t\tif (IsUpdateOrPatch::DB_FALSE == is_update_or_patch) {\n"
-                    #         output_content += f'\t\t\t\t{message_name_snake_cased}_document.append(' \
+                    #         output_content += f'\t\t\t\tr_{message_name_snake_cased}_document.append(' \
                     #                           f'{package_name}_handler::kvp("_id", {message_name_snake_cased}' \
                     #                           f'_obj.{field_name}()));\n'
                     #     else:
                     #         output_content += "\t\t\tif (IsUpdateOrPatch::DB_FALSE == update_or_patch) {\n"
-                    #         output_content += f"\t\t\t\tif ({message_name_snake_cased}_obj.has_{field_name}())\n"
-                    #         output_content += f'\t\t\t\t\t{message_name_snake_cased}_document.append(' \
+                    #         output_content += f"\t\t\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}())\n"
+                    #         output_content += f'\t\t\t\t\tr_{message_name_snake_cased}_document.append(' \
                     #                           f'{package_name}_handler::kvp("_id", {message_name_snake_cased}' \
                     #                           f'_obj.{field_name}()));\n'
                     #     output_content += "\t\t\t}\n"
                 else:
-                    output_content += f"\t\tif ({message_name_snake_cased}_obj.{field_name}_size() > 0)\n"
+                    output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.{field_name}_size() > 0)\n"
                     output_content += f"\t\t{{\n"
                     output_content += f"\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n"
-                    output_content += f"\t\t\tfor (int i = 0; i < {message_name_snake_cased}_obj.{field_name}_size(); ++i)\n"
-                    output_content += f"\t\t\t\t{field_name}_list.append({message_name_snake_cased}_obj.{field_name}(i));\n"
-                    output_content += f"\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp" \
+                    output_content += f"\t\t\tfor (int i = 0; i < kr_{message_name_snake_cased}_obj.{field_name}_size(); ++i)\n"
+                    output_content += f"\t\t\t\t{field_name}_list.append(kr_{message_name_snake_cased}_obj.{field_name}(i));\n"
+                    output_content += f"\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::kvp" \
                                       f"({package_name}_handler::{field_name}_fld_name, {field_name}_doc_array));\n"
                     output_content += f"\t\t}}\n"
 
             else:
                 if field_type != "repeated":
-                    output_content += f"\t\tif ({message_name_snake_cased}_obj.has_{field_name}())"
+                    output_content += f"\t\tif (kr_{message_name_snake_cased}_obj.has_{field_name}())"
                     output_content += f" {{\n"
                     output_content += f"\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
                     # print(f".............{field.proto.name}...............")
                     output_content += self.generate_nested_fields(field_type_message, field_name,
                                                                   message_name_snake_cased, package_name, field,
                                                                   field_name)
-                    output_content += f"\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp(" \
+                    output_content += f"\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::kvp(" \
                                       f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
                     output_content += f"\t\t}}\n"
 
@@ -984,12 +984,12 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
         output_content: str = ""
         output_content += f"\tvoid prepare_list_doc(const {package_name}::{message_name}List " \
-                          f"&{message_name_snake_cased}_list_obj, std::vector<bsoncxx::builder::basic::document> " \
-                          f"&{message_name_snake_cased}_document_list) "
+                          f"&r_{message_name_snake_cased}_list_obj, std::vector<bsoncxx::builder::basic::document> " \
+                          f"&r_{message_name_snake_cased}_document_list) "
         output_content += " {\n"
-        output_content += f"\t\tfor (int i =0; i < {message_name_snake_cased}_list_obj.{message_name_snake_cased}_size(); " \
+        output_content += f"\t\tfor (int i =0; i < r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}_size(); " \
                           f"++i) {{\n"
-        output_content += f"\t\t\tbsoncxx::builder::basic::document {message_name_snake_cased}_document;\n"
+        output_content += f"\t\t\tbsoncxx::builder::basic::document r_{message_name_snake_cased}_document;\n"
 
         for field in message.fields:
             field_name = field.proto.name
@@ -1000,47 +1000,47 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 if field_type != "repeated":
                     if field_name != "id":
                         if field_type == "required":
-                            output_content += f"\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
+                            output_content += f"\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                              f"{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                                              f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                               f"{field_name}()));\n"
                         else:
-                            output_content += f"\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                            output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                               f"has_{field_name}())\n"
-                            output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::" \
+                            output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::" \
                                               f"kvp({package_name}_handler::{field_name}_fld_name, " \
-                                              f"{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                                              f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                               f"{field_name}()));\n"
                     # else:
                     #     if field_type == "required":
                     #         output_content += "\t\t\t\tif (IsUpdateOrPatch::DB_FALSE == is_update_or_patch) {\n"
-                    #         output_content += f'\t\t\t\t\t{message_name_snake_cased}_document.append(' \
-                    #                           f'{package_name}_handler::kvp("_id", {message_name_snake_cased}_list_obj.' \
+                    #         output_content += f'\t\t\t\t\tr_{message_name_snake_cased}_document.append(' \
+                    #                           f'{package_name}_handler::kvp("_id", r_{message_name_snake_cased}_list_obj.' \
                     #                           f'{message_name_snake_cased}(i).{field_name}()));\n'
                     #     else:
                     #         output_content += "\t\t\t\tif (IsUpdateOrPatch::DB_FALSE == update_or_patch) {\n"
-                    #         output_content += f"\t\t\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                    #         output_content += f"\t\t\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                     #                           f"has_{field_name}())\n"
-                    #         output_content += f'\t\t\t\t\t{message_name_snake_cased}_document.append(' \
-                    #                           f'{package_name}_handler::kvp("_id", {message_name_snake_cased}_list_obj.' \
+                    #         output_content += f'\t\t\t\t\tr_{message_name_snake_cased}_document.append(' \
+                    #                           f'{package_name}_handler::kvp("_id", r_{message_name_snake_cased}_list_obj.' \
                     #                           f'{message_name_snake_cased}(i).{field_name}()));\n'
                     #     output_content += "\t\t\t\t}\n"
                 else:
-                    output_content += f"\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                    output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                       f"{field_name}_size() > 0)\n"
                     output_content += f"\t\t\t{{\n"
                     output_content += f"\t\t\t\tbsoncxx::builder::basic::array {field_name}_list;\n"
-                    output_content += f"\t\t\t\tfor (int i = 0; i < {message_name_snake_cased}_list_obj." \
+                    output_content += f"\t\t\t\tfor (int i = 0; i < r_{message_name_snake_cased}_list_obj." \
                                       f"{message_name_snake_cased}(i).{field_name}_size(); ++i)\n"
-                    output_content += f"\t\t\t\t\t{field_name}_list.append({message_name_snake_cased}_list_obj." \
+                    output_content += f"\t\t\t\t\t{field_name}_list.append(r_{message_name_snake_cased}_list_obj." \
                                       f"{message_name_snake_cased}(i).{field_name}(i));\n"
-                    output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp" \
+                    output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::kvp" \
                                       f"({package_name}_handler::{field_name}_fld_name, {field_name}_doc_array));\n"
                     output_content += f"\t\t\t}}\n"
 
             else:
                 if field_type != "repeated":
-                    output_content += f"\t\t\tif ({message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
+                    output_content += f"\t\t\tif (r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                       f"has_{field_name}())"
                     output_content += f" {{\n"
                     output_content += f"\t\t\t\tbsoncxx::builder::basic::document {field_name}_doc;\n"
@@ -1048,7 +1048,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                     output_content += self.generate_msg_nested_fields(field_type_message, field_name,
                                                                       message_name_snake_cased, package_name, field,
                                                                       field_name)
-                    output_content += f"\t\t\t\t{message_name_snake_cased}_document.append({package_name}_handler::kvp(" \
+                    output_content += f"\t\t\t\tr_{message_name_snake_cased}_document.append({package_name}_handler::kvp(" \
                                       f"{package_name}_handler::{field_name}_fld_name, {field_name}_doc));\n"
                     output_content += f"\t\t\t}}\n"
 
@@ -1087,8 +1087,8 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         output_content += "\t\t\t}\n\t\t}\n\n"
 
         output_content += f"\t\tstatic void update_id_in_document(bsoncxx::builder::basic::document " \
-                          f"&{message_name_snake_cased}_document, const int32_t new_generated_id) {{\n"
-        output_content += f'\t\t\t{message_name_snake_cased}_document.append(kvp("_id", new_generated_id));\n'
+                          f"&r_{message_name_snake_cased}_document, const int32_t new_generated_id) {{\n"
+        output_content += f'\t\t\tr_{message_name_snake_cased}_document.append(kvp("_id", new_generated_id));\n'
         output_content += "\t\t}\n\n"
 
         return output_content
@@ -1105,9 +1105,9 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         class_name = ''.join(word.capitalize() for word in class_name_list)
         class_name_snake_cased: str = convert_camel_case_to_specific_case(class_name)
 
-        output_content += self.headers_generate_handler(file_name, class_name_snake_cased)
+        # output_content += self.headers_generate_handler(file_name, class_name_snake_cased)
 
-        output_content += f"namespace {class_name_snake_cased}_handler {{\n"
+        output_content += f"namespace {class_name_snake_cased}_handler {{\n\n"
 
         # output_content += "\n\tenum class IsUpdateOrPatch {\n"
         # output_content += "\t\tDB_TRUE = true,\n"
@@ -1150,8 +1150,8 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                         output_content += "\t}\n\n"
                         output_content += self.generate_prepare_docs(message, message_name_snake_cased, package_name,
                                                                      message_name)
-                        output_content += f"\t\t\t{message_name_snake_cased}_document_list.emplace_back(std::move(" \
-                                          f"{message_name_snake_cased}_document));\n"
+                        output_content += f"\t\t\tr_{message_name_snake_cased}_document_list.emplace_back(std::move(" \
+                                          f"r_{message_name_snake_cased}_document));\n"
                         output_content += "\t\t}\n\t}\n\n"
 
                         # output_content += "\t};\n\n"

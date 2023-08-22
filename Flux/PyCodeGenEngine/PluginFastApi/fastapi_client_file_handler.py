@@ -94,6 +94,14 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                       f"_client_url, {message_name_snake_cased}_id)"
         return output_str
 
+    def handle_DELETE_all_client_gen(self, message: protogen.Message, field_type: str | None = None) -> str:
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = " "*4 + f"def delete_all_{message_name_snake_cased}_client(self) -> Dict:\n"
+        output_str += " "*4 + f"    return generic_http_delete_all_client(self.delete_all_{message_name_snake_cased}" \
+                      f"_client_url)"
+        return output_str
+
     def handle_index_client_gen(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         index_fields: List[protogen.Field] = [field for field in message.fields
@@ -139,9 +147,11 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_client_routes_url(self, message: protogen.Message, message_name_snake_cased: str) -> str:
         output_str = ""
-        option_value_dict = \
-            self.get_complex_option_set_values(message,
-                                               BaseFastapiPlugin.flux_msg_json_root)
+        if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root):
+            option_value_dict = self.get_complex_option_value_from_proto(message, FastapiClientFileHandler.flux_msg_json_root)
+        else:
+            option_value_dict = (
+                self.get_complex_option_value_from_proto(message, FastapiClientFileHandler.flux_msg_json_root_time_series))
 
         crud_field_name_to_url_dict = {
             BaseFastapiPlugin.flux_json_root_create_field: f"self.create_{message_name_snake_cased}_client_url: "
@@ -176,6 +186,10 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
                                                            "str = f'http://{self.host}:{self.port}/" +
                                                            f"{self.proto_file_package}/"
                                                            f"delete-{message_name_snake_cased}'",
+            BaseFastapiPlugin.flux_json_root_delete_all_field: f"self.delete_all_{message_name_snake_cased}_client_url: "
+                                                               "str = f'http://{self.host}:{self.port}/" +
+                                                               f"{self.proto_file_package}/"
+                                                               f"delete_all-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_read_websocket_field: f"self.get_{message_name_snake_cased}_"
                                                                    f"client_ws_url: "
                                                                    "str = f'ws://{self.host}:{self.port}/" +
@@ -329,9 +343,11 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
     def _handle_client_route_methods(self, message: protogen.Message) -> str:
         output_str = ""
-        option_value_dict = \
-            self.get_complex_option_set_values(message,
-                                               BaseFastapiPlugin.flux_msg_json_root)
+        if self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root):
+            option_value_dict = self.get_complex_option_value_from_proto(message, FastapiClientFileHandler.flux_msg_json_root)
+        else:
+            option_value_dict = (
+                self.get_complex_option_value_from_proto(message, FastapiClientFileHandler.flux_msg_json_root_time_series))
 
         crud_field_name_to_method_call_dict = {
             BaseFastapiPlugin.flux_json_root_create_field: self.handle_POST_client_gen,
@@ -342,6 +358,7 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
             BaseFastapiPlugin.flux_json_root_patch_field: self.handle_PATCH_client_gen,
             BaseFastapiPlugin.flux_json_root_patch_all_field: self.handle_PATCH_all_client_gen,
             BaseFastapiPlugin.flux_json_root_delete_field: self.handle_DELETE_client_gen,
+            BaseFastapiPlugin.flux_json_root_delete_all_field: self.handle_DELETE_all_client_gen,
             BaseFastapiPlugin.flux_json_root_read_websocket_field: self.handle_read_by_id_WEBSOCKET_client_gen
         }
 
@@ -379,14 +396,14 @@ class FastapiClientFileHandler(BaseFastapiPlugin, ABC):
 
     def handle_client_file_gen(self, file) -> str:
         if self.is_option_enabled(file, FastapiClientFileHandler.flux_file_crud_host):
-            host = self.get_non_repeated_valued_custom_option_value(file, FastapiClientFileHandler.flux_file_crud_host)
+            host = self.get_simple_option_value_from_proto(file, FastapiClientFileHandler.flux_file_crud_host)
         else:
             host = '"127.0.0.1"'
 
         if self.is_option_enabled(file, FastapiClientFileHandler.flux_file_crud_port_offset):
             port_offset = \
-                self.get_non_repeated_valued_custom_option_value(file,
-                                                                 FastapiClientFileHandler.flux_file_crud_port_offset)
+                self.get_simple_option_value_from_proto(file,
+                                                        FastapiClientFileHandler.flux_file_crud_port_offset)
             port = 8000 + parse_to_int(port_offset)
         else:
             port = 8000

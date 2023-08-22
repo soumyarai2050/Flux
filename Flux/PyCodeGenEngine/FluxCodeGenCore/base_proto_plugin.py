@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import os
 import re
-from typing import List, Dict, ClassVar, Any
+from typing import List, Dict, ClassVar, Any, Set
 import logging
 from abc import ABC, abstractmethod
 import protogen
@@ -9,7 +9,7 @@ import protogen
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
-from FluxPythonUtils.scripts.utility_functions import parse_to_int, parse_to_float
+from FluxPythonUtils.scripts.utility_functions import parse_to_int, parse_to_float, convert_camel_case_to_specific_case
 
 # Required for accessing custom options from schema
 from Flux.PyCodeGenEngine.FluxCodeGenCore import insertion_imports
@@ -38,17 +38,19 @@ class BaseProtoPlugin(ABC):
     flux_fld_val_is_datetime: ClassVar[str] = "FluxFldValIsDateTime"
     flux_fld_alias: ClassVar[str] = "FluxFldAlias"
     flux_msg_json_root: ClassVar[str] = "FluxMsgJsonRoot"
+    flux_msg_json_root_time_series: ClassVar[str] = "FluxMsgJsonRootTimeSeries"
     flux_msg_json_query: ClassVar[str] = "FluxMsgJsonQuery"
-    flux_json_root_create_field: ClassVar[str] = "CreateDesc"
-    flux_json_root_create_all_field: ClassVar[str] = "CreateAllDesc"
-    flux_json_root_read_field: ClassVar[str] = "ReadDesc"
-    flux_json_root_update_field: ClassVar[str] = "UpdateDesc"
-    flux_json_root_update_all_field: ClassVar[str] = "UpdateAllDesc"
-    flux_json_root_patch_field: ClassVar[str] = "PatchDesc"
-    flux_json_root_patch_all_field: ClassVar[str] = "PatchAllDesc"
-    flux_json_root_delete_field: ClassVar[str] = "DeleteDesc"
-    flux_json_root_read_websocket_field: ClassVar[str] = "ReadWebSocketDesc"
-    flux_json_root_update_websocket_field: ClassVar[str] = "UpdateWebSocketDesc"
+    flux_json_root_create_field: ClassVar[str] = "CreateOp"
+    flux_json_root_create_all_field: ClassVar[str] = "CreateAllOp"
+    flux_json_root_read_field: ClassVar[str] = "ReadOp"
+    flux_json_root_update_field: ClassVar[str] = "UpdateOp"
+    flux_json_root_update_all_field: ClassVar[str] = "UpdateAllOp"
+    flux_json_root_patch_field: ClassVar[str] = "PatchOp"
+    flux_json_root_patch_all_field: ClassVar[str] = "PatchAllOp"
+    flux_json_root_delete_field: ClassVar[str] = "DeleteOp"
+    flux_json_root_delete_all_field: ClassVar[str] = "DeleteAllOp"
+    flux_json_root_read_websocket_field: ClassVar[str] = "ReadWebSocketOp"
+    flux_json_root_update_websocket_field: ClassVar[str] = "UpdateWebSocketOp"
     flux_json_root_set_reentrant_lock_field: ClassVar[str] = "SetReentrantLock"
     flux_json_query_name_field: ClassVar[str] = "QueryName"
     flux_json_query_aggregate_var_name_field: ClassVar[str] = "AggregateVarName"
@@ -59,73 +61,83 @@ class BaseProtoPlugin(ABC):
     flux_json_query_route_get_type_field_val: ClassVar[str] = "GET"
     flux_json_query_route_patch_type_field_val: ClassVar[str] = "PATCH"
     flux_json_query_require_js_slice_changes_field: ClassVar[str] = "RequireJsSliceChanges"
+    flux_json_root_ts_mongo_version_field: ClassVar[str] = "MongoVersion"
+    flux_json_root_ts_granularity_field: ClassVar[str] = "Granularity"
+    flux_fld_val_time_field: ClassVar[str] = "FluxFldValTimeField"
+    flux_fld_val_meta_field: ClassVar[str] = "FluxFldValMetaField"
+    flux_json_root_ts_expire_after_sec_field: ClassVar[str] = "ExpireAfterSeconds"
+    flux_json_root_ts_sec_field_name_field: ClassVar[str] = "SecondaryField"
     flux_fld_is_required: ClassVar[str] = "FluxFldIsRequired"
     flux_fld_cmnt: ClassVar[str] = "FluxFldCmnt"
     flux_msg_cmnt: ClassVar[str] = "FluxMsgCmnt"
     flux_file_cmnt: ClassVar[str] = "FluxFileCmnt"
     flux_fld_index: ClassVar[str] = "FluxFldIndex"
     flux_fld_web_socket: ClassVar[str] = "FluxFldWebSocket"
-    flux_fld_abbreviated: str = "FluxFldAbbreviated"
-    flux_fld_auto_complete: str = "FluxFldAutoComplete"
-    flux_fld_sequence_number: str = "FluxFldSequenceNumber"
-    flux_fld_button: str = "FluxFldButton"
-    flux_msg_title: str = "FluxMsgTitle"
-    flux_fld_title: str = "FluxFldTitle"
-    flux_fld_filter: str = "FluxFldFilter"
-    flux_fld_val_max: str = "FluxFldValMax"
-    flux_fld_val_min: str = "FluxFldValMin"
-    flux_msg_nested_fld_val_filter_param: str = "FluxMsgNestedFldValFilterParam"
-    flux_fld_date_time_format: str = "FluxFldDateTimeFormat"
-    flux_fld_elaborated_title: str = "FluxFldElaborateTitle"
-    flux_fld_name_color: str = "FluxFldNameColor"
-    flux_msg_widget_ui_data_element: str = "FluxMsgWidgetUIDataElement"
-    flux_msg_widget_ui_data_element_widget_ui_data_field: str = "widget_ui_data"
-    flux_msg_aggregate_query_var_name: str = "FluxMsgAggregateQueryVarName"
-    aggregation_type_update: str = "AggregateType_UpdateAggregate"
-    aggregation_type_filter: str = "AggregateType_FilterAggregate"
-    aggregation_type_both: str = "AggregateType_FilterNUpdate"
-    aggregation_type_unspecified: str = "AggregateType_UNSPECIFIED"
-    flux_msg_crud_shared_lock: str = "FluxMsgCRUDSharedLock"
-    flux_file_crud_host: str = "FluxFileCRUDHost"
-    flux_file_crud_port_offset: str = "FluxFileCRUDPortOffset"
-    flux_fld_help: str = "FluxFldHelp"
-    flux_fld_ui_update_only: str = "FluxFldUIUpdateOnly"
-    flux_fld_ui_placeholder: str = "FluxFldUIPlaceholder"
-    flux_fld_default_value_placeholder_string: str = "FluxFldDefaultValuePlaceholderString"
-    flux_fld_alert_bubble_color: str = "FluxFldAlertBubbleColor"
-    flux_fld_alert_bubble_source: str = "FluxFldAlertBubbleSource"
-    flux_fld_color: str = "FluxFldColor"
-    flux_fld_server_populate: str = "FluxFldServerPopulate"
-    flux_fld_switch: str = "FluxFldSwitch"
-    flux_fld_orm_no_update: str = "FluxFldOrmNoUpdate"
-    flux_fld_size_max: str = "FluxFldSizeMax"
-    flux_fld_sticky: str = "FluxFldSticky"
-    flux_fld_val_sort_weight: str = "FluxFldValSortWeight"
-    flux_fld_hide: str = "FluxFldHide"
-    flux_fld_progress_bar: str = "FluxFldProgressBar"
-    flux_fld_filter_enable: str = "FluxFldFilterEnable"
-    flux_msg_server_populate: str = "FluxMsgServerPopulate"
-    flux_msg_main_crud_operations_agg: str = "FluxMsgMainCRUDOperationsAgg"
-    flux_fld_collection_link: str = "FluxFldCollectionLink"
-    flux_fld_no_common_key: str = "FluxFldNoCommonKey"
-    flux_fld_number_format: str = "FluxFldNumberFormat"
-    flux_fld_display_type: str = "FluxFldDisplayType"
-    flux_fld_display_zero: str = "FluxFldDisplayZero"
-    flux_fld_text_align: str = "FluxFldTextAlign"
-    flux_fld_micro_separator: str = "FluxFldMicroSeparator"
-    flux_msg_ui_get_all_limit: str = "FluxMsgUIGetAllLimit"
-    flux_fld_abbreviated_link: str = "FluxFldAbbreviatedLink"
-    flux_msg_executor_options: str = "FluxMsgExecutorOptions"
-    executor_option_is_websocket_model_field: str = "IsWebSocketModel"
-    executor_option_enable_notify_all_field: str = "EnableNotifyAll"
-    executor_option_is_top_lvl_model_field: str = "IsTopLvlModel"
-    executor_option_executor_key_count_field: str = "ExecutorKeyCounts"
-    executor_option_executor_key_sequence_field: str = "ExecutorKeySequence"
-    executor_option_log_key_sequence_field: str = "LogKeySequence"
-    flux_fld_PK: str = "FluxFldPk"
+    flux_fld_abbreviated: ClassVar[str] = "FluxFldAbbreviated"
+    flux_fld_auto_complete: ClassVar[str] = "FluxFldAutoComplete"
+    flux_fld_sequence_number: ClassVar[str] = "FluxFldSequenceNumber"
+    flux_fld_button: ClassVar[str] = "FluxFldButton"
+    flux_msg_title: ClassVar[str] = "FluxMsgTitle"
+    flux_fld_title: ClassVar[str] = "FluxFldTitle"
+    flux_fld_filter: ClassVar[str] = "FluxFldFilter"
+    flux_fld_val_max: ClassVar[str] = "FluxFldValMax"
+    flux_fld_val_min: ClassVar[str] = "FluxFldValMin"
+    flux_msg_nested_fld_val_filter_param: ClassVar[str] = "FluxMsgNestedFldValFilterParam"
+    flux_fld_date_time_format: ClassVar[str] = "FluxFldDateTimeFormat"
+    flux_fld_elaborated_title: ClassVar[str] = "FluxFldElaborateTitle"
+    flux_fld_name_color: ClassVar[str] = "FluxFldNameColor"
+    flux_msg_widget_ui_data_element: ClassVar[str] = "FluxMsgWidgetUIDataElement"
+    flux_msg_widget_ui_data_element_widget_ui_data_field: ClassVar[str] = "widget_ui_data"
+    flux_msg_aggregate_query_var_name: ClassVar[str] = "FluxMsgAggregateQueryVarName"
+    aggregation_type_update: ClassVar[str] = "AggregateType_UpdateAggregate"
+    aggregation_type_filter: ClassVar[str] = "AggregateType_FilterAggregate"
+    aggregation_type_both: ClassVar[str] = "AggregateType_FilterNUpdate"
+    aggregation_type_unspecified: ClassVar[str] = "AggregateType_UNSPECIFIED"
+    flux_msg_crud_shared_lock: ClassVar[str] = "FluxMsgCRUDSharedLock"
+    flux_file_crud_host: ClassVar[str] = "FluxFileCRUDHost"
+    flux_file_crud_port_offset: ClassVar[str] = "FluxFileCRUDPortOffset"
+    flux_fld_help: ClassVar[str] = "FluxFldHelp"
+    flux_fld_ui_update_only: ClassVar[str] = "FluxFldUIUpdateOnly"
+    flux_fld_ui_placeholder: ClassVar[str] = "FluxFldUIPlaceholder"
+    flux_fld_default_value_placeholder_string: ClassVar[str] = "FluxFldDefaultValuePlaceholderString"
+    flux_fld_alert_bubble_color: ClassVar[str] = "FluxFldAlertBubbleColor"
+    flux_fld_alert_bubble_source: ClassVar[str] = "FluxFldAlertBubbleSource"
+    flux_fld_color: ClassVar[str] = "FluxFldColor"
+    flux_fld_server_populate: ClassVar[str] = "FluxFldServerPopulate"
+    flux_fld_switch: ClassVar[str] = "FluxFldSwitch"
+    flux_fld_orm_no_update: ClassVar[str] = "FluxFldOrmNoUpdate"
+    flux_fld_size_max: ClassVar[str] = "FluxFldSizeMax"
+    flux_fld_sticky: ClassVar[str] = "FluxFldSticky"
+    flux_fld_val_sort_weight: ClassVar[str] = "FluxFldValSortWeight"
+    flux_fld_hide: ClassVar[str] = "FluxFldHide"
+    flux_fld_progress_bar: ClassVar[str] = "FluxFldProgressBar"
+    flux_fld_filter_enable: ClassVar[str] = "FluxFldFilterEnable"
+    flux_msg_server_populate: ClassVar[str] = "FluxMsgServerPopulate"
+    flux_msg_main_crud_operations_agg: ClassVar[str] = "FluxMsgMainCRUDOperationsAgg"
+    flux_fld_collection_link: ClassVar[str] = "FluxFldCollectionLink"
+    flux_fld_no_common_key: ClassVar[str] = "FluxFldNoCommonKey"
+    flux_fld_number_format: ClassVar[str] = "FluxFldNumberFormat"
+    flux_fld_display_type: ClassVar[str] = "FluxFldDisplayType"
+    flux_fld_display_zero: ClassVar[str] = "FluxFldDisplayZero"
+    flux_fld_text_align: ClassVar[str] = "FluxFldTextAlign"
+    flux_fld_micro_separator: ClassVar[str] = "FluxFldMicroSeparator"
+    flux_msg_ui_get_all_limit: ClassVar[str] = "FluxMsgUIGetAllLimit"
+    flux_fld_abbreviated_link: ClassVar[str] = "FluxFldAbbreviatedLink"
+    flux_fld_mapping_underlying_meta_field: ClassVar[str] = "FluxFldMappingUnderlyingMetaField"
+    flux_fld_mapping_src: ClassVar[str] = "FluxFldMappingSrc"
+    flux_fld_mapping_projection_query_field: ClassVar[str] = "FluxFldMappingProjectionQueryField"
+    flux_msg_executor_options: ClassVar[str] = "FluxMsgExecutorOptions"
+    flux_fld_projections: ClassVar[str] = "FluxFldProjections"
+    executor_option_is_websocket_model_field: ClassVar[str] = "IsWebSocketModel"
+    executor_option_enable_notify_all_field: ClassVar[str] = "EnableNotifyAll"
+    executor_option_is_top_lvl_model_field: ClassVar[str] = "IsTopLvlModel"
+    executor_option_executor_key_count_field: ClassVar[str] = "ExecutorKeyCounts"
+    executor_option_executor_key_sequence_field: ClassVar[str] = "ExecutorKeySequence"
+    executor_option_log_key_sequence_field: ClassVar[str] = "LogKeySequence"
+    flux_fld_PK: ClassVar[str] = "FluxFldPk"
     default_id_field_name: ClassVar[str] = "id"
-    default_id_type_var_name: str = "DefaultIdType"  # to be used in models as default type variable name
-    proto_package_var_name: str = "ProtoPackageName"  # to be used in models as proto_package_name variable name
+    default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name
+    proto_package_var_name: ClassVar[str] = "ProtoPackageName"  # to be used in models as proto_package_name variable name
     proto_type_to_py_type_dict: ClassVar[Dict[str, str]] = {
         "int32": "int",
         "int64": "int",
@@ -166,24 +178,38 @@ class BaseProtoPlugin(ABC):
                                   "output file name-dict of insertion points-respective content key-value pair ")
 
     def is_bool_option_enabled(self, msg_or_fld_option: protogen.Message | protogen.Field, option_name: str) -> bool:
-        if self.is_option_enabled(msg_or_fld_option, option_name) and \
-                "true" == self.get_non_repeated_valued_custom_option_value(msg_or_fld_option,
-                                                                           option_name):
+        if (self.is_option_enabled(msg_or_fld_option, option_name) and
+                self.get_simple_option_value_from_proto(msg_or_fld_option,
+                                                        option_name)):
             return True
         else:
             return False
 
     @staticmethod
-    def get_non_repeated_valued_custom_option_value(proto_entity: protogen.Message | protogen.Field | protogen.File,
-                                                    option_name: str):
-        options_list = [option for option in str(proto_entity.proto.options).split("\n") if ":" in option]
-        for option in options_list:
-            if re.search(r'\b' + option_name + r'\b', option):
-                option_content = ":".join(str(option).split(":")[1:])
-                if option_content.isspace():
-                    return option_content
-                return option_content.strip()
-            # else not required: Avoiding if option_name not in option_obj
+    def parse_string_to_original_types(value: str) -> str | int | bool | float:
+        """
+        :Returns: int or float: if value string contains only numerics,
+                  bool: if value contains string parsed bool,
+                  cleaned string with quotation marks: if value is dirty string,
+                  same value: if both cases are not matched
+        """
+        # bool check
+        if value in ['"True"', '"False"', '"true"', '"false"', "True", "False", "true", "false"]:
+            return True if value in ['"True"', '"true"', "True", "true"] else False
+        # int check
+        elif value.lstrip("-").isdigit():
+            return int(value)
+        # float check
+        elif re.match(r'^-?\d+(?:\.\d+)$', value) is not None:
+            return float(value)
+        # else str
+        else:
+            if value.isspace():
+                return ' '*len(value)
+            if '"' == value[-1]:
+                return str(value[1:-1].strip())
+            else:
+                return str(value.strip())
 
     @staticmethod
     def is_option_enabled(msg_or_fld_or_file: protogen.Message | protogen.Field | protogen.File,
@@ -196,42 +222,6 @@ class BaseProtoPlugin(ABC):
         if re.search(r'\b' + option_name + r'\b', proto_option_str):
             return True
         return False
-
-    # deprecated
-    @staticmethod
-    def __get_complex_option_value_as_list_of_tuple(option_string: str, option_name: str):
-        option_value_list_of_tuples = []
-        for option_str_line in str(option_string).split("\n"):
-            temp_list = []
-            if option_name in str(option_str_line):
-                option_str_line_index = option_string.index(option_str_line)
-                sliced_message_option_str = option_string[option_str_line_index:]
-                option_string = option_string[option_str_line_index + 1:]
-                for sliced_option_str_line in sliced_message_option_str.split("\n"):
-                    if ":" in sliced_option_str_line:
-                        if '"' in sliced_option_str_line.split(":")[1]:
-                            # For string value: removing extra quotation marks
-                            temp_list.append(str(sliced_option_str_line.split(":")[1][2:-1]))
-                        else:
-                            if ' true' == sliced_option_str_line.split(":")[1] or ' false' == \
-                                    sliced_option_str_line.split(":")[1]:
-                                temp_list.append(True if sliced_option_str_line.split(":")[1] == ' true' else False)
-                            else:
-                                # For int value
-                                temp_list.append(int(sliced_option_str_line.split(":")[1]))
-                    elif "}" in sliced_option_str_line:
-                        option_value_list_of_tuples.append(tuple(temp_list))
-                        break
-            # else not required: option_name not in option_string line, then ignore
-        return option_value_list_of_tuples
-
-    # deprecated
-    @staticmethod
-    def get_complex_msg_option_values_as_list_of_tuple(message: protogen.Message, option_name: str) -> List[Dict]:
-        message_options_temp_str = str(message.proto.options)
-        option_value_list_of_tuples = \
-            BaseProtoPlugin._get_complex_option_value_as_list_of_dict(message_options_temp_str, option_name)
-        return option_value_list_of_tuples
 
     @staticmethod
     def get_field_default_value(field: protogen.Field):
@@ -272,9 +262,40 @@ class BaseProtoPlugin(ABC):
             return val_str.strip()
 
     @staticmethod
-    def _get_complex_option_set_values(option_string: str, option_name: str | None = None,
-                                       proto_entity: protogen.Message | protogen.Field | protogen.File | None = None,
-                                       option_type: protogen.Message | None = None) -> Dict:
+    def get_simple_option_value_from_proto(proto_entity: protogen.Message | protogen.Field | protogen.File,
+                                           option_name: str, is_repeated: bool | None = None) -> (List | str | int |
+                                                                                                  bool | float | None):
+        """
+        Returns List if option is_repeated else value, returns None if option is not set
+        """
+        options_str_list = [option_str
+                            for option_str in str(proto_entity.proto.options).split("\n") if ":" in option_str]
+        option_val_list: List = []
+        for option_str in options_str_list:
+            if re.search(r'\b' + option_name + r'\b', option_str):
+                option_content = ":".join(str(option_str).split(":")[1:])
+                if option_content.isspace():
+                    option_val_list.append(option_content)
+                option_val_list.append(BaseProtoPlugin.parse_string_to_original_types(option_content.strip()))
+        if is_repeated:
+            return option_val_list
+        else:
+            if len(option_val_list) > 1:
+                err_str = ("is_repeated param was supplied as False but option is of repeated type, "
+                           f"option_name: {option_name}, proto_entity_name: {proto_entity.proto.name}")
+                logging.exception(err_str)
+                raise Exception(err_str)
+            else:
+                if option_val_list:
+                    return option_val_list[0]
+                else:
+                    return None
+
+    @staticmethod
+    def _get_complex_option_value_from_proto(option_string: str, option_name: str | None = None,
+                                             proto_entity: protogen.Message |
+                                                           protogen.Field | protogen.File | None = None,
+                                             option_type: protogen.Message | None = None) -> Dict:
         if option_type is None:
             if isinstance(proto_entity, protogen.Message) or isinstance(proto_entity, protogen.Field):
                 option_type = BaseProtoPlugin.get_complex_option_type(proto_entity.parent_file, option_name)
@@ -322,7 +343,7 @@ class BaseProtoPlugin(ABC):
                     field_name_index = option_string.index(field_name_search_str)
                     option_string_sliced = option_string[field_name_index + len(field_name_search_str):]
                     field_val = (
-                        BaseProtoPlugin._get_complex_option_set_values(option_string_sliced, option_type=field.message))
+                        BaseProtoPlugin._get_complex_option_value_from_proto(option_string_sliced, option_type=field.message))
 
                     is_repeated = False
                     field_val_list = []
@@ -333,8 +354,8 @@ class BaseProtoPlugin(ABC):
                             field_name_index = option_string_sliced.index(field_name_search_str)
                             option_string_sliced = option_string_sliced[field_name_index + len(field_name_search_str):]
                             field_val = (
-                                BaseProtoPlugin._get_complex_option_set_values(option_string_sliced,
-                                                                               option_type=field.message))
+                                BaseProtoPlugin._get_complex_option_value_from_proto(option_string_sliced,
+                                                                                     option_type=field.message))
                             field_val_list.append(field_val)
 
                     if is_repeated:
@@ -344,9 +365,9 @@ class BaseProtoPlugin(ABC):
         return output_dict
 
     @staticmethod
-    def get_complex_option_set_values(proto_entity: protogen.Message | protogen.Field | protogen.File,
-                                      option_name: str,
-                                      is_option_repeated: bool | None = None) -> List[Dict] | Dict:
+    def get_complex_option_value_from_proto(proto_entity: protogen.Message | protogen.Field | protogen.File,
+                                            option_name: str,
+                                            is_option_repeated: bool | None = None) -> List[Dict] | Dict:
         """
         Interface to get option values from proto model file
         :param proto_entity: proto entity of which option value is to be found
@@ -371,8 +392,8 @@ class BaseProtoPlugin(ABC):
                         option_string_list.append(option_string)
                 repeated_option_value_as_list_of_dict: List[Dict] = []
                 for option_string_ in option_string_list:
-                    option_val_dict = BaseProtoPlugin._get_complex_option_set_values(option_string_,
-                                                                                     option_name, proto_entity)
+                    option_val_dict = BaseProtoPlugin._get_complex_option_value_from_proto(option_string_,
+                                                                                           option_name, proto_entity)
                     repeated_option_value_as_list_of_dict.append(option_val_dict)
                 return repeated_option_value_as_list_of_dict
             else:
@@ -386,8 +407,8 @@ class BaseProtoPlugin(ABC):
                     option_str_end_index = option_string.index("[FluxMsg")
                     option_string = option_string[:option_str_end_index]
                 # else not required: taking complete sliced option_str
-                option_val_dict = BaseProtoPlugin._get_complex_option_set_values(option_string,
-                                                                                 option_name, proto_entity)
+                option_val_dict = BaseProtoPlugin._get_complex_option_value_from_proto(option_string,
+                                                                                       option_name, proto_entity)
                 return option_val_dict
         if is_option_repeated:
             return []
@@ -416,22 +437,22 @@ class BaseProtoPlugin(ABC):
     @staticmethod
     def get_flux_msg_cmt_option_value(message: protogen.Message) -> str:
         flux_msg_cmt_option_value = \
-            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(message,
-                                                                        BaseProtoPlugin.flux_msg_cmnt)
+            BaseProtoPlugin.get_simple_option_value_from_proto(message,
+                                                               BaseProtoPlugin.flux_msg_cmnt)
         return flux_msg_cmt_option_value[2:-1] \
             if flux_msg_cmt_option_value is not None else ""
 
     @staticmethod
     def get_flux_fld_cmt_option_value(field: protogen.Field) -> str:
         flux_fld_cmt_option_value = \
-            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(field, BaseProtoPlugin.flux_fld_cmnt)
+            BaseProtoPlugin.get_simple_option_value_from_proto(field, BaseProtoPlugin.flux_fld_cmnt)
         return flux_fld_cmt_option_value[2:-1] \
             if flux_fld_cmt_option_value is not None else ""
 
     @staticmethod
     def get_flux_file_cmt_option_value(file: protogen.File) -> str:
         flux_file_cmt_option_value = \
-            BaseProtoPlugin.get_non_repeated_valued_custom_option_value(file, BaseProtoPlugin.flux_file_cmnt)
+            BaseProtoPlugin.get_simple_option_value_from_proto(file, BaseProtoPlugin.flux_file_cmnt)
         return flux_file_cmt_option_value[2:-1] \
             if flux_file_cmt_option_value is not None else ""
 
@@ -455,6 +476,119 @@ class BaseProtoPlugin(ABC):
             err_str = f"Env var 'PROJECT_ROOT' received as {project_root_dir}"
             logging.exception(err_str)
             raise Exception(err_str)
+
+    def proto_to_py_datatype(self, field: protogen.Field) -> str:
+        match field.kind.name.lower():
+            case "message":
+                return field.message.proto.name
+            case "enum":
+                return field.enum.proto.name
+            case other:
+                if self.is_bool_option_enabled(field, BaseProtoPlugin.flux_fld_val_is_datetime):
+                    return "pendulum.DateTime"
+                else:
+                    return BaseProtoPlugin.proto_type_to_py_type_dict[field.kind.name.lower()]
+
+    def get_nested_field_proto_to_py_datatype(self, field: protogen.Field, field_str: str):
+        """
+        :param field: field from where nested field starts
+        :param field_str: field_str having nested field dot seperated
+        """
+        nested_field: protogen.Field = self.get_nested_field_proto_object(field, field_str)
+        return self.proto_to_py_datatype(nested_field)
+
+    def get_nested_field_proto_object(self, field: protogen.Field, field_str: str):
+        """
+        :param field: field from where nested field starts
+        :param field_str: field_str having nested field dot seperated
+        """
+        field_str_dot_sep = field_str.split(".")
+
+        if field_str_dot_sep[0] == field.proto.name:
+            # If field_str starts with current field name, removing first field
+            field_str_dot_sep = field_str_dot_sep[1:]
+
+        if len(field_str_dot_sep) > 1:
+            for nested_field in field.message.fields:
+                if nested_field.proto.name == field_str_dot_sep[0]:
+                    self.get_nested_field_proto_to_py_datatype(nested_field, ".".join(field_str_dot_sep[1:]))
+        # else not required: if field_str_dot_sep is length 1 that means, either recursion has reached
+        # last nested field or field_str only wanted absolute next nested field, handling for both is present below
+
+        # handling for last nested field
+        for nested_field in field.message.fields:
+            if nested_field.proto.name == field_str_dot_sep[0]:
+                return nested_field
+
+    @staticmethod
+    def get_projection_option_value_to_fields(message: protogen.Message) -> Dict[str, List[str]]:
+        """
+        returns dict where key is either temp str of query_name or proposed query name from projections option value
+        to all field names having that projection value. For nested projection option value, temp str of query name or
+        proposed query name is sliced and taken as key of dict and value of dict is set of field names including
+        nested path.
+        """
+        projection_val_to_fields_dict: Dict[str, List[str]] = {}
+        for field in message.fields:
+            if BaseProtoPlugin.is_option_enabled(field, BaseProtoPlugin.flux_fld_projections):
+                projection_option_val_list: List[str] = (
+                    BaseProtoPlugin.get_simple_option_value_from_proto(field, BaseProtoPlugin.flux_fld_projections,
+                                                                       is_repeated=True))
+                for projection_option_val in projection_option_val_list:
+                    mapping_key: str | None = None
+                    if ":" in projection_option_val:
+                        mapping_key = projection_option_val.split(":")[0]
+                        projection_key = projection_option_val.split(":")[-1]
+                    else:
+                        projection_key = projection_option_val
+
+                    if projection_key not in projection_val_to_fields_dict:
+                        projection_val_to_fields_dict[projection_key] = []
+
+                    if mapping_key:
+                        mapping_key_dot_sep = mapping_key.split(".")
+                        if mapping_key_dot_sep[0] == field.proto.name:
+                            if len(mapping_key_dot_sep) > 1:
+                                mapping_key = ".".join(mapping_key_dot_sep[1:])
+                            else:
+                                mapping_key = None
+                    if mapping_key:
+                        field_name = f"{field.proto.name}.{mapping_key}"
+                    else:
+                        field_name = f"{field.proto.name}"
+                    projection_val_to_fields_dict[projection_key].append(field_name)
+
+        if not projection_val_to_fields_dict:
+            err_str = (f"Could not find option {BaseProtoPlugin.flux_fld_projections} set on any field "
+                       f"of message {message.proto.name}")
+            logging.exception(err_str)
+            raise Exception(err_str)
+        else:
+            return projection_val_to_fields_dict
+
+    @staticmethod
+    def get_projection_temp_query_name_to_generated_query_name_dict(message: protogen.Message) -> Dict[str, str]:
+        projection_val_to_fields_dict: Dict[str, List[str]] = (
+            BaseProtoPlugin.get_projection_option_value_to_fields(message))
+        projection_val_to_projection_query_name_dict = {}
+
+        for projection_val, field_names in projection_val_to_fields_dict.items():
+            if projection_val.isnumeric():
+                # numeric values are mapped to generated query name
+                field_name_list = []
+                for field_name in field_names:
+                    if "." in field_name:
+                        field_name_list.append("_".join(field_name.split(".")))
+                    else:
+                        field_name_list.append(field_name)
+                fields_name_str = "_n_".join(field_name_list)
+                message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+                query_name = f"get_{fields_name_str}_projection_from_{message_name_snake_cased}"
+                projection_val_to_projection_query_name_dict[projection_val] = query_name
+            else:
+                # other values are mapped to same value itself
+                projection_val_to_projection_query_name_dict[projection_val] = projection_val
+        return projection_val_to_projection_query_name_dict
 
     def _process(self, plugin: ExtendedProtogenPlugin) -> None:
         """

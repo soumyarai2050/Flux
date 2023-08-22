@@ -1487,8 +1487,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     # set to get abbreviated dependent message name
                     if self.is_option_enabled(field, JsxFileGenPlugin.flux_fld_abbreviated):
                         fld_abbreviated_option_value = \
-                            self.get_non_repeated_valued_custom_option_value(field,
-                                                                             JsxFileGenPlugin.flux_fld_abbreviated)[1:]
+                            self.get_simple_option_value_from_proto(field,
+                                                                    JsxFileGenPlugin.flux_fld_abbreviated)[1:]
                         break
                 else:
                     err_str = f"Could not find any field having {JsxFileGenPlugin.flux_fld_abbreviated} option set in " \

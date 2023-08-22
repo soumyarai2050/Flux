@@ -24,11 +24,11 @@ namespace market_data_handler {
 
     class MarketData_MongoDBHandler {
     public:
-        MarketData_MongoDBHandler(quill::Logger* logger, const int min_pool_size = 2, const int max_pool_size = 2):
+        MarketData_MongoDBHandler(quill::Logger* p_logger, const int min_pool_size = 2, const int max_pool_size = 2):
         str_uri(db_uri + "/?minPoolSize=" + std::to_string(min_pool_size) + "&maxPoolSize=" + std::to_string(max_pool_size)),
-        client(pool.acquire()), market_data_service_db((*client)[market_data_service_db_name]), min_pool_size_(min_pool_size),
-        max_pool_size_(min_pool_size_), logger_(logger) {
-            LOG_INFO(logger_, "Mongo URI: {}", str_uri);
+        client(pool.acquire()), market_data_service_db((*client)[market_data_service_db_name]), m_min_pool_size_(min_pool_size),
+        m_max_pool_size_(max_pool_size), m_p_logger_(p_logger) {
+            LOG_INFO(m_p_logger_, "Mongo URI: {}", str_uri);
         }
 
         mongocxx::instance inst{};
@@ -39,8 +39,8 @@ namespace market_data_handler {
         mongocxx::database market_data_service_db;
 
     protected:
-        const int min_pool_size_;
-        const int max_pool_size_;
-        quill::Logger* logger_;
+        const int m_min_pool_size_;
+        const int m_max_pool_size_;
+        quill::Logger* m_p_logger_;
     };
 }
