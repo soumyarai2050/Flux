@@ -299,9 +299,21 @@ message SymbolNExchId{
 
 
 message BarData {
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadWebSocketOp: AggregateType_UNSPECIFIED
+  };
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 5.0,
     CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadWebSocketOp: AggregateType_UNSPECIFIED,
@@ -309,7 +321,7 @@ message BarData {
     ExpireAfterSeconds: 5
   };
   required int32 id = 1;
-  required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldMappingProjectionQueryField) = "1:symbol_n_exch_id.symbol", (FluxFldMappingProjectionQueryField) = "2:symbol_n_exch_id.symbol", (FluxFldMappingProjectionQueryField) = "3:symbol_n_exch_id.symbol"];
+  required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true, (FluxFldMappingProjectionQueryField) = "1:symbol_n_exch_id.symbol", (FluxFldMappingProjectionQueryField) = "2:symbol_n_exch_id.symbol", (FluxFldMappingProjectionQueryField) = "3:symbol_n_exch_id.symbol"];
   required string start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required string end_time = 4 [(FluxFldValIsDateTime) = true];
   optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3"];
@@ -326,6 +338,7 @@ message TickByTickBBO {
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 5.0,
     CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadWebSocketOp: AggregateType_UNSPECIFIED,
@@ -346,6 +359,7 @@ message LastTrade {
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 5.0,
     CreateOp: AggregateType_FilterAggregate,
+    CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_FilterAggregate,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadWebSocketOp: AggregateType_FilterAggregate,
@@ -445,6 +459,7 @@ message RawMarketDepthHistory {
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 5.0,
     CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadWebSocketOp: AggregateType_UNSPECIFIED,
@@ -552,4 +567,8 @@ message LastTradeList {
 
 message DashList {
   repeated Dash dash = 1 [(FluxFldPk) = "true"];
+}
+
+message BarDataList {
+  repeated BarData bar_data = 1;
 }

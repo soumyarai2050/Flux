@@ -80,10 +80,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     flx_msg_simple_repeated_attribute_options: List[str] = [
         # put this category options here
     ]
-    flux_msg_complex_non_repeated_attribute_options: List[str] = [
+    flx_msg_complex_non_repeated_attribute_options: List[str] = [
         # put this category options here
     ]
-    flux_msg_complex_repeated_attribute_options: List[str] = [
+    flx_msg_complex_repeated_attribute_options: List[str] = [
         # put this category options here
     ]
 
@@ -424,7 +424,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         json_msg_str = ""
         for option in options_list:
             if self.is_option_enabled(field_or_message_obj, option):
-                if option in self.flx_fld_simple_non_repeated_attribute_options:
+                if option in (self.flx_fld_simple_non_repeated_attribute_options +
+                              self.flx_msg_simple_non_repeated_attribute_options):
                     option_value: str | int | bool | float = (
                         self.get_simple_option_value_from_proto(field_or_message_obj, option))
 
@@ -463,7 +464,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     json_msg_str += ' ' * init_space_count + \
                                     (f'"{flux_prefix_removed_option_name_case_styled}": '
                                      f'{self.parse_python_type_to_json_type_str(option_value)},\n')
-                elif option in self.flx_fld_simple_repeated_attribute_options:
+                elif option in (self.flx_fld_simple_repeated_attribute_options +
+                                self.flx_msg_simple_repeated_attribute_options):
                     option_value_list: List = self.get_simple_option_value_from_proto(field_or_message_obj, option,
                                                                                       is_repeated=True)
 
@@ -566,8 +568,10 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                                  init_space_count: int) -> str:
         json_msg_str = ""
         for option in options_list:
+
             if self.is_option_enabled(field_or_message_obj, option):
-                if option in self.flux_msg_complex_non_repeated_attribute_options:
+                if option in (self.flx_fld_complex_non_repeated_attribute_options +
+                              self.flx_msg_complex_non_repeated_attribute_options):
                     option_value_dict: Dict = \
                         self.get_complex_option_value_from_proto(field_or_message_obj, option)
                     # converting flux_option into json attribute name
@@ -599,7 +603,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     # which needs to have value 'true' or 'false' as string form but since in plugin handling
                     # if andy field is found having value as string form of bool then it is type-cast to
                     # json bool, to avoid this explicitly value is turned into str bool
-                elif option in self.flux_msg_complex_repeated_attribute_options:
+                elif option in (self.flx_fld_complex_repeated_attribute_options +
+                                self.flx_msg_complex_repeated_attribute_options):
                     option_value_dict: List[Dict] = \
                         self.get_complex_option_value_from_proto(field_or_message_obj, option)
                     # converting flux_option into json attribute name

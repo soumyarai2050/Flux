@@ -10,7 +10,7 @@ if __name__ == "__main__":
     code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
     env_var_dict = CodeGenEngineEnvManager.default_gen_env_var_dict
     env_var_dict["PLUGIN_FILE_NAME"] = "cpp_populate_random_values.py"
-    code_gen_engine_env_manager.init_env_and_update_sys_path("market_data", "_",
+    code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",
                                                              "PluginCppUtilGen", env_var_dict)
 
     plugin_execute_script = PluginExecuteScript(str(code_gen_engine_env_manager.project_dir), "service.proto")

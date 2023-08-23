@@ -88,12 +88,12 @@ class WSConnectionManager:
 class PathWSConnectionManager(WSConnectionManager):
     def __init__(self):
         super().__init__()
-        self.active_ws_data_set: Set[WSData] = set()
+        self.active_ws_data_list: List[WSData] = []
 
     def __str__(self):
         ret_str = "active_ws_set: "
         with self.rlock:
-            for ws_data in self.active_ws_data_set:
+            for ws_data in self.active_ws_data_list:
                 ret_str += str(ws_data.ws_object)
             return ret_str + "\n" + str(super)
 
@@ -104,11 +104,11 @@ class PathWSConnectionManager(WSConnectionManager):
             is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
             # if ws not in self.active_ws_n_callable_tuple_set:
             if not any(ws in active_ws_callable_tuple
-                       for active_ws_callable_tuple in self.active_ws_data_set):
+                       for active_ws_callable_tuple in self.active_ws_data_list):
                 # old or new ws does not matter - may have been added to master via a different path
-                self.active_ws_data_set.add(WSData(ws_object=ws, filter_callable=filter_callable,
-                                                   filter_callable_kwargs=callable_kwargs,
-                                                   projection_model=projection_model))
+                self.active_ws_data_list.append(WSData(ws_object=ws, filter_callable=filter_callable,
+                                                       filter_callable_kwargs=callable_kwargs,
+                                                       projection_model=projection_model))
                 return True
             elif is_new_ws:
                 raise Exception(f"Unexpected! ws: {ws} is in active_ws_n_callable_tuple_set "
@@ -123,9 +123,9 @@ class PathWSConnectionManager(WSConnectionManager):
 
     async def disconnect(self, ws: WebSocket):
         async with self.rlock:
-            for fetched_ws_data in self.active_ws_data_set:
+            for fetched_ws_data in self.active_ws_data_list:
                 if fetched_ws_data.ws_object == ws:
-                    self.active_ws_data_set.remove(fetched_ws_data)
+                    self.active_ws_data_list.remove(fetched_ws_data)
                     break
             else:
                 logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_n_callable_tuple_set: {str(self)}")
@@ -162,20 +162,20 @@ class PathWSConnectionManager(WSConnectionManager):
             if remove_websocket is not None:
                 await self.disconnect(remove_websocket)
 
-    def get_activ_ws_data_set(self) -> Set[WSData]:
-        return self.active_ws_data_set
+    def get_activ_ws_data_list(self) -> List[WSData]:
+        return self.active_ws_data_list
 
 
 class PathWithIdWSConnectionManager(WSConnectionManager):
     def __init__(self):
         super().__init__()
-        self.id_to_active_ws_data_set_dict: Dict[Any, Set[WSData]] = dict()
+        self.id_to_active_ws_data_list_dict: Dict[Any, List[WSData]] = dict()
 
     def __str__(self):
         ret_str = "active_ws_set: "
         with self.rlock:
-            for obj_id, active_ws_data_set in self.id_to_active_ws_data_set_dict.items():
-                set_as_str = "".join([str(ws_data.ws_object) for ws_data in active_ws_data_set])
+            for obj_id, active_ws_data_list in self.id_to_active_ws_data_list_dict.items():
+                set_as_str = "".join([str(ws_data.ws_object) for ws_data in active_ws_data_list])
                 ret_str += f"obj_id: {obj_id} set: {set_as_str}\n"
             return ret_str + "\n" + str(super)
 
@@ -185,22 +185,22 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
         async with self.rlock:
             is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
             # new or not, if id is not in dict, it's new for this path
-            if obj_id not in self.id_to_active_ws_data_set_dict:
-                self.id_to_active_ws_data_set_dict[obj_id] = set()
-                self.id_to_active_ws_data_set_dict[obj_id].add(
+            if obj_id not in self.id_to_active_ws_data_list_dict:
+                self.id_to_active_ws_data_list_dict[obj_id] = []
+                self.id_to_active_ws_data_list_dict[obj_id].append(
                     WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
                            projection_model=projection_model))
             elif is_new_ws:  # we have the obj_id in our dict but master did not have this websocket
-                active_ws_n_filter_callable_tuple_set: Set[WSData] = \
-                    self.id_to_active_ws_data_set_dict[obj_id]
-                if not (ws in [ws_data.ws_object for ws_data in active_ws_n_filter_callable_tuple_set]):
-                    self.id_to_active_ws_data_set_dict[obj_id].add(
+                active_ws_n_filter_callable_tuple_list: List[WSData] = \
+                    self.id_to_active_ws_data_list_dict[obj_id]
+                if not (ws in [ws_data.ws_object for ws_data in active_ws_n_filter_callable_tuple_list]):
+                    self.id_to_active_ws_data_list_dict[obj_id].append(
                         WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
                                projection_model=projection_model))
                     logging.debug("new client web-socket connect called on a pre-added obj_id-web-path")
                 else:
                     raise Exception(
-                        f"Unexpected! ws: {ws} for id: {obj_id} found in active_ws_n_filter_callable_tuple_set "
+                        f"Unexpected! ws: {ws} for id: {obj_id} found in active_ws_n_filter_callable_tuple_list "
                         f"but not in master: {str(self)}, likely a bug")
             else:
                 pass
@@ -208,15 +208,15 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
 
     async def disconnect(self, ws: WebSocket, obj_id: Any):
         async with self.rlock:
-            for fetched_ws_data in self.id_to_active_ws_data_set_dict[obj_id]:
+            for fetched_ws_data in self.id_to_active_ws_data_list_dict[obj_id]:
                 if fetched_ws_data.ws_object == ws:
-                    self.id_to_active_ws_data_set_dict[obj_id].remove(fetched_ws_data)
+                    self.id_to_active_ws_data_list_dict[obj_id].remove(fetched_ws_data)
                     break
             else:
                 logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_n_callable_tuple_set "
                               f"for obj_id {obj_id}: {str(self)}")
-            if len(self.id_to_active_ws_data_set_dict[obj_id]) == 0:
-                del self.id_to_active_ws_data_set_dict[obj_id]
+            if len(self.id_to_active_ws_data_list_dict[obj_id]) == 0:
+                del self.id_to_active_ws_data_list_dict[obj_id]
             await WSConnectionManager.remove_from_master_ws_set(ws)
 
     # async def receive_in_json(self, websocket: WebSocket):
@@ -226,8 +226,8 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
     #     else:
     #         return cleaned_json_data_str
 
-    def get_activ_ws_tuple_set_with_id(self, obj_id) -> Set[WSData] | None:
-        return self.id_to_active_ws_data_set_dict.get(obj_id)
+    def get_activ_ws_tuple_list_with_id(self, obj_id) -> Set[WSData] | None:
+        return self.id_to_active_ws_data_list_dict.get(obj_id)
 
     async def broadcast(self, json_str, obj_id: Any, ws_data: WSData, task_list: List[asyncio.Task]):
         async with self.rlock:
@@ -256,6 +256,6 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                 logging.exception(f"Exception: {e}, ws: {remove_websocket}")
             finally:
                 if remove_websocket is not None:
-                    if remove_websocket in self.id_to_active_ws_data_set_dict[obj_id]:
+                    if remove_websocket in self.id_to_active_ws_data_list_dict[obj_id]:
                         await self.disconnect(remove_websocket, obj_id)
 

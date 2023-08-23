@@ -35,3 +35,4 @@ sqlmodel==0.0.8
 pandas==2.0.2
 pexpect==4.8.0
 pytest-html==3.2.0
+pymongoarrow==1.0.2

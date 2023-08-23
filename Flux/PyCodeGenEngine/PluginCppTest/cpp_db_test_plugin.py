@@ -49,7 +49,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
 
     @staticmethod
     def generate_bulk_patch_for_test(message: protogen.Message, message_name, message_name_snake_cased: str, package_name: str,
-                                     class_name: str):
+                                     class_name: str, flux_fld_pk_value):
 
         output_content: str = ""
 
@@ -67,7 +67,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                 if field_type_message is not None and field_type != "repeated":
                     for f in field_type_message.fields:
                         field_variable_type: str = f.kind.name.lower()
-                        if f.message is None:
+                        if f.message is None and f.proto.name:
                             if CppDbTestPlugin.is_option_enabled(f, CppDbTestPlugin.flux_fld_val_is_datetime):
                                 output_content += f'\t\t{message_name_snake_cased}_list.mutable_' \
                                                   f'{message_name_snake_cased}(i)->mutable_{field_name}()->set_' \
@@ -89,7 +89,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                 if field_type_message is not None and field_type != "repeated":
                     for f in field_type_message.fields:
                         field_variable_type: str = f.kind.name.lower()
-                        if f.message is None:
+                        if f.message is None and f.proto.name not in flux_fld_pk_value:
                             if CppDbTestPlugin.is_option_enabled(f, CppDbTestPlugin.flux_fld_val_is_datetime):
                                 output_content += f'\t\t{message_name_snake_cased}_list.mutable_' \
                                                   f'{message_name_snake_cased}(i)->mutable_{field_name}()->set_' \
@@ -123,7 +123,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
         return output_content
 
     def generate_patch_for_test(self, message: protogen.Message, message_name: str,
-                                message_name_snake_cased: str, class_name: str):
+                                message_name_snake_cased: str, class_name: str, flux_fld_pk_value):
         output_content: str = ""
 
         key_list: List[List[str]] = StratExecutorPlugin.get_executor_key_sequence_list_of_model(message)
@@ -132,7 +132,6 @@ class CppDbTestPlugin(BaseProtoPlugin):
             field_type = field.cardinality.name.lower()
             field_type_message = field.message
             if not CppDbTestPlugin.is_option_enabled(field, CppDbTestPlugin.flux_fld_PK):
-
                 if field_type_message is not None and field_type != "repeated":
                     for f in field_type_message.fields:
                         field_variable_type: str = f.kind.name.lower()
@@ -155,7 +154,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                 if field_type_message is not None and field_type != "repeated":
                     for f in field_type_message.fields:
                         field_variable_type: str = f.kind.name.lower()
-                        if f.message is None:
+                        if f.message is None and f.proto.name not in flux_fld_pk_value:
                             if CppDbTestPlugin.is_option_enabled(f, CppDbTestPlugin.flux_fld_val_is_datetime):
                                 output_content += f'\t{message_name_snake_cased}.mutable_{field_name}()->set_{f.proto.name}' \
                                                   f'({class_name}PopulateRandomValues::get_utc_time());\n'
@@ -244,7 +243,8 @@ class CppDbTestPlugin(BaseProtoPlugin):
                     field_name: str = field.proto.name
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
                     if CppDbTestPlugin.is_option_enabled(field, CppDbTestPlugin.flux_fld_PK):
-
+                        flux_fld_pk_value = (CppDbTestPlugin.get_simple_option_value_from_proto
+                                            (field, CppDbTestPlugin.flux_fld_PK))
                         output_content += f"\nTEST({class_name}{message_name}TestSuite, DBTest) {{\n\t"
                         # output_content += (f"{class_name}MongoDB{message_name}Codec {message_name_snake_cased}_codec("
                         #                    f"mongo_db, logger);\n")
@@ -285,7 +285,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n\n"
 
                         output_content += self.generate_patch_for_test(message, message_name,
-                                                                       message_name_snake_cased, class_name)
+                                                                       message_name_snake_cased, class_name, flux_fld_pk_value)
 
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n"
                         output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"
@@ -332,7 +332,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                                           f"_json);\n\n"
 
                         output_content += self.generate_bulk_patch_for_test(message, message_name, message_name_snake_cased, package_name,
-                                                                            class_name)
+                                                                            class_name, flux_fld_pk_value)
                         output_content += f"\n\tASSERT_TRUE({message_name_snake_cased}_codec.delete_all_data_from_" \
                                           f"collection());\n"
                         output_content += f"\t{message_name_snake_cased}_json_from_db.clear();\n"

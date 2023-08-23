@@ -65,6 +65,7 @@ const fieldProps = [
     { propertyName: "val_time_field", usageName: "val_time_field" },
     { propertyName: "val_meta_field", usageName: "val_meta_field" },
     { propertyName: "projections", usageName: "projections" },
+    { propertyName: "mapping_projection_query_field", usageName: "mapping_projection_query_field" },
 ]
 
 // properties supported explicitly on the array types
@@ -1785,10 +1786,6 @@ export function applyFilter(arr, filters = [], collectionView = false, collectio
         const filterDict = getFilterDict(filters);
         Object.keys(filterDict).forEach(key => {
             let values = filterDict[key].split(",").map(val => val.trim()).filter(val => val !== "");
-            if (collectionView) {
-                const collection = collections.find(collection => collection.key === key);
-                key = collection.tableTitle;
-            }
             updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
         })
         return updatedArr;
@@ -2420,7 +2417,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
         let chartSeriesCollections = collections;
         if (series.underlying_time_series) {
             const collection = getCollectionByName(collections, series.encode.y, isCollectionType);
-            const [seriesWidgetName, mappingSrcField] = collection.mapping_src.split('.', 1);
+            const [seriesWidgetName, mappingSrcField] = collection.mapping_src.split('.', 2);
             const seriesCollections = schemaCollections[seriesWidgetName];
             const xCollection = seriesCollections.find(col => col.val_time_field === true);
             xEncode = xCollection.tableTitle;
@@ -2495,10 +2492,10 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                 name: xAxisName,
                 encode: encode
             }
-            if (axis.type === ChartAxisType.VALUE) {
-                const max = getAxisMax(rows, encode, 0);
-                axis.max = max;
-            }
+            // if (axis.type === ChartAxisType.VALUE) {
+            //     const max = getAxisMax(rows, encode, 0);
+            //     axis.max = max;
+            // }
             xAxis.push(axis);
         }
     })
@@ -2513,9 +2510,9 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                 type: yAxisType,
                 name: yAxisName,
                 encode: encode,
-                splitNumber: 5,
-                max: max,
-                interval: max / 5
+                // splitNumber: 5,
+                // max: max,
+                // interval: max / 5
             })
         }
     })
@@ -2642,9 +2639,8 @@ export function genChartDatasets(rows = [], tsData, chartObj, hasTimeSeries, par
     if (hasTimeSeries) {
         tsData.forEach(ts => {
             datasets.push({
-                dimensions: Object.keys(ts.projection_models[0]),
-                source: ts.projection_models,
-                // TODO: remove hardcoded name from meta_data.symbol
+                dimensions: ts.projection_models && ts.projection_models.length > 0 ? Object.keys(ts.projection_models[0]) : [],
+                source: ts.projection_models ? ts.projection_models : [],
                 name: _.get(ts, param),
                 type: 'time_series'
             })
@@ -2668,6 +2664,11 @@ export function genChartDatasets(rows = [], tsData, chartObj, hasTimeSeries, par
     return datasets;
 }
 
-export function mergeTsData(tsData, updatedData, groupBy) {
-
+export function mergeTsData(tsData, updatedData, param) {
+    tsData = cloneDeep(tsData);
+    updatedData.forEach(data => {
+        const timeSeries = tsData.find(ts => _.get(ts, param) === _.get(data, param));
+        timeSeries.projection_models.push(data.projection_models);
+    })
+    return tsData;
 }   

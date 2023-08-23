@@ -403,7 +403,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f'client({message_name_snake_cased}_id);\n'
                                 output_content += "\tASSERT_EQ(delete_response, json);\n"
 
-                                output_content += "\tfor (int i = 1; i < 3; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i < 10000; ++i) {\n"
                                 output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \
                                                   f"{message_name_snake_cased}({message_name_snake_cased});\n"
                                 output_content += f"\t\t{message_name_snake_cased}.set_id(i);\n"
@@ -418,7 +418,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_list_from_server.DebugString());\n\n"
 
                                 output_content += f"\t{message_name_snake_cased}_list.Clear();\n"
-                                output_content += "\tfor (int i = 1; i < 3; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i < 10000; ++i) {\n"
                                 output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \
                                                   f"{message_name_snake_cased}({message_name_snake_cased});\n"
                                 output_content += f"\t\t{message_name_snake_cased}.set_id(i);\n"
@@ -433,7 +433,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_list_from_server.DebugString());\n\n"
 
                                 output_content += f"\t{message_name_snake_cased}.Clear();\n"
-                                output_content += "\tfor (int i = 1; i < 3; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i < 10000; ++i) {\n"
                                 for field in message.fields:
                                     field_name: str = field.proto.name
                                     field_type_message: None | protogen.Message = field.message
@@ -459,7 +459,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                 output_content += f"\tASSERT_EQ({message_name_snake_cased}_list.DebugString(), " \
                                                   f"{message_name_snake_cased}_list_for_patch.DebugString());\n\n"
                                 output_content += "\tjson.clear();\n"
-                                output_content += "\tfor (int i = 1; i < 3; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i < 10000; ++i) {\n"
                                 output_content += '\t\tjson = R"({"msg":"Deletion Successful","id":)";\n'
                                 output_content += '\t\tjson += std::to_string(i); // Convert int to string and append\n'
                                 output_content += '\t\tjson += R"(})";\n'

@@ -85,7 +85,7 @@ def validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type: Type[Do
         raise Exception(err)
 
 
-async def broadcast_all_from_active_ws_data_set(active_ws_data_set: Set[WSData], pydantic_class_type,
+async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type,
                                                 pydantic_obj_id_list: List[Any],
                                                 broadcast_callable: Callable,
                                                 tasks_list: List[asyncio.Task],
@@ -110,7 +110,7 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: Set[WSData],
         await broadcast_callable(json_str, ws_data, tasks_list)
 
 
-async def broadcast_from_active_ws_data_set(active_ws_data_set: Set[WSData], pydantic_class_type,
+async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type,
                                             pydantic_obj_id: Any,
                                             broadcast_callable: Callable,
                                             tasks_list: List[asyncio.Task],
@@ -149,22 +149,22 @@ async def publish_ws(pydantic_class_type: Type[DocType], pydantic_obj_id: Any, f
     """
     validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type)
     tasks_list: List[asyncio.Task] = []
-    active_ws_data_set: Set[WSData] = pydantic_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_set()
-    if active_ws_data_set:
+    active_ws_data_list: List[WSData] = pydantic_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_list()
+    if active_ws_data_list:
         async with pydantic_class_type.read_ws_path_ws_connection_manager.rlock:
-            await broadcast_from_active_ws_data_set(active_ws_data_set, pydantic_class_type, pydantic_obj_id,
+            await broadcast_from_active_ws_data_set(active_ws_data_list, pydantic_class_type, pydantic_obj_id,
                                                     pydantic_class_type.read_ws_path_ws_connection_manager.broadcast,
                                                     tasks_list, dummy_pydantic_model=dummy_pydantic_model,
                                                     filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
     if update_ws_with_id:
-        active_ws_data_set_for_id: Set[WSData] = \
-            pydantic_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_set_with_id(
+        active_ws_data_list_for_id: List[WSData] = \
+            pydantic_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_list_with_id(
                 pydantic_obj_id)
 
-        if active_ws_data_set_for_id:
+        if active_ws_data_list_for_id:
             async with pydantic_class_type.read_ws_path_with_id_ws_connection_manager.rlock:
                 await broadcast_from_active_ws_data_set(
-                    active_ws_data_set_for_id, pydantic_class_type, pydantic_obj_id,
+                    active_ws_data_list_for_id, pydantic_class_type, pydantic_obj_id,
                     pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast,
                     tasks_list, broadcast_with_id=True, dummy_pydantic_model=dummy_pydantic_model,
                     filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
@@ -186,27 +186,30 @@ async def publish_ws_all(pydantic_class_type: Type[DocType], pydantic_obj_id_lis
     validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type)
     tasks_list: List[asyncio.Task] = []
 
-    active_ws_data_set: Set[WSData] = pydantic_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_set()
-    if active_ws_data_set:
+    active_ws_data_list: List[WSData] = pydantic_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_list()
+    if active_ws_data_list:
         async with pydantic_class_type.read_ws_path_ws_connection_manager.rlock:
-            await broadcast_all_from_active_ws_data_set(active_ws_data_set, pydantic_class_type,
+            await broadcast_all_from_active_ws_data_set(active_ws_data_list, pydantic_class_type,
                                                         pydantic_obj_id_list,
                                                         pydantic_class_type.read_ws_path_ws_connection_manager.broadcast,
-                                                        tasks_list, dummy_pydantic_model)
+                                                        tasks_list, dummy_pydantic_model, filter_agg_pipeline,
+                                                        has_links)
     # TODO: this can be optimized by sending array of messages to ws instead of sending one message at a time per ws
     #       in most use-case the consumer of one id is interested in all ids.
     if update_ws_with_id:
         for pydantic_obj_id in pydantic_obj_id_list:
-            active_ws_data_set_for_id: Set[WSData] = \
-                pydantic_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_set_with_id(
+            active_ws_data_list_for_id: List[WSData] = \
+                pydantic_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_list_with_id(
                     pydantic_obj_id)
 
-            if active_ws_data_set_for_id:
+            if active_ws_data_list_for_id:
                 async with pydantic_class_type.read_ws_path_with_id_ws_connection_manager.rlock:
                     await broadcast_from_active_ws_data_set(
-                        active_ws_data_set_for_id, pydantic_class_type, pydantic_obj_id,
+                        active_ws_data_list_for_id, pydantic_class_type, pydantic_obj_id,
                         pydantic_class_type.read_ws_path_with_id_ws_connection_manager.broadcast,
-                        tasks_list, broadcast_with_id=True, dummy_pydantic_model=dummy_pydantic_model)
+                        tasks_list, broadcast_with_id=True, dummy_pydantic_model=dummy_pydantic_model,
+                        filter_agg_pipeline=filter_agg_pipeline, has_links=has_links
+                    )
     if tasks_list:
         await execute_tasks_list_with_all_completed(tasks_list, pydantic_class_type)
 

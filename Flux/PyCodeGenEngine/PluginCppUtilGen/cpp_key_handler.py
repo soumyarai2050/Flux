@@ -75,7 +75,7 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
             field_name: str = field.proto.name
             field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
             field_type_message: protogen.Message | None = field.message
-            if CppKeyHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
+            if CppKeyHandlerPlugin.is_option_enabled(field, CppKeyHandlerPlugin.flux_fld_PK):
                 if field_type_message is not None:
                     flux_fld_pk_value = (CppKeyHandlerPlugin.get_simple_option_value_from_proto
                                               (field, CppKeyHandlerPlugin.flux_fld_PK))
