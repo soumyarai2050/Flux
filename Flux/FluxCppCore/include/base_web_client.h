@@ -58,16 +58,17 @@ namespace FluxCppCore {
             boost::asio::connect(synchronous_socket, c_result_);
             boost::beast::http::write(synchronous_socket, request);
 
+            boost::beast::error_code error_code_obj;
             boost::beast::flat_buffer buffer;
-            boost::beast::http::response<boost::beast::http::dynamic_body> response;
-            boost::beast::http::read(synchronous_socket, buffer, response);
-            response_json_out = boost::beast::buffers_to_string(response.body().data());
+            boost::beast::http::response_parser<boost::beast::http::dynamic_body> response_parser_obj;
+            response_parser_obj.body_limit(boost::none);
+            boost::beast::http::read(synchronous_socket, buffer, response_parser_obj, error_code_obj);
 
-            if (!response_json_out.empty()) {
-                return true;
-            } else {
-                return false;
+            if (error_code_obj) {
+                std::cerr << "An error occurred: " << error_code_obj.message() << std::endl;
             }
+            response_json_out = boost::beast::buffers_to_string(response_parser_obj.get().body().data());
+            return !response_json_out.empty();
         }
 
         [[nodiscard]] bool send_get_request(const std::string_view url, std::string &r_response_json_out) const {

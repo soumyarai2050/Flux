@@ -423,10 +423,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 # container class for projection model
                 output_str += (f"class {message.proto.name}ProjectionContainerFor"
                                f"{field_names_str_camel_cased}(BaseModel):\n")
-                if meta_field.message:
-                    output_str += f"    {meta_field_name}: {meta_field_type}Optional\n"
-                else:
-                    output_str += f"    {meta_field_name}: {meta_field_type}\n"
+                output_str += f"    {meta_field_name}: {meta_field_type}\n"
                 output_str += (f"    projection_models: List[{message.proto.name}ProjectionFor"
                                f"{field_names_str_camel_cased}]\n\n\n")
 

@@ -138,7 +138,7 @@ function getMappingSrcDict(mappingSrc) {
 }
 
 function getMetaFieldDict(metaFieldList) {
-    getKeyValueDictFromArray(metaFieldList);
+    return getKeyValueDictFromArray(metaFieldList);
 }
 
 export function createCollections(schema, currentSchema, callerProps, collections = [], sequence = { sequence: 1 }, xpath, objectxpath) {
@@ -204,22 +204,19 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
             complexFieldProps.map(({ propertyName, usageName }) => {
                 if (currentSchema.hasOwnProperty(propertyName) || v.hasOwnProperty(propertyName)) {
-                    collection[usageName] = v[propertyName] ? v[propertyName] : currentSchema[propertyName];
+                    const propertyValue = v[propertyName] ? v[propertyName] : currentSchema[propertyName];
 
                     if (propertyName === 'auto_complete') {
-                        let autocompleteDict = getAutocompleteDict(collection[usageName]);
+                        let autocompleteDict = getAutocompleteDict(propertyValue);
                         setAutocompleteValue(schema, collection, autocompleteDict, k, usageName);
-                        if (!collection.hasOwnProperty('options')) {
-                            delete collection[usageName];
-                        }
                     }
 
                     if (propertyName === 'mapping_underlying_meta_field' || propertyName === 'mapping_src') {
                         let dict;
                         if (propertyName === 'mapping_underlying_meta_field') {
-                            dict = getMetaFieldDict(collection[usageName]);
+                            dict = getMetaFieldDict(propertyValue);
                         } else {
-                            dict = getMappingSrcDict(collection[usageName]);
+                            dict = getMappingSrcDict(propertyValue);
                         }
                         for (const field in dict) {
                             if (collection.xpath.endsWith(field)) {
@@ -595,25 +592,23 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
 
         complexFieldProps.map(({ propertyName, usageName }) => {
             if (currentSchema.hasOwnProperty(propertyName) || attributes.hasOwnProperty(propertyName)) {
-                node[usageName] = attributes[propertyName] ? attributes[propertyName] : currentSchema[propertyName];
+                const propertyValue = attributes[propertyName] ? attributes[propertyName] : currentSchema[propertyName];
 
                 if (propertyName === 'auto_complete') {
-                    let autocompleteDict = getAutocompleteDict(node[usageName]);
+                    let autocompleteDict = getAutocompleteDict(propertyValue);
                     setAutocompleteValue(schema, node, autocompleteDict, propname, usageName);
                     if (node.hasOwnProperty('options')) {
                         node.customComponentType = 'autocomplete';
                         node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
-                    } else {
-                        delete node[usageName];
                     }
                 }
 
                 if (propertyName === 'mapping_underlying_meta_field' || propertyName === 'mapping_src') {
                     let dict;
                     if (propertyName === 'mapping_underlying_meta_field') {
-                        dict = getMetaFieldDict(node[usageName]);
+                        dict = getMetaFieldDict(propertyValue);
                     } else {
-                        dict = getMappingSrcDict(node[usageName]);
+                        dict = getMappingSrcDict(propertyValue);
                     }
                     for (const field in dict) {
                         if (node.xpath.endsWith(field)) {
@@ -2414,6 +2409,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
     chartDataObj.series.forEach(series => {
         let xEncode;
         let yEncode;
+        let yMax = 0;
         let chartSeriesCollections = collections;
         if (series.underlying_time_series) {
             const collection = getCollectionByName(collections, series.encode.y, isCollectionType);
@@ -2425,6 +2421,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
             yEncode = yCollection.tableTitle;
             series.encode.x = xEncode;
             series.encode.y = yEncode;
+            const tsRows = [];
             datasets.forEach((dataset, index) => {
                 if (dataset.type === 'time_series') {
                     const updatedSeries = cloneDeep(series);
@@ -2435,13 +2432,16 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                         updatedSeries.showSymbol = false;
                     }
                     seriesList.push(updatedSeries);
+                    tsRows.push(...dataset.source)
                 }
             })
+            yMax = getAxisMax(tsRows, yEncode, yEncodes.length);
             chartSeriesCollections = seriesCollections;
         } else {
             xEncode = series.encode.x;
             yEncode = series.encode.y;
             if (chartDataObj.partition_fld) {
+                const partitionRows = [];
                 datasets.forEach((dataset, index) => {
                     if (dataset.type === 'partition') {
                         const updatedSeries = cloneDeep(series);
@@ -2452,8 +2452,10 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                             updatedSeries.showSymbol = false;
                         }
                         seriesList.push(updatedSeries);
+                        partitionRows.push(...dataset.source);
                     }
                 })
+                yMax = getAxisMax(partitionRows, yEncode, yEncodes.length);
             } else {
                 const dataset = datasets.find(dataset => dataset.type === 'default');
                 if (dataset) {
@@ -2465,6 +2467,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                         updatedSeries.showSymbol = false;
                     }
                     seriesList.push(updatedSeries);
+                    yMax = getAxisMax(rows, yEncode, yEncodes.length);
                 }
             }
         }
@@ -2478,7 +2481,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
             xEndodes.push({ encode: xEncode, seriesCollections: chartSeriesCollections, isCollectionType: !series.underlying_time_series });
         }
         if (!yEncodes.includes(yEncode)) {
-            yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !series.underlying_time_series });
+            yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !series.underlying_time_series, max: yMax });
         }
     })
     xEndodes.forEach(({ encode, seriesCollections, isCollectionType }) => {
@@ -2492,16 +2495,15 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                 name: xAxisName,
                 encode: encode
             }
-            // if (axis.type === ChartAxisType.VALUE) {
-            //     const max = getAxisMax(rows, encode, 0);
-            //     axis.max = max;
-            // }
+            if (axis.type === ChartAxisType.VALUE) {
+                const max = getAxisMax(rows, encode, 0);
+                axis.max = max;
+            }
             xAxis.push(axis);
         }
     })
-    yEncodes.forEach(({ encode, seriesCollections, isCollectionType }, index) => {
+    yEncodes.forEach(({ encode, seriesCollections, isCollectionType, max }) => {
         const [yAxisType, yAxisName] = getChartAxisTypeAndName(seriesCollections, encode, isCollectionType);
-        const max = getAxisMax(rows, encode, index);
         // only two y-axis is allowed per chart.
         // if more than 2 y-axis is present, only considers the first 2 y-axis
         // this limitation is added to avoid unsupported configurations
@@ -2510,9 +2512,9 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                 type: yAxisType,
                 name: yAxisName,
                 encode: encode,
-                // splitNumber: 5,
-                // max: max,
-                // interval: max / 5
+                splitNumber: 5,
+                max: max,
+                interval: max / 5
             })
         }
     })
@@ -2529,6 +2531,8 @@ function updateChartAttributesInSchema(schema, currentSchema) {
             if (primitiveDataTypes.includes(attributes.type)) {
                 if (key === DB_ID) {
                     attributes.server_populate = true;
+                    attributes.hide = true;
+                    attributes.orm_no_update = true;
                 } else if (key === 'chart_name') {
                     attributes.orm_no_update = true;
                 }
@@ -2541,21 +2545,30 @@ function updateChartAttributesInSchema(schema, currentSchema) {
     }
 }
 
-export function updateChartSchema(schema, collections, collectionView = false) {
+export function updateChartSchema(schema, collections, isCollectionType = false) {
     schema = cloneDeep(schema);
     const chartDataSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
     updateChartAttributesInSchema(schema, chartDataSchema);
+    chartDataSchema.auto_complete = 'partition_fld:StrFldList';
     const chartEncodeSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_encode']);
     chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
     const filterSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
-    filterSchema.auto_complete = 'fld_name:FldList';
+    filterSchema.auto_complete = 'fld_name:MetaFldList';
     let fldList;
-    if (collectionView) {
-        fldList = collections.map(collection => collection.title);
+    let strFldList;
+    let metaFldList;
+    if (isCollectionType) {
+        fldList = collections.map(collection => collection.key);
+        strFldList = collections.filter(collection => collection.type === DataTypes.STRING).map(collection => collection.key);
+        metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection.key);
     } else {
         fldList = collections.map(collection => collection.tableTitle);
+        strFldList = collections.filter(collection => collection.type === DataTypes.STRING).map(collection => collection.tableTitle);
+        metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection.tableTitle);
     }
     schema.autocomplete['FldList'] = fldList;
+    schema.autocomplete['StrFldList'] = strFldList;
+    schema.autocomplete['MetaFldList'] = metaFldList;
     return schema;
 }
 
@@ -2671,4 +2684,30 @@ export function mergeTsData(tsData, updatedData, param) {
         timeSeries.projection_models.push(data.projection_models);
     })
     return tsData;
-}   
+}
+
+export function genMetaFilters(arr, collections, filterDict, filterFld, isCollectionType = false) {
+    const filters = [];
+    const fldMappingDict = {};
+    collections.forEach(col => {
+        if (col.hasOwnProperty('mapping_underlying_meta_field')) {
+            const metaField = col.mapping_underlying_meta_field.split('.').pop();
+            if (isCollectionType) {
+                fldMappingDict[col.key] = metaField;
+            } else {
+                fldMappingDict[col.tableTitle] = metaField;
+            }
+        }
+    })
+    let values = filterDict[filterFld].split(",").map(val => val.trim()).filter(val => val !== "");
+    arr.forEach(row => {
+        if (values.includes(_.get(row, filterFld))) {
+            const filter = {};
+            for (const key in fldMappingDict) {
+                filter[fldMappingDict[key]] = _.get(row, key);
+            }
+            filters.push(filter);
+        }
+    })
+    return filters;
+}

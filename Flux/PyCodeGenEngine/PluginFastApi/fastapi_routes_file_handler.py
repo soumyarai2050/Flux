@@ -1587,8 +1587,8 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             # If no field is found having projection enabled
             return output_str
 
-        query_name_to_param_str_n_field_tuple_list_dict: Dict[str, List[Tuple[str, protogen.Field]]] = (
-            self.get_projection_query_name_to_param_field_n_field_obj_tuple_list_dict(message))
+        meta_data_field_name_to_field_proto_dict: Dict[str, (protogen.Field | Dict[str, protogen.Field])] = (
+            self.get_meta_data_field_name_to_field_proto_dict(message))
         projection_val_to_fields_dict = FastapiRoutesFileHandler.get_projection_option_value_to_fields(message)
         projection_val_to_query_name_dict = (
             FastapiRoutesFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(message))
@@ -1605,16 +1605,17 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             container_model_name = f"{message.proto.name}ProjectionContainerFor{field_names_str_camel_cased}"
             projection_model_name = f"{message.proto.name}ProjectionFor{field_names_str_camel_cased}"
 
-            query_param_field_str_n_field_tuple_list = (
-                query_name_to_param_str_n_field_tuple_list_dict.get(projection_option_val))
-
             query_param_str = ""
             query_param_with_type_str = ""
-            if query_param_field_str_n_field_tuple_list:
-                for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
-                    query_param_str += f"{field.proto.name}, "
-                    query_param_with_type_str += f"{field.proto.name}: {self.proto_to_py_datatype(field)}, "
-
+            for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
+                if isinstance(meta_field_value, dict):
+                    for nested_meta_field_name, nested_meta_field in meta_field_value.items():
+                        query_param_str += f"{nested_meta_field_name}, "
+                        query_param_with_type_str += (f"{nested_meta_field_name}: "
+                                                      f"{self.proto_to_py_datatype(nested_meta_field)}, ")
+                else:
+                    query_param_str += f"{meta_field_name}, "
+                    query_param_with_type_str += f"{meta_field_name}: {self.proto_to_py_datatype(meta_field_value)}, "
             query_param_str += "start_date_time, end_date_time"
             query_param_with_type_str += ("start_date_time: DateTime | None = None, "
                                           "end_date_time: DateTime | None = None")
@@ -1624,9 +1625,13 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                                                       return_type_str=container_model_name)
 
             query_param_dict_str = "{"
-            if query_param_field_str_n_field_tuple_list:
-                for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
-                    query_param_dict_str += f'"{field.proto.name}": {field.proto.name}, '
+            for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
+                if isinstance(meta_field_value, dict):
+                    for nested_meta_field_name, nested_meta_field in meta_field_value.items():
+                        query_param_dict_str += (f'"{nested_meta_field_name}": '
+                                                 f'{nested_meta_field_name}, ')
+                else:
+                    query_param_dict_str += f'"{meta_field_name}": {meta_field_name}, '
             query_param_dict_str += '"start_date_time": start_date_time, "end_date_time": end_date_time}'
 
             # WS method

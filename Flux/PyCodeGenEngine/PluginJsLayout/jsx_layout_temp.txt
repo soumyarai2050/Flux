@@ -313,17 +313,6 @@ function Layout() {
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
-    const onPartitionFldChange = useCallback((name, partitionFld) => {
-        layoutsRef.current = layoutsRef.current.map(layout => {
-            if (layout.i === name) {
-                layout = cloneDeep(layout);
-                layout.partition_fld = partitionFld;
-            }
-            return layout
-        });
-        setUpdateCounter(prevCounter => prevCounter + 1);
-    }, [])
-
     const onFiltersChange = useCallback((name, filters) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {

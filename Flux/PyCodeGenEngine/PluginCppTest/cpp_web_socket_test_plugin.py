@@ -107,7 +107,7 @@ class CppWebsocketTestPlugin(BaseProtoPlugin):
                         output_content += f"\t{package_name}::{message_name}List {message_name_snake_cased}_list;\n"
                         output_content += f"\t{package_name}::{message_name}List {message_name_snake_cased}" \
                                           f"_list_from_server;\n"
-                        output_content += "\tfor (int i = 0; i < 5; ++i) {\n"
+                        output_content += "\tfor (int i = 0; i <= 10000; ++i) {\n"
                         output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \
                                           f"{message_name_snake_cased}({message_name_snake_cased});\n"
                         output_content += f"\t\t{message_name_snake_cased}_list.add_{message_name_snake_cased}()" \

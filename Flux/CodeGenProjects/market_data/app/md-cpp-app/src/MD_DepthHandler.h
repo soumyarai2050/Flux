@@ -111,7 +111,11 @@ namespace md_handler {
                 boost::json::array md_array = { md_json };
                 std::string serialized_market_depth_json = boost::json::serialize(md_array);
                 std::cout << md_array << std::endl;
-                mongo_db.webSocketServer.publish(serialized_market_depth_json);
+                if (mongo_db.webSocketServer.has_ws_clients_connected())
+                    mongo_db.webSocketServer.publish(serialized_market_depth_json);
+                else{
+
+                }
             };
 
 

@@ -319,7 +319,7 @@ async def _underlying_patch_n_put_all(pydantic_class_type: Type[DocType], proto_
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
     stored_obj_list = await get_obj_list(pydantic_class_type, updated_obj_id_list,
                                          filter_agg_pipeline, has_links)
-    await publish_ws_all(pydantic_class_type, stored_obj_list, filter_agg_pipeline, has_links, update_ws_with_id=True)
+    await publish_ws_all(pydantic_class_type, updated_obj_id_list, filter_agg_pipeline, has_links, update_ws_with_id=True)
     return stored_obj_list
 
 
@@ -513,9 +513,6 @@ async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_pack
         pydantic_obj_list.append(pydantic_dummy_model(id=pydantic_obj.id))
         del_success.id.append(pydantic_obj.id)
 
-    await publish_ws_all(pydantic_class_type, pydantic_obj_list, update_ws_with_id=True,
-                         dummy_pydantic_model=pydantic_dummy_model)
-
     # deleting all
     await pydantic_class_type.delete_all()
 
@@ -527,6 +524,8 @@ async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_pack
         # else not required: all good
     # else not required: if id is not int then it must be of PydanticObjectId so no handling required
 
+    await publish_ws_all(pydantic_class_type, del_success.id, update_ws_with_id=True,
+                         dummy_pydantic_model=pydantic_dummy_model)
     return del_success
 
 

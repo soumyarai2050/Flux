@@ -19,13 +19,6 @@ enum Theme{
     THEME_LIGHT = 3;
 }
 
-enum ChartAxisType {
-  CHART_AXIS_TYPE_UNSPECIFIED = 0;
-  category = 1;
-  time = 2;
-  value = 3;
-}
-
 enum ChartType {
   CHART_TYPE_UNSPECIFIED = 0;
   bar = 1;
@@ -75,7 +68,6 @@ message WidgetUIDataElement {
   repeated WidgetUIData widget_ui_data = 13;
   repeated ChartData chart_data = 14;
   repeated UIFilter filters = 15;
-  optional string partition_fld = 16;
 }
 
 message WidgetUIData{
@@ -108,7 +100,7 @@ message UIProgressBar{
 }
 
 message ChartEncode {
-  required string x = 1;
+  optional string x = 1;
   required string y = 2;
 }
 

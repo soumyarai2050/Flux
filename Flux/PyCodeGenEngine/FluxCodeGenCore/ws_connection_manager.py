@@ -12,7 +12,7 @@ class WSData(BaseModel):
     ws_object: WebSocket
     filter_callable: Callable[..., Any] | None = None
     filter_callable_kwargs: Dict[Any, Any] | None = None
-    projection_model: BaseModel | None = None
+    projection_model: Any | None = None
 
     class Config:
         arbitrary_types_allowed = True

@@ -558,8 +558,6 @@ function AbbreviatedFilterWidget(props) {
                     chartData={props.chartData}
                     onChartDataChange={props.onChartDataChange}
                     collections={collections}
-                    partitionFld={props.partitionFld}
-                    onPartitionFldChange={props.onPartitionFldChange}
                     filters={props.filters}
                     collectionView={true}
                 />

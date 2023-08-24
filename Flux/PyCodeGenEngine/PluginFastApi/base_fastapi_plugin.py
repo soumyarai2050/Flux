@@ -202,37 +202,37 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         # else not required: Avoid if message does not have custom id field
         return id_field_type
 
-    def get_projection_query_name_to_param_field_n_field_obj_tuple_list_dict(self, message: protogen.Message):
-        query_name_to_param_str_n_field_tuple_list_dict: Dict[str, List[Tuple[str, protogen.Field]]] = {}
+    def get_meta_data_field_name_to_field_proto_dict(self, message: protogen.Message
+                                                     ) -> Dict[str, protogen.Field | Dict[str, protogen.Field]]:
+        meta_data_field_name_to_field_proto_dict: Dict[str, (protogen.Field | Dict[str, protogen.Field])] = {}
+
         for field in message.fields:
-            if BaseFastapiPlugin.is_option_enabled(field, BaseFastapiPlugin.flux_fld_mapping_projection_query_field):
-                query_name_mapping_list = \
-                    BaseFastapiPlugin.get_simple_option_value_from_proto(
-                        field, BaseFastapiPlugin.flux_fld_mapping_projection_query_field, is_repeated=True)
-
-                for query_name_mapping in query_name_mapping_list:
-                    if ":" not in query_name_mapping:
-                        query_name = query_name_mapping
-                        query_name_n_field_tuple = (field.proto.name, field)
-                    else:
-                        query_name_mapping_colan_sep = query_name_mapping.split(":")
-                        query_name: str = query_name_mapping_colan_sep[0]
-                        query_param_name: str = query_name_mapping_colan_sep[-1]
-                        nested_field: protogen.Field = self.get_nested_field_proto_object(field, query_param_name)
-                        query_name_n_field_tuple = (query_param_name, nested_field)
-                    if query_name_mapping not in query_name_to_param_str_n_field_tuple_list_dict:
-                        query_name_to_param_str_n_field_tuple_list_dict[query_name] = [query_name_n_field_tuple]
-                    else:
-                        query_name_to_param_str_n_field_tuple_list_dict[query_name].append(
-                            query_name_n_field_tuple)
-
-        if query_name_to_param_str_n_field_tuple_list_dict:
-            return query_name_to_param_str_n_field_tuple_list_dict
+            if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_val_meta_field):
+                meta_field = field
+                break
         else:
-            err_str = (f"Couldn't find any field having {BaseFastapiPlugin.flux_fld_mapping_projection_query_field}"
-                       f"option set in message {message.proto.name}")
+            err_str = (f"Could not find any time field in {message.proto.name} message having "
+                       f"{BaseFastapiPlugin.flux_msg_json_root_time_series} option")
             logging.exception(err_str)
             raise Exception(err_str)
+
+        if meta_field.message is not None:
+            meta_data_field_name_to_field_proto_dict[meta_field.proto.name] = {}
+            for nested_field in meta_field.message.fields:
+                if nested_field.message is None:
+                    meta_data_field_name_to_field_proto_dict[meta_field.proto.name][nested_field.proto.name] = (
+                        nested_field)
+                else:
+                    err_str = ("Unsupported meta field type: meta field type must be either simple type or proto "
+                               f"message type with only simple field, received another field: "
+                               f"{nested_field.proto.name} of message type {nested_field.message.proto.name} "
+                               f"in meta_field: {meta_field.proto.name} of message: {message.proto.name}")
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+        else:
+            meta_data_field_name_to_field_proto_dict[meta_field.proto.name] = meta_field
+        return meta_data_field_name_to_field_proto_dict
+
 
     @abstractmethod
     def handle_fastapi_initialize_file_gen(self):

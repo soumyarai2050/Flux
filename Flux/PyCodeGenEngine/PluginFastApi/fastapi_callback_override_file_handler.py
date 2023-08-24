@@ -345,7 +345,8 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
 
         # Projection handling
         projection_query_filter_func_req_query_name_n_message: List[Tuple[str, protogen.Message,
-                                                                    List[Tuple[str, protogen.Field]]]] = []
+                                                                    Dict[str, (protogen.Field |
+                                                                               Dict[str, protogen.Field])]]] = []
         for message in self.root_message_list:
             if FastapiCallbackOverrideFileHandler.is_option_enabled(
                     message, FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series):
@@ -381,9 +382,10 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                 projection_val_to_fields_dict = (
                     FastapiCallbackOverrideFileHandler.get_projection_option_value_to_fields(message))
                 projection_val_to_query_name_dict = (
-                    FastapiCallbackOverrideFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(message))
-                query_name_to_param_str_n_field_tuple_list_dict: Dict[str, List[Tuple[str, protogen.Field]]] = (
-                    self.get_projection_query_name_to_param_field_n_field_obj_tuple_list_dict(message))
+                    FastapiCallbackOverrideFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(
+                        message))
+                meta_data_field_name_to_field_proto_dict: Dict[str, (protogen.Field | Dict[str, protogen.Field])] = (
+                    self.get_meta_data_field_name_to_field_proto_dict(message))
                 for projection_option_val, query_name in projection_val_to_query_name_dict.items():
                     msg_name = message.proto.name
                     msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
@@ -398,13 +400,15 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                     field_names_str_camel_cased = convert_to_capitalized_camel_case(field_names_str)
                     projection_model_name = f"{message.proto.name}ProjectionFor{field_names_str_camel_cased}"
 
-                    query_param_field_str_n_field_tuple_list = (
-                        query_name_to_param_str_n_field_tuple_list_dict.get(projection_option_val))
-
                     query_param_with_type_str = ""
-                    if query_param_field_str_n_field_tuple_list:
-                        for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
-                            query_param_with_type_str += f"{field.proto.name}: {self.proto_to_py_datatype(field)}, "
+                    for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
+                        if isinstance(meta_field_value, dict):
+                            for nested_meta_field_name, nested_meta_field in meta_field_value.items():
+                                query_param_with_type_str += (f"{nested_meta_field_name}: "
+                                                              f"{self.proto_to_py_datatype(nested_meta_field)}, ")
+                        else:
+                            query_param_with_type_str += (f"{meta_field_name}: "
+                                                          f"{self.proto_to_py_datatype(meta_field_value)}, ")
                     query_param_with_type_str += ("start_date_time: DateTime | None = None, "
                                                   "end_date_time: DateTime | None = None")
 
@@ -416,12 +420,18 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                                                                        self.routes_file_name)
                     output_str += f"        from {routes_import_path} import " \
                                   f"underlying_read_{msg_name_snake_cased}_http\n"
+
                     query_param_dict_str = ""
-                    if query_param_field_str_n_field_tuple_list:
-                        for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
-                            query_param_dict_str += f'"{query_param_field_str}": {field.proto.name}'
-                            if query_param_field_str != list(query_param_field_str_n_field_tuple_list)[-1]:
-                                query_param_dict_str += ", "
+                    for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
+                        if isinstance(meta_field_value, dict):
+                            for nested_meta_field_name, nested_meta_field in meta_field_value.items():
+                                query_param_dict_str += (f'"{meta_field_name}.{nested_meta_field_name}": '
+                                                         f'{nested_meta_field.proto.name}')
+                                if nested_meta_field_name != list(meta_data_field_name_to_field_proto_dict)[-1]:
+                                    query_param_dict_str += ", "
+                        else:
+                            query_param_dict_str += f'"{meta_field_name}": {meta_field_value.proto.name}'
+
                     if not query_param_dict_str:
                         output_str += "        projection_filter: Dict = {}\n"
                     else:
@@ -446,23 +456,16 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                                    f"sample plugin generated file")
                         logging.exception(err_str)
                         raise Exception(err_str)
-                    if meta_field.message:
-                        output_str += f"        {meta_field.proto.name} = {meta_field.message.proto.name}Optional()\n"
-                        for param_name_str, field in query_param_field_str_n_field_tuple_list:
-                            output_str += f"        {param_name_str} = {field.proto.name}\n"
-                    else:
-                        if len(query_param_field_str_n_field_tuple_list) == 1:
-                            param_name_str, field = query_param_field_str_n_field_tuple_list[0]
-                            if field != meta_field:
-                                err_str = ""
-                                logging.exception(err_str)
-                                raise Exception(err_str)
+                    for meta_field_name, meta_field_proto_or_val in meta_data_field_name_to_field_proto_dict.items():
+                        if isinstance(meta_field_proto_or_val, dict):
+                            output_str += f"        {meta_field_name} = {meta_field.message.proto.name}("
+                            for nested_meta_field_name, nested_meta_field_proto in meta_field_proto_or_val.items():
+                                output_str += f"{nested_meta_field_name}={nested_meta_field_name}"
+                                if nested_meta_field_name != list(meta_field_proto_or_val)[-1]:
+                                    output_str += f", "
+                            output_str += f")\n"
                         else:
-                            err_str = ("Since meta field is of simple type, each query can have only one query param, "
-                                       f"found {len(query_param_field_str_n_field_tuple_list)}")
-                            logging.exception(err_str)
-                            raise Exception(err_str)
-                        output_str += f"        {meta_field.proto.name} = {param_name_str}"
+                            output_str += f"        {meta_field_name} = {meta_field_name}\n"
                     output_str += (f"        container_model = {container_model_name}("
                                    f"{meta_field.proto.name}={meta_field.proto.name}, projection_models="
                                    f"{msg_name_snake_cased}_projection_list)\n")
@@ -472,10 +475,10 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                     output_str += f"    async def {query_name}_query_ws_pre(self):\n"
                     output_str += f"        return {query_name}_filter_callable\n\n"
                     projection_query_filter_func_req_query_name_n_message.append(
-                        (query_name, message, query_param_field_str_n_field_tuple_list))
+                        (query_name, message, meta_data_field_name_to_field_proto_dict))
 
         # handling projection ws query filter functions
-        for query_name, message, query_param_field_str_n_field_tuple_list in (
+        for query_name, message, meta_data_field_name_to_field_proto_dict in (
                 projection_query_filter_func_req_query_name_n_message):
             for field in message.fields:
                 if self.is_bool_option_enabled(field,
@@ -495,29 +498,28 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
             output_str += f'    start_date_time = kwargs.get("start_date_time")\n'
             output_str += f'    end_date_time = kwargs.get("end_date_time")\n'
             output_str += f'    obj_json = json.loads({msg_name_snake_cased}_obj_json_str)\n'
-            if query_param_field_str_n_field_tuple_list:
-                for query_param_field_str, field in query_param_field_str_n_field_tuple_list:
-                    output_str += f'    {field.proto.name}_param = kwargs.get("{field.proto.name}")\n'
+            for meta_field_name, meta_field_proto_or_val in meta_data_field_name_to_field_proto_dict.items():
+                if isinstance(meta_field_proto_or_val, dict):
+                    for nested_meta_field_name, nested_meta_field_proto in meta_field_proto_or_val.items():
+                        output_str += f'    {nested_meta_field_name}_param = kwargs.get("{nested_meta_field_name}")\n'
+                else:
+                    output_str += f'    {meta_field_name}_param = kwargs.get("{meta_field_name}")\n'
 
-                    query_param_field_str_dot_sep = query_param_field_str.split(".")
-                    indent_count = 1
-                    last_field_str = "obj_json"
-                    for index, param_field_str in enumerate(query_param_field_str_dot_sep):
-                        output_str += ('    ' * indent_count +
-                                       f'{param_field_str} = {last_field_str}.get("{param_field_str}")\n')
-                        output_str += '    ' * indent_count + f'if {param_field_str} is None:\n'
-                        indent_count += 1
-                        output_str += '    ' * indent_count + f'return False\n'
-                        indent_count -= 1
-                        output_str += '    ' * indent_count + f'else:\n'
-                        indent_count += 1
-                        if index+1 == len(query_param_field_str_dot_sep):
-                            output_str += '    ' * indent_count + f'if {param_field_str} != {field.proto.name}_param:\n'
-                            indent_count += 1
-                            output_str += '    ' * indent_count + f'return False\n'
-                        else:
-                            last_field_str = param_field_str
-                            continue
+            for meta_field_name, meta_field_proto_or_val in meta_data_field_name_to_field_proto_dict.items():
+                # not nested impl since only 1 lvl nested message type field can be meta field currently
+                output_str += f'    {meta_field_name} = obj_json.get("{meta_field_name}")\n'
+                output_str += f'    if {meta_field_name} is None:\n'
+                output_str += f'        return False\n'
+                if isinstance(meta_field_proto_or_val, dict):
+                    output_str += f'    else:\n'
+                    for nested_meta_field_name, nested_meta_field_proto_or_val in meta_field_proto_or_val.items():
+                        output_str += (f'        {nested_meta_field_name} = '
+                                       f'{meta_field_name}.get("{nested_meta_field_name}")\n')
+                        output_str += f'        if {nested_meta_field_name} is None:\n'
+                        output_str += f'            return False\n'
+                        output_str += f'        else:\n'
+                        output_str += f'            if {nested_meta_field_name} != {nested_meta_field_name}_param:\n'
+                        output_str += f'                return False\n'
             output_str += f'    time_field_val_str = obj_json.get("{time_field_name}")\n'
             output_str += f'    time_field_val = pendulum.parse(time_field_val_str)\n'
             output_str += f'    if start_date_time and not end_date_time:\n'

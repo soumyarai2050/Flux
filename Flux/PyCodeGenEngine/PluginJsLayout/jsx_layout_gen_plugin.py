@@ -123,12 +123,10 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += "            options={"+f"layoutsById.{message_name_case_styled}.widget_ui_data"+"}\n"
             output_str += "            chartData={"+ f"layoutsById.{message_name_case_styled}.chart_data"+"}\n"
             output_str += "            filters={" + f"layoutsById.{message_name_case_styled}.filters" + "}\n"
-            output_str += "            partitionFld={" + f"layoutsById.{message_name_case_styled}.partition_fld" + "}\n"
             output_str += "            onChartDataChange={onChartDataChange}\n"
             output_str += "            onChangeLayout={onLayoutTypeChange}\n"
             output_str += '            onOverrideChange={onOverrideChange}\n'
             output_str += "            onFiltersChange={onFiltersChange}\n"
-            output_str += "            onPartitionFldChange={onPartitionFldChange}\n"
             output_str += f'        />\n'
             output_str += f'    </Paper>\n'
             output_str += '}\n'

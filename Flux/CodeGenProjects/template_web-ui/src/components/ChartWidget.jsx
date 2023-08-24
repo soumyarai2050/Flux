@@ -7,7 +7,7 @@ import _, { cloneDeep } from 'lodash';
 import { Add, AltRoute } from '@mui/icons-material';
 import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL } from '../constants';
 import {
-    addxpath, applyFilter, clearxpath, genChartDatasets, generateObjectFromSchema, getChartOption,
+    addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema, getChartOption,
     getCollectionByName, getFilterDict, mergeTsData, updateChartDataObj, updateChartSchema
 } from '../utils';
 import WidgetContainer from './WidgetContainer';
@@ -55,7 +55,7 @@ function ChartWidget(props) {
     //    - if chart configuration has time series, time series data is fetched from query (oe queries) 
     //      based on applied filter 
     //    - if not time-series, apply filter on rows 
-    //    - TODO: add only the necessary field in filter dropdown for time-series
+    //    - add only the necessary field in filter dropdown for time-series
     // 4. create expanded chart configuration object to be used by echart using stored chart configuration and datasets 
 
     const schema = updateChartSchema(props.schema, props.collections, props.collectionView);
@@ -67,7 +67,7 @@ function ChartWidget(props) {
             setTheme('dark');
         }
     }, [])
-    
+
     useEffect(() => {
         // update the local row dataset on update from parent
         setRows(props.rows);
@@ -126,15 +126,12 @@ function ChartWidget(props) {
                             name = queryName;
                         }
                     })
-                    seriesCollection = seriesCollections.find(col => col.hasOwnProperty('mapping_projection_query_field'));
-                    seriesCollection.mapping_projection_query_field.forEach(queryNQueryParam => {
-                        // if param is found, dont proceed
-                        if (param) return;
-                        const [queryName, queryParam] = queryNQueryParam.split(':');
-                        if (queryName === name) {
-                            param = queryParam;
-                        }
-                    })
+                    const filterDict = getFilterDict(storedChartObj.filters);
+                    if (Object.keys(filterDict).length > 0) {
+                        const filterFieldName = Object.keys(filterDict)[0];
+                        const filterCollection = getCollectionByName(props.collections, filterFieldName, props.collectionView);
+                        param = filterCollection.mapping_underlying_meta_field.substring(filterCollection.mapping_underlying_meta_field.indexOf('.') + 1);
+                    }
                     setQuery({ name, param });
                 }
             })
@@ -145,6 +142,8 @@ function ChartWidget(props) {
                 if (storedChartObj.filters && storedChartObj.filters.length > 0) {
                     const updatedRows = applyFilter(rows, storedChartObj.filters, props.collectionView, props.collections);
                     setRows(updatedRows);
+                } else {
+                    setRows(props.rows);
                 }
                 setHasTimeSeries(false);
             }
@@ -161,39 +160,43 @@ function ChartWidget(props) {
     useEffect(() => {
         if (storedChartObj.series && hasTimeSeries) {
             const filterDict = getFilterDict(storedChartObj.filters);
-            const collectionWithFilter = seriesFieldAttributesList.find(col => col.hasOwnProperty('mapping_projection_query_field'));
-            let seriesFilterField;
-            collectionWithFilter.mapping_projection_query_field.forEach(projectionQueryField => {
-                if (seriesFilterField) return;
-                const [queryName, filterField] = projectionQueryField.split(':');
-                if (queryName === query.name) {
-                    seriesFilterField = filterField;
-                }
-            })
-            const collection = props.collections.find(col => col.hasOwnProperty('mapping_underlying_meta_field') && col.mapping_underlying_meta_field.filter(meta => meta.includes(seriesFilterField)).length > 0);
-            const filterFieldName = props.collectionView ? collection.key : collection.tableTitle;
-            const filterValues = filterDict[filterFieldName].split(',').map(filterValue => filterValue.trim());
-            const series = storedChartObj.series.find(series => series.underlying_time_series === true);
-            if (series) {
-                // TODO: uncomment after websocket query is available
-                // setTsData([]);
-                // filterValues.forEach(value => {
-                //     const socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/ws-query-${query.name}?${query.param.substring(query.param.lastIndexOf('.') + 1)}=${value}`);
-                //     socket.onmessage = (event) => {
-                //         let updatedData = JSON.parse(event.data);
-                //         getAllWsList.current = getAllWsList.current.push(...updatedData);
-                //     }
-                //     /* close the websocket on cleanup */
-                //     return () => socket.close();
-                // });
-                const updatedTsData = [];
-                filterValues.forEach(value => {
-                    axios.get(`${API_ROOT_URL}/query-${query.name}?${query.param.substring(query.param.lastIndexOf('.') + 1)}=${value}`).then(res => {
-                        updatedTsData.push(...res.data);
-                        setTsData([...updatedTsData]);
-                        setTsUpdateCounter(prevCount => prevCount + 1);
+            let filterFieldName;
+            if (Object.keys(filterDict).length > 0) {
+                filterFieldName = Object.keys(filterDict)[0];
+                const metaFilters = genMetaFilters(rows, props.collections, filterDict, filterFieldName, props.collectionView);
+                // TODO: extend the logic to multiple series
+                // const seriesList = storedChartObj.series.filter(series => series.underlying_time_series === true);
+                // for (const series in seriesList)
+                const series = storedChartObj.series.find(series => series.underlying_time_series === true);
+                if (series) {
+                    // TODO: uncomment after websocket query is available
+                    // setTsData([]);
+                    // filterValues.forEach(value => {
+                    //     const socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/ws-query-${query.name}?${query.param.substring(query.param.lastIndexOf('.') + 1)}=${value}`);
+                    //     socket.onmessage = (event) => {
+                    //         let updatedData = JSON.parse(event.data);
+                    //         getAllWsList.current = getAllWsList.current.push(...updatedData);
+                    //     }
+                    //     /* close the websocket on cleanup */
+                    //     return () => socket.close();
+                    // });
+                    const updatedTsData = [];
+                    metaFilters.forEach(metaFilterDict => {
+                        let paramStr;
+                        for (const key in metaFilterDict) {
+                            if (paramStr) {
+                                paramStr += `&${key}=${metaFilterDict[key]}`;
+                            } else {
+                                paramStr = `${key}=${metaFilterDict[key]}`;
+                            }
+                        }
+                        axios.get(`${API_ROOT_URL}/query-${query.name}?${paramStr}`).then(res => {
+                            updatedTsData.push(...res.data);
+                            setTsData([...updatedTsData]);
+                            setTsUpdateCounter(prevCount => prevCount + 1);
+                        })
                     })
-                })
+                }
             }
         }
     }, [storedChartObj, hasTimeSeries])

@@ -105,12 +105,13 @@ const NodeField = (props) => {
                 forcePopupIcon={false}
                 variant='outlined'
                 size='small'
+                fullWidth
                 sx={{ minWidth: '150px !important' }}
                 className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                 required={props.data.required}
                 value={value}
                 onChange={(e, v) => props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath)}
-                componentsProps={{ popper: { style: { width: 'fit-content' } } }}
+                // componentsProps={{ popper: { style: { minWidth: 'fit-content', width: 'parent' } } }}
                 renderInput={(params) => (
                     <TextField
                         {...params}

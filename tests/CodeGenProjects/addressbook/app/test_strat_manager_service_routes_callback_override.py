@@ -268,7 +268,11 @@ def test_sanity_underlying_time_series(static_data_, clean_and_set_limits, dash_
     for index, symbol_pair in enumerate(symbol_pair_list):
         dash_obj: DashBaseModel = DashBaseModel(**dash_)
         dash_obj.rt_dash.leg1.sec.sec_id = symbol_pair[0]
+        dash_obj.rt_dash.leg1.vwap -=  index * 10
+        dash_obj.rt_dash.leg1.vwap_change -= index * 0.5
         dash_obj.rt_dash.leg2.sec.sec_id = symbol_pair[1]
+        dash_obj.rt_dash.leg2.vwap -=  index * 1
+        dash_obj.rt_dash.leg2.vwap_change -= index * 0.25
         stored_dash_obj: DashBaseModel = market_data_web_client.create_dash_client(dash_obj)
         dash_ids.append(stored_dash_obj.id)
     # create dash filters and dashboards

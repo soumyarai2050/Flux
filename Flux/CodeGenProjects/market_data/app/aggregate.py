@@ -234,18 +234,23 @@ def get_latest_bar_data_for_each_symbol():
     return {"aggregate": [
         {
             '$group': {
-                '_id': '$symbol',
-                'doc': {
-                    '$max': {
-                        '_id': '$_id',
-                        'datetime': '$datetime',
-                        'symbol': '$symbol'
-                    }
+                '_id': '$symbol_n_exch_id.symbol',
+                'max_start_time': {
+                    '$max': '$start_time'
+                },
+                'id': {
+                    '$max': '$_id'
                 }
             }
         }, {
-            '$replaceRoot': {
-                'newRoot': '$doc'
+            '$project': {
+                '_id': '$id',
+                'symbol_n_exch_id': {
+                    'symbol': '$_id',
+                    'exch_id': 'NA'
+                },
+                'start_time': '$max_start_time',
+                'end_time': '$max_start_time'
             }
         }
     ]}

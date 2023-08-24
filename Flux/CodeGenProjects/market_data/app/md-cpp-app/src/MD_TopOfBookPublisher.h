@@ -161,6 +161,8 @@ namespace md_handler {
             rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
             create_top_of_book.Accept(writer);
             const std::string& request_json = buffer.GetString();
+            // TODO important: Add WS publish in future here
+
             request.setContentLength(request_json.length());
             std::ostream &requestStream = session.sendRequest(request);
             requestStream << request_json;

@@ -55,6 +55,10 @@ public:
         io_context_.run();
     }
 
+    bool has_ws_clients_connected(){
+        return not ws_vector.empty();
+    }
+
     ~WebSocketServer(){
         shutdown = true;
         ws_vector.clear();

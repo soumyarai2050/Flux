@@ -49,8 +49,8 @@ class MarketDataServiceRoutesCallbackBeanieNativeOverride(MarketDataServiceRoute
         bar_data_n_latest_update_date_time = BarDataNLatestUpdateDateTime(symbol_n_last_update_datetime=[])
         for bar_data in bar_data_list:
             bar_data_n_latest_update_date_time.symbol_n_last_update_datetime.append(
-                BarDataSymbolNLatestUpdateDateTime(symbol=bar_data.symbol,
-                                                   last_update_datetime=bar_data.datetime)
+                BarDataSymbolNLatestUpdateDateTime(symbol=bar_data.symbol_n_exch_id.symbol,
+                                                   last_update_datetime=bar_data.start_time)
             )
         return [bar_data_n_latest_update_date_time]
 
@@ -63,11 +63,11 @@ class MarketDataServiceRoutesCallbackBeanieNativeOverride(MarketDataServiceRoute
         return [dash_obj]
 
     async def get_vwap_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData], symbol: str,
-                                                          start_date_time: DateTime | None = None,
+                                                          exch_id: str, start_date_time: DateTime | None = None,
                                                           end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_routes import \
             underlying_read_bar_data_http
-        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, }
+        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, "symbol_n_exch_id.exch_id": exch_id, }
         if start_date_time and not end_date_time:
             projection_filter["start_time"] = {"$gt": start_date_time}
         elif not start_date_time and end_date_time:
@@ -76,19 +76,18 @@ class MarketDataServiceRoutesCallbackBeanieNativeOverride(MarketDataServiceRoute
             projection_filter["start_time"] = {"$gt": start_date_time, "$lt": end_date_time}
         bar_data_projection_list = await underlying_read_bar_data_http(projection_model=BarDataProjectionForVwap,
                                                                        projection_filter=projection_filter)
-        symbol_n_exch_id = SymbolNExchIdOptional()
-        symbol_n_exch_id.symbol = symbol
+        symbol_n_exch_id = SymbolNExchId(symbol=symbol, exch_id=exch_id)
         container_model = BarDataProjectionContainerForVwap(symbol_n_exch_id=symbol_n_exch_id,
                                                             projection_models=bar_data_projection_list)
         return [container_model]
 
     async def get_vwap_n_vwap_change_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData],
-                                                                        symbol: str,
+                                                                        symbol: str, exch_id: str,
                                                                         start_date_time: DateTime | None = None,
                                                                         end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_routes import \
             underlying_read_bar_data_http
-        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, }
+        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, "symbol_n_exch_id.exch_id": exch_id, }
         if start_date_time and not end_date_time:
             projection_filter["start_time"] = {"$gt": start_date_time}
         elif not start_date_time and end_date_time:
@@ -97,18 +96,17 @@ class MarketDataServiceRoutesCallbackBeanieNativeOverride(MarketDataServiceRoute
             projection_filter["start_time"] = {"$gt": start_date_time, "$lt": end_date_time}
         bar_data_projection_list = await underlying_read_bar_data_http(
             projection_model=BarDataProjectionForVwapNVwapChange, projection_filter=projection_filter)
-        symbol_n_exch_id = SymbolNExchIdOptional()
-        symbol_n_exch_id.symbol = symbol
+        symbol_n_exch_id = SymbolNExchId(symbol=symbol, exch_id=exch_id)
         container_model = BarDataProjectionContainerForVwapNVwapChange(symbol_n_exch_id=symbol_n_exch_id,
                                                                        projection_models=bar_data_projection_list)
         return [container_model]
 
     async def get_vwap_change_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData], symbol: str,
-                                                                 start_date_time: DateTime | None = None,
+                                                                 exch_id: str, start_date_time: DateTime | None = None,
                                                                  end_date_time: DateTime | None = None):
         from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_routes import \
             underlying_read_bar_data_http
-        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, }
+        projection_filter: Dict = {"symbol_n_exch_id.symbol": symbol, "symbol_n_exch_id.exch_id": exch_id, }
         if start_date_time and not end_date_time:
             projection_filter["start_time"] = {"$gt": start_date_time}
         elif not start_date_time and end_date_time:
@@ -117,8 +115,7 @@ class MarketDataServiceRoutesCallbackBeanieNativeOverride(MarketDataServiceRoute
             projection_filter["start_time"] = {"$gt": start_date_time, "$lt": end_date_time}
         bar_data_projection_list = await underlying_read_bar_data_http(projection_model=BarDataProjectionForVwapChange,
                                                                        projection_filter=projection_filter)
-        symbol_n_exch_id = SymbolNExchIdOptional()
-        symbol_n_exch_id.symbol = symbol
+        symbol_n_exch_id = SymbolNExchId(symbol=symbol, exch_id=exch_id)
         container_model = BarDataProjectionContainerForVwapChange(symbol_n_exch_id=symbol_n_exch_id,
                                                                   projection_models=bar_data_projection_list)
         return [container_model]
