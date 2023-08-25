@@ -45,6 +45,126 @@ class CppWebsocketTestPlugin(BaseProtoPlugin):
         output_content += f'#include "../CppUtilGen/{class_name}_populate_random_values.h"\n\n'
         return output_content
 
+    def generate_multiple_model_handler(self, package_name: str, class_name: str):
+        output: str = ""
+        output += "TEST(MultipleModel, WebSocket) {\n"
+        output += '\tconst std::string host = "127.0.0.1";\n'
+        i: int = 0
+        port: int = 8083
+        for message in self.root_message_list:
+            if CppWebsocketTestPlugin.is_option_enabled(message, CppWebsocketTestPlugin.flux_msg_json_root):
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppWebsocketTestPlugin.is_option_enabled(field, CppWebsocketTestPlugin.flux_fld_PK):
+                        output += f"\t{package_name}::{message_name} {message_name_snake_cased};\n"
+                        output += f"\t{package_name}::{message_name} {message_name_snake_cased}_from_server;\n"
+                        output += f"\t{package_name}_handler::{class_name}PopulateRandomValues::" \
+                                  f"{message_name_snake_cased}({message_name_snake_cased});\n"
+                        output += f"\t{package_name}_handler::{class_name}{message_name}WebSocketServer" \
+                                  f"<{package_name}::{message_name}> {message_name_snake_cased}_web_socket_server" \
+                                  f"({message_name_snake_cased}, host, {port});\n"
+                        port += 1
+                        break
+
+        output += "\n"
+        for message in self.root_message_list:
+            if CppWebsocketTestPlugin.is_option_enabled(message, CppWebsocketTestPlugin.flux_msg_json_root):
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppWebsocketTestPlugin.is_option_enabled(field, CppWebsocketTestPlugin.flux_fld_PK):
+                        output += f"\tstd::thread {message_name_snake_cased}_server_thread([&](){{\n"
+                        output += f"\t\t{message_name_snake_cased}_web_socket_server.run();\n"
+                        output += "\t});\n"
+                        break
+        output += "\n\t// Sleep to allow the server to start before running the tests\n"
+        output += "\tstd::this_thread::sleep_for(std::chrono::seconds(1));\n"
+
+        port = 8083
+        for message in self.root_message_list:
+            if CppWebsocketTestPlugin.is_option_enabled(message, CppWebsocketTestPlugin.flux_msg_json_root):
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppWebsocketTestPlugin.is_option_enabled(field, CppWebsocketTestPlugin.flux_fld_PK):
+                        output += f"\tWebSocketClient<{package_name}::{message_name}> {message_name_snake_cased}" \
+                                  f"_web_socket_client({message_name_snake_cased}_from_server, host, {port});\n"
+                        port += 1
+                        break
+
+        output += "\n"
+        for message in self.root_message_list:
+            if CppWebsocketTestPlugin.is_option_enabled(message, CppWebsocketTestPlugin.flux_msg_json_root):
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppWebsocketTestPlugin.is_option_enabled(field, CppWebsocketTestPlugin.flux_fld_PK):
+                        output += f"\tstd::thread {message_name_snake_cased}_client_thread([&](){{\n"
+                        output += f"\t\t{message_name_snake_cased}_web_socket_client.run();\n"
+                        output += "\t});\n\n"
+                        break
+
+        output += "\n"
+        for message in self.root_message_list:
+            if CppWebsocketTestPlugin.is_option_enabled(message, CppWebsocketTestPlugin.flux_msg_json_root):
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppWebsocketTestPlugin.is_option_enabled(field, CppWebsocketTestPlugin.flux_fld_PK):
+                        output += f"\tif ({message_name_snake_cased}_server_thread.joinable() and " \
+                                  f"{message_name_snake_cased}_server_thread.joinable()) {{\n"
+                        output += f"\t\t{message_name_snake_cased}_server_thread.join();\n"
+                        output += f"\t\t{message_name_snake_cased}_client_thread.join();\n"
+                        output += "\t}\n\n"
+                        break
+
+        output += "\n"
+        for message in self.root_message_list:
+            if CppWebsocketTestPlugin.is_option_enabled(message, CppWebsocketTestPlugin.flux_msg_json_root):
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppWebsocketTestPlugin.is_option_enabled(field, CppWebsocketTestPlugin.flux_fld_PK):
+                        output += f"\t{message_name_snake_cased}_web_socket_client.get_received_data" \
+                                  f"({message_name_snake_cased}_from_server);\n"
+                        break
+
+        output += "\n"
+        for message in self.root_message_list:
+            if CppWebsocketTestPlugin.is_option_enabled(message, CppWebsocketTestPlugin.flux_msg_json_root):
+                message_name = message.proto.name
+                message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
+                    if CppWebsocketTestPlugin.is_option_enabled(field, CppWebsocketTestPlugin.flux_fld_PK):
+                        output += f"\tASSERT_EQ({message_name_snake_cased}.DebugString(), " \
+                                  f"{message_name_snake_cased}_from_server.DebugString());\n"
+                        break
+
+        output += "}\n\n"
+        return output
+
     def output_file_generate_handler(self, file: protogen.File):
 
         self.get_all_root_message(file.messages)
@@ -139,6 +259,7 @@ class CppWebsocketTestPlugin(BaseProtoPlugin):
                         output_content += "}\n\n"
                         break
 
+        output_content += self.generate_multiple_model_handler(package_name, class_name)
         proto_file_name = str(file.proto.name).split(".")[0]
         output_file_name = f"{class_name_snake_cased}_web_socket_test.h"
         return {output_file_name: output_content}

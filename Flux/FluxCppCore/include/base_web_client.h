@@ -402,16 +402,18 @@ namespace FluxCppCore {
                     status =  m_codec.decode_model_list(r_obj_in_n_out, modified_json);
                     return status;
                 } else {
-                    LOG_ERROR(m_p_logger_, "Error while creating {}: {} url: {}", RootModelListType::GetDescriptor()->name(),
-                              json, create_client_url_view);
+                    LOG_ERROR(m_p_logger_, "Error while creating {};;;url: {}, Json: {} ",
+                             RootModelListType::GetDescriptor()->name(), create_client_url_view, json);
                     return false;
                 }
             } else {
-                LOG_ERROR(m_p_logger_, "Error while encoding {}: {}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR(m_p_logger_, "Error while encoding {};;;{}", RootModelListType::GetDescriptor()->name(),
                           r_obj_in_n_out.DebugString());
                 return false;
             }
-            return status;
+            LOG_ERROR(m_p_logger_, "Error unreachable code reached {};;;{}", RootModelListType::GetDescriptor()->name(),
+                          r_obj_in_n_out.DebugString());
+                return false;
         }
 
         [[nodiscard]] bool patch_client (RootModelListType &r_obj_in_n_out) const {
@@ -459,7 +461,6 @@ namespace FluxCppCore {
                           r_obj_in_n_out.DebugString());
                 return false;
             }
-            return status;
         }
 
         [[nodiscard]] bool put_client (RootModelListType &r_obj_in_n_out) const {

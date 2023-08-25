@@ -46,7 +46,9 @@ function ChartWidget(props) {
     // TODO: check if updateCounters are irrelevent
     const [tsUpdateCounter, setTsUpdateCounter] = useState(0);
     const [datasetUpdateCounter, setDatasetUpdateCounter] = useState(0);
+    const [reloadCounter, setReloadCounter] = useState(0);
     const getAllWsList = useRef([]);
+    const socketList = useRef([]);
 
     // 1. update chart schema to add flux properties to necessary fields
     // 2. identify is chart configuration has time series field in y-axis (limitation) 
@@ -70,7 +72,12 @@ function ChartWidget(props) {
 
     useEffect(() => {
         // update the local row dataset on update from parent
-        setRows(props.rows);
+        if (storedChartObj.filters && storedChartObj.filters.length > 0) {
+            const updatedRows = applyFilter(props.rows, storedChartObj.filters, props.collectionView, props.collections);
+            setRows(updatedRows);
+        } else {
+            setRows(props.rows);
+        }
     }, [props.rows])
 
     useEffect(() => {
@@ -171,15 +178,7 @@ function ChartWidget(props) {
                 if (series) {
                     // TODO: uncomment after websocket query is available
                     // setTsData([]);
-                    // filterValues.forEach(value => {
-                    //     const socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/ws-query-${query.name}?${query.param.substring(query.param.lastIndexOf('.') + 1)}=${value}`);
-                    //     socket.onmessage = (event) => {
-                    //         let updatedData = JSON.parse(event.data);
-                    //         getAllWsList.current = getAllWsList.current.push(...updatedData);
-                    //     }
-                    //     /* close the websocket on cleanup */
-                    //     return () => socket.close();
-                    // });
+                    // TODO: comment next line if switching to ws
                     const updatedTsData = [];
                     metaFilters.forEach(metaFilterDict => {
                         let paramStr;
@@ -190,6 +189,15 @@ function ChartWidget(props) {
                                 paramStr = `${key}=${metaFilterDict[key]}`;
                             }
                         }
+                        // TODO: uncomment after websocket query is available
+                        // const socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/ws-query-${query.name}?${paramStr}`);
+                        // socket.onmessage = (event) => {
+                        //     let updatedData = JSON.parse(event.data);
+                        //     getAllWsList.current.push(...updatedData);
+                        // }
+                        // /* close the websocket on cleanup */
+                        // return () => socket.close();
+                        // TODO: comment below http query
                         axios.get(`${API_ROOT_URL}/query-${query.name}?${paramStr}`).then(res => {
                             updatedTsData.push(...res.data);
                             setTsData([...updatedTsData]);
@@ -199,7 +207,7 @@ function ChartWidget(props) {
                 }
             }
         }
-    }, [storedChartObj, hasTimeSeries])
+    }, [storedChartObj, hasTimeSeries, reloadCounter])
 
     useEffect(() => {
         if (storedChartObj.series) {
@@ -221,7 +229,7 @@ function ChartWidget(props) {
     //     }
     // }, [tsData, query])
 
-
+    // TODO: uncomment after websocket query is available
     // useEffect(() => {
     //     const intervalId = setInterval(flushGetAllWs, 500);
     //     return () => {
@@ -277,6 +285,7 @@ function ChartWidget(props) {
     const onReload = () => {
         setMode(Modes.READ_MODE);
         props.onReload();
+        setReloadCounter(prevCount => prevCount + 1);
     }
 
     const onCreate = () => {

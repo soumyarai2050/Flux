@@ -347,6 +347,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         projection_query_filter_func_req_query_name_n_message: List[Tuple[str, protogen.Message,
                                                                     Dict[str, (protogen.Field |
                                                                                Dict[str, protogen.Field])]]] = []
+        query_name_to_field_path_str_list_dict: Dict[str, List[str]] = {}
         for message in self.root_message_list:
             if FastapiCallbackOverrideFileHandler.is_option_enabled(
                     message, FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series):
@@ -391,6 +392,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                     msg_name_snake_cased = convert_camel_case_to_specific_case(msg_name)
                     field_name_list: List[str] = []
                     field_name_set = projection_val_to_fields_dict[projection_option_val]
+                    query_name_to_field_path_str_list_dict[query_name] = list(field_name_set)
                     for field_name in field_name_set:
                         if "." in field_name:
                             field_name_list.append("_".join(field_name.split(".")))
@@ -420,7 +422,8 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                                                                        self.routes_file_name)
                     output_str += f"        from {routes_import_path} import " \
                                   f"underlying_read_{msg_name_snake_cased}_http\n"
-
+                    output_str += (f"        # once aggregate function used below is shifted to aggregate.py "
+                                   f"of project, import aggregate here for use\n")
                     query_param_dict_str = ""
                     for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
                         if isinstance(meta_field_value, dict):
@@ -432,50 +435,169 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                         else:
                             query_param_dict_str += f'"{meta_field_name}": {meta_field_value.proto.name}'
 
-                    if not query_param_dict_str:
-                        output_str += "        projection_filter: Dict = {}\n"
-                    else:
-                        output_str += "        projection_filter: Dict = {"+f"{query_param_dict_str}"+"}\n"
-                    output_str += f"        if start_date_time and not end_date_time:\n"
-                    output_str += '            projection_filter["'+f'{time_field_name}'+('"] = '
-                                                                                          '{"$gt": start_date_time}\n')
-                    output_str += f"        elif not start_date_time and end_date_time:\n"
-                    output_str += '            projection_filter["'+f'{time_field_name}'+('"] = '
-                                                                                          '{"$lt": end_date_time}\n')
-                    output_str += f"        elif start_date_time and end_date_time:\n"
-                    output_str += '            projection_filter["'+f'{time_field_name}'+('"] = '
-                                                                    '{"$gt": start_date_time, "$lt": end_date_time}\n')
-                    output_str += (f"        {msg_name_snake_cased}_projection_list = await underlying_read_"
-                                   f"{msg_name_snake_cased}_http(projection_model={projection_model_name}, "
-                                   f"projection_filter=projection_filter)\n")
-                    container_model_name = f"{message.proto.name}ProjectionContainerFor{field_names_str_camel_cased}"
-                    message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-                    meta_data_field_json = self.json_sample_loaded_json.get(message_name_snake_cased)
-                    if meta_data_field_json is None:
-                        err_str = (f"Can't Find Model name {message_name_snake_cased} in json "
-                                   f"sample plugin generated file")
-                        logging.exception(err_str)
-                        raise Exception(err_str)
+                    agg_params_str = ""
                     for meta_field_name, meta_field_proto_or_val in meta_data_field_name_to_field_proto_dict.items():
                         if isinstance(meta_field_proto_or_val, dict):
-                            output_str += f"        {meta_field_name} = {meta_field.message.proto.name}("
                             for nested_meta_field_name, nested_meta_field_proto in meta_field_proto_or_val.items():
-                                output_str += f"{nested_meta_field_name}={nested_meta_field_name}"
-                                if nested_meta_field_name != list(meta_field_proto_or_val)[-1]:
-                                    output_str += f", "
-                            output_str += f")\n"
+                                agg_params_str += f"{nested_meta_field_name}, "
                         else:
-                            output_str += f"        {meta_field_name} = {meta_field_name}\n"
-                    output_str += (f"        container_model = {container_model_name}("
-                                   f"{meta_field.proto.name}={meta_field.proto.name}, projection_models="
-                                   f"{msg_name_snake_cased}_projection_list)\n")
-                    output_str += f"        return [container_model]\n\n"
+                            agg_params_str += f"{meta_field_name}, "
+                    agg_params_str += "start_date_time, end_date_time"
+                    container_model_name = f"{message.proto.name}ProjectionContainerFor{field_names_str_camel_cased}"
+
+                    projection_agg_pipeline_name = f"{query_name}_agg_pipeline"
+                    output_str += (f"        {msg_name_snake_cased}_projection_list = await underlying_read_"
+                                   f"{msg_name_snake_cased}_http({projection_agg_pipeline_name}({agg_params_str}), "
+                                   f"projection_model={container_model_name})\n")
+                    output_str += f"        return {msg_name_snake_cased}_projection_list\n\n"
 
                     # handling projection ws query
                     output_str += f"    async def {query_name}_query_ws_pre(self):\n"
-                    output_str += f"        return {query_name}_filter_callable\n\n"
+                    output_str += f"        return {query_name}_filter_callable, {projection_agg_pipeline_name}\n\n"
                     projection_query_filter_func_req_query_name_n_message.append(
                         (query_name, message, meta_data_field_name_to_field_proto_dict))
+
+        # handling aggregation pipelines for projection query
+        for query_name, message, meta_data_field_name_to_field_proto_dict in (
+                projection_query_filter_func_req_query_name_n_message):
+            output_str += "\n"
+            for field in message.fields:
+                if self.is_bool_option_enabled(field,
+                                               FastapiCallbackOverrideFileHandler.flux_fld_val_time_field):
+                    time_field_name = field.proto.name
+                    break
+            else:
+                err_str = (f"Could not find any time field in {message.proto.name} message having "
+                           f"{FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series} option")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            for field in message.fields:
+                if self.is_bool_option_enabled(field, FastapiCallbackOverrideFileHandler.flux_fld_val_meta_field):
+                    meta_field = field
+                    break
+            else:
+                err_str = (f"Could not find any time field in {message.proto.name} message having "
+                           f"{FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series} option")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            output_str += f"def {query_name}_agg_pipeline("
+            for meta_field_name, meta_field_proto_or_val in meta_data_field_name_to_field_proto_dict.items():
+                if isinstance(meta_field_proto_or_val, dict):
+                    for nested_meta_field_name, nested_meta_field_proto in meta_field_proto_or_val.items():
+                        output_str += (f'{nested_meta_field_name}: '
+                                       f'{self.proto_to_py_datatype(nested_meta_field_proto)}, ')
+                else:
+                    output_str += f'{meta_field_name}: {self.proto_to_py_datatype(field)}, '
+            output_str += ("start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, "
+                           "id_list: List[int] | None = None):\n")
+            output_str += ("    # shift this function to aggregate.py file of project and remove this comment "
+                           "afterward\n")
+            output_str += "    agg_pipeline = [\n"
+            output_str += "        {\n"
+            output_str += "            '$match': {},\n"
+            output_str += "        },\n"
+            output_str += "        {\n"
+            output_str += "            '$match': {\n"
+            for meta_field_name, meta_field_proto_or_val in meta_data_field_name_to_field_proto_dict.items():
+                if isinstance(meta_field_proto_or_val, dict):
+                    output_str += "                '$and': [\n"
+                    for nested_meta_field_name, nested_meta_field_proto in meta_field_proto_or_val.items():
+                        output_str += "                    {\n"
+                        output_str += (f"                        '{meta_field_name}.{nested_meta_field_name}': "
+                                       f"{nested_meta_field_name}\n")
+                        if nested_meta_field_name != list(meta_field_proto_or_val)[-1]:
+                            output_str += "                    },\n"
+                        else:
+                            output_str += "                    }\n"
+                    output_str += "                ]\n"
+                else:
+                    output_str += f"                '{meta_field_name}': {meta_field_name}\n"
+            output_str += "            }\n"
+            output_str += "        },\n"
+            output_str += "        {\n"
+            output_str += "            '$match': {},\n"
+            output_str += "        },\n"
+            output_str += "        {\n"
+            output_str += "            '$project': {\n"
+            output_str += "                '_id': 0,\n"
+            output_str += f"                '{meta_field.proto.name}': 1,\n"
+            output_str += "                'projection_models': {\n"
+            output_str += f"                    '{time_field_name}': '${time_field_name}',\n"
+            field_str_list = query_name_to_field_path_str_list_dict.get(query_name)
+            for field_str in field_str_list:
+                if "." in field_str:
+                    field_str_ = field_str.split(".")[-1]
+                    output_str += f"                    '{field_str_}': '${field_str}'"
+                else:
+                    output_str += f"                    '{field_str}': '${field_str}'"
+                if field_str != field_str_list[-1]:
+                    output_str += ", \n"
+                else:
+                    output_str += "\n"
+            output_str += "                }\n"
+            output_str += "            },\n"
+            output_str += "        },\n"
+            output_str += "        {\n"
+            output_str += "            '$group': {\n"
+            output_str += f"                '_id': '${meta_field.proto.name}',\n"
+            output_str += "                'projection_models': {\n"
+            output_str += "                    '$push': '$projection_models'\n"
+            output_str += "                }\n"
+            output_str += "            }\n"
+            output_str += "        },\n"
+            output_str += "        {\n"
+            output_str += "            '$project': {\n"
+            output_str += "                '_id': 0,\n"
+            output_str += f"                '{meta_field.proto.name}': '$_id',\n"
+            output_str += f"                'projection_models': 1\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "    ]\n"
+            output_str += "    if id_list is not None:\n"
+            output_str += "        agg_pipeline[0]['$match'] = {\n"
+            output_str += "            '_id': {\n"
+            output_str += "                '$in': id_list\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "    if start_date_time and not end_date_time:\n"
+            output_str += "        agg_pipeline[2]['$match'] = {\n"
+            output_str += "            '$expr': {\n"
+            output_str += "                '$gt': [\n"
+            output_str += f"                    '${time_field_name}', start_date_time\n"
+            output_str += "                ]\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "    elif not start_date_time and end_date_time:\n"
+            output_str += "        agg_pipeline[2]['$match'] = {\n"
+            output_str += "            '$expr': {\n"
+            output_str += "                '$lt': [\n"
+            output_str += f"                    '${time_field_name}', end_date_time\n"
+            output_str += "                ]\n"
+            output_str += "            }\n"
+            output_str += "        }\n"
+            output_str += "    elif start_date_time and end_date_time:\n"
+            output_str += "        agg_pipeline[2]['$match'] = {\n"
+            output_str += "            '$and': [\n"
+            output_str += "                {\n"
+            output_str += "                    '$expr': {\n"
+            output_str += "                        '$gt': [\n"
+            output_str += f"                            '${time_field_name}', start_date_time\n"
+            output_str += "                        ]\n"
+            output_str += "                    }\n"
+            output_str += "                },\n"
+            output_str += "                {\n"
+            output_str += "                    '$expr': {\n"
+            output_str += "                        '$lt': [\n"
+            output_str += f"                            '${time_field_name}', end_date_time\n"
+            output_str += "                        ]\n"
+            output_str += "                    }\n"
+            output_str += "                }\n"
+            output_str += "            ]\n"
+            output_str += "        }\n"
+
+            output_str += "    return {'aggregate': agg_pipeline}\n\n"
 
         # handling projection ws query filter functions
         for query_name, message, meta_data_field_name_to_field_proto_dict in (
@@ -495,41 +617,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
             message_name = message.proto.name
             msg_name_snake_cased = convert_camel_case_to_specific_case(message_name)
             output_str += f"def {query_name}_filter_callable({msg_name_snake_cased}_obj_json_str: str, **kwargs):\n"
-            output_str += f'    start_date_time = kwargs.get("start_date_time")\n'
-            output_str += f'    end_date_time = kwargs.get("end_date_time")\n'
-            output_str += f'    obj_json = json.loads({msg_name_snake_cased}_obj_json_str)\n'
-            for meta_field_name, meta_field_proto_or_val in meta_data_field_name_to_field_proto_dict.items():
-                if isinstance(meta_field_proto_or_val, dict):
-                    for nested_meta_field_name, nested_meta_field_proto in meta_field_proto_or_val.items():
-                        output_str += f'    {nested_meta_field_name}_param = kwargs.get("{nested_meta_field_name}")\n'
-                else:
-                    output_str += f'    {meta_field_name}_param = kwargs.get("{meta_field_name}")\n'
-
-            for meta_field_name, meta_field_proto_or_val in meta_data_field_name_to_field_proto_dict.items():
-                # not nested impl since only 1 lvl nested message type field can be meta field currently
-                output_str += f'    {meta_field_name} = obj_json.get("{meta_field_name}")\n'
-                output_str += f'    if {meta_field_name} is None:\n'
-                output_str += f'        return False\n'
-                if isinstance(meta_field_proto_or_val, dict):
-                    output_str += f'    else:\n'
-                    for nested_meta_field_name, nested_meta_field_proto_or_val in meta_field_proto_or_val.items():
-                        output_str += (f'        {nested_meta_field_name} = '
-                                       f'{meta_field_name}.get("{nested_meta_field_name}")\n')
-                        output_str += f'        if {nested_meta_field_name} is None:\n'
-                        output_str += f'            return False\n'
-                        output_str += f'        else:\n'
-                        output_str += f'            if {nested_meta_field_name} != {nested_meta_field_name}_param:\n'
-                        output_str += f'                return False\n'
-            output_str += f'    time_field_val_str = obj_json.get("{time_field_name}")\n'
-            output_str += f'    time_field_val = pendulum.parse(time_field_val_str)\n'
-            output_str += f'    if start_date_time and not end_date_time:\n'
-            output_str += f'        return start_date_time < time_field_val\n'
-            output_str += f'    elif not start_date_time and end_date_time:\n'
-            output_str += f'        return end_date_time > time_field_val\n'
-            output_str += f'    elif start_date_time and end_date_time:\n'
-            output_str += f'        return start_date_time < time_field_val < end_date_time\n'
-            output_str += f'    else:\n'
-            output_str += f'        return True\n\n'
+            output_str += f'    return True\n\n'
 
         return output_str
 

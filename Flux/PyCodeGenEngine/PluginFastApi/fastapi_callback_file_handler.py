@@ -289,9 +289,12 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"        return {message_name_snake_cased}_obj_list\n\n"
         return output_str
 
-    def _handle_callback_ws_query_method_output(self, query_name: str) -> str:
+    def _handle_callback_ws_query_method_output(self, query_name: str, is_projection_query: bool | None = None) -> str:
         output_str = f"    async def {query_name}_query_ws_pre(self):\n"
-        output_str += f"        return {query_name}_filter_callable\n\n"
+        if not is_projection_query:
+            output_str += f"        return {query_name}_filter_callable\n\n"
+        else:
+            output_str += f"        return {query_name}_filter_callable, []\n\n"
         output_str += f"    async def {query_name}_query_ws_post(self):\n"
         output_str += f"        return None\n\n"
         return output_str
@@ -386,7 +389,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                     output_str += self._handle_callback_http_query_method_output(message, query_name,
                                                                                  query_param_with_type_str)
                     # WS
-                    output_str += self._handle_callback_ws_query_method_output(query_name)
+                    output_str += self._handle_callback_ws_query_method_output(query_name, True)
                     msg_name_n_ws_query_name_tuple_list.append((message.proto.name, query_name))
 
         return output_str

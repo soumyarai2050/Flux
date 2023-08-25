@@ -1107,22 +1107,16 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
 
         output_str += mutex_handling_str
         output_str += " " * indent_count + f"    await callback_class.read_all_{message_name_snake_cased}_pre()\n"
-        output_str += " " * indent_count + f"    if projection_model:\n"
-        output_str += " " * indent_count + (f"        obj_list = await generic_callable({message.proto.name}, "
-                                            f"{BaseFastapiPlugin.proto_package_var_name}, has_links=False, "
-                                            f"projection_model=projection_model, "
-                                            f"projection_filter=projection_filter)\n")
-        output_str += " " * indent_count + f"    else:\n"
-        output_str += " " * indent_count + f"        if filter_agg_pipeline is not None:\n"
+        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
-                      f"            obj_list = await generic_callable({message.proto.name}, " \
+                      f"        obj_list = await generic_callable({message.proto.name}, " \
                       f"{BaseFastapiPlugin.proto_package_var_name}, filter_agg_pipeline, " \
-                      f"has_links={msg_has_links})\n"
-        output_str += " " * indent_count + "        else:\n"
+                      f"has_links={msg_has_links}, projection_model=projection_model)\n"
+        output_str += " " * indent_count + "    else:\n"
         match aggregation_type:
             case FastapiRoutesFileHandler.aggregation_type_filter:
                 output_str += " " * indent_count + \
-                              f"            obj_list = await generic_callable({message.proto.name}, " \
+                              f"        obj_list = await generic_callable({message.proto.name}, " \
                               f"{BaseFastapiPlugin.proto_package_var_name}, " \
                               f"{self._get_filter_configs_var_name(message)}, has_links={msg_has_links})\n"
             case FastapiRoutesFileHandler.aggregation_type_update | FastapiRoutesFileHandler.aggregation_type_both:
@@ -1132,7 +1126,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                 raise Exception(err_str)
             case other:
                 output_str += " " * indent_count + \
-                              f"            obj_list = await generic_callable({message.proto.name}, " \
+                              f"        obj_list = await generic_callable({message.proto.name}, " \
                               f"{BaseFastapiPlugin.proto_package_var_name}, " \
                               f"has_links={msg_has_links})\n"
         output_str += " " * indent_count + f"    await callback_class.read_all_{message_name_snake_cased}_post(obj_list)\n"
@@ -1495,14 +1489,21 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
                              query_params_with_type_str: str, query_args_dict_str: str,
                              projection_model_name: str | None = None) -> str:
         output_str = "@perf_benchmark\n"
-        output_str += f"async def underlying_{query_name}_query_ws(websocket: WebSocket, {query_params_with_type_str}):\n"
-        output_str += f"    filter_callable = await callback_class.{query_name}_query_ws_pre()\n"
-        output_str += f'    params_json = {query_args_dict_str}\n'
-        output_str += f"    await generic_query_ws(websocket, {BaseFastapiPlugin.proto_package_var_name}, " \
-                      f"{message.proto.name}, filter_callable, params_json"
+        output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
+                       f"{query_params_with_type_str}):\n")
         if projection_model_name:
-            output_str += f", {projection_model_name})\n"
+            output_str += (f"    filter_callable, projection_agg_pipeline_callable = "
+                           f"await callback_class.{query_name}_query_ws_pre()\n")
+            output_str += f"    agg_params = {query_args_dict_str}\n"
+            output_str += f"    await generic_query_ws(websocket, {BaseFastapiPlugin.proto_package_var_name}, " \
+                          f"{message.proto.name}, filter_callable, agg_params"
+            output_str += (f", projection_agg_pipeline_callable=projection_agg_pipeline_callable, "
+                           f"projection_model={projection_model_name})\n")
         else:
+            output_str += f"    filter_callable = await callback_class.{query_name}_query_ws_pre()\n"
+            output_str += f'    params_json = {query_args_dict_str}\n'
+            output_str += f"    await generic_query_ws(websocket, {BaseFastapiPlugin.proto_package_var_name}, " \
+                          f"{message.proto.name}, filter_callable, params_json"
             output_str += ")\n"
         output_str += f"    await callback_class.{query_name}_query_ws_post()\n"
         output_str += f"\n\n"
@@ -1637,7 +1638,7 @@ class FastapiRoutesFileHandler(BaseFastapiPlugin, ABC):
             # WS method
             output_str += self._handle_ws_query_str(message, query_name, query_param_str,
                                                     query_param_with_type_str, query_param_dict_str,
-                                                    projection_model_name)
+                                                    container_model_name)
         return output_str
 
     def handle_CRUD_task(self) -> str:

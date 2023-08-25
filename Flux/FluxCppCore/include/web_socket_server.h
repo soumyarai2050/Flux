@@ -30,7 +30,7 @@ namespace FluxCppCore {
     public:
         explicit WebSocketServer(UserDataType &user_data, const std::string k_host = "127.0.0.1",
                                  const int32_t k_web_socket_server_port = 8083, const int32_t k_read_timeout = 60,
-                                 quill::Logger *p_logger = quill::get_logger()) : mr_user_data(user_data),
+                                 quill::Logger *p_logger = quill::get_logger()) : m_user_data(user_data),
                                  km_host_(k_host), km_port_(k_web_socket_server_port),
                                  km_read_timeout_seconds(k_read_timeout),
                                  m_acceptor_(m_io_context_, tcp::endpoint{asio::ip::make_address(km_host_),
@@ -137,7 +137,7 @@ namespace FluxCppCore {
                 }
                 // Send the HTTP response body to the WebSocket client
                 ws_vector.push_back(std::move(ws_ptr));
-                NewClientCallBack(mr_user_data, ws_vector.size()-1);
+                NewClientCallBack(m_user_data, ws_vector.size()-1);
                 // invoke callback to let user know of this new client with index
             }
             catch (std::exception const& error) {
@@ -145,7 +145,7 @@ namespace FluxCppCore {
             }
         }
 
-        UserDataType mr_user_data;
+        UserDataType m_user_data;
         const std::string km_host_;
         const int32_t km_port_;
         const boost::posix_time::seconds km_read_timeout_seconds;

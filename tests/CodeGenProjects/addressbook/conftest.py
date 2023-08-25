@@ -649,6 +649,7 @@ def dash_():
                     "sec_id": "CB_Sec_1",
                     "sec_type": "TICKER"
                 },
+                "exch_id": "Exchange",
                 "vwap": 150,
                 "vwap_change": 2.5
             },
@@ -657,6 +658,7 @@ def dash_():
                     "sec_id": "EQT_Sec_1",
                     "sec_type": "TICKER"
                 },
+                "exch_id": "Exchange",
                 "vwap": 10,
                 "vwap_change": 0.5
             }

@@ -26,14 +26,15 @@ using tcp = boost::asio::ip::tcp;
 template <typename UserDataType>
 class WebSocketClient {
 public:
-    explicit WebSocketClient(UserDataType &user_data, const std::string &k_server_address = "127.0.0.1",
+    explicit WebSocketClient(UserDataType &user_data, const std::string k_server_address = "127.0.0.1",
+                             const int32_t port = 8083,
                              quill::Logger *p_logger = quill::get_logger()) :
                              km_user_data_type_name_(UserDataType::GetDescriptor()->name()),
-                             m_server_address_(std::move(k_server_address)), m_resolver_(m_io_context_),
-                             m_ws_(m_io_context_), user_data_(user_data), mp_logger_(p_logger) {}
+                             m_server_address_(k_server_address), m_port_(port), m_resolver_(m_io_context_),
+                             m_ws_(m_io_context_), m_user_data_(user_data), mp_logger_(p_logger) {}
 
     void run() {
-        auto const results = m_resolver_.resolve(m_server_address_, "8083");
+        auto const results = m_resolver_.resolve(m_server_address_, std::to_string(m_port_));
         net::connect(m_ws_.next_layer(), results.begin(), results.end());
 
         m_ws_.handshake(m_server_address_, "/");
@@ -52,29 +53,29 @@ public:
     }
 
     void get_received_data(UserDataType &user_data) {
-        user_data = user_data_;
+        user_data = m_user_data_;
     }
 
 private:
     void read_data_from_server() {
         m_deadline_timer_.expires_from_now(boost::posix_time::seconds(10)); // Set the timeout to 10 seconds
-        m_ws_.async_read(buffer_, [this](boost::system::error_code error_code, std::size_t bytes_transferred) {
+        m_ws_.async_read(m_buffer_, [this](boost::system::error_code error_code, std::size_t bytes_transferred) {
             m_deadline_timer_.cancel();
             bool status = false;
             if (!error_code) {
                 m_update_received_ = true;
                 std::string data;
-                data = (beast::buffers_to_string(buffer_.data()));
-                buffer_.consume(buffer_.size());
+                data = (beast::buffers_to_string(m_buffer_.data()));
+                m_buffer_.consume(m_buffer_.size());
                 const std::string target = "List";
                 if (km_user_data_type_name_.find(target) == std::string::npos) {
-                    status = FluxCppCore::RootModelJsonCodec<UserDataType>::decode_model(user_data_, data);
+                    status = FluxCppCore::RootModelJsonCodec<UserDataType>::decode_model(m_user_data_, data);
                 } else {
-                    status = FluxCppCore::RootModelListJsonCodec<UserDataType>::decode_model_list(user_data_, data);
+                    status = FluxCppCore::RootModelListJsonCodec<UserDataType>::decode_model_list(m_user_data_, data);
                 }
                 if (status) {
                     LOG_INFO(mp_logger_, "Received data: {}", data);
-                    LOG_INFO(mp_logger_, "Deserialized data: {} ", user_data_.DebugString());
+                    LOG_INFO(mp_logger_, "Deserialized data: {} ", m_user_data_.DebugString());
                 } else {
                     LOG_ERROR(mp_logger_, "Failed while decoding received Data: {} UserDataType: {} ",
                               data, km_user_data_type_name_);
@@ -104,13 +105,14 @@ private:
 
     const std::string km_user_data_type_name_;
     std::string m_server_address_;
+    int32_t m_port_;
     net::io_context m_io_context_;
     tcp::resolver m_resolver_;
     net::deadline_timer m_deadline_timer_{m_io_context_};
     bool m_update_received_{false};
     websocket::stream<tcp::socket> m_ws_;
-    beast::flat_buffer buffer_;
-    UserDataType user_data_;
+    beast::flat_buffer m_buffer_;
+    UserDataType m_user_data_;
     quill::Logger *mp_logger_;
 };
 
