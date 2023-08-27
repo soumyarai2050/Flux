@@ -93,7 +93,7 @@ namespace FluxCppCore {
             if (!error_code) {
                 return true;
             } else {
-                LOG_ERROR(mp_logger, "Error writing data to client: {}, Data {}", error_code.message(), kr_send_string);
+                LOG_ERROR(mp_logger, "Error writing data to client: {};;; Data {}", error_code.message(), kr_send_string);
                 return false;
             }
         }

@@ -251,7 +251,8 @@ function Layout() {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {
                 layout = cloneDeep(layout);
-                if (bindVal) {
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal)
                     const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
                     if (widgetUIData) {
                         widgetUIData.view_layout = layoutType;
@@ -272,7 +273,8 @@ function Layout() {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {
                 layout = cloneDeep(layout);
-                if (bindVal) {
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal);
                     const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
                     if (widgetUIData) {
                         widgetUIData.enable_override = enableOverride;
@@ -306,6 +308,21 @@ function Layout() {
                     layout.chart_data = chartData;
                 } else {
                     layout.chart_data = [chartDataObj];
+                }
+            }
+            return layout
+        });
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
+    const onChartDelete = useCallback((name, chartName) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                if (layout.chart_data) {
+                    let chartData = cloneDeep(layout.chart_data);
+                    chartData = chartData.filter(obj => obj.chart_name !== chartName);
+                    layout.chart_data = chartData;
                 }
             }
             return layout

@@ -557,9 +557,12 @@ function AbbreviatedFilterWidget(props) {
                     rows={rows}
                     chartData={props.chartData}
                     onChartDataChange={props.onChartDataChange}
+                    onChartDelete={props.onChartDelete}
                     collections={collections}
                     filters={props.filters}
                     collectionView={true}
+                    setSelectedId={onRowSelect}
+                    abbreviated={props.abbreviated}
                 />
             ) : (
                 <WidgetContainer>

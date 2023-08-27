@@ -4,11 +4,11 @@ import {
     ListItem, ListItemButton, ListItemText, Button, RadioGroup, Radio, FormControlLabel, Popover
 } from '@mui/material';
 import _, { cloneDeep } from 'lodash';
-import { Add, AltRoute } from '@mui/icons-material';
-import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL } from '../constants';
+import { Add, AltRoute, Delete } from '@mui/icons-material';
+import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, DB_ID } from '../constants';
 import {
     addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema, getChartOption,
-    getCollectionByName, getFilterDict, mergeTsData, updateChartDataObj, updateChartSchema
+    getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, mergeTsData, roundNumber, updateChartDataObj, updateChartSchema
 } from '../utils';
 import WidgetContainer from './WidgetContainer';
 import { Icon } from './Icon';
@@ -17,9 +17,20 @@ import TreeWidget from './TreeWidget';
 import EChart from './EChart';
 import classes from './ChartWidget.module.css';
 import { useSelector } from 'react-redux';
-import axios from 'axios';
+// import axios from 'axios';
 
 const CHART_SCHEMA_NAME = 'chart_data';
+
+const tooltipFormatter = (value) => {
+    if (typeof value === DataTypes.NUMBER) {
+        if (Number.isInteger(value)) {
+            return value.toLocaleString();
+        } else {
+            return roundNumber(value, 2).toLocaleString();
+        }
+    }
+    return value;
+}
 
 function ChartWidget(props) {
     // redux states
@@ -37,18 +48,19 @@ function ChartWidget(props) {
     // const [anchorEl, setAnchorEl] = useState(null);
     const [chartObj, setChartObj] = useState({});
     const [theme, setTheme] = useState('light');
-    const [hasTimeSeries, setHasTimeSeries] = useState(false);
-    const [tsData, setTsData] = useState([]);
+    const [tsData, setTsData] = useState({});
     const [datasets, setDatasets] = useState([]);
     const [rows, setRows] = useState(props.rows);
-    const [query, setQuery] = useState();
-    const [seriesFieldAttributesList, setSeriesFieldAttributesList] = useState([]);
+    const [queryDict, setQueryDict] = useState({});
     // TODO: check if updateCounters are irrelevent
+    const [chartUpdateCounter, setChartUpdateCounter] = useState(0);
     const [tsUpdateCounter, setTsUpdateCounter] = useState(0);
     const [datasetUpdateCounter, setDatasetUpdateCounter] = useState(0);
     const [reloadCounter, setReloadCounter] = useState(0);
-    const getAllWsList = useRef([]);
+    const [schema, setSchema] = useState(props.schema);
+    const [selectedData, setSelectedData] = useState();
     const socketList = useRef([]);
+    const getAllWsDict = useRef({});
 
     // 1. update chart schema to add flux properties to necessary fields
     // 2. identify is chart configuration has time series field in y-axis (limitation) 
@@ -60,7 +72,7 @@ function ChartWidget(props) {
     //    - add only the necessary field in filter dropdown for time-series
     // 4. create expanded chart configuration object to be used by echart using stored chart configuration and datasets 
 
-    const schema = updateChartSchema(props.schema, props.collections, props.collectionView);
+    // const schema = updateChartSchema(props.schema, props.collections, props.collectionView);
 
     useEffect(() => {
         // set the theme of chart from browser preferences
@@ -68,15 +80,19 @@ function ChartWidget(props) {
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             setTheme('dark');
         }
+        const updatedSchema = updateChartSchema(props.schema, props.collections, props.collectionView);
+        setSchema(updatedSchema);
     }, [])
 
     useEffect(() => {
         // update the local row dataset on update from parent
-        if (storedChartObj.filters && storedChartObj.filters.length > 0) {
-            const updatedRows = applyFilter(props.rows, storedChartObj.filters, props.collectionView, props.collections);
-            setRows(updatedRows);
-        } else {
-            setRows(props.rows);
+        if (mode === Modes.READ_MODE) {
+            if (storedChartObj.filters && storedChartObj.filters.length > 0) {
+                const updatedRows = applyFilter(props.rows, storedChartObj.filters, props.collectionView, props.collections);
+                setRows(updatedRows);
+            } else {
+                setRows(props.rows);
+            }
         }
     }, [props.rows])
 
@@ -87,11 +103,13 @@ function ChartWidget(props) {
                 setSelectedIndex(0);
                 setStoredChartObj(props.chartData[0]);
                 setModifiedChartObj(addxpath(cloneDeep(props.chartData[0])));
-            } else {
+            }
+            else {
                 setStoredChartObj(props.chartData[selectedIndex]);
                 setModifiedChartObj(addxpath(cloneDeep(props.chartData[selectedIndex])));
             }
         }
+        setChartUpdateCounter(prevCount => prevCount + 1);
     }, [props.chartData])
 
     useEffect(() => {
@@ -103,6 +121,7 @@ function ChartWidget(props) {
             setModifiedChartObj({});
             resetChart();
         }
+        setChartUpdateCounter(prevCount => prevCount + 1);
     }, [selectedIndex])
 
     useEffect(() => {
@@ -112,39 +131,37 @@ function ChartWidget(props) {
     useEffect(() => {
         // identify if the chart configuration obj selected has a time series or not
         // for time series, selected y axis field should have mapping_src attribute set on it
-        // and underlying_time_series should be checked
+        // and time_series should be checked
         if (storedChartObj.series) {
-            let timeSeries = false;
-            storedChartObj.series.forEach(series => {
+            let updatedQueryDict = {};
+            storedChartObj.series.forEach((series, index) => {
                 const collection = getCollectionByName(props.collections, series.encode.y, props.collectionView);
-                if (collection.mapping_src && series.underlying_time_series) {
-                    timeSeries = true;
-                    const [seriesWidgetName, mappingSrcField] = collection.mapping_src.split('.', 2);
+                if (storedChartObj.time_series && collection.hasOwnProperty('mapping_src')) {
+                    const [seriesWidgetName, ...mappingSrcField] = collection.mapping_src.split('.');
+                    const srcField = mappingSrcField.join('.');
                     const seriesCollections = schemaCollections[seriesWidgetName];
-                    setSeriesFieldAttributesList(seriesCollections);
-                    let seriesCollection = seriesCollections.find(col => col.tableTitle === mappingSrcField);
+                    const mappedCollection = seriesCollections.find(col => col.tableTitle === srcField);
+                    // fetch query details for time series
                     let name;
-                    let param;
-                    seriesCollection.projections.forEach(projection => {
+                    let params = [];
+                    mappedCollection.projections.forEach(projection => {
                         // if query is found, dont proceed
                         if (name) return;
                         const [fieldName, queryName] = projection.split(':');
-                        if (fieldName === mappingSrcField) {
+                        if (fieldName === srcField) {
                             name = queryName;
                         }
                     })
-                    const filterDict = getFilterDict(storedChartObj.filters);
-                    if (Object.keys(filterDict).length > 0) {
-                        const filterFieldName = Object.keys(filterDict)[0];
-                        const filterCollection = getCollectionByName(props.collections, filterFieldName, props.collectionView);
-                        param = filterCollection.mapping_underlying_meta_field.substring(filterCollection.mapping_underlying_meta_field.indexOf('.') + 1);
-                    }
-                    setQuery({ name, param });
+                    seriesCollections.forEach(col => {
+                        if (col.val_meta_field && ![DataTypes.OBJECT, DataTypes.ARRAY].includes(col.type)) {
+                            params.push(col.tableTitle);
+                        }
+                    })
+                    updatedQueryDict[index] = { name, params };
                 }
             })
-            if (timeSeries) {
-                setHasTimeSeries(true);
-            } else {
+            setQueryDict(updatedQueryDict);
+            if (!storedChartObj.time_series) {
                 // if not time series, apply the filters on rows
                 if (storedChartObj.filters && storedChartObj.filters.length > 0) {
                     const updatedRows = applyFilter(rows, storedChartObj.filters, props.collectionView, props.collections);
@@ -152,90 +169,148 @@ function ChartWidget(props) {
                 } else {
                     setRows(props.rows);
                 }
-                setHasTimeSeries(false);
             }
         }
-    }, [storedChartObj])
+    }, [chartUpdateCounter])
+
+    useEffect(() => {
+        if (storedChartObj.series && storedChartObj.time_series) {
+            const filterDict = getFilterDict(storedChartObj.filters);
+            if (Object.keys(filterDict).length > 0) {
+                const metaFilters = genMetaFilters(rows, props.collections, filterDict, Object.keys(filterDict)[0], props.collectionView);
+                storedChartObj.series.forEach((series, index) => {
+                    const collection = getCollectionByName(props.collections, series.encode.y, props.collectionView);
+                    if (collection.hasOwnProperty('mapping_src')) {
+                        const query = queryDict[index];
+                        if (query) {
+                            metaFilters.forEach(metaFilterDict => {
+                                let paramStr;
+                                for (const key in metaFilterDict) {
+                                    if (paramStr) {
+                                        paramStr += `&${key}=${metaFilterDict[key]}`;
+                                    } else {
+                                        paramStr = `${key}=${metaFilterDict[key]}`;
+                                    }
+                                }
+                                const socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/ws-query-${query.name}?${paramStr}`);
+                                socketList.current.push(socket);
+                                socket.onmessage = (event) => {
+                                    let updatedData = JSON.parse(event.data);
+                                    if (getAllWsDict.current[query.name]) {
+                                        getAllWsDict.current[query.name].push(...updatedData);
+                                    } else {
+                                        getAllWsDict.current[query.name] = updatedData;
+                                    }
+                                }
+                            })
+                        }
+                    }
+                })
+            }
+        }
+        return () => {
+            socketList.current.forEach(socket => {
+                if (socket) {
+                    socket.close();
+                }
+            })
+            socketList.current = [];
+            getAllWsDict.current = {};
+            setTsData({});
+        }
+    }, [chartUpdateCounter, reloadCounter, queryDict, rows])
 
     useEffect(() => {
         // create the datasets for chart configuration (time-series and non time-series both)
-        const updatedDatasets = genChartDatasets(rows, tsData, storedChartObj, hasTimeSeries, query ? query.param : null);
+        const updatedDatasets = genChartDatasets(rows, tsData, storedChartObj, queryDict, props.collections, props.collectionView);
         setDatasets(updatedDatasets);
         setDatasetUpdateCounter(prevCount => prevCount + 1);
-    }, [storedChartObj, rows, tsData, hasTimeSeries, tsUpdateCounter])
-
-    useEffect(() => {
-        if (storedChartObj.series && hasTimeSeries) {
-            const filterDict = getFilterDict(storedChartObj.filters);
-            let filterFieldName;
-            if (Object.keys(filterDict).length > 0) {
-                filterFieldName = Object.keys(filterDict)[0];
-                const metaFilters = genMetaFilters(rows, props.collections, filterDict, filterFieldName, props.collectionView);
-                // TODO: extend the logic to multiple series
-                // const seriesList = storedChartObj.series.filter(series => series.underlying_time_series === true);
-                // for (const series in seriesList)
-                const series = storedChartObj.series.find(series => series.underlying_time_series === true);
-                if (series) {
-                    // TODO: uncomment after websocket query is available
-                    // setTsData([]);
-                    // TODO: comment next line if switching to ws
-                    const updatedTsData = [];
-                    metaFilters.forEach(metaFilterDict => {
-                        let paramStr;
-                        for (const key in metaFilterDict) {
-                            if (paramStr) {
-                                paramStr += `&${key}=${metaFilterDict[key]}`;
-                            } else {
-                                paramStr = `${key}=${metaFilterDict[key]}`;
-                            }
-                        }
-                        // TODO: uncomment after websocket query is available
-                        // const socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/ws-query-${query.name}?${paramStr}`);
-                        // socket.onmessage = (event) => {
-                        //     let updatedData = JSON.parse(event.data);
-                        //     getAllWsList.current.push(...updatedData);
-                        // }
-                        // /* close the websocket on cleanup */
-                        // return () => socket.close();
-                        // TODO: comment below http query
-                        axios.get(`${API_ROOT_URL}/query-${query.name}?${paramStr}`).then(res => {
-                            updatedTsData.push(...res.data);
-                            setTsData([...updatedTsData]);
-                            setTsUpdateCounter(prevCount => prevCount + 1);
-                        })
-                    })
-                }
-            }
-        }
-    }, [storedChartObj, hasTimeSeries, reloadCounter])
+    }, [chartUpdateCounter, rows, tsUpdateCounter, queryDict])
 
     useEffect(() => {
         if (storedChartObj.series) {
             const updatedObj = addxpath(cloneDeep(storedChartObj));
-            const updatedChartObj = updateChartDataObj(updatedObj, props.collections, rows, datasets, props.collectionView, schemaCollections);
+            const updatedChartObj = updateChartDataObj(updatedObj, props.collections, rows, datasets, props.collectionView, schemaCollections, queryDict);
             setChartObj(updatedChartObj)
         }
-    }, [datasets, datasetUpdateCounter])
+    }, [datasetUpdateCounter, queryDict])
 
     // TODO: uncomment after websocket query is available
-    // const flushGetAllWs = useCallback(() => {
-    //     /* apply get-all websocket changes */
-    //     if (getAllWsList.current.length > 0) {
-    //         if (query && query.param) {
-    //             const updatedTsData = mergeTsData(tsData, getAllWsList.current, query.param);
-    //             setTsData(updatedTsData);
-    //         }
-    //         getAllWsList.current = [];
-    //     }
-    // }, [tsData, query])
+    const flushGetAllWs = useCallback(() => {
+        /* apply get-all websocket changes */
+        if (Object.keys(getAllWsDict.current).length > 0 && mode === Modes.READ_MODE) {
+            const updatedWsDict = cloneDeep(getAllWsDict.current);
+            getAllWsDict.current = {}
+            const updatedTsData = mergeTsData(tsData, updatedWsDict, queryDict);
+            setTsData(updatedTsData);
+            setTsUpdateCounter(prevCount => prevCount + 1);
+        }
+    }, [tsData, queryDict, mode])
 
     // TODO: uncomment after websocket query is available
-    // useEffect(() => {
-    //     const intervalId = setInterval(flushGetAllWs, 500);
-    //     return () => {
-    //         clearInterval(intervalId);
-    //     }
-    // }, [])
+    useEffect(() => {
+        const intervalId = setInterval(flushGetAllWs, 500);
+        return () => {
+            clearInterval(intervalId);
+        }
+    }, [tsData, queryDict, mode])
+
+    useEffect(() => {
+        if (props.collectionView && selectedData) {
+            const idField = props.abbreviated.split(':')[0];
+            if (storedChartObj.time_series) {
+                const query = queryDict[selectedData.seriesIndex];
+                if (query) {
+                    const keys = query.params.map(param => {
+                        const collection = props.collections.find(col => {
+                            if (col.hasOwnProperty('mapping_underlying_meta_field')) {
+                                const [, ...mappedFieldSplit] = col.mapping_underlying_meta_field.split('.');
+                                const mappedField = mappedFieldSplit.join('.');
+                                if (mappedField === param) {
+                                    return true;
+                                }
+                            }
+                            return false;
+                        })
+                        if (props.collectionView) {
+                            return collection.key;
+                        } else {
+                            return collection.tableTitle;
+                        }
+                    })
+                    const filterCriteria = {};
+                    query.params.forEach((param, index) => {
+                        filterCriteria[keys[index]] = _.get(selectedData, param);
+                    })
+                    const row = rows.find(row => {
+                        let found = true;
+                        Object.keys(filterCriteria).forEach(field => {
+                            if (row[field] !== filterCriteria[field]) {
+                                found = false;
+                            }
+                        })
+                        if (found) return true;
+                        return false;
+                    })
+                    if (row) {
+                        if (row.hasOwnProperty(idField)) {
+                            let id = row[idField];
+                            if (typeof id === DataTypes.STRING) {
+                                id = getIdFromAbbreviatedKey(props.abbreviated, id);
+                            }
+                            props.setSelectedId(id);
+                        }
+                    }
+                }
+            } else {
+                let id = selectedData[idField];
+                if (typeof id === DataTypes.STRING) {
+                    id = getIdFromAbbreviatedKey(props.abbreviated, id);
+                }
+                props.setSelectedId(id);
+            }
+        }
+    }, [selectedData, queryDict])
 
     // on closing of modal, open a pop up to confirm/discard changes
     const onClose = (e) => {
@@ -250,10 +325,8 @@ function ChartWidget(props) {
     const resetChart = () => {
         setRows(props.rows);
         setDatasets([]);
-        setHasTimeSeries(false);
-        setTsData([]);
-        setQuery();
-        setSeriesFieldAttributesList([]);
+        setTsData({});
+        setQueryDict({});
         setTsUpdateCounter(0);
         setDatasetUpdateCounter(0);
     }
@@ -264,6 +337,7 @@ function ChartWidget(props) {
         setOpenModalPopup(false);
         const updatedObj = clearxpath(cloneDeep(data));
         props.onChartDataChange(props.name, updatedObj);
+        setChartUpdateCounter(prevCount => prevCount + 1);
     }
 
     // on closing of modal popup (discard), revert back the changes
@@ -304,12 +378,29 @@ function ChartWidget(props) {
 
     const onUpdate = (updatedData) => {
         setData(updatedData);
+        const updatedSchema = cloneDeep(schema);
+        const filterSchema = _.get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
+        if (updatedData.time_series) {
+            filterSchema.auto_complete = 'fld_name:MetaFldList';
+        } else {
+            filterSchema.auto_complete = 'fld_name:FldList';
+        }
+        setSchema(updatedSchema);
     }
 
     const onSelect = (index) => {
         if (index !== selectedIndex) {
             setSelectedIndex(index);
             resetChart();
+        }
+    }
+
+    const onChartDelete = (chartName, index) => {
+        props.onChartDelete(props.name, chartName);
+        if (index === selectedIndex) {
+            setSelectedIndex();
+            setStoredChartObj({});
+            setModifiedChartObj({});
         }
     }
 
@@ -414,30 +505,38 @@ function ChartWidget(props) {
                                 <ListItemButton>
                                     <ListItemText>{item.chart_name}</ListItemText>
                                 </ListItemButton>
+                                <Icon title='Delete' onClick={() => onChartDelete(item.chart_name, index)}>
+                                    <Delete fontSize='small' />
+                                </Icon>
                             </ListItem>
                         ))}
                     </List>
                 </Box>
                 <Divider orientation="vertical" flexItem />
                 <Box className={classes.chart_container}>
-                    <EChart
-                        loading={false}
-                        theme={theme}
-                        option={{
-                            legend: {},
-                            tooltip: {
-                                trigger: 'axis',
-                                axisPointer: {
-                                    type: 'cross'
-                                }
-                            },
-                            dataZoom: {
-                                type: 'inside'
-                            },
-                            dataset: datasets,
-                            ...options
-                        }}
-                    />
+                    {storedChartObj.chart_name && (
+                        <EChart
+                            loading={false}
+                            theme={theme}
+                            option={{
+                                legend: {},
+                                tooltip: {
+                                    trigger: 'axis',
+                                    axisPointer: {
+                                        type: 'cross'
+                                    },
+                                    valueFormatter: (value) => tooltipFormatter(value)
+                                },
+                                dataZoom: {
+                                    type: 'inside'
+                                },
+                                dataset: datasets,
+                                ...options
+                            }}
+                            setSelectedData={setSelectedData}
+                            isCollectionType={props.collectionView}
+                        />
+                    )}
                 </Box>
             </Box>
             <FullScreenModal

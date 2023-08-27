@@ -30,7 +30,8 @@ const complexFieldProps = [
     { propertyName: "elaborate_title", usageName: "elaborateTitle" },
     { propertyName: "filter_enable", usageName: "filterEnable" },
     { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
-    { propertyName: "mapping_src", usageName: "mapping_src" }
+    { propertyName: "mapping_src", usageName: "mapping_src" },
+    { propertyName: "val_meta_field", usageName: "val_meta_field" },
 ]
 
 const fieldProps = [
@@ -63,7 +64,6 @@ const fieldProps = [
     { propertyName: "display_zero", usageName: "displayZero" },
     { propertyName: "micro_separator", usageName: "microSeparator" },
     { propertyName: "val_time_field", usageName: "val_time_field" },
-    { propertyName: "val_meta_field", usageName: "val_meta_field" },
     { propertyName: "projections", usageName: "projections" },
     { propertyName: "mapping_projection_query_field", usageName: "mapping_projection_query_field" },
 ]
@@ -223,6 +223,9 @@ export function createCollections(schema, currentSchema, callerProps, collection
                                 collection[usageName] = dict[field];
                             }
                         }
+                    }
+                    if (!['auto_complete', 'mapping_underlying_meta_field', 'mapping_src'].includes(propertyName)) {
+                        collection[usageName] = propertyValue;
                     }
                 }
             })
@@ -615,6 +618,9 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
                             node[usageName] = dict[field];
                         }
                     }
+                }
+                if (!['auto_complete', 'mapping_underlying_meta_field', 'mapping_src'].includes(propertyName)) {
+                    node[usageName] = propertyValue;
                 }
             }
         })
@@ -2371,8 +2377,38 @@ function getAxisMax(rows, field, index = 0) {
         }
     })
     max = Math.ceil(max);
-    const scale = 1.5 - 0.25 * index;
+    // const scale = 1.5 - 0.25 * index;
+    const scale = 1.25;
     return max * scale;
+}
+
+function getAxisMin(rows, field, index = 0) {
+    /* 
+        Params:
+        - rows (Array[Object]): list of dict of table rows dataset
+        - field (String): field name
+        - index (Number): index of axis. default 0
+    */
+
+    if (!rows) {
+        throw new Error('getAxisMax failed. rows list is null or undefined, rows: ' + rows);
+    }
+    let min = 0;
+    rows.forEach((row, index) => {
+        if (row.hasOwnProperty(field)) {
+            const value = row[field];
+            if (index === 0) {
+                min = value;
+            }
+            if (value < min) {
+                min = value;
+            }
+        }
+    })
+    min = Math.floor(min);
+    // const scale = 1.5 - 0.25 * index;
+    const scale = 1.25;
+    return min / scale;
 }
 
 export function getCollectionByName(collections, name, isCollectionType = false) {
@@ -2397,7 +2433,7 @@ export function getCollectionByName(collections, name, isCollectionType = false)
     return collection;
 }
 
-export function updateChartDataObj(chartDataObj, collections, rows, datasets, isCollectionType = false, schemaCollections) {
+export function updateChartDataObj(chartDataObj, collections, rows, datasets, isCollectionType = false, schemaCollections, queryDict) {
     chartDataObj = cloneDeep(chartDataObj);
     const xEndodes = [];
     const yEncodes = [];
@@ -2406,37 +2442,46 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
     const seriesList = [];
     let prevYEncode;
     let prevYEncodeIndex = 0;
-    chartDataObj.series.forEach(series => {
+    chartDataObj.series.forEach((series, seriesIndex) => {
         let xEncode;
         let yEncode;
         let yMax = 0;
+        let yMin = 0;
         let chartSeriesCollections = collections;
-        if (series.underlying_time_series) {
+        if (chartDataObj.time_series) {
             const collection = getCollectionByName(collections, series.encode.y, isCollectionType);
-            const [seriesWidgetName, mappingSrcField] = collection.mapping_src.split('.', 2);
-            const seriesCollections = schemaCollections[seriesWidgetName];
-            const xCollection = seriesCollections.find(col => col.val_time_field === true);
-            xEncode = xCollection.tableTitle;
-            const yCollection = seriesCollections.find(col => col.tableTitle === mappingSrcField);
-            yEncode = yCollection.tableTitle;
-            series.encode.x = xEncode;
-            series.encode.y = yEncode;
-            const tsRows = [];
-            datasets.forEach((dataset, index) => {
-                if (dataset.type === 'time_series') {
-                    const updatedSeries = cloneDeep(series);
-                    updatedSeries.datasetIndex = index;
-                    updatedSeries.name = dataset.name + ' ' + series.encode.y;
-                    updatedSeries.animation = false;
-                    if (updatedSeries.type === 'line' && dataset.source.length > 1) {
-                        updatedSeries.showSymbol = false;
-                    }
-                    seriesList.push(updatedSeries);
-                    tsRows.push(...dataset.source)
+            if (collection.hasOwnProperty('mapping_src')) {
+                const [seriesWidgetName, ...mappingSrcField] = collection.mapping_src.split('.');
+                const srcField = mappingSrcField.join('.');
+                const seriesCollections = schemaCollections[seriesWidgetName];
+                const query = queryDict[seriesIndex];
+                if (query) {
+                    const xCollection = seriesCollections.find(col => col.val_time_field === true);
+                    xEncode = xCollection.tableTitle;
+                    const yCollection = seriesCollections.find(col => col.tableTitle === srcField);
+                    yEncode = yCollection.tableTitle;
+                    // series.encode.x = xEncode;
+                    // series.encode.y = yEncode;
+                    const tsRows = [];
+                    datasets.forEach((dataset, index) => {
+                        if (dataset.type === 'time_series' && dataset.query === query.name) {
+                            const updatedSeries = cloneDeep(series);
+                            updatedSeries.datasetIndex = index;
+                            updatedSeries.name = dataset.name + ' ' + series.encode.y;
+                            updatedSeries.animation = false;
+                            if (updatedSeries.type === 'line' && dataset.source.length > 10) {
+                                updatedSeries.showSymbol = false;
+                            }
+                            updatedSeries.yAxisIndex = yEncodes.length;
+                            seriesList.push(updatedSeries);
+                            tsRows.push(...dataset.source)
+                        }
+                    })
+                    yMax = getAxisMax(tsRows, yEncode, yEncodes.length);
+                    yMin = getAxisMin(tsRows, yEncode, yEncodes.length);
+                    chartSeriesCollections = seriesCollections;
                 }
-            })
-            yMax = getAxisMax(tsRows, yEncode, yEncodes.length);
-            chartSeriesCollections = seriesCollections;
+            }
         } else {
             xEncode = series.encode.x;
             yEncode = series.encode.y;
@@ -2448,14 +2493,16 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                         updatedSeries.datasetIndex = index;
                         updatedSeries.name = dataset.name + ' ' + series.encode.y;
                         updatedSeries.animation = false;
-                        if (updatedSeries.type === 'line' && dataset.source.length > 1) {
+                        if (updatedSeries.type === 'line' && dataset.source.length > 10) {
                             updatedSeries.showSymbol = false;
                         }
+                        updatedSeries.yAxisIndex = yEncodes.length;
                         seriesList.push(updatedSeries);
                         partitionRows.push(...dataset.source);
                     }
                 })
                 yMax = getAxisMax(partitionRows, yEncode, yEncodes.length);
+                yMin = getAxisMin(partitionRows, yEncode, yEncodes.length);
             } else {
                 const dataset = datasets.find(dataset => dataset.type === 'default');
                 if (dataset) {
@@ -2463,25 +2510,28 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                     updatedSeries.datasetIndex = datasets.indexOf(dataset);
                     updatedSeries.name = series.encode.y;
                     updatedSeries.animation = false;
-                    if (updatedSeries.type === 'line' && dataset.source.length > 1) {
+                    if (updatedSeries.type === 'line' && dataset.source.length > 10) {
                         updatedSeries.showSymbol = false;
                     }
+                    updatedSeries.yAxisIndex = yEncodes.length;
                     seriesList.push(updatedSeries);
                     yMax = getAxisMax(rows, yEncode, yEncodes.length);
+                    yMin = getAxisMin(rows, yEncode, yEncodes.length);
                 }
             }
         }
-        if (!prevYEncode) {
-            prevYEncode = yEncode;
-        } else if (prevYEncode !== yEncode) {
-            prevYEncodeIndex += 1;
-            series.yAxisIndex = prevYEncodeIndex;
-        }
-        if (!xEndodes.includes(xEncode)) {
-            xEndodes.push({ encode: xEncode, seriesCollections: chartSeriesCollections, isCollectionType: !series.underlying_time_series });
-        }
-        if (!yEncodes.includes(yEncode)) {
-            yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !series.underlying_time_series, max: yMax });
+        if (xEncode && yEncode) {
+            if (!prevYEncode) {
+                prevYEncode = yEncode;
+            } else if (prevYEncode !== yEncode) {
+                prevYEncodeIndex += 1;
+            }
+            if (!xEndodes.includes(xEncode)) {
+                xEndodes.push({ encode: xEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series });
+            }
+            if (!yEncodes.includes(yEncode)) {
+                yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series, max: yMax, min: yMin });
+            }
         }
     })
     xEndodes.forEach(({ encode, seriesCollections, isCollectionType }) => {
@@ -2502,7 +2552,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
             xAxis.push(axis);
         }
     })
-    yEncodes.forEach(({ encode, seriesCollections, isCollectionType, max }) => {
+    yEncodes.forEach(({ encode, seriesCollections, isCollectionType, max, min }) => {
         const [yAxisType, yAxisName] = getChartAxisTypeAndName(seriesCollections, encode, isCollectionType);
         // only two y-axis is allowed per chart.
         // if more than 2 y-axis is present, only considers the first 2 y-axis
@@ -2514,7 +2564,9 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                 encode: encode,
                 splitNumber: 5,
                 max: max,
-                interval: max / 5
+                interval: (max - min) / 5,
+                min: min,
+                onZero: false
             })
         }
     })
@@ -2553,7 +2605,7 @@ export function updateChartSchema(schema, collections, isCollectionType = false)
     const chartEncodeSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_encode']);
     chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
     const filterSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
-    filterSchema.auto_complete = 'fld_name:MetaFldList';
+    filterSchema.auto_complete = 'fld_name:FldList';
     let fldList;
     let strFldList;
     let metaFldList;
@@ -2639,7 +2691,7 @@ export function getChartDatasets(rows, partitionFld, chartObj) {
     }
 }
 
-export function genChartDatasets(rows = [], tsData, chartObj, hasTimeSeries, param) {
+export function genChartDatasets(rows = [], tsData, chartObj, queryDict, collections, isCollectionType = false) {
     const datasets = [];
     if (rows.length > 0) {
         datasets.push({
@@ -2649,40 +2701,91 @@ export function genChartDatasets(rows = [], tsData, chartObj, hasTimeSeries, par
             type: 'default'
         })
     }
-    if (hasTimeSeries) {
-        tsData.forEach(ts => {
-            datasets.push({
-                dimensions: ts.projection_models && ts.projection_models.length > 0 ? Object.keys(ts.projection_models[0]) : [],
-                source: ts.projection_models ? ts.projection_models : [],
-                name: _.get(ts, param),
-                type: 'time_series'
-            })
-        })
-    } else {
-        if (rows.length > 0 && chartObj.partition_fld) {
-            const groupsDict = rows.reduce((acc, cur) => {
-                acc[cur[chartObj.partition_fld]] = [...acc[cur[chartObj.partition_fld]] || [], cur];
-                return acc;
-            }, {});
-            for (const groupName in groupsDict) {
-                datasets.push({
-                    dimensions: Object.keys(rows[0]),
-                    source: groupsDict[groupName],
-                    name: groupName,
-                    type: 'partition'
-                })
+    if (chartObj.series) {
+        chartObj.series.forEach((series, index) => {
+            if (chartObj.time_series) {
+                const collection = getCollectionByName(collections, series.encode.y, isCollectionType);
+                if (collection.hasOwnProperty('mapping_src')) {
+                    const query = queryDict[index];
+                    if (query) {
+                        const seriesTsData = tsData[query.name];
+                        if (seriesTsData) {
+                            seriesTsData.forEach(ts => {
+                                if (ts.projection_models && ts.projection_models.length > 0) {
+                                    let name = query.params.map(param => _.get(ts, param)).join(' ');
+                                    const { projection_models, ...meta } = ts;
+                                    const metaFieldName = Object.keys(meta)[0];
+                                    ts.projection_models.map(projection => {
+                                        projection[metaFieldName] = meta[metaFieldName];
+                                        projection['seriesIndex'] = index;
+                                        return projection;
+                                    })
+                                    datasets.push({
+                                        dimensions: Object.keys(ts.projection_models[0]),
+                                        source: ts.projection_models,
+                                        name: name,
+                                        type: 'time_series',
+                                        query: query.name
+                                    })
+                                }
+                            })
+                        }
+                    }
+                }
+            } else {
+                if (rows.length > 0 && chartObj.partition_fld) {
+                    const groupsDict = rows.reduce((acc, cur) => {
+                        acc[cur[chartObj.partition_fld]] = [...acc[cur[chartObj.partition_fld]] || [], cur];
+                        return acc;
+                    }, {});
+                    for (const groupName in groupsDict) {
+                        datasets.push({
+                            dimensions: Object.keys(rows[0]),
+                            source: groupsDict[groupName],
+                            name: groupName,
+                            type: 'partition'
+                        })
+                    }
+                }
             }
-        }
+        })
     }
     return datasets;
 }
 
-export function mergeTsData(tsData, updatedData, param) {
-    tsData = cloneDeep(tsData);
-    updatedData.forEach(data => {
-        const timeSeries = tsData.find(ts => _.get(ts, param) === _.get(data, param));
-        timeSeries.projection_models.push(data.projection_models);
-    })
+export function mergeTsData(tsData, updatedData, queryDict) {
+    for (const queryName in updatedData) {
+        const dataList = updatedData[queryName];
+        let query;
+        Object.entries(queryDict).forEach(([index, queryProps]) => {
+            if (query) return;
+            if (queryProps.name === queryName) {
+                query = queryProps;
+            }
+        })
+        if (query) {
+            if (!tsData.hasOwnProperty(queryName)) {
+                tsData[queryName] = [];
+            }
+            dataList.forEach(data => {
+                const timeSeries = tsData[queryName].find(ts => {
+                    let found = true;
+                    query.params.forEach(param => {
+                        if (_.get(ts, param) !== _.get(data, param)) {
+                            found = false;
+                        }
+                    })
+                    if (found) return true;
+                    return false;
+                })
+                if (timeSeries) {
+                    timeSeries.projection_models.push(...data.projection_models);
+                } else {
+                    tsData[queryName].push(data);
+                }
+            })
+        }
+    }
     return tsData;
 }
 

@@ -35,7 +35,7 @@ namespace FluxCppCore {
             if (status.code() == google::protobuf::util::StatusCode::kOk) {
                 return true;
             } else {
-                LOG_ERROR(c_p_logger_, "Failed Decoding {}, error: {} json: {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR(c_p_logger_, "Failed Decoding {};;; error: {};;; json: {}", RootModelType::GetDescriptor()->name(),
                           status.message().ToString(), kr_json);
                 return false;
             }
@@ -51,7 +51,7 @@ namespace FluxCppCore {
             if (status.code() == google::protobuf::util::StatusCode::kOk)
                 return true;
             else {
-                LOG_ERROR(c_p_logger_, "Failed Encoding {}, error: {} {}: {}", RootModelType::GetDescriptor()->name(),
+                LOG_ERROR(c_p_logger_, "Failed Encoding {};;; error: {};;; {}: {}", RootModelType::GetDescriptor()->name(),
                           status.message().ToString(), RootModelType::GetDescriptor()->name(),
                           kr_model_obj.DebugString());
                 return false;
@@ -81,7 +81,7 @@ namespace FluxCppCore {
                 } // else not required: when we try to encode empty string we'll not find `:[{` as substr
                 return true;
             } else {
-                LOG_ERROR(c_p_logger_, "Failed Encoding {}, error: {} {}: {}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR(c_p_logger_, "Failed Encoding {};;; error: {};;; {}: {}", RootModelListType::GetDescriptor()->name(),
                           status.message().ToString(), RootModelListType::GetDescriptor()->name(),
                           kr_model_list_obj.DebugString());
                 return false;
@@ -110,7 +110,7 @@ namespace FluxCppCore {
             if (status.code() == google::protobuf::util::StatusCode::kOk) {
                 return true;
             } else {
-                LOG_ERROR(c_p_logger_, "Failed Decoding {}, error: {} list_json: {}", RootModelListType::GetDescriptor()->name(),
+                LOG_ERROR(c_p_logger_, "Failed Decoding {};;; error: {};;; list_json: {}", RootModelListType::GetDescriptor()->name(),
                           status.message().ToString(), r_list_json);
                 return false;
             }

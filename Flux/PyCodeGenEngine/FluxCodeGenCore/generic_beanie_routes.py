@@ -85,11 +85,11 @@ def validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type: Type[Do
         raise Exception(err)
 
 
-async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type,
+async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type: DocType,
                                                 pydantic_obj_id_list: List[Any],
                                                 broadcast_callable: Callable,
                                                 tasks_list: List[asyncio.Task],
-                                                dummy_pydantic_model=None,
+                                                dummy_pydantic_model: ModelMetaclass | None = None,
                                                 filter_agg_pipeline: Dict | None = None,
                                                 has_links: bool | None = None):
     for ws_data in active_ws_data_set:
@@ -118,12 +118,12 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
         # else not required: not going to broadcast if not a valid update for this ws
 
 
-async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type,
+async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type: DocType,
                                             pydantic_obj_id: Any,
                                             broadcast_callable: Callable,
                                             tasks_list: List[asyncio.Task],
                                             broadcast_with_id: bool | None = None,
-                                            dummy_pydantic_model=None,
+                                            dummy_pydantic_model: ModelMetaclass | None = None,
                                             filter_agg_pipeline: Dict | None = None,
                                             has_links: bool | None = None):
     for ws_data in active_ws_data_set:
@@ -158,7 +158,8 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], py
 
 
 async def publish_ws(pydantic_class_type: Type[DocType], pydantic_obj_id: Any, filter_agg_pipeline: Dict | None = None,
-                     has_links: bool | None = None, update_ws_with_id: bool | None = None, dummy_pydantic_model=None):
+                     has_links: bool | None = None, update_ws_with_id: bool | None = None,
+                     dummy_pydantic_model: ModelMetaclass | None = None):
     """
     :param pydantic_class_type: Document Class Type
     :param pydantic_obj_id: pydantic_obj_id for create/update/delete
@@ -194,7 +195,7 @@ async def publish_ws(pydantic_class_type: Type[DocType], pydantic_obj_id: Any, f
 
 async def publish_ws_all(pydantic_class_type: Type[DocType], pydantic_obj_id_list: List[Any],
                          filter_agg_pipeline: Dict | None = None, has_links: bool | None = None,
-                         update_ws_with_id: bool | None = None, dummy_pydantic_model=None):
+                         update_ws_with_id: bool | None = None, dummy_pydantic_model: ModelMetaclass | None = None):
     """
     :param pydantic_class_type: Document Class Type
     :param pydantic_obj_id_list: List of pydantic_obj_ids for create/update/delete
@@ -251,7 +252,7 @@ async def execute_update_agg_pipeline(pydantic_class_type: Type[DocType],
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_post_http(pydantic_class_type: Type[DocType], proto_package_name: str, pydantic_obj,
+async def generic_post_http(pydantic_class_type: Type[DocType], proto_package_name: str, pydantic_obj: DocType,
                             filter_agg_pipeline: Any = None,
                             update_agg_pipeline: Any = None, has_links: bool = False):
 
@@ -345,8 +346,9 @@ async def _underlying_patch_n_put_all(pydantic_class_type: Type[DocType], proto_
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_put_http(pydantic_class_type, proto_package_name: str, stored_pydantic_obj, pydantic_obj_updated,
-                           filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None, has_links: bool = False):
+async def generic_put_http(pydantic_class_type: Type[DocType], proto_package_name: str, stored_pydantic_obj: DocType,
+                           pydantic_obj_updated: DocType, filter_agg_pipeline: Any = None,
+                           update_agg_pipeline: Any = None, has_links: bool = False):
     return await _underlying_patch_n_put(pydantic_class_type, proto_package_name, stored_pydantic_obj,
                                          pydantic_obj_updated.dict(by_alias=True),
                                          filter_agg_pipeline,
@@ -435,9 +437,10 @@ def assign_missing_ids_n_handle_date_time_type(pydantic_class_type: Type[DocType
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_patch_http(pydantic_class_type: Type[DocType], proto_package_name: str, stored_pydantic_obj,
-                             pydantic_obj_update_json, filter_agg_pipeline: Any = None,
-                             update_agg_pipeline: Any = None, has_links: bool = False):
+async def generic_patch_http(pydantic_class_type: Type[DocType], proto_package_name: str,
+                             stored_pydantic_obj: DocType, pydantic_obj_update_json,
+                             filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None,
+                             has_links: bool = False):
     assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json)
     updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(by_alias=True),
                                                      pydantic_obj_update_json)
@@ -488,8 +491,9 @@ async def generic_patch_all_http(pydantic_class_type: Type[DocType], proto_packa
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_delete_http(pydantic_class_type: Type[DocType], proto_package_name: str, pydantic_dummy_model,
-                              pydantic_obj, update_agg_pipeline: Any = None, has_links: bool = False):
+async def generic_delete_http(pydantic_class_type: Type[DocType], proto_package_name: str,
+                              pydantic_dummy_model: ModelMetaclass, pydantic_obj: DocType,
+                              update_agg_pipeline: Any = None, has_links: bool = False):
     id_is_int_type = isinstance(pydantic_obj.id, int)
 
     if has_links:
@@ -518,7 +522,8 @@ async def generic_delete_http(pydantic_class_type: Type[DocType], proto_package_
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_package_name: str, pydantic_dummy_model):
+async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_package_name: str,
+                                  pydantic_dummy_model: ModelMetaclass):
     id_is_int_type = (pydantic_class_type.__fields__.get("id").type_ == int)
 
     try:
@@ -551,8 +556,9 @@ async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_pack
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_read_http(pydantic_class_type, proto_package_name: str, filter_agg_pipeline: Any = None,
-                            has_links: bool = False, read_ids_list: List[Any] | None = None, projection_model=None):
+async def generic_read_http(pydantic_class_type: Type[DocType], proto_package_name: str,
+                            filter_agg_pipeline: Any = None, has_links: bool = False,
+                            read_ids_list: List[Any] | None = None, projection_model=None):
     pydantic_list: List[pydantic_class_type]
     pydantic_list = \
         await get_obj_list(pydantic_class_type, read_ids_list,
@@ -589,8 +595,8 @@ def get_by_id_ws_url(host: str, port: int, proto_package_name: str, pydantic_cla
 
 
 @http_except_n_log_error(status_code=500)
-async def generic_read_ws(ws: WebSocket, project_name: str,
-                          pydantic_class_type, filter_agg_pipeline: Any = None, has_links: bool = False):
+async def generic_read_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocType],
+                          filter_agg_pipeline: Any = None, has_links: bool = False):
     is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws)
     logging.debug(f"websocket client requested to connect: {ws.client}")
     host, port = get_beanie_host_n_port(project_name)
@@ -646,11 +652,11 @@ async def generic_read_ws(ws: WebSocket, project_name: str,
 
 
 @http_except_n_log_error(status_code=500)
-async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type,
+async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocType],
                            filter_callable: Callable[..., Any] | None = None,
                            filter_callable_kwargs: Dict[Any, Any] | None = None,
                            projection_agg_pipeline_callable: Callable[..., Any] | None = None,
-                           projection_model=None):
+                           projection_model: ModelMetaclass | None = None):
     if filter_callable_kwargs is None:
         filter_callable_kwargs = {}
 
@@ -719,8 +725,8 @@ async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_read_by_id_http(pydantic_class_type, proto_package_name: str, pydantic_obj_id,
-                                  filter_agg_pipeline: Any = None, has_links: bool = False):
+async def generic_read_by_id_http(pydantic_class_type: Type[DocType], proto_package_name: str,
+                                  pydantic_obj_id: Any, filter_agg_pipeline: Any = None, has_links: bool = False):
     fetched_pydantic_obj: pydantic_class_type = await get_obj(pydantic_class_type, pydantic_obj_id,
                                                               filter_agg_pipeline, has_links)
     if not fetched_pydantic_obj:
@@ -731,8 +737,8 @@ async def generic_read_by_id_http(pydantic_class_type, proto_package_name: str, 
 
 
 @http_except_n_log_error(status_code=500)
-async def generic_read_by_id_ws(ws: WebSocket, project_name: str, pydantic_class_type, pydantic_obj_id,
-                                filter_agg_pipeline: Any = None, has_links: bool = False):
+async def generic_read_by_id_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocType],
+                                pydantic_obj_id: Any, filter_agg_pipeline: Any = None, has_links: bool = False):
     # prevent duplicate addition
     is_new_ws: bool = await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.connect(ws, pydantic_obj_id)
 
@@ -795,8 +801,9 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, pydantic_class
                           f"{get_by_id_ws_url(host, port, project_name, pydantic_class_type, pydantic_obj_id)}")
 
 
-async def get_obj(pydantic_class_type, pydantic_obj_id, filter_agg_pipeline: Any = None, has_links: bool = False,
-                  projection_model=None):
+async def get_obj(pydantic_class_type: Type[DocType], pydantic_obj_id: Any,
+                  filter_agg_pipeline: Any = None, has_links: bool = False,
+                  projection_model: ModelMetaclass | None = None):
     fetched_pydantic_obj: pydantic_class_type
     if filter_agg_pipeline is None:
         fetched_pydantic_obj = await pydantic_class_type.get(pydantic_obj_id, fetch_links=has_links)
@@ -806,8 +813,9 @@ async def get_obj(pydantic_class_type, pydantic_obj_id, filter_agg_pipeline: Any
     return fetched_pydantic_obj
 
 
-async def get_obj_list(pydantic_class_type, find_ids: List[Any] | None = None,
-                       filter_agg_pipeline: Any = None, has_links: bool = False, projection_model=None):
+async def get_obj_list(pydantic_class_type: Type[DocType], find_ids: List[Any] | None = None,
+                       filter_agg_pipeline: Any = None, has_links: bool = False,
+                       projection_model: ModelMetaclass | None = None):
     pydantic_list: List[pydantic_class_type]
     try:
         if filter_agg_pipeline is None:
@@ -826,8 +834,9 @@ async def get_obj_list(pydantic_class_type, find_ids: List[Any] | None = None,
         raise e
 
 
-async def get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, pydantic_obj_id_list: List | None = None,
-                                has_links: bool = False, projection_model=None):
+async def get_filtered_obj_list(filter_agg_pipeline: Dict, pydantic_class_type: Type[DocType],
+                                pydantic_obj_id_list: List | None = None,
+                                has_links: bool = False, projection_model: ModelMetaclass | None = None):
     # prevent polluting caller provided filter_agg_pipeline
     filter_agg_pipeline_copy = deepcopy(filter_agg_pipeline)
     if pydantic_obj_id_list is not None:
@@ -851,8 +860,9 @@ async def get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type, pydant
     return pydantic_list
 
 
-async def get_filtered_obj(filter_agg_pipeline, pydantic_class_type, pydantic_obj_id, has_links: bool = False,
-                           projection_model=None):
+async def get_filtered_obj(filter_agg_pipeline: Dict, pydantic_class_type: Type[DocType],
+                           pydantic_obj_id: Any, has_links: bool = False,
+                           projection_model: ModelMetaclass | None = None):
     pydantic_list = await get_filtered_obj_list(filter_agg_pipeline, pydantic_class_type,
                                                 [pydantic_obj_id], has_links, projection_model)
     if pydantic_list:

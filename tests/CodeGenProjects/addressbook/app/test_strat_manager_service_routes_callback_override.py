@@ -268,13 +268,13 @@ def test_sanity_underlying_time_series(static_data_, clean_and_set_limits, dash_
     for index, symbol_pair in enumerate(symbol_pair_list):
         dash_obj: DashBaseModel = DashBaseModel(**dash_)
         dash_obj.rt_dash.leg1.sec.sec_id = symbol_pair[0]
-        dash_obj.rt_dash.leg1.vwap -=  index * 10
+        dash_obj.rt_dash.leg1.vwap -= index * 10
         dash_obj.rt_dash.leg1.vwap_change -= index * 0.5
         dash_obj.rt_dash.leg2.sec.sec_id = symbol_pair[1]
-        dash_obj.rt_dash.leg2.vwap -=  index * 1
+        dash_obj.rt_dash.leg2.vwap -= index * 1
         dash_obj.rt_dash.leg2.vwap_change -= index * 0.25
         stored_dash_obj: DashBaseModel = market_data_web_client.create_dash_client(dash_obj)
-        dash_ids.append(stored_dash_obj.id)
+        dash_ids.append(str(stored_dash_obj.id))
     # create dash filters and dashboards
     dash_filters_obj: DashFiltersBaseModel = DashFiltersBaseModel(**dash_filter_)
     stored_dash_filters_obj = market_data_web_client.create_dash_filters_client(dash_filters_obj)
@@ -301,7 +301,7 @@ def test_sanity_underlying_time_series(static_data_, clean_and_set_limits, dash_
             leg1_bar_data.end_time = current_time.add(seconds=1)
             leg1_bar_data.symbol_n_exch_id.symbol = symbol_pair[0]
             leg1_bar_data.vwap = random.randint(leg1_px_portion[0], leg1_px_portion[1])
-            leg1_bar_data.vwap_change = random.randint(leg1_px_change[0], leg1_px_change[1])
+            leg1_bar_data.vwap_change = random.randint(leg1_px_change[0], leg1_px_change[1]) + 0.25
             volume_change = random.randint(0, 1_000)
             leg1_bar_data.volume = volume + volume_change
 
@@ -310,7 +310,7 @@ def test_sanity_underlying_time_series(static_data_, clean_and_set_limits, dash_
             leg2_bar_data.end_time = current_time.add(seconds=1)
             leg2_bar_data.symbol_n_exch_id.symbol = symbol_pair[1]
             leg2_bar_data.vwap = random.randint(leg2_px_portion[0], leg2_px_portion[1])
-            leg2_bar_data.vwap_change = random.randint(leg1_px_change[0], leg1_px_change[1])
+            leg2_bar_data.vwap_change = random.randint(leg2_px_change[0], leg2_px_change[1]) + 0.25
             volume_change = random.randint(0, 1_000)
             leg2_bar_data.volume = volume + volume_change
 

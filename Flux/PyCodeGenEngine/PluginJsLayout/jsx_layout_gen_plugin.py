@@ -124,6 +124,7 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += "            chartData={"+ f"layoutsById.{message_name_case_styled}.chart_data"+"}\n"
             output_str += "            filters={" + f"layoutsById.{message_name_case_styled}.filters" + "}\n"
             output_str += "            onChartDataChange={onChartDataChange}\n"
+            output_str += "            onChartDelete={onChartDelete}\n"
             output_str += "            onChangeLayout={onLayoutTypeChange}\n"
             output_str += '            onOverrideChange={onOverrideChange}\n'
             output_str += "            onFiltersChange={onFiltersChange}\n"

@@ -100,7 +100,7 @@ const NodeField = (props) => {
                 options={props.data.options}
                 getOptionLabel={(option) => option}
                 isOptionEqualToValue={(option, value) => option == value}
-                disableClearable
+                // disableClearable
                 disabled={disabled}
                 forcePopupIcon={false}
                 variant='outlined'

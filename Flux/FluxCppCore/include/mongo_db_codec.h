@@ -2,6 +2,7 @@
 
 #include "../../CodeGenProjects/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
 #include "../../CodeGenProjects/market_data/generated/CppUtilGen/market_data_key_handler.h"
+#include "../../cpp_app/include/market_data_mongo_db_handler.h"
 #include "json_codec.h"
 
 using namespace market_data_handler;
@@ -297,7 +298,7 @@ namespace FluxCppCore {
         bool IsInitialized(const RootModelType &kr_root_model_obj) const{
             // return true, if the object is initialized and has all the required fields (false otherwise)
             if (!kr_root_model_obj.IsInitialized()) {
-                LOG_ERROR(m_p_logger_, "Required fields is not initialized in {} obj: {}",
+                LOG_ERROR(m_p_logger_, "Required fields is not initialized in {};;; obj: {}",
                           get_root_model_name(), kr_root_model_obj.DebugString());
                 return false;
             } else {

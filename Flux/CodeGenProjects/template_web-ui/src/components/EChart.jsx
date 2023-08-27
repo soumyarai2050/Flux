@@ -1,13 +1,19 @@
 import React, { useEffect, useRef } from 'react';
 import { init, getInstanceByDom } from 'echarts';
 
-function EChart({ option, theme, loading }) {
+function EChart({ option, theme, loading, setSelectedData, isCollectionType }) {
     const chartRef = useRef(null);
 
     useEffect(() => {
+        function onChartClick(data) {
+            setSelectedData(data.data);
+        }
         let chart;
         if (chartRef.current !== null) {
             chart = init(chartRef.current, theme);
+            if (isCollectionType) {
+                chart.on('click', onChartClick);
+            }
         }
 
         function resizeChart() {
@@ -16,6 +22,9 @@ function EChart({ option, theme, loading }) {
         window.addEventListener('resize', resizeChart);
 
         return () => {
+            if (isCollectionType) {
+                chart?.off('click', onChartClick);
+            }
             chart?.dispose();
             window.removeEventListener('resize', resizeChart);
         }
@@ -25,7 +34,7 @@ function EChart({ option, theme, loading }) {
         // Update chart
         if (chartRef.current !== null) {
             const chart = getInstanceByDom(chartRef.current);
-            chart.setOption(option, {replaceMerge: ['series', 'xAxis', 'yAxis']});
+            chart.setOption(option, { replaceMerge: ['series', 'xAxis', 'yAxis'] });
         }
     }, [option, theme]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function
 

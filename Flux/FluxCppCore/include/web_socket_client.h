@@ -77,7 +77,7 @@ private:
                     LOG_INFO(mp_logger_, "Received data: {}", data);
                     LOG_INFO(mp_logger_, "Deserialized data: {} ", m_user_data_.DebugString());
                 } else {
-                    LOG_ERROR(mp_logger_, "Failed while decoding received Data: {} UserDataType: {} ",
+                    LOG_ERROR(mp_logger_, "Failed while decoding received Data: {};;; UserDataType: {} ",
                               data, km_user_data_type_name_);
                 }
 
