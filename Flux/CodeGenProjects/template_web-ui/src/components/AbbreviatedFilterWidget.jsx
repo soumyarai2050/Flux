@@ -92,14 +92,15 @@ function AbbreviatedFilterWidget(props) {
         return props.items.filter(item => {
             const itemId = getIdFromAbbreviatedKey(props.abbreviated, item);
             const metadata = props.itemsMetadata.find(metadata => _.get(metadata, DB_ID) === itemId);
-            if (metadata) {
-                // TODO: update applyFilter to support collection view
-                if (applyFilter([metadata], props.filters, true, collections).length > 0) {
-                    return true;
-                }
-            } else {
-                return true;
-            }
+            // if (metadata) {
+            //     // TODO: update applyFilter to support collection view
+            //     if (applyFilter([metadata], props.filters, true, collections).length > 0) {
+            //         return true;
+            //     }
+            // } else {
+            //     return true;
+            // }
+            if (metadata) return true;
             return false;
         })
     }, [props.items, props.abbreviated, props.itemsMetadata, getIdFromAbbreviatedKey, applyFilter, props.filters])
@@ -123,7 +124,8 @@ function AbbreviatedFilterWidget(props) {
                 page,
                 pageSize: rowsPerPage,
                 order,
-                orderBy
+                orderBy,
+                filters: props.filters
             });
         }
     }, [items, props.itemsMetadata, page, rowsPerPage, order, orderBy])

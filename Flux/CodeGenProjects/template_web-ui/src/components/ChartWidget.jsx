@@ -1,36 +1,28 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
+// third-party package imports
 import {
-    Box, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List,
-    ListItem, ListItemButton, ListItemText, Button, RadioGroup, Radio, FormControlLabel, Popover
+    Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, 
+    List, ListItem, ListItemButton, ListItemText 
 } from '@mui/material';
 import _, { cloneDeep } from 'lodash';
-import { Add, AltRoute, Delete } from '@mui/icons-material';
-import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, DB_ID } from '../constants';
+import { Add, Delete } from '@mui/icons-material';
+// project constants and common utility function imports
+import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL } from '../constants';
 import {
-    addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema, getChartOption,
-    getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, mergeTsData, roundNumber, updateChartDataObj, updateChartSchema
+    addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema, 
+    getChartOption, getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, mergeTsData, tooltipFormatter, 
+    updateChartDataObj, updateChartSchema, updatePartitionFldSchema
 } from '../utils';
+// custom component imports
 import WidgetContainer from './WidgetContainer';
 import { Icon } from './Icon';
 import FullScreenModal from './Modal';
 import TreeWidget from './TreeWidget';
 import EChart from './EChart';
 import classes from './ChartWidget.module.css';
-import { useSelector } from 'react-redux';
-// import axios from 'axios';
 
 const CHART_SCHEMA_NAME = 'chart_data';
-
-const tooltipFormatter = (value) => {
-    if (typeof value === DataTypes.NUMBER) {
-        if (Number.isInteger(value)) {
-            return value.toLocaleString();
-        } else {
-            return roundNumber(value, 2).toLocaleString();
-        }
-    }
-    return value;
-}
 
 function ChartWidget(props) {
     // redux states
@@ -72,8 +64,6 @@ function ChartWidget(props) {
     //    - add only the necessary field in filter dropdown for time-series
     // 4. create expanded chart configuration object to be used by echart using stored chart configuration and datasets 
 
-    // const schema = updateChartSchema(props.schema, props.collections, props.collectionView);
-
     useEffect(() => {
         // set the theme of chart from browser preferences
         // TODO: add listener to listen for preferences changes
@@ -107,6 +97,8 @@ function ChartWidget(props) {
             else {
                 setStoredChartObj(props.chartData[selectedIndex]);
                 setModifiedChartObj(addxpath(cloneDeep(props.chartData[selectedIndex])));
+                const updatedSchema = updatePartitionFldSchema(schema, props.chartData[selectedIndex]);
+                setSchema(updatedSchema);
             }
         }
         setChartUpdateCounter(prevCount => prevCount + 1);
@@ -116,6 +108,8 @@ function ChartWidget(props) {
         if (selectedIndex || selectedIndex === 0) {
             setStoredChartObj(props.chartData[selectedIndex]);
             setModifiedChartObj(addxpath(cloneDeep(props.chartData[selectedIndex])));
+            const updatedSchema = updatePartitionFldSchema(schema, props.chartData[selectedIndex]);
+            setSchema(updatedSchema);
         } else {
             setStoredChartObj({});
             setModifiedChartObj({});
@@ -235,7 +229,6 @@ function ChartWidget(props) {
         }
     }, [datasetUpdateCounter, queryDict])
 
-    // TODO: uncomment after websocket query is available
     const flushGetAllWs = useCallback(() => {
         /* apply get-all websocket changes */
         if (Object.keys(getAllWsDict.current).length > 0 && mode === Modes.READ_MODE) {
@@ -247,7 +240,6 @@ function ChartWidget(props) {
         }
     }, [tsData, queryDict, mode])
 
-    // TODO: uncomment after websocket query is available
     useEffect(() => {
         const intervalId = setInterval(flushGetAllWs, 500);
         return () => {
@@ -380,10 +372,13 @@ function ChartWidget(props) {
         setData(updatedData);
         const updatedSchema = cloneDeep(schema);
         const filterSchema = _.get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
+        const chartSchema = _.get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, CHART_SCHEMA_NAME]);
         if (updatedData.time_series) {
             filterSchema.auto_complete = 'fld_name:MetaFldList';
+            chartSchema.properties.partition_fld.hide = true;
         } else {
             filterSchema.auto_complete = 'fld_name:FldList';
+            chartSchema.properties.partition_fld.hide = false;
         }
         setSchema(updatedSchema);
     }

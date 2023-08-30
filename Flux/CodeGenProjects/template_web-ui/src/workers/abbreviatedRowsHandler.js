@@ -1,13 +1,39 @@
-import _ from 'lodash';
+import _, {cloneDeep} from 'lodash';
 import { DB_ID, DataTypes } from '../constants';
 
 const FLOAT_POINT_PRECISION = 2;
 
 onmessage = (e) => {
-    const { items, itemsData, itemProps, abbreviation, loadedProps, page, pageSize, order, orderBy } = e.data;
+    const { items, itemsData, itemProps, abbreviation, loadedProps, page, pageSize, order, orderBy, filters } = e.data;
     const rows = getAbbreviatedRows(items, itemsData, itemProps, abbreviation, loadedProps);
-    const activeRows = getActiveRows(rows, page, pageSize, order, orderBy);
-    postMessage([rows, activeRows]);
+    const filteredRows = applyFilter(rows, filters);
+    const activeRows = getActiveRows(filteredRows, page, pageSize, order, orderBy);
+    postMessage([filteredRows, activeRows]);
+}
+
+function applyFilter(arr, filters = []) {
+    if (arr && arr.length > 0) {
+        let updatedArr = cloneDeep(arr);
+        const filterDict = getFilterDict(filters);
+        Object.keys(filterDict).forEach(key => {
+            let values = filterDict[key].split(",").map(val => val.trim()).filter(val => val !== "");
+            updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
+        })
+        return updatedArr;
+    }
+    return [];
+}
+
+function getFilterDict(filters) {
+    const filterDict = {};
+    if (filters) {
+        filters.forEach(filter => {
+            if (filter.fld_value) {
+                filterDict[filter.fld_name] = filter.fld_value;
+            }
+        })
+    }
+    return filterDict;
 }
 
 function stableSort(array, comparator) {
