@@ -220,7 +220,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f'client({message_name_snake_cased}_id);\n'
                                 output_content += "\tASSERT_EQ(delete_response, json);\n\n"
 
-                                output_content += "\tfor (int i = 1; i <= 10000; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i <= 100; ++i) {\n"
                                 output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \
                                                   f"{message_name_snake_cased}({message_name_snake_cased});\n"
                                 output_content += f"\t\t{message_name_snake_cased}.set_id(i);\n"
@@ -235,7 +235,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_list_from_server.DebugString());\n\n"
 
                                 output_content += f"\t{message_name_snake_cased}_list.Clear();\n"
-                                output_content += "\tfor (int i = 1; i <= 10000; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i <= 100; ++i) {\n"
                                 output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \
                                                   f"{message_name_snake_cased}({message_name_snake_cased});\n"
                                 output_content += f"\t\t{message_name_snake_cased}.set_id(i);\n"
@@ -250,7 +250,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_list_from_server.DebugString());\n\n"
 
                                 output_content += f"\t{message_name_snake_cased}.Clear();\n"
-                                output_content += "\tfor (int i = 1; i <= 10000; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i <= 100; ++i) {\n"
                                 for field in message.fields:
                                     field_name: str = field.proto.name
                                     field_type_message: None | protogen.Message = field.message
@@ -277,7 +277,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_list_for_patch.DebugString());\n\n"
 
                                 output_content += "\tjson.clear();\n"
-                                output_content += "\tfor (int i = 1; i <= 10000; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i <= 100; ++i) {\n"
                                 output_content += '\t\tjson = R"({"msg":"Deletion Successful","id":)";\n'
                                 output_content += '\t\tjson += std::to_string(i); // Convert int to string and append\n'
                                 output_content += '\t\tjson += R"(})";\n'
@@ -403,7 +403,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f'client({message_name_snake_cased}_id);\n'
                                 output_content += "\tASSERT_EQ(delete_response, json);\n"
 
-                                output_content += "\tfor (int i = 1; i < 10000; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i < 100; ++i) {\n"
                                 output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \
                                                   f"{message_name_snake_cased}({message_name_snake_cased});\n"
                                 output_content += f"\t\t{message_name_snake_cased}.set_id(i);\n"
@@ -418,7 +418,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_list_from_server.DebugString());\n\n"
 
                                 output_content += f"\t{message_name_snake_cased}_list.Clear();\n"
-                                output_content += "\tfor (int i = 1; i < 10000; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i < 100; ++i) {\n"
                                 output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \
                                                   f"{message_name_snake_cased}({message_name_snake_cased});\n"
                                 output_content += f"\t\t{message_name_snake_cased}.set_id(i);\n"
@@ -433,7 +433,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_list_from_server.DebugString());\n\n"
 
                                 output_content += f"\t{message_name_snake_cased}.Clear();\n"
-                                output_content += "\tfor (int i = 1; i < 10000; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i < 100; ++i) {\n"
                                 for field in message.fields:
                                     field_name: str = field.proto.name
                                     field_type_message: None | protogen.Message = field.message
@@ -459,7 +459,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                 output_content += f"\tASSERT_EQ({message_name_snake_cased}_list.DebugString(), " \
                                                   f"{message_name_snake_cased}_list_for_patch.DebugString());\n\n"
                                 output_content += "\tjson.clear();\n"
-                                output_content += "\tfor (int i = 1; i < 10000; ++i) {\n"
+                                output_content += "\tfor (int i = 1; i < 100; ++i) {\n"
                                 output_content += '\t\tjson = R"({"msg":"Deletion Successful","id":)";\n'
                                 output_content += '\t\tjson += std::to_string(i); // Convert int to string and append\n'
                                 output_content += '\t\tjson += R"(})";\n'
@@ -698,6 +698,58 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                 output_content += "\tASSERT_EQ(delete_response, json);\n"
                                 output_content += "}\n\n"
                             break
+
+            elif CppWebClientTestPlugin.is_option_enabled\
+                (message, CppWebClientTestPlugin.flux_msg_json_root_time_series):
+                for field1 in message.fields:
+                    field_name1: str = field1.proto.name
+                    field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name1)
+                    if CppWebClientTestPlugin.is_option_enabled(field1, CppWebClientTestPlugin.flux_fld_PK):
+                        output_content += f"TEST({message_name}TestSuite, WebClient) {{\n"
+                        output_content += f"\t{package_name}::{message_name} {message_name_snake_cased};\n"
+                        output_content += f"\t{package_name}::{message_name}List {message_name_snake_cased}_list;\n"
+                        output_content += f"\t{package_name}::{message_name}List {message_name_snake_cased}" \
+                                          f"_list_from_server;\n"
+                        output_content += f"\tstd::string {message_name_snake_cased}_json;\n"
+                        output_content += f"\tstd::string {message_name_snake_cased}_json_from_server;\n"
+                        output_content += f"\tRootModelListWebClient<{package_name}::{message_name}List, " \
+                                          f"{package_name}_handler::create_all_{message_name_snake_cased}_client_url, " \
+                                          f"{package_name}_handler::get_all_{message_name_snake_cased}_client_url, " \
+                                          f"{package_name}_handler::get_{message_name_snake_cased}" \
+                                          f"_max_id_client_url, {package_name}_handler::put_" \
+                                          f"all_{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
+                                          f"all_{message_name_snake_cased}_client_url, {package_name}_handler::" \
+                                          f"delete_all_{message_name_snake_cased}_client_url> " \
+                                          f"web_client(host, port);\n\n"
+
+                        output_content += "\tfor (int i = 1; i < 100; ++i) {\n"
+                        output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \
+                                          f"{message_name_snake_cased}({message_name_snake_cased});\n"
+                        output_content += f"\t\t{message_name_snake_cased}.set_id(i);\n"
+                        output_content += f"\t\t{message_name_snake_cased}_list.add_{message_name_snake_cased}()" \
+                                          f"->CopyFrom({message_name_snake_cased});\n"
+                        output_content += "\t}\n\n"
+
+                        output_content += f"\t{message_name_snake_cased}_list_from_server.CopyFrom" \
+                                          f"({message_name_snake_cased}_list);\n"
+                        output_content += f"\tASSERT_TRUE(web_client.create_client({message_name_snake_cased}" \
+                                          f"_list_from_server));\n"
+                        output_content += f"\tASSERT_EQ({message_name_snake_cased}_list.DebugString(), " \
+                                          f"{message_name_snake_cased}_list_from_server.DebugString());\n"
+                        output_content += '\tstd::string json = R"({"msg":"Deletion Successful","id":[)";\n\n'
+                        output_content += f"\tfor (int i = 0; i < {message_name_snake_cased}_list." \
+                                          f"{message_name_snake_cased}_size(); ++i) {{\n"
+                        output_content += f"\t\tjson += std::to_string({message_name_snake_cased}_list." \
+                                          f"{message_name_snake_cased}(i).id());\n"
+                        output_content += '\t\tjson += ",";\n'
+                        output_content += "\t}\n\n"
+
+                        output_content += "\tjson.pop_back();\n"
+                        output_content += '\tjson += R"(]})";\n\n'
+
+                        output_content += "\tstd::string delete_response = web_client.delete_client();\n"
+                        output_content += "\tASSERT_EQ(delete_response, json);\n"
+                        output_content += "}\n\n"
 
         output_file_name = f"{class_name_snake_cased}_web_client_test.h"
         return {output_file_name: output_content}

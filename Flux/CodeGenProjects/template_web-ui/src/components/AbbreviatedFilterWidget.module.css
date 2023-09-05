@@ -45,3 +45,11 @@
 .dropdown :global .MuiSelect-outlined {
     padding: 0px;
 }
+
+.row {
+    cursor: pointer;
+}
+
+.row_disabled {
+    cursor: not-allowed;
+}

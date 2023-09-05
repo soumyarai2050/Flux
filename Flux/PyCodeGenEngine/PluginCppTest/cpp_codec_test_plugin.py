@@ -67,11 +67,12 @@ class CppCodecTestPlugin(BaseProtoPlugin):
         for message in self.root_message_list:
             message_name = message.proto.name
             message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-            if CppCodecTestPlugin.is_option_enabled (message, CppCodecTestPlugin.flux_msg_json_root):
+            if CppCodecTestPlugin.is_option_enabled (message, CppCodecTestPlugin.flux_msg_json_root) or \
+                    CppCodecTestPlugin.is_option_enabled(message, CppCodecTestPlugin.flux_msg_json_root_time_series):
                 for field in message.fields:
                     field_name: str = field.proto.name
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
-                    if CppCodecTestPlugin.is_option_enabled(field, "FluxFldPk"):
+                    if CppCodecTestPlugin.is_option_enabled(field, CppCodecTestPlugin.flux_fld_PK):
                         output_content += f"TEST({message_name}, CppCodecTest) {{\n"
                         output_content += f'\t{class_name_snake_cased}::{message_name} {message_name_snake_cased};\n'
                         output_content += f'\t{class_name_snake_cased}::{message_name} {message_name_snake_cased}_decode;\n'

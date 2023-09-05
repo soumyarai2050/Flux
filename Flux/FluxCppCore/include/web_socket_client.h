@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <string>
+#include <functional>
 
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
@@ -23,21 +24,25 @@ namespace websocket = beast::websocket;
 namespace net = boost::asio;
 using tcp = boost::asio::ip::tcp;
 
-template <typename UserDataType>
+template <typename UserDataType, typename CallBackType = std::function<void(UserDataType&)>>
 class WebSocketClient {
 public:
     explicit WebSocketClient(UserDataType &user_data, const std::string k_server_address = "127.0.0.1",
-                             const int32_t port = 8083,
-                             quill::Logger *p_logger = quill::get_logger()) :
+                             const int32_t port = 8083, const int32_t k_read_timeout = 60,
+                             const std::string handshake_address = "/",
+                             quill::Logger *p_logger = quill::get_logger(), CallBackType call_back = {}) :
                              km_user_data_type_name_(UserDataType::GetDescriptor()->name()),
+                             km_handshake_address_(handshake_address), km_read_timeout_(k_read_timeout),
                              m_server_address_(k_server_address), m_port_(port), m_resolver_(m_io_context_),
-                             m_ws_(m_io_context_), m_user_data_(user_data), mp_logger_(p_logger) {}
+                             m_ws_(m_io_context_), m_user_data_(user_data),
+                             m_call_back_(call_back ? call_back : [](UserDataType&) {}),  // Provide a default if not provided,
+                             mp_logger_(p_logger) {}
 
     void run() {
         auto const results = m_resolver_.resolve(m_server_address_, std::to_string(m_port_));
         net::connect(m_ws_.next_layer(), results.begin(), results.end());
 
-        m_ws_.handshake(m_server_address_, "/");
+        m_ws_.handshake(m_server_address_, km_handshake_address_);
 
         m_update_received_ = false;
 
@@ -56,9 +61,9 @@ public:
         user_data = m_user_data_;
     }
 
-private:
+protected:
     void read_data_from_server() {
-        m_deadline_timer_.expires_from_now(boost::posix_time::seconds(10)); // Set the timeout to 10 seconds
+        m_deadline_timer_.expires_from_now(boost::posix_time::seconds(km_read_timeout_)); // Set the timeout to 10 seconds
         m_ws_.async_read(m_buffer_, [this](boost::system::error_code error_code, std::size_t bytes_transferred) {
             m_deadline_timer_.cancel();
             bool status = false;
@@ -67,11 +72,24 @@ private:
                 std::string data;
                 data = (beast::buffers_to_string(m_buffer_.data()));
                 m_buffer_.consume(m_buffer_.size());
+                std::string modified_json;
+                for (int i = 0; i < data.size(); ++i) {
+                    if (data[i] == '_' && (i + 1 < data.size()) && data[i + 1] == 'i' &&
+                        data[i + 2] == 'd' && (i > 0 && !std::isalnum(data[i - 1]))) {
+                        // Skip the underscore if `_id` is detected
+                        // Do nothing, and let the loop increment i automatically
+                    } else {
+                        // Copy the character to the modified json
+                        modified_json += data[i];
+                    }
+                }
                 const std::string target = "List";
                 if (km_user_data_type_name_.find(target) == std::string::npos) {
-                    status = FluxCppCore::RootModelJsonCodec<UserDataType>::decode_model(m_user_data_, data);
+                    status = FluxCppCore::RootModelJsonCodec<UserDataType>::decode_model(m_user_data_, modified_json);
+                    m_call_back_(m_user_data_);
                 } else {
-                    status = FluxCppCore::RootModelListJsonCodec<UserDataType>::decode_model_list(m_user_data_, data);
+                    status = FluxCppCore::RootModelListJsonCodec<UserDataType>::decode_model_list(m_user_data_, modified_json);
+                    m_call_back_(m_user_data_);
                 }
                 if (status) {
                     LOG_INFO(mp_logger_, "Received data: {}", data);
@@ -104,6 +122,8 @@ private:
     }
 
     const std::string km_user_data_type_name_;
+    const std::string km_handshake_address_;
+    const int32_t km_read_timeout_;
     std::string m_server_address_;
     int32_t m_port_;
     net::io_context m_io_context_;
@@ -113,6 +133,7 @@ private:
     websocket::stream<tcp::socket> m_ws_;
     beast::flat_buffer m_buffer_;
     UserDataType m_user_data_;
+    CallBackType m_call_back_;
     quill::Logger *mp_logger_;
 };
 

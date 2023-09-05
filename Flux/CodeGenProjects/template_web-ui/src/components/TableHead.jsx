@@ -12,14 +12,6 @@ const CustomHeadCell = (props) => {
         onRequestSort(event, property);
     };
 
-    const copyColumnHandler = (cell) => {
-        if (props.collectionView) {
-            props.copyColumnHandler(cell.key);
-        } else {
-            props.copyColumnHandler(cell.tableTitle);
-        }
-    }
-
     let emptyPrefixCells;
     if (prefixCells && prefixCells > 0) {
         emptyPrefixCells = Array(prefixCells).fill().map((_, i) => {
@@ -50,27 +42,27 @@ const CustomHeadCell = (props) => {
                         let color = cell.nameColor.toLowerCase();
                         tableCellColorClass = classes[color];
                     }
-
+                    const cellKey = props.collectionView ? cell.key : cell.tableTitle;
                     return (
                         <TableCell
                             key={index}
                             className={`${classes.cell} ${tableCellColorClass}`}
                             align='center'
                             padding='normal'
-                            sortDirection={orderBy === cell.tableTitle ? order : false}>
+                            sortDirection={orderBy === cellKey ? order : false}>
                             {props.copyColumnHandler && (
                                 <Tooltip title="Click to copy column">
-                                    <IconButton className={classes.icon} size='small' onClick={() => copyColumnHandler(cell)}>
+                                    <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cellKey)}>
                                         <ContentCopy fontSize='small' />
                                     </IconButton>
                                 </Tooltip>
                             )}
                             <TableSortLabel
-                                active={orderBy === cell.tableTitle}
-                                direction={orderBy === cell.tableTitle ? order : 'asc'}
-                                onClick={createSortHandler(cell.tableTitle)}>
+                                active={orderBy === cellKey}
+                                direction={orderBy === cellKey ? order : 'asc'}
+                                onClick={createSortHandler(cellKey)}>
                                 {cell.elaborateTitle ? cell.tableTitle : cell.title ? cell.title : cell.key}
-                                {orderBy === cell.tableTitle ? (
+                                {orderBy === cellKey ? (
                                     <Box component="span" sx={visuallyHidden}>
                                         {order === 'desc' ? 'sorted descending' : 'sorted ascending'}
                                     </Box>

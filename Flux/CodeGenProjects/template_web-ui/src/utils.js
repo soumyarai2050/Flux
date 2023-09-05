@@ -364,7 +364,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
     return collections;
 }
 
-export function generateObjectFromSchema(schema, currentSchema, additionalProps, xpath) {
+export function generateObjectFromSchema(schema, currentSchema, additionalProps, objectxpath) {
     if (additionalProps && additionalProps instanceof Object) {
         for (const key in additionalProps) {
             const prop = complexFieldProps.find(({ usageName }) => usageName === key);
@@ -379,7 +379,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
     let object = {};
     Object.keys(currentSchema.properties).map((propname) => {
         let metadata = currentSchema.properties[propname];
-        xpath = xpath ? xpath + '.' + propname : propname;
+        const xpath = objectxpath ? objectxpath + '.' + propname : propname;
 
         // do not create fields if populated from server or creation is not allowed on the fields.
         if (metadata.server_populate || metadata.ui_update_only) return;
@@ -1106,7 +1106,7 @@ export function addxpath(jsondata, xpath) {
             }
             _addxpath(jsondata[i], dataxpath)
         }
-    } else {
+    } else if (isObject(jsondata)) {
         _addxpath(jsondata, xpath);
     }
     return jsondata;
@@ -2482,6 +2482,8 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
         let yEncode = series.encode.y;
         let yMax = 0;
         let yMin = 0;
+        let forceMin = false;
+        let forceMax = false;
         let chartSeriesCollections = collections;
         if (chartDataObj.time_series) {
             const collection = getCollectionByName(collections, series.encode.y, isCollectionType);
@@ -2499,7 +2501,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                     // series.encode.y = yEncode;
                     const tsRows = [];
                     datasets.forEach((dataset, index) => {
-                        if (dataset.type === 'time_series' && dataset.query === query.name) {
+                        if (dataset.type === 'time_series' && dataset.query === query.name && dataset.series_type === series.type) {
                             const updatedSeries = cloneDeep(series);
                             updatedSeries.datasetIndex = index;
                             updatedSeries.name = dataset.name + ' ' + series.encode.y + ' ' + series.type;
@@ -2512,8 +2514,20 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                             }
                         }
                     })
-                    yMax = getAxisMax(tsRows, yEncode, yEncodes.length);
-                    yMin = getAxisMin(tsRows, yEncode, yEncodes.length);
+                    if (series.y_min || series.y_min === 0) {
+                        yMin = series.y_min;
+                        forceMin = true;
+                    }
+                    if (series.y_max || series.y_max === 0) {
+                        yMax = series.y_max;
+                        forceMax = true;
+                    }
+                    if (!forceMin) {
+                        yMin = getAxisMin(tsRows, yEncode, yEncodes.length);
+                    }
+                    if (!forceMax) {
+                        yMax = getAxisMax(tsRows, yEncode, yEncodes.length);
+                    }
                     chartSeriesCollections = seriesCollections;
                 }
             }
@@ -2521,7 +2535,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
             if (chartDataObj.partition_fld) {
                 const partitionRows = [];
                 datasets.forEach((dataset, index) => {
-                    if (dataset.type === 'partition') {
+                    if (dataset.type === 'partition' && dataset.series_type === series.type) {
                         const updatedSeries = cloneDeep(series);
                         updatedSeries.datasetIndex = index;
                         updatedSeries.name = dataset.name + ' ' + series.encode.y + ' ' + series.type;
@@ -2534,8 +2548,20 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                         }
                     }
                 })
-                yMax = getAxisMax(partitionRows, yEncode, yEncodes.length);
-                yMin = getAxisMin(partitionRows, yEncode, yEncodes.length);
+                if (series.y_min || series.y_min === 0) {
+                    yMin = series.y_min;
+                    forceMin = true;
+                }
+                if (series.y_max || series.y_max === 0) {
+                    yMax = series.y_max;
+                    forceMax = true;
+                }
+                if (!forceMin) {
+                    yMin = getAxisMin(partitionRows, yEncode, yEncodes.length);
+                }
+                if (!forceMax) {
+                    yMax = getAxisMax(partitionRows, yEncode, yEncodes.length);
+                }
             } else {
                 const dataset = datasets.find(dataset => dataset.type === 'default');
                 if (dataset) {
@@ -2548,8 +2574,20 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                     if (updatedSeries.yAxisIndex < 2) {
                         seriesList.push(updatedSeries);
                     };
-                    yMax = getAxisMax(rows, yEncode, yEncodes.length);
-                    yMin = getAxisMin(rows, yEncode, yEncodes.length);
+                    if (series.y_min || series.y_min === 0) {
+                        yMin = series.y_min;
+                        forceMin = true;
+                    }
+                    if (series.y_max || series.y_max === 0) {
+                        yMax = series.y_max;
+                        forceMax = true;
+                    }
+                    if (!forceMin) {
+                        yMin = getAxisMin(rows, yEncode, yEncodes.length);
+                    }
+                    if (!forceMax) {
+                        yMax = getAxisMax(rows, yEncode, yEncodes.length);
+                    }
                 }
             }
         }
@@ -2563,7 +2601,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                 xEndodes.push({ encode: xEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series });
             }
             if (!yEncodes.find(encode => encode.encode === yEncode)) {
-                yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series, max: yMax, min: yMin });
+                yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series, max: yMax, min: yMin, forceMin, forceMax });
             }
         }
     })
@@ -2596,13 +2634,13 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
             xAxis.push(axis);
         }
     })
-    yEncodes.forEach(({ encode, seriesCollections, isCollectionType, max, min }) => {
+    yEncodes.forEach(({ encode, seriesCollections, isCollectionType, max, min, forceMin, forceMax }) => {
         const [yAxisType, yAxisName] = getChartAxisTypeAndName(seriesCollections, encode, isCollectionType);
         // only two y-axis is allowed per chart.
         // if more than 2 y-axis is present, only considers the first 2 y-axis
         // this limitation is added to avoid unsupported configurations
-        const axisMax = max + (max - min);
-        const axisMin = min >= 0 && min - (max - min) < 0 ? 0 : min - (max - min);
+        const axisMax = forceMax ? max : max + (max - min);
+        const axisMin = forceMin ? min : min >= 0 && min - (max - min) < 0 ? 0 : min - (max - min);
         if (yAxis.length < 2) {
             yAxis.push({
                 type: yAxisType,
@@ -2641,6 +2679,8 @@ function updateChartAttributesInSchema(schema, currentSchema) {
                     attributes.orm_no_update = true;
                 } else if (key === 'chart_name') {
                     attributes.orm_no_update = true;
+                } else if (['y_min', 'y_max'].includes(key)) {
+                    attributes.hide = true;
                 }
             } else if ([DataTypes.OBJECT, DataTypes.ARRAY].includes(attributes.type)) {
                 const ref = attributes.items.$ref.split('/')
@@ -2747,14 +2787,6 @@ export function getChartDatasets(rows, partitionFld, chartObj) {
 
 export function genChartDatasets(rows = [], tsData, chartObj, queryDict, collections, isCollectionType = false) {
     const datasets = [];
-    if (rows.length > 0) {
-        datasets.push({
-            dimensions: Object.keys(rows[0]),
-            source: rows,
-            name: 'default',
-            type: 'default'
-        })
-    }
     if (chartObj.series) {
         chartObj.series.forEach((series, index) => {
             if (chartObj.time_series) {
@@ -2779,32 +2811,45 @@ export function genChartDatasets(rows = [], tsData, chartObj, queryDict, collect
                                         source: ts.projection_models,
                                         name: name,
                                         type: 'time_series',
-                                        query: query.name
+                                        query: query.name,
+                                        series_type: series.type
                                     })
                                 }
                             })
                         }
                     }
                 }
-            } else {
-                if (rows.length > 0 && chartObj.partition_fld) {
+            } else if (rows.length > 0) {
+                if (chartObj.partition_fld) {
                     const groupsDict = rows.reduce((acc, cur) => {
                         acc[cur[chartObj.partition_fld]] = [...acc[cur[chartObj.partition_fld]] || [], cur];
                         return acc;
                     }, {});
-                    const sortAxis = series.xAxis && series.xAxis.length > 0 ? series.xAxis[0] : undefined;
+                    const sortAxis = series.encode.x;
                     for (const groupName in groupsDict) {
                         const group = groupsDict[groupName];
                         if (sortAxis) {
-                            group.sort((a, b) => _.get(a, sortAxis.encode) > _.get(b, sortAxis.encode) ? 1 : _.get(a, sortAxis.encode) < _.get(b, sortAxis.encode) ? -1 : 0);
+                            group.sort((a, b) => _.get(a, sortAxis) > _.get(b, sortAxis) ? 1 : _.get(a, sortAxis) < _.get(b, sortAxis) ? -1 : 0);
                         }
                         datasets.push({
                             dimensions: Object.keys(rows[0]),
                             source: group,
                             name: groupName,
-                            type: 'partition'
+                            type: 'partition',
+                            series_type: series.type
                         })
                     }
+                } else {
+                    const sortAxis = series.encode.x;
+                    if (sortAxis) {
+                        rows.sort((a, b) => _.get(a, sortAxis) > _.get(b, sortAxis) ? 1 : _.get(a, sortAxis) < _.get(b, sortAxis) ? -1 : 0);
+                    }
+                    datasets.push({
+                        dimensions: Object.keys(rows[0]),
+                        source: rows,
+                        name: 'default',
+                        type: 'default'
+                    })
                 }
             }
         })

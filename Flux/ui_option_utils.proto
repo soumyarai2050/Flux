@@ -108,6 +108,8 @@ message ChartSeries {
   optional string id = 1;
   required ChartType type = 2;
   required ChartEncode encode = 3;
+  optional float y_min = 4;
+  optional float y_max = 5;
 }
 
 message ChartData {

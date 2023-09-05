@@ -22,6 +22,8 @@ import PivotTable from './PivotTable';
 import classes from './AbbreviatedFilterWidget.module.css';
 import { utils, writeFileXLSX } from 'xlsx';
 import ChartWidget from './ChartWidget';
+import CopyToClipboard from './CopyToClipboard';
+import SkeletonField from './SkeletonField';
 
 
 function AbbreviatedFilterWidget(props) {
@@ -38,6 +40,11 @@ function AbbreviatedFilterWidget(props) {
     const [commonKeys, setCommonKeys] = useState([]);
     const [toastMessage, setToastMessage] = useState(null);
     const [clipboardText, setClipboardText] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {   
+        setLoading(true);
+    }, [props.collectionIndex])
 
     const collections = useMemo(() => {
         let collections = [];
@@ -92,26 +99,10 @@ function AbbreviatedFilterWidget(props) {
         return props.items.filter(item => {
             const itemId = getIdFromAbbreviatedKey(props.abbreviated, item);
             const metadata = props.itemsMetadata.find(metadata => _.get(metadata, DB_ID) === itemId);
-            // if (metadata) {
-            //     // TODO: update applyFilter to support collection view
-            //     if (applyFilter([metadata], props.filters, true, collections).length > 0) {
-            //         return true;
-            //     }
-            // } else {
-            //     return true;
-            // }
             if (metadata) return true;
             return false;
         })
     }, [props.items, props.abbreviated, props.itemsMetadata, getIdFromAbbreviatedKey, applyFilter, props.filters])
-
-    const bufferCollection = useMemo(() => {
-        return props.collections.filter(col => col.key === props.bufferedKeyName)[0];
-    }, [props.collections, props.bufferedKeyName])
-
-    const loadedCollection = useMemo(() => {
-        return props.collections.filter(col => col.key === props.loadedKeyName)[0];
-    }, [props.collections, props.loadedKeyName])
 
     useEffect(() => {
         if (window.Worker) {
@@ -120,7 +111,7 @@ function AbbreviatedFilterWidget(props) {
                 itemsData: props.itemsMetadata,
                 itemProps: collections,
                 abbreviation: props.abbreviated,
-                loadedProps: loadedCollection,
+                loadedProps: props.loadListFieldAttrs,
                 page,
                 pageSize: rowsPerPage,
                 order,
@@ -128,7 +119,7 @@ function AbbreviatedFilterWidget(props) {
                 filters: props.filters
             });
         }
-    }, [items, props.itemsMetadata, page, rowsPerPage, order, orderBy])
+    }, [items, props.itemsMetadata, page, rowsPerPage, order, orderBy, props.filters])
 
     useEffect(() => {
         if (window.Worker) {
@@ -136,6 +127,7 @@ function AbbreviatedFilterWidget(props) {
                 const [updatedRows, updatedActiveRows] = e.data;
                 setRows(updatedRows);
                 setActiveRows(updatedActiveRows);
+                setLoading(false);
             }
         }
         return () => {
@@ -272,11 +264,10 @@ function AbbreviatedFilterWidget(props) {
         setHeadCells(updatedHeadCells);
     }
 
-    const copyColumnHandler = (xpath) => {
-        let columnName = xpath.split('.').pop();
+    const copyColumnHandler = (columnName) => {
         let values = [columnName];
         rows.map(row => {
-            values.push(row[xpath]);
+            values.push(row[columnName]);
         })
         const text = values.join('\n');
         if (navigator.clipboard) {
@@ -360,6 +351,12 @@ function AbbreviatedFilterWidget(props) {
         </>
     )
 
+    if (loading) {
+        return (
+            <SkeletonField title={props.headerProps.title} />
+        )
+    }
+
     return (
         <>
             {props.headerProps.layout === Layouts.ABBREVIATED_FILTER_LAYOUT ? (
@@ -376,7 +373,7 @@ function AbbreviatedFilterWidget(props) {
                     supportedLayouts={props.headerProps.supportedLayouts}
                     onChangeLayout={props.headerProps.onChangeLayout}>
                     <Fragment>
-                        {!bufferCollection.hide && (
+                        {!props.bufferListFieldAttrs.hide && (
                             <Box className={classes.dropdown_container}>
                                 <Autocomplete
                                     className={classes.autocomplete_dropdown}
@@ -387,7 +384,7 @@ function AbbreviatedFilterWidget(props) {
                                     variant='outlined'
                                     value={props.searchValue ? props.searchValue : null}
                                     onChange={props.onChange}
-                                    renderInput={(params) => <TextField {...params} label={props.bufferedLabel} />}
+                                    renderInput={(params) => <TextField {...params} label={props.bufferListFieldAttrs.title} />}
                                 />
                                 <Button
                                     className={classes.button}
@@ -399,7 +396,7 @@ function AbbreviatedFilterWidget(props) {
                                 </Button>
                             </Box>
                         )}
-                        <Divider textAlign='left'><Chip label={props.loadedLabel} /></Divider>
+                        <Divider textAlign='left'><Chip label={props.loadListFieldAttrs.title} /></Divider>
                         {rows && rows.length > 0 && (
                             <>
                                 <TableContainer className={classes.container}>
@@ -408,7 +405,7 @@ function AbbreviatedFilterWidget(props) {
                                         size='medium'>
                                         <TableHead
                                             prefixCells={1}
-                                            suffixCells={bufferCollection.hide ? 0 : 1}
+                                            suffixCells={props.bufferListFieldAttrs.hide ? 0 : 1}
                                             headCells={filteredHeadCells}
                                             mode={Modes.READ_MODE}
                                             order={order}
@@ -439,7 +436,8 @@ function AbbreviatedFilterWidget(props) {
 
                                                     return (
                                                         <Fragment key={index}>
-                                                            <TableRow
+                                                            <TableRow 
+                                                                className={props.mode === Modes.EDIT_MODE && !selected ? classes.row_disabled : classes.row}
                                                                 selected={selected}
                                                                 onClick={() => onRowSelect(row["data-id"])}>
                                                                 <TableCell className={classes.cell} sx={{ width: 10 }}>
@@ -498,7 +496,7 @@ function AbbreviatedFilterWidget(props) {
                                                                         />
                                                                     )
                                                                 })}
-                                                                {!bufferCollection.hide && (
+                                                                {!props.bufferListFieldAttrs.hide && (
                                                                     <TableCell className={classes.cell} sx={{ width: 10 }}>
                                                                         <Icon title='Unload' onClick={() => props.onUnload(row["data-id"])}>
                                                                             <Delete fontSize='small' />
@@ -532,6 +530,7 @@ function AbbreviatedFilterWidget(props) {
                                 <Alert onClose={onCloseToastMessage} severity="success">{toastMessage}</Alert>
                             </Snackbar>
                         )}
+                        <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
                     </Fragment>
                 </WidgetContainer>
             ) : props.headerProps.layout === Layouts.PIVOT_TABLE ? (
@@ -580,9 +579,7 @@ AbbreviatedFilterWidget.propTypes = {
     options: PropTypes.array,
     searchValue: PropTypes.string,
     onChange: PropTypes.func,
-    bufferedLabel: PropTypes.string,
     onLoad: PropTypes.func,
-    loadedLabel: PropTypes.string,
     selected: PropTypes.number,
     onSelect: PropTypes.func,
     onUnload: PropTypes.func

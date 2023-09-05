@@ -120,7 +120,8 @@ class CppMaxIdHandler(BaseProtoPlugin):
         for message in self.root_message_list:
             message_name: str = message.proto.name
             message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
-            if CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root):
+            if CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root) or \
+                    CppMaxIdHandler.is_option_enabled(message, CppMaxIdHandler.flux_msg_json_root_time_series):
                 for field in message.fields:
                     if CppMaxIdHandler.is_option_enabled(field, CppMaxIdHandler.flux_fld_PK):
                         output_content += f"\t\tstatic inline MaxIdHandler c_{message_name_snake_cased}_max_id_handler{{}};\n"

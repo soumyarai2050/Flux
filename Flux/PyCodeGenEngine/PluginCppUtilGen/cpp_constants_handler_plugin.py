@@ -111,6 +111,51 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
                           f'"/{class_name_snake_cased}/delete-{message_name_snake_cased}";\n'
         output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(delete_{message_name_snake_cased}' \
                           f'_client_url)> delete_{message_name_snake_cased}_client_url_(delete_' \
+                          f'{message_name_snake_cased}_client_url);\n'
+        output_content += f'\tconstexpr char delete_all_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/delete_all-{message_name_snake_cased}";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(delete_all_{message_name_snake_cased}' \
+                          f'_client_url)> delete_all_{message_name_snake_cased}_client_url_(delete_all_' \
+                          f'{message_name_snake_cased}_client_url);\n\n'
+
+        return output_content
+
+    @staticmethod
+    def generate_time_series_model_client_url(message_name_snake_cased: str, class_name_snake_cased: str):
+        output_content: str = ""
+        output_content += f'\tconstexpr char get_all_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/get-all-{message_name_snake_cased}";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(get_all_{message_name_snake_cased}' \
+                          f'_client_url)> get_all_{message_name_snake_cased}_client_url_(get_all_' \
+                          f'{message_name_snake_cased}_client_url);\n'
+
+        output_content += f'\tconstexpr char create_all_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/create_all-{message_name_snake_cased}";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(create_all_{message_name_snake_cased}' \
+                          f'_client_url)> create_all_{message_name_snake_cased}_client_url_(create_all_' \
+                          f'{message_name_snake_cased}_client_url);\n'
+
+        output_content += f'\tconstexpr char get_{message_name_snake_cased}_max_id_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/query-get_{message_name_snake_cased}_max_id";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(get_{message_name_snake_cased}' \
+                          f'_max_id_client_url)> get_{message_name_snake_cased}_max_id_client_url_(get_' \
+                          f'{message_name_snake_cased}_max_id_client_url);\n'
+
+        output_content += f'\tconstexpr char put_all_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/put_all-{message_name_snake_cased}";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(put_all_{message_name_snake_cased}_client_url)> ' \
+                          f'put_all_{message_name_snake_cased}_client_url_(put_all_{message_name_snake_cased}_client_url);\n'
+
+        output_content += f'\tconstexpr char patch_all_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/patch_all-{message_name_snake_cased}";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(patch_all_{message_name_snake_cased}' \
+                          f'_client_url)> patch_all_{message_name_snake_cased}_client_url_(patch_all_' \
+                          f'{message_name_snake_cased}_client_url);\n'
+
+        output_content += f'\tconstexpr char delete_all_{message_name_snake_cased}_client_url[] = ' \
+                          f'"/{class_name_snake_cased}/delete_all-{message_name_snake_cased}/";\n'
+        output_content += f'\tconstexpr FluxCppCore::StringLiteral<sizeof(delete_all_{message_name_snake_cased}' \
+                          f'_client_url)> delete_all_{message_name_snake_cased}_client_url_(delete_all_' \
                           f'{message_name_snake_cased}_client_url);\n\n'
 
         return output_content
@@ -138,7 +183,7 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
         output_content += '    const std::string db_uri = getenv("MONGO_URI") ? getenv("MONGO_URI") : ' \
                           '"mongodb://localhost:27017";\n'
         file_name = str(file.proto.name).split(".")[0]
-        output_content += f'    const std::string {file_name}_db_name = "{file_name}";\n'
+        output_content += f'    const std::string {file_name}_db_name = "{package_name}";\n'
 
         output_content += "\n\t// key constants used across classes via constants for consistency\n"
 
@@ -150,6 +195,9 @@ class CppConstantsHandlerPlugin(BaseProtoPlugin):
             message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
             if CppConstantsHandlerPlugin.is_option_enabled(message, CppConstantsHandlerPlugin.flux_msg_json_root):
                 output_content += self.generate_client_url(message_name_snake_cased, class_name_snake_cased)
+            elif CppConstantsHandlerPlugin.is_option_enabled\
+                (message, CppConstantsHandlerPlugin.flux_msg_json_root_time_series):
+                output_content += self.generate_time_series_model_client_url(message_name_snake_cased, class_name_snake_cased)
 
         output_content += '\tconst std::string max_id_val_key = "max_id_val";\n'
 

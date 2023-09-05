@@ -77,11 +77,12 @@ function ChartWidget(props) {
     useEffect(() => {
         // update the local row dataset on update from parent
         if (mode === Modes.READ_MODE) {
+            let updatedRows = props.rows;
             if (storedChartObj.filters && storedChartObj.filters.length > 0) {
-                const updatedRows = applyFilter(props.rows, storedChartObj.filters, props.collectionView, props.collections);
+                updatedRows = applyFilter(props.rows, storedChartObj.filters, props.collectionView, props.collections);
+            }
+            if (!storedChartObj.time_series || (storedChartObj.time_series && rows.length !== updatedRows.length)) {
                 setRows(updatedRows);
-            } else {
-                setRows(props.rows);
             }
         }
     }, [props.rows])

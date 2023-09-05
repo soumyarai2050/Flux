@@ -235,7 +235,8 @@ class CppDbTestPlugin(BaseProtoPlugin):
 
         for message in self.root_message_list:
 
-            if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root):
+            if CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root) or \
+                    CppDbTestPlugin.is_option_enabled(message, CppDbTestPlugin.flux_msg_json_root_time_series):
                 message_name = message.proto.name
                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
@@ -298,7 +299,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                                           f"collection({message_name_snake_cased}_from_db," \
                                           f" found->second));\n\n"
 
-                        output_content += "\tfor (int i = 0; i <= 10000; ++i) {\n"
+                        output_content += "\tfor (int i = 0; i <= 100; ++i) {\n"
                         output_content += f"\t\tMarketDataPopulateRandomValues::{message_name_snake_cased}" \
                                           f"({message_name_snake_cased});\n"
                         output_content += f"\t\t{message_name_snake_cased}_list.add_{message_name_snake_cased}()->CopyFrom" \
@@ -311,7 +312,7 @@ class CppDbTestPlugin(BaseProtoPlugin):
                                           f"({message_name_snake_cased}_list, " \
                                           f"{message_name_snake_cased}_key_list, new_generated_id_list));\n\n"
 
-                        output_content += "\tfor (int i = 0; i <= 10000; ++i) {\n"
+                        output_content += "\tfor (int i = 0; i <= 100; ++i) {\n"
                         output_content += f"\t\t{message_name_snake_cased}_list.mutable_{message_name_snake_cased}" \
                                           f"(i)->set_id(new_generated_id_list[i]);\n"
                         output_content += "\t}\n\n"

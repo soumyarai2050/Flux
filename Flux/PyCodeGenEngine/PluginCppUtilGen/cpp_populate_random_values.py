@@ -67,9 +67,14 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                                           f"mutable_{parent_field}()->mutable_{field_name}()->set_" \
                                           f"{message_field_name}(get_utc_time());\n"
                             else:
-                                output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->" \
-                                          f"mutable_{parent_field}()->mutable_{field_name}()->set_{message_field_name}" \
-                                          f"(random_data_gen.get_random_{message_field.kind.name.lower()}());\n"
+                                if message_field_name != "id":
+                                    output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->" \
+                                              f"mutable_{parent_field}()->mutable_{field_name}()->set_{message_field_name}" \
+                                              f"(random_data_gen.get_random_{message_field.kind.name.lower()}());\n"
+                                elif message_field_name == "id" and message_field.kind.name.lower() == "string":
+                                    output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->" \
+                                              f"mutable_{parent_field}()->mutable_{field_name}()->set_{message_field_name}" \
+                                              f"(get_repeated_id_field_val());\n"
                         elif message_field.kind.name.lower() != "enum":
                             output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->mutable_{parent_field}()." \
                                       f"mutable_{field_name}()->add_{message_field_name}(random_data_gen.get_random_" \
@@ -95,9 +100,13 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                             output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->set_" \
                                       f"{message_field_name}(get_utc_time());\n"
                         else:
-                            output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->set_" \
-                                      f"{message_field_name}(random_data_gen.get_random_" \
-                                      f"{message_field.kind.name.lower()}());\n"
+                            if message_field_name != "id":
+                                output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->set_" \
+                                          f"{message_field_name}(random_data_gen.get_random_" \
+                                          f"{message_field.kind.name.lower()}());\n"
+                            else:
+                                output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->set_" \
+                                          f"{message_field_name}(get_repeated_id_field_val());\n"
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field and message_field.kind.name.lower() != "enum":
                     output += self.generate_nested_fields(message_field.message, message_field_name,
@@ -105,8 +114,64 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                 else:
                     output += self.generate_nested_fields(message_field.message, message_field_name,
                                                           message_name_snake_cased, package_name, field, field_name)
+            elif message_field.message is not None and field_type == "repeated":
+                output += self.generate_repeated_nested_fields(message_field.message, message_name_snake_cased,
+                                                               initial_parent_field, message_field_name,
+                                                               package_name)
         return output
 
+    def generate_repeated_nested_fields(self, message: protogen.Message, message_name_snake_cased, initial_parent_field,
+                                        message_field_name, package_name):
+        output: str = ""
+        if message_name_snake_cased != initial_parent_field:
+            output += f"\t\t\tauto {message_field_name} = {message_name_snake_cased}.mutable_{initial_parent_field}" \
+                      f"()->add_{message_field_name}();\n"
+        elif message_name_snake_cased == initial_parent_field:
+            output += f"\t\t\tauto {message_field_name} = {message_name_snake_cased}->add_{message_field_name}();\n"
+
+        for fields in message.fields:
+            field_name: str = fields.proto.name
+            field_type_message: protogen.Message | None = fields.message
+            field_type: str = fields.cardinality.name.lower()
+            field_kind: str = fields.kind.name.lower()
+            if field_type_message is None and field_type != "repeated" and field_kind != "enum":
+                if field_name != "id":
+                    if CppPopulateRandomValueHandlerPlugin.is_option_enabled\
+                                (fields, CppPopulateRandomValueHandlerPlugin.flux_fld_val_is_datetime):
+                        output += f"\t\t\t{message_field_name}->set_{field_name}(get_utc_time());\n"
+                    else:
+                        output += f"\t\t\t{message_field_name}->set_{field_name}(random_data_gen.get_random_{field_kind}());\n"
+                else:
+                    output += f"\t\t\t{message_field_name}->set_{field_name}(get_repeated_id_field_val());\n"
+            elif field_type_message is None and field_type != "repeated" and field_kind == "enum":
+                enum_field_name_list: list = fields.enum.full_name.split(".")
+                enum_field_list = fields.enum.values
+                output += f"\t\t\t{message_field_name}->set_{field_name}({package_name}::{enum_field_list[-1].proto.name});\n"
+            elif field_type_message is None and field_type == "repeated":
+                output += f"\t\t\t{message_field_name}->add_{field_name}(random_data_gen.get_random_{field_kind}());\n"
+            elif field_type_message is not None and field_type != "repeated":
+                field_type_message_name = convert_camel_case_to_specific_case(field_type_message.proto.name)
+                for nested_field in field_type_message.fields:
+                    nested_field_name = convert_camel_case_to_specific_case(nested_field.proto.name)
+                    nested_field_msg = nested_field.message
+                    nested_field_kind = nested_field.kind.name.lower()
+                    if nested_field_msg is None and nested_field.cardinality.name.lower() != "repeated" and \
+                            nested_field_kind != "enum":
+                        output += f"\t\t\t{message_field_name}->mutable_{field_type_message_name}()->" \
+                                  f"set_{nested_field_name}(random_data_gen.get_random_{nested_field_kind}());\n"
+                    elif nested_field_msg is None and nested_field.cardinality.name.lower() != "repeated" and \
+                            nested_field_kind== "enum":
+                        nested_enum_field_name_list: list = nested_field.enum.full_name.split(".")
+                        nested_enum_field_list = nested_field.enum.values
+                        output += f"\t\t\t{message_field_name}->mutable_{field_type_message_name}()->" \
+                                  f"set_{nested_field_name}({package_name}::{nested_enum_field_list[-1].proto.name});\n"
+
+            elif field_type_message is not None and field_type == "repeated":
+                field_type_message_name = convert_camel_case_to_specific_case(field_type_message.proto.name)
+                output += self.generate_repeated_nested_fields(field_type_message, message_field_name,
+                                                               message_field_name, field_name, package_name)
+
+        return output
     def output_file_generate_handler(self, file: protogen.File):
         self.get_all_root_message(file.messages)
         self.get_field_names(self.root_message_list)
@@ -137,9 +202,19 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
         output_content += '\t\t\treturn std::string(buffer);\n'
         output_content += "\t\t}\n\n"
 
+        output_content += "\t\tstatic std::string get_repeated_id_field_val() {\n"
+        output_content += "\t\t\tpid_t pid = getpid();\n"
+        output_content += "\t\t\tstd::string id = std::to_string(pid);\n"
+        output_content += '\t\t\tid += "-";\n'
+        output_content += "\t\t\tid += get_utc_time();\n"
+        output_content += "\t\t\treturn id;\n"
+        output_content += "\t\t}\n\n"
+
         for message in self.root_message_list:
             if CppPopulateRandomValueHandlerPlugin.is_option_enabled\
-                        (message, CppPopulateRandomValueHandlerPlugin.flux_msg_json_root):
+                        (message, CppPopulateRandomValueHandlerPlugin.flux_msg_json_root) or \
+                    CppPopulateRandomValueHandlerPlugin.is_option_enabled\
+                                (message, CppPopulateRandomValueHandlerPlugin.flux_msg_json_root_time_series):
 
                 for field in message.fields:
                     field_name: str = field.proto.name
@@ -186,11 +261,25 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                                             output_content += f"\t\t\t{message_name_snake_cased}.set_{field_name}" \
                                                               f"({field_name.capitalize()}::BUY);\n"
 
-                            elif field_type_message is not None:
-                                if field.cardinality.name.lower() != "repeated":
-                                    output_content += self.generate_nested_fields(field_type_message, field_name,
-                                                                                  message_name_snake_cased, package_name, field,
-                                                                                  field_name)
+                            elif field_type_message is not None and field.cardinality.name.lower() != "repeated":
+                                output_content += self.generate_nested_fields(field_type_message, field_name,
+                                                                              message_name_snake_cased, package_name, field,
+                                                                              field_name)
+                            elif field_type_message is not None and field.cardinality.name.lower() == "repeated":
+                                output_content += f"\t\t\tauto {field_name} = {message_name_snake_cased}." \
+                                                  f"add_{field_name}();\n"
+                                for nested_fields in field_type_message.fields:
+                                    nested_fields_name = convert_camel_case_to_specific_case(nested_fields.proto.name)
+                                    nested_fields_kind = nested_fields.kind.name.lower()
+                                    if nested_fields_kind != "enum":
+                                        if nested_fields_name != "id":
+                                            output_content += f"\t\t\t{field_name}->set_{nested_fields_name}(" \
+                                                              f"random_data_gen.get_random_" \
+                                                              f"{nested_fields_kind}());\n"
+                                        else:
+                                            output_content += f"\t\t\t{field_name}->set_{nested_fields_name}" \
+                                                              f"(get_repeated_id_field_val());\n"
+
 
                         output_content += "\t\t}\n\n"
                         break
@@ -204,4 +293,3 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
 
 if __name__ == "__main__":
     main(CppPopulateRandomValueHandlerPlugin)
-

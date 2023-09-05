@@ -447,6 +447,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        userChanges, discardedChanges, activeChanges, openWsPopup, mode, createMode, " \
                               "openConfirmSavePopup, formValidation, openFormValidationPopup, forceUpdate\n"
                 output_str += "    } = useSelector(state => " + f"state.{dependent_message_camel_cased});\n"
+                output_str += f"    const dependentLoading = useSelector(state => " \
+                              f"state.{dependent_message_camel_cased}.loading);\n"
                 if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                     dependent_abb_msg = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
                     dependent_abb_msg_camel_cased = convert_to_camel_case(dependent_abb_msg)
@@ -506,8 +508,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onSave={onSave}>\n"
         output_str += "                    <Divider textAlign='left'><Chip label='Staging' /></Divider>\n"
         output_str += "                    <List>\n"
-        output_str += "                        {_.get(modified" + f"{message_name}" + ", loadedKeyName) && _.get(" \
-                                                                                      "modified" + f"{message_name}" + ", loadedKeyName).map((item, index) => {\n"
+        output_str += "                        {_.get(modified" + f"{message_name}" + ", loadListFieldAttrs.key) && _.get(" \
+                                                                                      "modified" + f"{message_name}" + ", loadListFieldAttrs.key).map((item, index) => {\n"
         output_str += "                            let id = getIdFromAbbreviatedKey(abbreviated, item);\n"
         output_str += "                            if (id !== NEW_ITEM_ID) return;\n"
         output_str += "                            return (\n"
@@ -541,19 +543,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    mode={mode}\n"
         output_str += "                    schema={schema}\n"
         output_str += "                    collections={collections}\n"
-        output_str += "                    bufferedKeyName={bufferedKeyName}\n"
-        output_str += "                    bufferedLabel={collections.filter(col => " \
-                      "col.key === bufferedKeyName)[0].title}\n"
+        output_str += "                    bufferListFieldAttrs={bufferListFieldAttrs}\n"
         output_str += "                    searchValue={searchValue}\n"
-        output_str += "                    options={_.get(" + f"{message_name_camel_cased}" + ", bufferedKeyName) ? " \
-                                                                                              "_.get(" + f"{message_name_camel_cased}" + ", bufferedKeyName) : []}\n"
+        output_str += "                    options={_.get(" + f"{message_name_camel_cased}" + ", bufferListFieldAttrs.key) ? " \
+                                                                                              "_.get(" + f"{message_name_camel_cased}" + ", bufferListFieldAttrs.key) : []}\n"
         output_str += "                    onChange={onChange}\n"
         output_str += "                    onLoad={onLoad}\n"
-        output_str += "                    loadedKeyName={loadedKeyName}\n"
-        output_str += "                    loadedLabel={collections.filter(col => col.key === " \
-                      "loadedKeyName)[0].title}\n"
-        output_str += "                    items={_.get(" + f"{message_name_camel_cased}" + ", loadedKeyName) ? " \
-                                                                                            "_.get(" + f"{message_name_camel_cased}" + ", loadedKeyName) : []}\n"
+        output_str += "                    loadListFieldAttrs={loadListFieldAttrs}\n"
+        output_str += "                    items={_.get(" + f"{message_name_camel_cased}" + ", loadListFieldAttrs.key) ? " \
+                                                                                            "_.get(" + f"{message_name_camel_cased}" + ", loadListFieldAttrs.key) : []}\n"
         output_str += "                    activeItems={active" + f"{dependent_msg_name}List" + "}\n"
         output_str += "                    setActiveItems={setActive" + f"{dependent_msg_name}List" + "}\n"
         output_str += "                    setOldActiveItems={setOldActive" + f"{dependent_msg_name}List" + "}\n"
@@ -566,13 +564,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    disableOverride={widgetOption.disable_override}\n"
         output_str += "                    onOverrideChange={onOverrideChange}\n"
         output_str += "                    itemsMetadata={"f"{dependent_msg_name_camel_cased}" + "Array}\n"
-        output_str += "                    itemSchema={dependentSchema}\n"
+        output_str += "                    itemSchema={dependentWidgetSchema}\n"
         output_str += "                    itemCollections={dependentCollections}\n"
         if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
             dependent_msg_name = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
             dependent_msg_name_camel_cased = convert_to_camel_case(dependent_msg_name)
             output_str += "                    linkedItemsMetadata={" + f"{dependent_msg_name_camel_cased}Array" + "}\n"
-        output_str += "                    dependentName={dependentName}\n"
+        output_str += "                    dependentName={dependentWidgetName}\n"
         output_str += "                    alertBubbleSource={alertBubbleSource}\n"
         output_str += "                    alertBubbleColorSource={alertBubbleColorSource}\n"
         output_str += "                    error={error}\n"
@@ -589,21 +587,21 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
-        output_str += "                title={dependentSchema.title}\n"
+        output_str += "                title={dependentWidgetSchema.title}\n"
         output_str += "                open={openFormValidationPopup}\n"
         output_str += "                onClose={onCloseFormValidationPopup}\n"
         output_str += "                onContinue={onContinueFormEdit}\n"
         output_str += "                src={formValidation}\n"
         output_str += "            />\n"
         output_str += "            <ConfirmSavePopup\n"
-        output_str += "                title={dependentSchema.title}\n"
+        output_str += "                title={dependentWidgetSchema.title}\n"
         output_str += "                open={openConfirmSavePopup}\n"
         output_str += "                onClose={onCloseConfirmPopup}\n"
         output_str += "                onSave={onConfirmSave}\n"
         output_str += "                src={activeChanges}\n"
         output_str += "            />\n"
         output_str += "            <WebsocketUpdatePopup\n"
-        output_str += "                title={dependentSchema.title}\n"
+        output_str += "                title={dependentWidgetSchema.title}\n"
         output_str += "                open={openWsPopup}\n"
         output_str += "                onClose={onClosePopup}\n"
         output_str += "                src={discardedChanges}\n"
@@ -683,26 +681,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                               f"currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld'));\n"
                 output_str += f"    const title = getWidgetTitle(widgetOption, currentSchema, props.name, " \
                               f"{message_name_camel_cased});\n"
-                output_str += "    let bufferedKeyName = collections.filter(collection => " \
-                              "collection.key.includes('buffer'))[0] ?\n"
-                output_str += "        collections.filter(collection => collection.key.includes('buffer'))[0].key " \
-                              ": null;\n"
-                output_str += "    let loadedKeyName = collections.filter(collection => " \
-                              "collection.key.includes('load'))[0] ?\n"
-                output_str += "        collections.filter(collection => collection.key.includes('load'))[0].key " \
-                              ": null;\n"
-                output_str += '    let abbreviated = collections.filter(collection => collection.abbreviated && ' \
-                              'collection.abbreviated !== "JSON")[0] ?\n'
-                output_str += '        collections.filter(collection => collection.abbreviated && collection.' \
-                              'abbreviated !== "JSON")[0].abbreviated : null;\n'
-                output_str += '    let dependentName = abbreviated ? abbreviated.substring' \
-                              '(abbreviated.indexOf(":") + 1).split(".")[0] : null;\n'
-                output_str += "    let dependentSchema = _.get(schema, dependentName);\n"
-                output_str += "    if (!dependentSchema) {\n"
-                output_str += "        dependentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, dependentName]);\n"
+                output_str += "    const bufferListFieldAttrs = collections.find(col => " \
+                              "col.key.includes('buffer'));\n"
+                output_str += "    const loadListFieldAttrs = collections.find(col => " \
+                              "col.key.includes('load'));\n"
+                output_str += '    const abbreviated = loadListFieldAttrs.abbreviated;\n'
+                output_str += '    const dependentWidgetName = abbreviated.substring' \
+                              '(abbreviated.indexOf(":") + 1).split(".")[0];\n'
+                output_str += "    let dependentWidgetSchema = _.get(schema, dependentWidgetName);\n"
+                output_str += "    if (!dependentWidgetSchema) {\n"
+                output_str += "        dependentWidgetSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, " \
+                              "dependentWidgetName]);\n"
                 output_str += "    }\n"
-                output_str += "    const dependentCollections = " \
-                              "createCollections(schema, dependentSchema, { mode: Modes.READ_MODE });\n\n"
+                output_str += "    const dependentCollections = schemaCollections[dependentWidgetName];\n\n"
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
                       "widgetOption.truncate_date_time : false;\n\n"
         if layout_type not in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -798,7 +789,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 dependent_message = self.abbreviated_dependent_message_name
                 dependent_message_camel_cased = convert_to_camel_case(dependent_message)
-                output_str += f"        let loadedKeys = _.get({message_name_camel_cased}, loadedKeyName);\n"
+                output_str += f"        let loadedKeys = _.get({message_name_camel_cased}, loadListFieldAttrs.key);\n"
                 output_str += "        if (loadedKeys) {\n"
                 output_str += f"            if (loadedKeys.length > 0 && !selected{dependent_message}Id) " + "{\n"
                 output_str += "                let id = getIdFromAbbreviatedKey(abbreviated, loadedKeys[0]);\n"
@@ -816,7 +807,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           f"{dependent_message_camel_cased}Array;\n"
             output_str += "    }, " + f"[{dependent_message_camel_cased}Array])\n\n"
             output_str += "    useEffect(() => {\n"
-            output_str += f"        let loadedKeys = _.get(modified{message_name}, loadedKeyName);\n"
+            output_str += f"        let loadedKeys = _.get(modified{message_name}, loadListFieldAttrs.key);\n"
             output_str += "        if (loadedKeys && loadedKeys.length === 0) {\n"
             output_str += f"            if (selected{dependent_message}Id) " + "{\n"
             output_str += "                if (mode === Modes.EDIT_MODE) {\n"
@@ -1034,7 +1025,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }, [])\n\n"
 
         output_str += "    /* if loading, render the skeleton view */\n"
-        output_str += "    if (loading) {\n"
+        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
+            output_str += "    if (loading || dependentLoading) {\n"
+        else:
+            output_str += "    if (loading) {\n"
         output_str += "        return (\n"
         output_str += "            <SkeletonField title={title} />\n"
         output_str += "        )\n"
@@ -1087,7 +1081,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "    /* required fields (loaded & buffered) not found. render error view */\n"
-            output_str += "    if (!bufferedKeyName || !loadedKeyName || !abbreviated) {\n"
+            output_str += "    if (!bufferListFieldAttrs.key || !loadListFieldAttrs.key || !abbreviated) {\n"
             output_str += "        return (\n"
             output_str += "            <Box>{Layouts.ABBREVIATED_FILTER_LAYOUT} not supported. " \
                           "Required fields not found.</Box>\n"
@@ -1319,7 +1313,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        setSearchValue('');\n"
             output_str += "    }\n\n"
             output_str += "    const onCreate = () => {\n"
-            output_str += f"        let updatedObj = generateObjectFromSchema(schema, dependentSchema);\n"
+            output_str += f"        let updatedObj = generateObjectFromSchema(schema, dependentWidgetSchema);\n"
             output_str += "        _.set(updatedObj, DB_ID, NEW_ITEM_ID);\n"
             output_str += "        updatedObj = addxpath(updatedObj);\n"
             output_str += f"        dispatch(setModified{self.abbreviated_dependent_message_name}(updatedObj));\n"
@@ -1329,7 +1323,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"        dispatch(setSelected{self.abbreviated_dependent_message_name}Id(NEW_ITEM_ID));\n"
             output_str += "        let newItem = getNewItem(dependentCollections, abbreviated);\n"
             output_str += f"        let modifiedObj = cloneDeep(modified{message_name});\n"
-            output_str += "        _.get(modifiedObj, loadedKeyName).push(newItem);\n"
+            output_str += "        _.get(modifiedObj, loadListFieldAttrs.key).push(newItem);\n"
             output_str += f"        dispatch(setModified{message_name}(modifiedObj));\n"
             output_str += "    }\n\n"
             output_str += "    const onConfirmSave = () => {\n"
@@ -1346,7 +1340,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"                dispatch(setModified{message_name}({message_name_camel_cased}));\n"
             else:
                 output_str += f"                dispatch(create{dependent_message}(" \
-                              "{ data: activeChanges, abbreviated, loadedKeyName }));\n"
+                              "{ data: activeChanges, abbreviated, loadedKeyName: loadListFieldAttrs.key }));\n"
             output_str += "            }\n"
             output_str += "        } else if (_.keys(activeChanges).length > 0) {\n"
             output_str += f"            dispatch(update{dependent_message}(activeChanges));\n"
@@ -1363,10 +1357,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }\n\n"
             output_str += "    const onLoad = () => {\n"
             output_str += f"        let updatedData = cloneDeep({message_name_camel_cased});\n"
-            output_str += f"        let index = _.get({message_name_camel_cased}, bufferedKeyName).indexOf(" \
+            output_str += f"        let index = _.get({message_name_camel_cased}, bufferListFieldAttrs.key).indexOf(" \
                           f"searchValue);\n"
-            output_str += "        _.get(updatedData, bufferedKeyName).splice(index, 1);\n"
-            output_str += "        _.get(updatedData, loadedKeyName).push(searchValue);\n"
+            output_str += "        _.get(updatedData, bufferListFieldAttrs.key).splice(index, 1);\n"
+            output_str += "        _.get(updatedData, loadListFieldAttrs.key).push(searchValue);\n"
             output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
             output_str += f"        dispatch(update{message_name}(updatedData));\n"
             output_str += "        let id = getIdFromAbbreviatedKey(abbreviated, searchValue);\n"
@@ -1376,15 +1370,15 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onUnload = (id) => {\n"
             output_str += f"        let updatedData = cloneDeep({message_name_camel_cased});\n"
             output_str += f"        let abbreviatedKey = getAbbreviatedKeyFromId(_.get({message_name_camel_cased}, " \
-                          f"loadedKeyName), abbreviated, id);\n"
+                          f"loadListFieldAttrs.key), abbreviated, id);\n"
             output_str += f"        let index = _.get({message_name_camel_cased}, " \
-                          "loadedKeyName).indexOf(abbreviatedKey);\n"
+                          "loadListFieldAttrs.key).indexOf(abbreviatedKey);\n"
             output_str += f"        let socket = socketDict.current[id];\n"
             output_str += "        if (socket) {\n"
             output_str += f"            socket.close();\n"
             output_str += "        }\n"
-            output_str += f"        _.get(updatedData, loadedKeyName).splice(index, 1);\n"
-            output_str += f"        _.get(updatedData, bufferedKeyName).push(abbreviatedKey);\n"
+            output_str += f"        _.get(updatedData, loadListFieldAttrs.key).splice(index, 1);\n"
+            output_str += f"        _.get(updatedData, bufferListFieldAttrs.key).push(abbreviatedKey);\n"
             output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
             output_str += "        dispatch(update" + f"{message_name}(updatedData));\n"
             output_str += "    }\n\n"
@@ -1464,7 +1458,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += self.handle_abbreviated_return(message_name, message_name_camel_cased, layout_type)
         else:
             output_str += self.handle_non_abbreviated_return(message_name, message_name_camel_cased, layout_type)
-        output_str += f"export default {message_name};\n\n"
+        output_str += f"export default React.memo({message_name});\n\n"
 
         return output_str
 

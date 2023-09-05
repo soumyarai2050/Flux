@@ -25,7 +25,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         super().__init__(base_dir_path)
 
     def handle_import_output(self, ) -> str:
-        output_str = "import { configureStore } from '@reduxjs/toolkit';\n"
+        output_str = "import { configureStore, getDefaultMiddleware } from '@reduxjs/toolkit';\n"
         for message in self.root_msg_list:
             message_name = message.proto.name
             message_name_camel_cased = capitalized_to_camel_case(message_name)
@@ -48,7 +48,11 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             else:
                 output_str += f"        {message_name_camel_cased}: {message_name_camel_cased}Slice,\n"
 
-        output_str += "    }\n"
+        output_str += "    },\n"
+        output_str += "    middleware: (getDefaultMiddleware) => getDefaultMiddleware({\n"
+        output_str += "        serializableCheck: false,\n"
+        output_str += "        immutableCheck: false\n"
+        output_str += "    })\n"
         output_str += "});\n"
 
         return output_str

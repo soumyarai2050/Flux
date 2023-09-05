@@ -299,17 +299,6 @@ message SymbolNExchId{
 
 
 message BarData {
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_UNSPECIFIED,
-    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
-    ReadOp: AggregateType_UNSPECIFIED,
-    UpdateOp: AggregateType_UNSPECIFIED,
-    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
-    PatchOp: AggregateType_UNSPECIFIED,
-    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
-    DeleteOp: AggregateType_UNSPECIFIED,
-    ReadWebSocketOp: AggregateType_UNSPECIFIED
-  };
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 5.0,
     CreateOp: AggregateType_UNSPECIFIED,
@@ -318,7 +307,7 @@ message BarData {
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
-    ExpireAfterSeconds: 5
+    ExpireAfterSeconds: 60
   };
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
@@ -571,4 +560,40 @@ message DashList {
 
 message BarDataList {
   repeated BarData bar_data = 1;
+}
+
+message RawMarketDepthHistoryList {
+  repeated RawMarketDepthHistory raw_market_depth_history = 1;
+}
+
+message TickByTickBBOList {
+  repeated TickByTickBBO tick_by_tick_bbo = 1;
+}
+
+message  DashFiltersCollectionList {
+  repeated DashFiltersCollection dash_filters_collection = 1;
+}
+
+message DummyList {
+  repeated Dummy dummy = 1;
+}
+
+message PortfolioLimitsList {
+  repeated PortfolioLimits portfolio_limits = 1;
+}
+
+message UILayoutList {
+  repeated UILayout ui_layout = 1;
+}
+
+message MarketDataBriefList {
+  repeated MarketDataBrief market_data_brief = 1;
+}
+
+message DashFiltersList {
+  repeated DashFilters dash_filters = 1;
+}
+
+message DashCollectionList {
+  repeated DashCollection dash_collection = 1;
 }

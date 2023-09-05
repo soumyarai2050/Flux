@@ -15,7 +15,7 @@ namespace FluxCppCore {
     public:
         explicit MongoDBCodec(std::shared_ptr<market_data_handler::MarketData_MongoDBHandler> sp_mongo_db_,
                               quill::Logger *p_logger = quill::get_logger())
-                              :m_sp_mongo_db(sp_mongo_db_),
+                              :m_sp_mongo_db(std::move(sp_mongo_db_)),
                               m_mongo_db_collection(m_sp_mongo_db->market_data_service_db[get_root_model_name()]),
                               m_p_logger_(p_logger) {}
 
@@ -206,26 +206,10 @@ namespace FluxCppCore {
 
 
         bool get_all_data_from_collection(RootModelListType &r_root_model_list_obj_out) {
-            bool status = false;
             std::string all_data_from_db_json_string;
-            auto cursor = m_mongo_db_collection.find({});
+            mongocxx::cursor cursor = m_mongo_db_collection.find({});
 
-            for (const auto &bson_doc: cursor) {
-                std::string doc_view = bsoncxx::to_json(bson_doc);
-                size_t pos = doc_view.find("_id");
-                if (pos != std::string::npos)
-                    doc_view.erase(pos, 1);
-                all_data_from_db_json_string += doc_view;
-                all_data_from_db_json_string += ",";
-            }
-            if (all_data_from_db_json_string.back() == ',') {
-                all_data_from_db_json_string.pop_back();
-            } // else not required: all_data_from_db_json_string is empty so need to perform any operation
-            r_root_model_list_obj_out.Clear();
-            if (!all_data_from_db_json_string.empty())
-                status = FluxCppCore::RootModelListJsonCodec<RootModelListType>::decode_model_list(
-                        r_root_model_list_obj_out, all_data_from_db_json_string);
-            return status;
+            return get_data_from_db(r_root_model_list_obj_out, cursor);
         }
 
         bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &kr_root_model_doc_id) {
@@ -236,8 +220,12 @@ namespace FluxCppCore {
                 auto &&doc = *cursor.begin();
                 std::string bson_doc = bsoncxx::to_json(doc);
                 size_t pos = bson_doc.find("_id");
-                if (pos != std::string::npos)
-                    bson_doc.erase(pos, 1);
+                while (pos != std::string::npos) {
+                    if (!isalpha(bson_doc[pos - 1])) {
+                        bson_doc.erase(pos, 1);
+                    }
+                    pos = bson_doc.find("_id", pos + 1);
+                }
                 status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, bson_doc);
                 return status;
             } else {
@@ -245,9 +233,25 @@ namespace FluxCppCore {
             }
         }
 
+        int64_t count_data_from_collection(const bsoncxx::builder::stream::document &filter) {
+            return m_mongo_db_collection.count_documents({filter});
+        }
+
+        int64_t count_data_from_collection() {
+            return m_mongo_db_collection.count_documents({});
+        }
 
         bool delete_all_data_from_collection() {
             auto result = m_mongo_db_collection.delete_many({});
+            if (result) {
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        bool delete_all_data_from_collection(const bsoncxx::builder::stream::document &filter) {
+            auto result = m_mongo_db_collection.delete_many({filter});
             if (result) {
                 return true;
             } else {
@@ -332,5 +336,6 @@ namespace FluxCppCore {
         mongocxx::collection m_mongo_db_collection;
         static inline int32_t c_cur_unused_max_id = 1;
     };
+
 
 }

@@ -125,7 +125,8 @@ class CppKeyHandlerPlugin(BaseProtoPlugin):
         for message in self.root_message_list:
             message_name = message.proto.name
             message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-            if CppKeyHandlerPlugin.is_option_enabled(message, CppKeyHandlerPlugin.flux_msg_json_root):
+            if CppKeyHandlerPlugin.is_option_enabled(message, CppKeyHandlerPlugin.flux_msg_json_root) or \
+                    CppKeyHandlerPlugin.is_option_enabled(message, CppKeyHandlerPlugin.flux_msg_json_root_time_series):
                 for field in message.fields:
                     field_name: str = field.proto.name
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)

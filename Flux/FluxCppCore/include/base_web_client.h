@@ -101,6 +101,10 @@ namespace FluxCppCore {
             return send_http_request(boost::beast::http::verb::delete_, std::string (delete_url) + "/" +
             std::to_string(kr_id), "", r_response_json_out);
         }
+
+        [[nodiscard]] bool send_delete_request(std::string_view delete_url, std::string &r_response_json_out) const {
+            return send_http_request(boost::beast::http::verb::delete_, std::string (delete_url), "", r_response_json_out);
+        }
     };
 
 
@@ -355,11 +359,11 @@ namespace FluxCppCore {
             }
         }
 
-        [[nodiscard]] bool get_client(RootModelListType &r_obj_out, const int32_t &kr_id) const {
+        [[nodiscard]] bool get_client(RootModelListType &r_obj_out) const {
             bool status = false;
             std::string json_out;
             std::string_view get_client_url_view = get_client_url.value;
-            status = send_get_request(get_client_url_view, kr_id, json_out);
+            status = send_get_request(get_client_url_view, json_out);
             if (status) {
                 std::string modified_json;
                 for (int i = 0; i < json_out.size(); ++i) {
@@ -509,7 +513,18 @@ namespace FluxCppCore {
             return status;
         }
 
-
+        [[nodiscard]] std::string delete_client () const {
+            std::string delete_response_json;
+            std::string_view delete_client_url_view = delete_client_url.value;
+            bool status = send_delete_request(delete_client_url_view, delete_response_json);
+            if (status) {
+                return delete_response_json;
+            } else {
+                LOG_ERROR(m_p_logger_, "Error while delete {};;; {}, url: {}", RootModelListType::GetDescriptor()->name(),
+                          delete_response_json, delete_client_url_view);
+                return delete_response_json;
+            }
+        }
     protected:
         quill::Logger* m_p_logger_ = quill::get_logger();
         RootModelListJsonCodec<RootModelListType> m_codec;
