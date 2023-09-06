@@ -82,13 +82,10 @@ function getLocalizedValueAndSuffix(metadata, value) {
     }
     if (metadata.numberFormat) {
         if (metadata.numberFormat.includes('%')) {
-            adornment = '%';
+            adornment = ' %';
         } else if (metadata.numberFormat.includes('bps')) {
-            adornment = 'bps';
+            adornment = ' bps';
         }
-    }
-    if (metadata.numberFormat && metadata.numberFormat.includes('%')) {
-        adornment = '%';
     }
     if (metadata.displayType === DataTypes.INTEGER) {
         return [adornment, floatToInt(value)]

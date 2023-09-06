@@ -565,7 +565,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onOverrideChange={onOverrideChange}\n"
         output_str += "                    itemsMetadata={"f"{dependent_msg_name_camel_cased}" + "Array}\n"
         output_str += "                    itemSchema={dependentWidgetSchema}\n"
-        output_str += "                    itemCollections={dependentCollections}\n"
+        output_str += "                    itemCollections={dependentWidgetCollections}\n"
         if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
             dependent_msg_name = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
             dependent_msg_name_camel_cased = convert_to_camel_case(dependent_msg_name)
@@ -584,6 +584,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onChartDelete={props.onChartDelete}\n"
         output_str += "                    filters={props.filters}\n"
         output_str += "                    onFiltersChange={props.onFiltersChange}\n"
+        output_str += "                    dependentLoading={dependentLoading}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
@@ -693,7 +694,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        dependentWidgetSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, " \
                               "dependentWidgetName]);\n"
                 output_str += "    }\n"
-                output_str += "    const dependentCollections = schemaCollections[dependentWidgetName];\n\n"
+                output_str += "    const dependentWidgetCollections = schemaCollections[dependentWidgetName];\n\n"
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
                       "widgetOption.truncate_date_time : false;\n\n"
         if layout_type not in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
@@ -829,7 +830,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                _.keys(userChanges).forEach(xpath => {\n"
             output_str += f"                    if (userChanges[DB_ID] === selected{dependent_message}Id) " + "{\n"
             output_str += "                        let key = xpath.split('.').pop();\n"
-            output_str += "                        let collection = dependentCollections.filter(c => c.key === " \
+            output_str += "                        let collection = dependentWidgetCollections.filter(c => c.key === " \
                           "key)[0];\n"
             output_str += "                        if (collection.type !== 'button') {\n"
             output_str += "                            _.set(modifiedObj, xpath, userChanges[xpath]);\n"
@@ -946,7 +947,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                const [updatedArray] = e.data;\n"
             output_str += "                dispatch(setForceUpdate(true));\n"
             output_str += f"                dispatch(set{dependent_message}" + \
-                          "ArrayWs({ data: updatedArray, collections: dependentCollections }));\n"
+                          "ArrayWs({ data: updatedArray, collections: dependentWidgetCollections }));\n"
             output_str += "            }\n"
             output_str += "        }\n"
             output_str += "        return () => {\n"
@@ -1025,10 +1026,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }, [])\n\n"
 
         output_str += "    /* if loading, render the skeleton view */\n"
-        if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
-            output_str += "    if (loading || dependentLoading) {\n"
-        else:
-            output_str += "    if (loading) {\n"
+        output_str += "    if (loading) {\n"
         output_str += "        return (\n"
         output_str += "            <SkeletonField title={title} />\n"
         output_str += "        )\n"
@@ -1321,7 +1319,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        dispatch(setCreateMode(true));\n"
             output_str += "        dispatch(setMode(Modes.EDIT_MODE));\n"
             output_str += f"        dispatch(setSelected{self.abbreviated_dependent_message_name}Id(NEW_ITEM_ID));\n"
-            output_str += "        let newItem = getNewItem(dependentCollections, abbreviated);\n"
+            output_str += "        let newItem = getNewItem(dependentWidgetCollections, abbreviated);\n"
             output_str += f"        let modifiedObj = cloneDeep(modified{message_name});\n"
             output_str += "        _.get(modifiedObj, loadListFieldAttrs.key).push(newItem);\n"
             output_str += f"        dispatch(setModified{message_name}(modifiedObj));\n"

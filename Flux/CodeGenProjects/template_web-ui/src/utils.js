@@ -66,6 +66,8 @@ const fieldProps = [
     { propertyName: "val_time_field", usageName: "val_time_field" },
     { propertyName: "projections", usageName: "projections" },
     { propertyName: "mapping_projection_query_field", usageName: "mapping_projection_query_field" },
+    { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
+    { propertyName: "mapping_src", usageName: "mapping_src" },
 ]
 
 // properties supported explicitly on the array types
@@ -141,7 +143,7 @@ function getMetaFieldDict(metaFieldList) {
     return getKeyValueDictFromArray(metaFieldList);
 }
 
-export function createCollections(schema, currentSchema, callerProps, collections = [], sequence = { sequence: 1 }, xpath, objectxpath) {
+export function createCollections(schema, currentSchema, callerProps, collections = [], sequence = { sequence: 1 }, xpath, objectxpath, metaFieldId) {
     currentSchema = cloneDeep(currentSchema);
 
     if (callerProps.xpath) {
@@ -199,6 +201,10 @@ export function createCollections(schema, currentSchema, callerProps, collection
                         collection.type = "progressBar";
                         collection.color = v.progress_bar.value_color_map;
                     }
+
+                    if (propertyName === 'mapping_underlying_meta_field' || propertyName === 'mapping_src') {
+                        collection[usageName] = v[propertyName][0];
+                    }
                 }
             })
 
@@ -221,6 +227,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
                         for (const field in dict) {
                             if (collection.xpath.endsWith(field)) {
                                 collection[usageName] = dict[field];
+                                collection.metaFieldId = metaFieldId;
                             }
                         }
                     }
@@ -335,6 +342,13 @@ export function createCollections(schema, currentSchema, callerProps, collection
             let ref = v.items.$ref.split('/')
             let record = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
             record = cloneDeep(record);
+            
+            let metaId = metaFieldId;
+            if (v.hasOwnProperty('mapping_underlying_meta_field')) {
+                if (!metaId) {
+                    metaId = collection.xpath;
+                }
+            }
 
             complexFieldProps.map(({ propertyName, usageName }) => {
                 if (currentSchema.hasOwnProperty(propertyName) || v.hasOwnProperty(propertyName)) {
@@ -357,7 +371,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 const sc = createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
                 collection.subCollections = cloneDeep(sc);
             } else {
-                createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
+                createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle, metaId);
             }
         }
     });
@@ -1484,18 +1498,15 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
     if (rows.length > 0) {
         tableColumns.map((column) => {
             if (hide && column.hide) return;
+            let fieldName = column.tableTitle;
             if (collectionView) {
                 if (column.type === 'button' || column.type === 'progressBar') {
                     return;
                 }
-            }
-            let fieldName = column.tableTitle;
-            if (collectionView) {
                 fieldName = column.key;
             }
             let found = true;
             for (let i = 0; i < rows.length - 1; i++) {
-
                 if (!_.isEqual(rows[i][fieldName], rows[i + 1][fieldName])) {
                     const values = [rows[i][fieldName], rows[i + 1][fieldName]];
                     for (let i = 0; i < values.length; i++) {
@@ -1916,9 +1927,9 @@ export function getLocalizedValueAndSuffix(metadata, value) {
     }
     if (metadata.numberFormat) {
         if (metadata.numberFormat.includes('%')) {
-            adornment = '%';
+            adornment = ' %';
         } else if (metadata.numberFormat.includes('bps')) {
-            adornment = 'bps';
+            adornment = ' bps';
         }
     }
     if (metadata.displayType === DataTypes.INTEGER) {
@@ -2896,8 +2907,16 @@ export function mergeTsData(tsData, updatedData, queryDict) {
 export function genMetaFilters(arr, collections, filterDict, filterFld, isCollectionType = false) {
     const filters = [];
     const fldMappingDict = {};
+    const metaCollection = collections.find(col => {
+        if (isCollectionType) {
+            return col.key === filterFld;
+        } else {
+            return col.tableTitle = filterFld;
+        }
+    })
+    const metaId = metaCollection.metaFieldId;
     collections.forEach(col => {
-        if (col.hasOwnProperty('mapping_underlying_meta_field')) {
+        if (col.hasOwnProperty('mapping_underlying_meta_field') && col.metaFieldId === metaId) {
             const metaField = col.mapping_underlying_meta_field.split('.').pop();
             if (isCollectionType) {
                 fldMappingDict[col.key] = metaField;

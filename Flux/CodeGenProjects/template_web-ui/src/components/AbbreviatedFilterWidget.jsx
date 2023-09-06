@@ -42,7 +42,7 @@ function AbbreviatedFilterWidget(props) {
     const [clipboardText, setClipboardText] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {   
+    useEffect(() => {
         setLoading(true);
     }, [props.collectionIndex])
 
@@ -52,7 +52,7 @@ function AbbreviatedFilterWidget(props) {
             props.abbreviated.split('^').forEach(field => {
                 let title;
                 let source = field;
-                // title is collection view is always expected to be present
+                // title in collection view is always expected to be present
                 if (source.indexOf(":") !== -1) {
                     title = field.split(":")[0];
                     source = field.split(":")[1];
@@ -88,7 +88,7 @@ function AbbreviatedFilterWidget(props) {
                     }
                     collections.push(collection);
                 } else {
-                    throw new Error('no collection (field attributes) found for field with xpath ' + source);
+                    throw new Error('no collection (field attributes) found for the field with xpath ' + source);
                 }
             })
         }
@@ -265,7 +265,7 @@ function AbbreviatedFilterWidget(props) {
     }
 
     const copyColumnHandler = (columnName) => {
-        let values = [columnName];
+        const values = [columnName];
         rows.map(row => {
             values.push(row[columnName]);
         })
@@ -351,10 +351,8 @@ function AbbreviatedFilterWidget(props) {
         </>
     )
 
-    if (loading) {
-        return (
-            <SkeletonField title={props.headerProps.title} />
-        )
+    if (loading || props.dependentLoading) {
+        return <SkeletonField title={props.headerProps.title} />
     }
 
     return (
@@ -436,7 +434,7 @@ function AbbreviatedFilterWidget(props) {
 
                                                     return (
                                                         <Fragment key={index}>
-                                                            <TableRow 
+                                                            <TableRow
                                                                 className={props.mode === Modes.EDIT_MODE && !selected ? classes.row_disabled : classes.row}
                                                                 selected={selected}
                                                                 onClick={() => onRowSelect(row["data-id"])}>

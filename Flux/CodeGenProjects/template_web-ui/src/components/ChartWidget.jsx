@@ -523,9 +523,28 @@ function ChartWidget(props) {
                                     },
                                     valueFormatter: (value) => tooltipFormatter(value)
                                 },
-                                dataZoom: {
-                                    type: 'inside'
-                                },
+                                dataZoom: [
+                                    {
+                                        type: 'inside',
+                                        filterMode: 'filter',
+                                        xAxisIndex: [0, 1]
+                                    },
+                                    {
+                                        type: 'inside',
+                                        filterMode: 'empty',
+                                        yAxisIndex: [0, 1]
+                                    },
+                                    {
+                                        type: 'slider',
+                                        filterMode: 'filter',
+                                        xAxisIndex: [0, 1]
+                                    },
+                                    {
+                                        type: 'slider',
+                                        filterMode: 'empty',
+                                        yAxisIndex: [0, 1]
+                                    }
+                                ],
                                 dataset: datasets,
                                 ...options
                             }}

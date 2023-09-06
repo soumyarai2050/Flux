@@ -13,13 +13,13 @@ import os
 
 # project imports
 os.environ["DBType"] = "beanie"
-from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import MarketDataServiceWebClient
+from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_http_client import MarketDataServiceHttpClient
 from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
 host: str = "127.0.0.1" if ((env_var := os.getenv("HOST")) is None or len(env_var) == 0) else env_var
 port: int = 8040 if ((env_var := os.getenv("PORT")) is None or len(env_var) == 0) else env_var
-market_data_service_web_client: MarketDataServiceWebClient = MarketDataServiceWebClient(host, port)
+market_data_service_web_client: MarketDataServiceHttpClient = MarketDataServiceHttpClient(host, port)
 
 config_file_path = PurePath(__file__).parent.parent / "data" / "config.yaml"
 config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))

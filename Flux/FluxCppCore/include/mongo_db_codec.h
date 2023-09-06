@@ -269,6 +269,10 @@ namespace FluxCppCore {
             }
         }
 
+        size_t get_md_key_to_db_id_size() {
+            return m_root_model_key_to_db_id.size();
+        }
+
         std::unordered_map<std::string, int32_t> m_root_model_key_to_db_id;
 
     protected:
