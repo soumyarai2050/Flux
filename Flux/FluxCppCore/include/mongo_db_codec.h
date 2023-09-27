@@ -129,11 +129,38 @@ namespace FluxCppCore {
             return status;
         }
 
+        bool process_element(const bsoncxx::document::element &element, bsoncxx::builder::basic::document &new_doc) {
+            if (element.type() == bsoncxx::type::k_date) {
+                auto date_value = element.get_date();
+                auto duration_since_epoch = std::chrono::duration_cast<std::chrono::microseconds>(date_value.value);
+
+                std::chrono::system_clock::time_point tp(duration_since_epoch);
+
+                std::time_t tt = std::chrono::system_clock::to_time_t(tp);
+                std::tm *gmt = std::gmtime(&tt);
+
+                char date_str[256];
+                std::strftime(date_str, sizeof(date_str), "%Y-%m-%dT%H:%M:%S", gmt);
+                std::string iso_date_str = std::string(date_str) + "+00:00";
+
+                new_doc.append(bsoncxx::builder::basic::kvp(element.key(), iso_date_str));
+            } else if (element.type() == bsoncxx::type::k_document) {
+                bsoncxx::builder::basic::document inner_doc;
+                for (const auto& inner_element : element.get_document().view()) {
+                    process_element(inner_element, inner_doc);
+                }
+                new_doc.append(bsoncxx::builder::basic::kvp(element.key(), inner_doc.view()));
+            } else {
+                new_doc.append(bsoncxx::builder::basic::kvp(element.key(), element.get_value()));
+            }
+            return true;
+        }
+
         bool update_or_patch(const int32_t &kr_model_doc_id, const bsoncxx::builder::basic::document &kr_bson_doc) {
             auto update_filter = market_data_handler::make_document(market_data_handler::kvp("_id", kr_model_doc_id));
             auto update_document = market_data_handler::make_document(
                     market_data_handler::kvp("$set", kr_bson_doc.view()));
-            auto result = m_mongo_db_collection.update_one(update_filter.view(), update_document.view());
+            auto result = m_mongo_db_collection.update_many(update_filter.view(), update_document.view());
             if (result->modified_count() > 0) {
                 return true;
             } else {
@@ -209,8 +236,34 @@ namespace FluxCppCore {
             std::string all_data_from_db_json_string;
             mongocxx::cursor cursor = m_mongo_db_collection.find({});
 
-            return get_data_from_db(r_root_model_list_obj_out, cursor);
+            for (const auto &bson_doc : cursor) {
+                bsoncxx::builder::basic::document new_doc;
+                for (const auto &element: bson_doc) {
+                    process_element(element, new_doc);
+                }
+
+                std::string doc_view = bsoncxx::to_json(new_doc.view());
+                size_t pos = doc_view.find("_id");
+                while (pos != std::string::npos) {
+                    if (!isalpha(doc_view[pos - 1])) {
+                        doc_view.erase(pos, 1);
+                    }
+                    pos = doc_view.find("_id", pos + 1);
+                }
+
+                all_data_from_db_json_string += doc_view;
+                all_data_from_db_json_string += ",";
+            }
+
+            if (all_data_from_db_json_string.back() == ',') {
+                all_data_from_db_json_string.pop_back();
+            } // else not required: all_data_from_db_json_string is empty so need to perform any operation
+            r_root_model_list_obj_out.Clear();
+            if (!all_data_from_db_json_string.empty())
+                return FluxCppCore::RootModelListJsonCodec<RootModelListType>::decode_model_list(r_root_model_list_obj_out, all_data_from_db_json_string);
+            return false;
         }
+
 
         bool get_data_by_id_from_collection(RootModelType &r_root_model_obj_out, const int32_t &kr_root_model_doc_id) {
             bool status = false;
@@ -218,15 +271,22 @@ namespace FluxCppCore {
                     bsoncxx::builder::stream::document{} << "_id" << kr_root_model_doc_id << bsoncxx::builder::stream::finalize);
             if (cursor.begin() != cursor.end()) {
                 auto &&doc = *cursor.begin();
-                std::string bson_doc = bsoncxx::to_json(doc);
-                size_t pos = bson_doc.find("_id");
-                while (pos != std::string::npos) {
-                    if (!isalpha(bson_doc[pos - 1])) {
-                        bson_doc.erase(pos, 1);
-                    }
-                    pos = bson_doc.find("_id", pos + 1);
+
+                bsoncxx::builder::basic::document new_doc;
+                for (const auto &element : doc) {
+                    process_element(element, new_doc);
                 }
-                status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, bson_doc);
+
+                std::string new_bson_doc = bsoncxx::to_json(new_doc.view());
+                size_t pos = new_bson_doc.find("_id");
+                while (pos != std::string::npos) {
+                    if (!isalpha(new_bson_doc[pos - 1])) {
+                        new_bson_doc.erase(pos, 1);
+                    }
+                    pos = new_bson_doc.find("_id", pos + 1);
+                }
+
+                status = FluxCppCore::RootModelJsonCodec<RootModelType>::decode_model(r_root_model_obj_out, new_bson_doc);
                 return status;
             } else {
                 return status;

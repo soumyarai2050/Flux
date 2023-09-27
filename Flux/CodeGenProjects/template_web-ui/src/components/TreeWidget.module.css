@@ -1,10 +1,10 @@
 .icon {
-    background-color: #ccc !important;
+    /* background-color: #ccc !important; */
     margin-right: 5px !important;
 }
 
 .icon:hover {
-    background-color: #ddd !important;
+    /* background-color: #ddd !important; */
 }
 
 .dropdown {

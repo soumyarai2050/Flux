@@ -49,8 +49,15 @@ log_generic_timings = parse_to_int(log_generic_timings_env_var) \
 
 
 def get_beanie_host_n_port(project_name: str):
+    server_port = os.environ.get("PORT")
+    if server_port is None or len(server_port) == 0:
+        err_str = f"Env var 'Port' received as {server_port}"
+        logging.exception(err_str)
+        raise Exception(err_str)
+
     project_path = code_gen_projects_path / project_name
-    config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(project_path / "data" / "config.yaml"))
+    config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(
+        str(project_path / "data" / f"{project_name}_{server_port}_config.yaml"))
     return config_yaml_dict.get("beanie_host"), parse_to_int(config_yaml_dict.get("beanie_port"))
 
 
@@ -85,7 +92,7 @@ def validate_ws_connection_managers_in_pydantic_obj(pydantic_class_type: Type[Do
         raise Exception(err)
 
 
-async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type: DocType,
+async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type: Type[DocType],
                                                 pydantic_obj_id_list: List[Any],
                                                 broadcast_callable: Callable,
                                                 tasks_list: List[asyncio.Task],
@@ -118,7 +125,7 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
         # else not required: not going to broadcast if not a valid update for this ws
 
 
-async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type: DocType,
+async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], pydantic_class_type: Type[DocType],
                                             pydantic_obj_id: Any,
                                             broadcast_callable: Callable,
                                             tasks_list: List[asyncio.Task],
@@ -252,18 +259,25 @@ async def execute_update_agg_pipeline(pydantic_class_type: Type[DocType],
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_post_http(pydantic_class_type: Type[DocType], proto_package_name: str, pydantic_obj: DocType,
+async def generic_post_http(pydantic_class_type: Type[DocType],
+                            proto_package_name: str, pydantic_obj: DocType,
                             filter_agg_pipeline: Any = None,
-                            update_agg_pipeline: Any = None, has_links: bool = False):
-
+                            update_agg_pipeline: Any = None, has_links: bool = False,
+                            return_obj_copy: bool | None = True) -> DocType | bool:
     if not has_links:
         new_pydantic_obj: pydantic_class_type = await pydantic_obj.create()
     else:
         new_pydantic_obj: pydantic_class_type = await pydantic_obj.save(link_rule=WriteRules.WRITE)
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
-    updated_stored_obj = await get_obj(pydantic_class_type, new_pydantic_obj.id, filter_agg_pipeline, has_links)
-    await publish_ws(pydantic_class_type, updated_stored_obj.id, filter_agg_pipeline, has_links)
-    return updated_stored_obj
+
+    await publish_ws(pydantic_class_type, new_pydantic_obj.id, filter_agg_pipeline, has_links)
+
+    if return_obj_copy:
+        fetched_obj = await get_obj(pydantic_class_type, new_pydantic_obj.id, filter_agg_pipeline, has_links)
+        return fetched_obj
+    else:
+        return True
+
 
 
 @http_except_n_log_error(status_code=500)
@@ -271,7 +285,7 @@ async def generic_post_http(pydantic_class_type: Type[DocType], proto_package_na
 async def generic_post_all_http(pydantic_class_type: Type[DocType], proto_package_name: str,
                                 pydantic_obj_list: List[DocType],
                                 filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None,
-                                has_links: bool = False):
+                                has_links: bool = False, return_obj_copy: bool | None = True) -> List[DocType] | bool:
 
     if not has_links:
         new_pydantic_obj_list: InsertManyResult = await pydantic_class_type.insert_many(pydantic_obj_list)
@@ -279,10 +293,15 @@ async def generic_post_all_http(pydantic_class_type: Type[DocType], proto_packag
         new_pydantic_obj_list: InsertManyResult = await pydantic_class_type.insert_many(pydantic_obj_list,
                                                                                         link_rule=WriteRules.WRITE)
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
-    updated_stored_obj_list = await get_obj_list(pydantic_class_type, new_pydantic_obj_list.inserted_ids,
-                                                 filter_agg_pipeline, has_links)
+
     await publish_ws_all(pydantic_class_type, new_pydantic_obj_list.inserted_ids, filter_agg_pipeline, has_links)
-    return updated_stored_obj_list
+
+    if return_obj_copy:
+        fetched_obj_list = await get_obj_list(pydantic_class_type, new_pydantic_obj_list.inserted_ids,
+                                              filter_agg_pipeline, has_links)
+        return fetched_obj_list
+    else:
+        return True
 
 
 def _get_beanie_formatted_update_request_json(updated_pydantic_obj_dict: Dict):
@@ -294,7 +313,8 @@ def _get_beanie_formatted_update_request_json(updated_pydantic_obj_dict: Dict):
 async def _underlying_patch_n_put(pydantic_class_type: Type[DocType], proto_package_name: str,
                                   stored_pydantic_obj: DocType,
                                   updated_pydantic_obj_dict: Dict, filter_agg_pipeline: Any = None,
-                                  update_agg_pipeline: Any = None, has_links: bool = False):
+                                  update_agg_pipeline: Any = None, has_links: bool = False,
+                                  return_obj_copy: bool | None = True) -> DocType | bool:
     """
         Underlying interface for Single object Put & Patch
     """
@@ -312,17 +332,24 @@ async def _underlying_patch_n_put(pydantic_class_type: Type[DocType], proto_pack
         tmp_obj = pydantic_class_type(**updated_pydantic_obj_dict)
         await tmp_obj.save(link_rule=WriteRules.WRITE)
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
-    stored_obj = await get_obj(pydantic_class_type, _id,
-                               filter_agg_pipeline, has_links)
-    await publish_ws(pydantic_class_type, stored_obj.id, filter_agg_pipeline, has_links, update_ws_with_id=True)
-    return stored_obj
+
+    return_value: DocType | bool
+    if return_obj_copy:
+        return_value = await get_obj(pydantic_class_type, _id,
+                                     filter_agg_pipeline, has_links)
+    else:
+        return_value = True
+
+    await publish_ws(pydantic_class_type, _id, filter_agg_pipeline, has_links, update_ws_with_id=True)
+    return return_value
 
 
 async def _underlying_patch_n_put_all(pydantic_class_type: Type[DocType], proto_package_name: str,
                                       stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocType, Dict]],
                                       updated_obj_id_list: List[Any] | None = None,
                                       filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None,
-                                      has_links: bool = False):
+                                      has_links: bool = False, return_obj_copy: bool | None = True
+                                      ) -> List[DocType] | bool:
     """
     Underlying interface for Put-All & Patch-All
     """
@@ -338,21 +365,28 @@ async def _underlying_patch_n_put_all(pydantic_class_type: Type[DocType], proto_
             # no need to revert removed _id from updated_pydantic_obj_dict since after here not being used
 
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
-    stored_obj_list = await get_obj_list(pydantic_class_type, updated_obj_id_list,
-                                         filter_agg_pipeline, has_links)
+
     await publish_ws_all(pydantic_class_type, updated_obj_id_list, filter_agg_pipeline, has_links, update_ws_with_id=True)
-    return stored_obj_list
+
+    if return_obj_copy:
+        stored_obj_list = await get_obj_list(pydantic_class_type, updated_obj_id_list,
+                                             filter_agg_pipeline, has_links)
+        return stored_obj_list
+    else:
+        return True
 
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_put_http(pydantic_class_type: Type[DocType], proto_package_name: str, stored_pydantic_obj: DocType,
                            pydantic_obj_updated: DocType, filter_agg_pipeline: Any = None,
-                           update_agg_pipeline: Any = None, has_links: bool = False):
+                           update_agg_pipeline: Any = None, has_links: bool = False,
+                           return_obj_copy: bool | None = True) -> DocType | bool:
     return await _underlying_patch_n_put(pydantic_class_type, proto_package_name, stored_pydantic_obj,
                                          pydantic_obj_updated.dict(by_alias=True),
                                          filter_agg_pipeline,
-                                         update_agg_pipeline, has_links)
+                                         update_agg_pipeline, has_links,
+                                         return_obj_copy)
 
 
 def get_stored_obj_id_to_obj_dict(stored_pydantic_obj_list: List[DocType]
@@ -382,16 +416,18 @@ async def generic_put_all_http(pydantic_class_type: Type[DocType], proto_package
                                stored_pydantic_obj_list: List[DocType],
                                updated_pydantic_obj_list: List[DocType], updated_obj_id_list: List[Any],
                                filter_agg_pipeline: Any = None,
-                               update_agg_pipeline: Any = None, has_links: bool = False):
+                               update_agg_pipeline: Any = None, has_links: bool = False,
+                               return_obj_copy: bool | None = True) -> List[DocType] | bool:
     stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocType, Dict]] = \
         _generic_put_all_http(stored_pydantic_obj_list, updated_pydantic_obj_list)
     return await _underlying_patch_n_put_all(pydantic_class_type, proto_package_name,
                                              stored_pydantic_obj_n_updated_obj_dict_tuple_list,
                                              updated_obj_id_list, filter_agg_pipeline,
-                                             update_agg_pipeline, has_links)
+                                             update_agg_pipeline, has_links, return_obj_copy)
 
 
-def assign_missing_ids_n_handle_date_time_type(pydantic_class_type: Type[DocType], pydantic_obj_update_json: Dict,
+def assign_missing_ids_n_handle_date_time_type(pydantic_class_type: Type[DocType] | ModelMetaclass,
+                                               pydantic_obj_update_json: Dict,
                                                ignore_root_id_check: bool | None = True,
                                                ignore_handling_datetime: bool | None = False):
     """
@@ -440,13 +476,14 @@ def assign_missing_ids_n_handle_date_time_type(pydantic_class_type: Type[DocType
 async def generic_patch_http(pydantic_class_type: Type[DocType], proto_package_name: str,
                              stored_pydantic_obj: DocType, pydantic_obj_update_json,
                              filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None,
-                             has_links: bool = False):
+                             has_links: bool = False, return_obj_copy: bool | None = True
+                             ) -> DocType | bool:
     assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json)
     updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(by_alias=True),
                                                      pydantic_obj_update_json)
     return await _underlying_patch_n_put(pydantic_class_type, proto_package_name, stored_pydantic_obj,
                                          updated_pydantic_obj_dict,
-                                         filter_agg_pipeline, update_agg_pipeline, has_links)
+                                         filter_agg_pipeline, update_agg_pipeline, has_links, return_obj_copy)
 
 
 def underlying_generic_patch_all_http(pydantic_class_type: Type[DocType], stored_pydantic_obj_list: List[DocType],
@@ -481,33 +518,32 @@ async def generic_patch_all_http(pydantic_class_type: Type[DocType], proto_packa
                                  stored_pydantic_obj_list: List[DocType],
                                  pydantic_obj_update_json_list: List[Dict], updated_obj_id_list: List[Any],
                                  filter_agg_pipeline: Any = None,
-                                 update_agg_pipeline: Any = None, has_links: bool = False):
+                                 update_agg_pipeline: Any = None, has_links: bool = False,
+                                 return_obj_copy: bool | None = True) -> List[DocType] | bool:
     stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocType, Dict]] = \
         underlying_generic_patch_all_http(pydantic_class_type, stored_pydantic_obj_list, pydantic_obj_update_json_list)
     return await _underlying_patch_n_put_all(pydantic_class_type, proto_package_name,
                                              stored_pydantic_obj_n_updated_obj_dict_tuple_list,
-                                             updated_obj_id_list, filter_agg_pipeline, update_agg_pipeline, has_links)
+                                             updated_obj_id_list, filter_agg_pipeline, update_agg_pipeline,
+                                             has_links, return_obj_copy)
 
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_delete_http(pydantic_class_type: Type[DocType], proto_package_name: str,
-                              pydantic_dummy_model: ModelMetaclass, pydantic_obj: DocType,
-                              update_agg_pipeline: Any = None, has_links: bool = False):
-    id_is_int_type = isinstance(pydantic_obj.id, int)
+                              pydantic_dummy_model, pydantic_obj: DocType,
+                              update_agg_pipeline: Any = None, has_links: bool = False,
+                              return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:
+    _id = pydantic_obj.id
+    id_is_int_type = isinstance(_id, int)
 
     if has_links:
         await pydantic_obj.delete(link_rule=DeleteRules.DELETE_LINKS)
     else:
         await pydantic_obj.delete()
     await execute_update_agg_pipeline(pydantic_class_type, proto_package_name, update_agg_pipeline)
-    try:
-        pydantic_base_model: pydantic_dummy_model = pydantic_dummy_model(id=pydantic_obj.id)
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    await publish_ws(pydantic_class_type, pydantic_base_model.id, has_links=has_links, update_ws_with_id=True,
+    await publish_ws(pydantic_class_type, _id, has_links=has_links, update_ws_with_id=True,
                      dummy_pydantic_model=pydantic_dummy_model)
-    del_success.id = pydantic_obj.id
 
     # Setting back incremental id to 0 if collection gets empty
     if id_is_int_type:
@@ -517,13 +553,18 @@ async def generic_delete_http(pydantic_class_type: Type[DocType], proto_package_
         # else not required: all good
     # else not required: if id is not int then it must be of PydanticObjectId so no handling required
 
-    return del_success
+    if return_obj_copy:
+        del_success.id = _id
+        return del_success
+    else:
+        return True
 
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_package_name: str,
-                                  pydantic_dummy_model: ModelMetaclass):
+                                  pydantic_dummy_model: ModelMetaclass, return_obj_copy: bool | None = True
+                                  ) -> DefaultWebResponse | bool:
     id_is_int_type = (pydantic_class_type.__fields__.get("id").type_ == int)
 
     try:
@@ -531,11 +572,9 @@ async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_pack
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
-    pydantic_obj_list = []
     # preparing success message
     del_success.id = []
     for pydantic_obj in stored_pydantic_obj_list:
-        pydantic_obj_list.append(pydantic_dummy_model(id=pydantic_obj.id))
         del_success.id.append(pydantic_obj.id)
 
     # deleting all
@@ -551,7 +590,10 @@ async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_pack
 
     await publish_ws_all(pydantic_class_type, del_success.id, update_ws_with_id=True,
                          dummy_pydantic_model=pydantic_dummy_model)
-    return del_success
+    if return_obj_copy:
+        return del_success
+    else:
+        return True
 
 
 @http_except_n_log_error(status_code=500)

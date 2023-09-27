@@ -2,6 +2,7 @@
 import logging
 from typing import List
 import os
+from pathlib import PurePath
 
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.execute import Execute, ProtoGenOutputTypes
@@ -27,7 +28,7 @@ class PluginExecuteScript:
         "ui_core_pb2"
     ]
 
-    def __init__(self, base_dir_path: str, model_file_suffix: str):
+    def __init__(self, base_dir_path: str | List[str], model_file_suffix: str):
         """
         :param base_dir_path: project's base directory path
         :param model_file_suffix: suffix of proto model file needs to be used in plugin
@@ -51,7 +52,8 @@ class PluginExecuteScript:
         Execute.compile_proto_file(proto_file_path_list, proto_files_dir_paths_list, out_dir, output_type)
         logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
 
-    def import_pb2_scripts(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str], out_dir: str):
+    def import_pb2_scripts(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str],
+                           out_dir: str, run_only_once: bool = False):
         if (py_code_gen_core_dir_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None and \
                 len(py_code_gen_core_dir_path):
             pb2_import_generator_path = os.path.join(py_code_gen_core_dir_path, self.pb2_import_generator_plugin_name)
@@ -59,13 +61,15 @@ class PluginExecuteScript:
             err_str = f"Env var 'PY_CODE_GEN_CORE_PATH' received as {py_code_gen_core_dir_path}"
             logging.exception(err_str)
             raise Exception(err_str)
+
         Execute.run_plugin_proto(proto_file_path_list, proto_files_dir_paths_list,
-                                 pb2_import_generator_path, out_dir)
+                                 pb2_import_generator_path, out_dir, run_only_once)
         logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
 
-    def execute_plugin_cmd(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str], out_dir: str):
+    def execute_plugin_cmd(self, proto_file_path_list: List[str], proto_files_dir_paths_list: List[str],
+                           out_dir: str, run_only_once: bool = False):
         Execute.run_plugin_proto(proto_file_path_list, proto_files_dir_paths_list,
-                                 self.plugin_path, out_dir)
+                                 self.plugin_path, out_dir, run_only_once)
         logging.debug(f"Protoc successfully executed Plugin {self.plugin_path}, output at {out_dir}")
 
     def remove_insertion_points_from_generated_output(self, out_dir: str):
@@ -87,10 +91,10 @@ class PluginExecuteScript:
 
     def clear_used_imports_from_file(self):
         insertion_import_file_name = None
-        if ((py_code_gen_core_dir_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None and \
+        if ((py_code_gen_core_dir_path := os.getenv("PY_CODE_GEN_CORE_PATH")) is not None and
                 len(py_code_gen_core_dir_path)) and \
-                ((insertion_import_file_name := os.getenv("INSERTION_IMPORT_FILE_NAME")) is not None and \
-                len(insertion_import_file_name)):
+                ((insertion_import_file_name := os.getenv("INSERTION_IMPORT_FILE_NAME")) is not None and
+                 len(insertion_import_file_name)):
             with open(os.path.join(py_code_gen_core_dir_path, insertion_import_file_name)) as fl:
                 line_sep_content = fl.readlines()
                 remove_line_index = []
@@ -112,11 +116,20 @@ class PluginExecuteScript:
 
     def get_required_param_values(self):
         # List of full paths of proto models in model directory
-        all_proto_file_path_list = [os.path.join(self.base_dir_path, "model", proto_file)
-                                    for proto_file in os.listdir(os.path.join(self.base_dir_path, "model"))]
-        proto_file_path_list = [os.path.join(self.base_dir_path, "model", proto_file)
-                                for proto_file in os.listdir(os.path.join(self.base_dir_path, "model"))
-                                if "options" not in proto_file and proto_file.endswith(self.model_file_suffix)]
+        print("#####")
+        print(self.base_dir_path)
+        print("#####")
+        if isinstance(self.base_dir_path, list):
+            proto_file_path_list = []
+            for dir_path in self.base_dir_path:
+                proto_file_path_list.extend(
+                    [os.path.join(dir_path, "model", proto_file)
+                     for proto_file in os.listdir(os.path.join(dir_path, "model"))
+                     if "options" not in proto_file and proto_file.endswith(self.model_file_suffix)])
+        else:
+            proto_file_path_list = [os.path.join(self.base_dir_path, "model", proto_file)
+                                    for proto_file in os.listdir(os.path.join(self.base_dir_path, "model"))
+                                    if "options" not in proto_file and proto_file.endswith(self.model_file_suffix)]
         if (output_dir := os.getenv("OUTPUT_DIR")) is None or len(output_dir) == 0:
             err_str = f"Env Var 'OUTPUT_DIR' received as {output_dir}"
             logging.exception(err_str)
@@ -127,27 +140,56 @@ class PluginExecuteScript:
             logging.exception(err_str)
             raise Exception(err_str)
         # else not required: plugin_output_dir is present, continue further
-        proto_files_dir_paths_list: List[str] = [
-            os.path.join(self.base_dir_path, "model"),
-            os.path.abspath(os.path.join(self.base_dir_path, "..", ".."))
-        ]
+        proto_files_dir_paths_list: List[str] = []
+        if isinstance(self.base_dir_path, list):
+            for dir_path in self.base_dir_path:
+                proto_files_dir_paths_list.append(str(PurePath(dir_path) / "model"))
+                root_path = os.path.abspath(os.path.join(dir_path, "..", ".."))
+                if root_path not in proto_files_dir_paths_list:
+                    proto_files_dir_paths_list.append(root_path)
+        else:
+            proto_files_dir_paths_list.extend([
+                os.path.join(self.base_dir_path, "model"),
+                os.path.abspath(os.path.join(self.base_dir_path, "..", ".."))
+            ])
         insertion_imports_dir_path = self.current_script_dir_path
 
-        return all_proto_file_path_list, proto_file_path_list, output_dir, plugin_output_dir, \
-            proto_files_dir_paths_list, insertion_imports_dir_path
+        return proto_file_path_list, plugin_output_dir, proto_files_dir_paths_list, insertion_imports_dir_path
 
     def execute(self):
-        all_proto_file_path_list, proto_file_path_list, out_dir, plugin_out_dir, proto_files_dir_paths_list, \
-            insertion_imports_dir_path = self.get_required_param_values()
+        proto_file_path_list, plugin_out_dir, proto_files_dir_paths_list, insertion_imports_dir_path = (
+            self.get_required_param_values())
 
-        # Creating pb2 files of all proto models
-        self.compile_protoc_models(all_proto_file_path_list, proto_files_dir_paths_list, out_dir)
+        run_only_once = False
+        if isinstance(self.base_dir_path, list):
+            run_only_once = True
+            all_proto_file_path_list = []
+            for dir_path in self.base_dir_path:
+                for proto_file in os.listdir(PurePath(dir_path) / "model"):
+                    all_proto_file_path_list.append(str(PurePath(dir_path) / "model" / proto_file))
+                out_dir = str(PurePath(dir_path) / "generated")
+                # Creating pb2 files of all proto models
+                self.compile_protoc_models(all_proto_file_path_list, proto_files_dir_paths_list, out_dir)
+        else:
+            all_proto_file_path_list = [str(PurePath(self.base_dir_path) / "model" / proto_file)
+                                        for proto_file in os.listdir(PurePath(self.base_dir_path) / "model")]
+            out_dir = str(PurePath(self.base_dir_path) / "generated")
+            # Creating pb2 files of all proto models
+            self.compile_protoc_models(all_proto_file_path_list, proto_files_dir_paths_list, out_dir)
 
         # Adding import of pb2 file in insertion_imports.py
-        self.import_pb2_scripts(proto_file_path_list, proto_files_dir_paths_list, insertion_imports_dir_path)
+        if isinstance(self.base_dir_path, list):
+            output_dir_env = os.environ.get("OUTPUT_DIR")
+            for dir_path in self.base_dir_path:
+                output_dir_env += f":{PurePath(dir_path)/'generated'}"
+            os.environ["OUTPUT_DIR"] = output_dir_env
+
+        self.import_pb2_scripts(proto_file_path_list, proto_files_dir_paths_list, insertion_imports_dir_path,
+                                run_only_once=run_only_once)
 
         # Running the plugin to generate output files
-        self.execute_plugin_cmd(proto_file_path_list, proto_files_dir_paths_list, plugin_out_dir)
+        self.execute_plugin_cmd(proto_file_path_list, proto_files_dir_paths_list, plugin_out_dir,
+                                run_only_once=run_only_once)
 
         # Removing plugin comment from output generated files if present
         self.remove_insertion_points_from_generated_output(plugin_out_dir)

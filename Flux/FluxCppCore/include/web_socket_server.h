@@ -156,7 +156,7 @@ namespace FluxCppCore {
         asio::io_context m_io_context_;
         tcp::acceptor m_acceptor_;
         // interval to timeout read if no data and handle any shutdown if requested
-        asio::deadline_timer m_timer_;
+        boost::asio::deadline_timer m_timer_;
         quill::Logger *mp_logger;
     };
 

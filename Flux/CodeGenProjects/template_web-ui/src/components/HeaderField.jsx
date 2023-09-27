@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Typography, Box, ClickAwayListener, Tooltip } from "@mui/material";
-import { IndeterminateCheckBox, AddBox, AddCircle, RemoveCircle, Menu, LiveHelp } from "@mui/icons-material";
+import { IndeterminateCheckBox, AddBox, AddCircle, RemoveCircle, Menu, LiveHelp, ArrowDropDownSharp, ArrowDropUpSharp, HelpSharp, HelpOutline } from "@mui/icons-material";
 import { DataTypes, Modes } from '../constants';
 import { Icon } from './Icon';
 import PropTypes from 'prop-types';
@@ -27,7 +27,7 @@ const HeaderField = (props) => {
     let add = false;
     let remove = false;
     if (props.data.mode === Modes.EDIT_MODE) {
-        if (props.data.type === DataTypes.ARRAY && !props.data['data-remove']  && !props.data.uiUpdateOnly) {
+        if (props.data.type === DataTypes.ARRAY && !props.data['data-remove'] && !props.data.uiUpdateOnly) {
             add = true;
             remove = true;
         }
@@ -43,17 +43,27 @@ const HeaderField = (props) => {
 
     return (
         <Box className={classes.container} data-xpath={props.data.xpath}>
-            <Box className={classes.header} data-xpath={props.data.xpath}>
+            <Box className={classes.header} data-xpath={props.data.xpath} bgcolor='background.nodeHeader'>
                 <span className={classes.icon}>
                     {props.isOpen ? (
-                        <IndeterminateCheckBox fontSize='small' data-close={props.data.xpath} onClick={props.onClick} />
+                        <ArrowDropUpSharp fontSize='small' data-close={props.data.xpath} onClick={props.onClick} />
                     ) : (
-                        <AddBox data-open={props.data.xpath} onClick={props.onClick} />
+                        <ArrowDropDownSharp data-open={props.data.xpath} onClick={props.onClick} />
                     )}
                 </span>
-                <Typography variant="subtitle1" >
+                <Typography variant="subtitle1" sx={{display: 'flex', flex: '1'}} >
                     {title}
                 </Typography>
+                {
+                    props.data.help && (
+                        <Tooltip title={props.data.help}>
+                            <HelpOutline fontSize='small' />
+                        </Tooltip>
+                        // <Box className={classes.option}>
+
+                        // </Box>
+                    )
+                }
             </Box>
 
             <HeaderOptions
@@ -64,15 +74,6 @@ const HeaderField = (props) => {
                 onClick={onClick}
                 onToggle={onToggle}
             />
-            {
-                props.data.help && (
-                    <Box className={classes.option}>
-                        <Icon title={props.data.help}>
-                            <LiveHelp color='primary' />
-                        </Icon>
-                    </Box>
-                )
-            }
         </Box>
     )
 }

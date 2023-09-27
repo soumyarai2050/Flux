@@ -58,7 +58,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_text_align,
         BaseProtoPlugin.flux_fld_micro_separator,
         BaseProtoPlugin.flux_fld_val_time_field,
-        BaseProtoPlugin.flux_fld_val_meta_field
+        BaseProtoPlugin.flux_fld_val_meta_field,
+        BaseProtoPlugin.flux_fld_server_running_status
     ]
     flx_fld_simple_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_fld_mapping_underlying_meta_field,
@@ -92,6 +93,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_alert_bubble_color,
         BaseProtoPlugin.flux_fld_alert_bubble_source,
         BaseProtoPlugin.flux_fld_val_max,
+        BaseProtoPlugin.flux_fld_val_min,
         BaseProtoPlugin.flux_fld_mapping_underlying_meta_field,
         BaseProtoPlugin.flux_fld_mapping_src
     ]
@@ -112,6 +114,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         self.__enum_list: List[protogen.Enum] = []
         self.__case_style_convert_method: Callable[[str], str] | None = None
         self.__add_autocomplete_dict: bool = False
+        self._proto_project_name_to_msg_list_dict: Dict[str, List[protogen.Message]] = {}
+        self._current_project_name: str | None = None
 
     def __proto_data_type_to_json(self, field: protogen.Field) -> Tuple[str, str]:
         underlying_type = field.kind.name.lower()
@@ -578,13 +582,12 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
                     flux_prefix_removed_option_name_case_styled = \
                         self.__case_style_convert_method(flux_prefix_removed_option_name)
-
                     json_msg_str += self._get_json_complex_key_value_str(flux_prefix_removed_option_name_case_styled,
                                                                          option_value_dict, int(init_space_count/2))
 
                     if option == JsonSchemaConvertPlugin.flux_fld_button:
-                        json_msg_str_splited_list = json_msg_str.split("\n")
-                        for index, line in enumerate(json_msg_str_splited_list):
+                        json_msg_str_splitted_list = json_msg_str.split("\n")
+                        for index, line in enumerate(json_msg_str_splitted_list):
                             if ':' in line and "{" not in line and "[" not in line:
                                 if '"' not in line[line.index(":")+1:]:
                                     key_str: str
@@ -596,12 +599,12 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                     else:
                                         val_str = f' "{val_str.strip()}"'
 
-                                    json_msg_str_splited_list[index] = f"{key_str}:{val_str}"
-                        json_msg_str = "\n".join(json_msg_str_splited_list)
+                                    json_msg_str_splitted_list[index] = f"{key_str}:{val_str}"
+                        json_msg_str = "\n".join(json_msg_str_splitted_list)
                     # else not required: if option is not flux_fld_button then avoid as only this option
                     # has dependency to keep every option field as str, more specifically it has some fields
                     # which needs to have value 'true' or 'false' as string form but since in plugin handling
-                    # if andy field is found having value as string form of bool then it is type-cast to
+                    # if any field is found having value as string form of bool then it is type-cast to
                     # json bool, to avoid this explicitly value is turned into str bool
                 elif option in (self.flx_fld_complex_repeated_attribute_options +
                                 self.flx_msg_complex_repeated_attribute_options):
@@ -917,8 +920,50 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 widget_ui_data_option_value_dict[option_fld] = \
                     f"{self.__underlying_handle_options_value_having_msg_fld_name(widget_ui_data_option_value_dict[option_fld], JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}"
 
+        indent_count = 2
         json_msg_str = self._get_json_complex_key_value_str(widget_ui_data_key, widget_ui_data_option_value_dict,
-                                                            2)
+                                                            indent_count)
+
+        # Also checking if msg is from another project used in this project
+        is_from_not_this_project: bool = True
+        other_project_name: str | None = None
+        for project_name, message_list in self._proto_project_name_to_msg_list_dict.items():
+            if project_name != self._current_project_name:
+                if message in message_list:
+                    is_from_not_this_project: bool = False
+                    other_project_name = project_name
+                    break
+
+        if not is_from_not_this_project:
+            proto_model_name = widget_ui_data_option_value_dict.get(
+                    JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_name_field)
+            dynamic_url = widget_ui_data_option_value_dict.get(
+                JsonSchemaConvertPlugin.widget_ui_option_depends_on_other_model_for_dynamic_url_field)
+            indent_count += 2
+            json_msg_str += (" " * indent_count) + '"connection_details": {\n'
+            indent_count += 2
+            if dynamic_url:
+                proto_model_name_case_styled = self.__case_style_convert_method(proto_model_name)
+                json_msg_str += (" " * indent_count) + f'"host": "{proto_model_name_case_styled}.host",\n'
+                json_msg_str += (" " * indent_count) + f'"port": "{proto_model_name_case_styled}.port",\n'
+
+                json_msg_str += (" " * indent_count) + f'"project_name": "{other_project_name}",\n'
+                json_msg_str += (" " * indent_count) + f'"dynamic_url": true\n'
+            else:
+                other_project_config_file_path = (PurePath(__file__).parent.parent.parent / "CodeGenProjects" /
+                                                  other_project_name / "data" / "config.yaml")
+                other_project_config_yaml_dict = (
+                    YAMLConfigurationManager.load_yaml_configurations(str(other_project_config_file_path)))
+                host = other_project_config_yaml_dict.get("main_server_beanie_host")
+                port = other_project_config_yaml_dict.get("main_server_beanie_port")
+
+                json_msg_str += (" " * indent_count) + f'"host": "{host}",\n'
+                json_msg_str += (" " * indent_count) + f'"port": {port},\n'
+                json_msg_str += (" " * indent_count) + f'"project_name": "{other_project_name}",\n'
+                json_msg_str += (" " * indent_count) + f'"dynamic_url": false\n'
+            indent_count -= 2
+            json_msg_str += (" " * indent_count) + '},\n'
+
         return json_msg_str
 
     def __handle_json_layout_message_schema(self, message: protogen.Message) -> str:
@@ -1003,10 +1048,17 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         json_msg_str += '  }\n'
         return json_msg_str
 
-    def output_file_generate_handler(self, file: protogen.File):
+    def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
+        if isinstance(file, list):
+            for f in file:
+                self._proto_project_name_to_msg_list_dict[f.proto.package] = f.messages
+                self.__load_json_layout_and_non_layout_messages_in_dicts(f)
+            file = file[0]  # since first file will be this project's proto file
+            self._current_project_name = file.proto.package
+        else:
+            self.__load_json_layout_and_non_layout_messages_in_dicts(file)
         # Performing Recursion to messages (including nested type) to get json layout, non-layout and enums and
         # adding to their respective data-member
-        self.__load_json_layout_and_non_layout_messages_in_dicts(file)
         if self.__response_field_case_style.lower() == "snake":
             self.__case_style_convert_method = convert_camel_case_to_specific_case
         elif self.__response_field_case_style.lower() == "camel":

@@ -1,5 +1,5 @@
 .container {
-    background-color: white;
+    /* background-color: white; */
 }
 
 .table {
@@ -7,24 +7,28 @@
 }
 
 .row:nth-of-type(even) {
-    background-color: #eee;
+    /* background-color: #eee; */
 }
 
 .add {
-    background-color: #c6efce !important;
+    /* background-color: #c6efce !important; */
+    background-color: var(--green-400) !important;
+    color: white;
 }
 
 .remove {
-    background-color: #ffc7ce !important;
+    /* background-color: #ffc7ce !important; */
+    background-color: var(--red-600) !important;
+    color: white;
 }
 
 .icon {
-    background-color: #ccc !important;
+    /* background-color: #ccc !important; */
     margin-right: 5px !important;
 }
 
 .icon:hover {
-    background-color: #ddd !important;
+    /* background-color: #ddd !important; */
 }
 
 .dropdown {

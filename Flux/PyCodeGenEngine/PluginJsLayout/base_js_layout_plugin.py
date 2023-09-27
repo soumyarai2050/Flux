@@ -34,6 +34,9 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
         self.parent_abbreviated_filter_layout_msg_list: List[protogen.Message] = []
         self.abbreviated_msg_name_to_dependent_msg_name_dict: Dict[str, str] = {}
         self.parent_abb_msg_name_to_linked_abb_msg_name_dict: Dict[str, str] = {}
+        self.current_proto_file_name: str | None = None
+        self.proto_file_name_to_message_list_dict: Dict[str, List[protogen.Message]] = {}
+        self.file_name_to_dependency_file_names_dict: Dict[str, List[str]] = {}
         if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and \
                 len(response_field_case_style):
             self.response_field_case_style: str = response_field_case_style
@@ -44,18 +47,40 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
             raise Exception(err_str)
         self.case_style_convert_method: Callable[[str], str] | None = None
 
-    def load_root_message_to_data_member(self, file: protogen.File):
-        message_list: List[protogen.Message] = file.messages
-
+    def handle_dependency_files(self, file: protogen.File, message_list: List[protogen.Message],
+                                is_multi_project: bool | None = None):
         # Adding messages from core proto files having json_root option
         core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
         if core_or_util_files is not None:
             for dependency_file in file.dependencies:
                 if dependency_file.proto.name in core_or_util_files:
-                    message_list.extend(dependency_file.messages)
+                    if is_multi_project:
+                        file_name = dependency_file.proto.name
+                        self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = (
+                            dependency_file.messages)
+                    for msg in dependency_file.messages:
+                        if msg not in message_list:
+                            message_list.append(msg)
                 # else not required: if dependency file name not in core_or_util_files
                 # config list, avoid messages from it
         # else not required: core_or_util_files key is not in yaml dict config
+
+    def load_root_message_to_data_member(self, file: protogen.File):
+        message_list: List[protogen.Message]
+        if isinstance(file, list):
+            message_list = []
+            current_full_file_name: str = file[0].proto.name   # since first file in list is current proto file
+            self.current_proto_file_name = current_full_file_name.split(os.sep)[-1]
+            for f in file:
+                message_list.extend(f.messages)
+                file_name = f.proto.name
+                self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = f.messages
+                self.handle_dependency_files(f, message_list, True)
+                self.file_name_to_dependency_file_names_dict[f.proto.name] = \
+                    [file.proto.name for file in f.dependencies]
+        else:
+            message_list = file.messages
+            self.handle_dependency_files(file, message_list)
 
         # handling current file
         for message in set(message_list):
@@ -122,7 +147,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
             # Collecting all parent_abbreviated_type message from simple_abbreviated_type list
             parent_abb_msg_name_list = []
             for abb_msg_name, abb_dependent_msg_name in self.abbreviated_msg_name_to_dependent_msg_name_dict.items():
-                for msg in file.messages:
+                for msg in message_list:
                     found_msg = False
                     if abb_dependent_msg_name == msg.proto.name:
                         found_msg = True
@@ -157,3 +182,31 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
             err_str = f"{self.response_field_case_style} is not supported case style"
             logging.exception(err_str)
             raise Exception(err_str)
+
+    def _get_ui_msg_dependent_msg_name_from_another_proto(self, message: protogen.Message) -> str | None:
+        """
+        :param message: msg type to check
+        :return: None if not dependent on msg from another proto file else returns
+                 msg name on which it depends from another proto file and if msg is from another
+                 proto file but is not dependent on any other message then returns empty str ''
+        """
+        if self.proto_file_name_to_message_list_dict:
+            for file_name, message_list in self.proto_file_name_to_message_list_dict.items():
+                if (file_name != self.current_proto_file_name and
+                        file_name not in self.file_name_to_dependency_file_names_dict[self.current_proto_file_name]):
+                    if message in message_list:
+                        if BaseJSLayoutPlugin.is_option_enabled(message,
+                                                                BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
+                            option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                                message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+                            dependent_model_name = (
+                                option_dict.get(BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field))
+                            if dependent_model_name is None:
+                                return ""
+                            else:
+                                return dependent_model_name
+        return None
+
+
+# - plimits - olimits
+# url line in both alerts

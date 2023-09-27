@@ -68,6 +68,17 @@ message WidgetUIDataElement {
   repeated WidgetUIData widget_ui_data = 13;
   repeated ChartData chart_data = 14;
   repeated UIFilter filters = 15;
+  optional string depending_proto_file_name = 16;  // other project's proto file name on which current model is dependent
+  optional string depending_proto_model_name = 17;   // other project's proto model name present in proto_file_name
+                                          // on which current model is dependent
+  optional bool depends_on_other_model_for_id = 18 [default=false];
+  optional bool depends_on_other_model_for_dynamic_url = 19 [default=false];
+  repeated ColumnOrder column_orders = 20;
+}
+
+message ColumnOrder {
+  required string column_name = 1;
+  required int32 sequence = 2;
 }
 
 message WidgetUIData{

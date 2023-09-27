@@ -9,7 +9,8 @@ namespace md_handler {
     public:
         explicit MD_DepthHandler(MD_MongoDBHandler &mongo_db_) : mongo_db(mongo_db_) {
             //build initial cache to avoid duplicate record creation on market depth and top of the book
-            // TODO LAZY performance test and see if non-composite symbol only index make a difference in large data set / adding position / depth makes a difference
+            // TODO LAZY performance test and see if non-composite symbol only index make a difference
+            //  in large data set / adding position / depth makes a difference
             // market_depth_collection.create_index(make_document(kvp("symbol", 1)), {});
             market_depth_collection.create_index(
                     make_document(kvp("symbol", 1), kvp("side", 1)), {});

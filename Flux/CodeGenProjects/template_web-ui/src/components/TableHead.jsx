@@ -4,9 +4,11 @@ import { ContentCopy } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { visuallyHidden } from '@mui/utils';
 import classes from './TableHead.module.css';
+import { useTheme } from '@emotion/react';
 
 const CustomHeadCell = (props) => {
     const { order, orderBy, onRequestSort, prefixCells, suffixCells } = props;
+    const theme = useTheme();
 
     const createSortHandler = (property) => (event) => {
         onRequestSort(event, property);
@@ -37,16 +39,18 @@ const CustomHeadCell = (props) => {
                 {props.headCells.map((cell, index) => {
                     if (cell.key.startsWith('xpath_') || cell.hide) return;
 
-                    let tableCellColorClass = '';
+                    let tableHeadColor = theme.palette.text.primary;
                     if (cell.nameColor) {
-                        let color = cell.nameColor.toLowerCase();
-                        tableCellColorClass = classes[color];
+                        const color = cell.nameColor.toLowerCase();
+                        tableHeadColor = theme.palette.text[color];
+                        console.log(tableHeadColor);
                     }
                     const cellKey = props.collectionView ? cell.key : cell.tableTitle;
                     return (
                         <TableCell
                             key={index}
-                            className={`${classes.cell} ${tableCellColorClass}`}
+                            className={`${classes.cell}`}
+                            sx={{color: `${tableHeadColor} !important`}}
                             align='center'
                             padding='normal'
                             sortDirection={orderBy === cellKey ? order : false}>

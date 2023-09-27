@@ -1,12 +1,17 @@
 .head {
-    background-color: #0097a7;
-    color: white !important;
+    /* background-color: #0097a7; */
+    /* background-color: var(--teal-400); */
+    /* color: white !important; */
     white-space: nowrap;
 }
 
 .cell {
-    color: white !important;
+    /* color: white !important; */
     padding: 4px 2px !important;
+}
+
+.cell:hover {
+    color: white !important;
 }
 
 .critical {

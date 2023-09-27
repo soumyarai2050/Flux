@@ -25,7 +25,7 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
-    def output_file_generate_handler(self, file: protogen.File):
+    def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
 

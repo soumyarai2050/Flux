@@ -3,14 +3,15 @@
 }
 
 .header {
-    background-color: #0097a7;
+    /* background-color: var(--teal-400); */
+    /* background-color: #0097a7; */
     color: white;
     padding: 5px;
     border-radius: 5px;
     width: 250px;
     display: flex;
     align-items: center;
-    margin: 1px 0px;
+    margin: 2px 2px;
     box-shadow: 0px 0px 1px 0px #999;
 }
 
@@ -25,7 +26,7 @@
     justify-content: center;
     padding: 0px 5px;
     border-radius: 5px;
-    background-color: #ccc;
+    /* background-color: #ccc; */
     /* box-shadow: 0px 0px 1px 0px black; */
     margin: 1px 0px;
     margin-left: 2px;

@@ -43,7 +43,7 @@ const defaultLayoutsById = defaultLayouts.reduce((dict, obj) => {
     return dict;
 }, {});
 
-function Layout() {
+function Layout(props) {
     /* redux states */
     const { uiLayoutArray, uiLayout, loading } = useSelector(state => state.uiLayout);
     /* local react states */
@@ -269,6 +269,17 @@ function Layout() {
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
+    const onColumnOrdersChange = useCallback((name, columnOrders) => {
+        layoutsRef.current = layoutsRef.current.map(layout => {
+            if (layout.i === name) {
+                layout = cloneDeep(layout);
+                layout.column_orders = columnOrders;
+            }
+            return layout
+        });
+        setUpdateCounter(prevCounter => prevCounter + 1);
+    }, [])
+
     const onOverrideChange = useCallback((name, enableOverride, disableOverride, bindVal = null) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {
@@ -352,7 +363,7 @@ function Layout() {
 
     return (
         <Box className={classes.layout}>
-            <SideDrawer draggable={draggable} onToggleDrag={onToggleDrag}>
+            <SideDrawer draggable={draggable} mode={props.mode} onToggleDrag={onToggleDrag} onChangeMode={props.onChangeMode} >
                 <Icon className={classes.icon} name="LoadLayout" title='Load Layout' onClick={() => setOpenLoadLayout(true)}>
                     <DashboardCustomize fontSize='medium' />
                 </Icon>
@@ -389,8 +400,8 @@ function Layout() {
                     />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={onCloseSaveLayout} autoFocus>Discard</Button>
-                    <Button onClick={onSave} autoFocus>Save</Button>
+                    <Button color='error' variant='contained' onClick={onCloseSaveLayout} autoFocus>Discard</Button>
+                    <Button color='success' variant='contained' onClick={onSave} autoFocus>Save</Button>
                 </DialogActions>
             </Dialog>
             <Dialog
@@ -416,8 +427,8 @@ function Layout() {
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={onCloseLoadLayout} autoFocus>Discard</Button>
-                    <Button disabled={searchValue ? false : true} onClick={onLoad} autoFocus>Load</Button>
+                    <Button color='error' variant='contained' onClick={onCloseLoadLayout} autoFocus>Discard</Button>
+                    <Button color='success' variant='contained' disabled={searchValue ? false : true} onClick={onLoad} autoFocus>Load</Button>
                 </DialogActions>
             </Dialog>
         </Box>

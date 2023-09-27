@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, Fragment, memo } from 'react';
 import _, { cloneDeep } from 'lodash';
 import {
     TableContainer, Table, TableBody, DialogTitle, DialogContent, DialogContentText,
-    DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination, Snackbar, Alert
+    DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination,
+    Snackbar, Alert, TextField, Popover, Box
 } from '@mui/material';
 import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp } from '@mui/icons-material';
 import { utils, writeFileXLSX } from 'xlsx';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
-import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, stableSort, getComparator, getTableRowsFromData } from '../utils';
+import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, stableSort, getComparator, getTableRowsFromData, sortColumns } from '../utils';
 import { DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
@@ -19,9 +20,7 @@ import { AlertErrorMessage } from './Alert';
 import classes from './TableWidget.module.css';
 import CopyToClipboard from './CopyToClipboard';
 
-
 const TableWidget = (props) => {
-
     const [rowTrees, setRowTrees] = useState([]);
     const [rows, setRows] = useState(props.rows);
     const [headCells, setHeadCells] = useState(props.tableColumns);
@@ -30,9 +29,9 @@ const TableWidget = (props) => {
     const [selectedRows, setSelectedRows] = useState([]);
     const [data, setData] = useState(props.data);
     const [open, setOpen] = useState(false); // for full height modal
-    const [showSettings, setShowSettings] = useState(false);
+    const [openSettings, setOpenSettings] = useState(false);
+    const [settingsArchorEl, setSettingsArcholEl] = useState();
     const [hide, setHide] = useState(true);
-
     const [rowsPerPage, setRowsPerPage] = useState(25);
     const [page, setPage] = useState(0);
     const [order, setOrder] = React.useState('asc');
@@ -60,9 +59,9 @@ const TableWidget = (props) => {
     }, [rows, headCells, props.mode, hide])
 
     useEffect(() => {
-        if (rows.length === 0)  {
+        if (rows.length === 0) {
             let updatedData = cloneDeep(props.formValidation);
-            if(props.xpath) {
+            if (props.xpath) {
                 for (const key in updatedData) {
                     if (key.startsWith(props.xpath)) {
                         props.onFormUpdate(key, null);
@@ -87,6 +86,7 @@ const TableWidget = (props) => {
             }
             return true;
         })
+        updatedCells = sortColumns(updatedCells, props.columnOrders);
         return updatedCells;
     }
 
@@ -233,12 +233,14 @@ const TableWidget = (props) => {
         props.onOverrideChange(enableOverride, disableOverride);
     }
 
-    const onSettingsOpen = () => {
-        setShowSettings(true);
+    const onSettingsOpen = (e) => {
+        setOpenSettings(true);
+        setSettingsArcholEl(e.currentTarget);
     }
 
-    const onSettingsClose = () => {
-        setShowSettings(false);
+    const onSettingsClose = (e) => {
+        setOpenSettings(false);
+        setSettingsArcholEl(null);
     }
 
     const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes) => {
@@ -330,6 +332,23 @@ const TableWidget = (props) => {
         setToastMessage(null);
     }, [])
 
+    const onColumnOrderChange = (value, xpath) => {
+        let columnOrders = cloneDeep(props.columnOrders);
+        if (columnOrders) {
+            const columnOrder = columnOrders.find(column => column.column_name === xpath);
+            if (columnOrder) {
+                columnOrder.sequence = value;
+            } else {
+                columnOrders.push({ column_name: xpath, sequence: value });
+            }
+        } else {
+            columnOrders = [{ column_name: xpath, sequence: value }]
+        }
+        props.onColumnOrdersChange(props.name, columnOrders);
+    }
+
+    const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
+
     let menu = (
         <Fragment>
             {props.headerProps.menu}
@@ -340,18 +359,17 @@ const TableWidget = (props) => {
             )}
             <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
             <Icon className={classes.icon} name="Export" title="Export" onClick={exportToExcel}><FileDownload fontSize='small' /></Icon>
-            <Select
-                style={{display: showSettings ? 'inherit' : 'none'}}
-                className={classes.dropdown}
-                open={showSettings}
-                onOpen={onSettingsOpen}
-                onClose={onSettingsClose}
-                value=''
-                onChange={() => { }}
-                size='small'>
+            <Popover
+                id={`${props.name}_table_settings`}
+                open={openSettings}
+                anchorEl={settingsArchorEl}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                onClose={onSettingsClose}>
                 <MenuItem dense={true}>
-                    <FormControlLabel size='small'
-                        label='Select All'
+                    <FormControlLabel
+                        sx={{ display: 'flex', flex: 1 }}
+                        size='small'
+                        label='Select All / Unselect All'
                         control={
                             <Checkbox
                                 size='small'
@@ -360,11 +378,23 @@ const TableWidget = (props) => {
                             />
                         }
                     />
+                    <Icon title='show/hide all fields'>
+                        <LiveHelp color='primary' />
+                    </Icon>
                 </MenuItem>
                 {headCells.map((cell, index) => {
+                    let sequence = cell.sequenceNumber;
+                    if (props.columnOrders) {
+                        const columnOrder = props.columnOrders.find(column => column.column_name === cell.tableTitle);
+                        if (columnOrder) {
+                            sequence = columnOrder.sequence;
+                        }
+                    }
                     return (
                         <MenuItem key={index} dense={true}>
-                            <FormControlLabel size='small'
+                            <FormControlLabel
+                                sx={{ display: 'flex', flex: 1 }}
+                                size='small'
                                 label={cell.elaborateTitle ? cell.tableTitle : cell.key}
                                 control={
                                     <Checkbox
@@ -374,15 +404,25 @@ const TableWidget = (props) => {
                                     />
                                 }
                             />
-                            {cell.help &&
-                                <Icon title={cell.help}>
-                                    <LiveHelp color='primary' />
-                                </Icon>
-                            }
+                            <Select
+                                size='small'
+                                value={sequence}
+                                onChange={(e) => onColumnOrderChange(e.target.value, cell.tableTitle)}>
+                                {[...Array(maxSequence).keys()].map((v, index) => (
+                                    <MenuItem key={index} value={index + 1}>{index + 1}</MenuItem>
+                                ))}
+                            </Select>
+                            <Box sx={{ minWidth: '30px' }}>
+                                {cell.help &&
+                                    <Icon title={cell.help}>
+                                        <LiveHelp color='primary' />
+                                    </Icon>
+                                }
+                            </Box>
                         </MenuItem>
                     )
                 })}
-            </Select>
+            </Popover>
         </Fragment>
     )
 
@@ -425,26 +465,6 @@ const TableWidget = (props) => {
                                 {stableSort(rows, getComparator(order, orderBy))
                                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                                     .map((row, index) => {
-                                        // for respecting sequenceNumber provided in the schema.
-                                        // sorts the row keys based on sequenceNumber
-                                        if (props.collections.length > 0) {
-                                            row = Object.keys(row).sort(function (a, b) {
-                                                if (a.startsWith('xpath_') && b.startsWith('xpath_')) return 0;
-                                                else if (a.startsWith('xpath_') || a.startsWith(DB_ID)) return -1;
-                                                else if (b.startsWith('xpath_') || b.startsWith(DB_ID)) return 1;
-                                                else {
-                                                    let colA = props.collections.filter(col => col.key === a)[0];
-                                                    let colB = props.collections.filter(col => col.key === b)[0];
-                                                    if (!colA || !colB) return 0;
-                                                    if (colA.sequenceNumber < colB.sequenceNumber) return -1;
-                                                    else return 1;
-                                                }
-                                            }).reduce(function (obj, key) {
-                                                obj[key] = row[key];
-                                                return obj;
-                                            }, {})
-                                        }
-
                                         let tableRowClass = '';
                                         if (row['data-add']) {
                                             tableRowClass = classes.add;

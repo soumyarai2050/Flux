@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_STANDARD 23)
-list(APPEND CMAKE_MODULE_PATH "../cmake/")
+list(APPEND CMAKE_MODULE_PATH "/mnt/e/FluxCodeGenEn/FluxCodeGenEngine/tests/CodeGenProjects/market_data/cpp_app/cmake")
 message (WARNING ${CMAKE_MODULE_PATH})
+project(Google_tests CXX)
 find_package(Mongo REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(quill REQUIRED)
@@ -33,7 +34,6 @@ file(GLOB FluxCppCore_SRC ${FluxCppCore}/*)
 
 FetchContent_MakeAvailable(googletest)
 
-project(Google_tests)
 #add_subdirectory(lib)
 message(WARNING ${MONGO_INCLUDE_DIR})
 message(WARNING ${BSON_INCLUDE_DIR})
@@ -54,6 +54,9 @@ set(SRC_FILES
 )
 
 message(SRC_FILES ${SRC_FILES})
+
+# Enable debugging symbols for the test executable
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
 # adding the Google_Tests_run target
 add_executable(Google_Tests_run DB_Test.cpp ${SRC_FILES})

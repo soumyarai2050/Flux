@@ -8,16 +8,16 @@
 }
 
 .widget {
-    background-color: whitesmoke !important;
+    /* background-color: whitesmoke !important; */
 }
 
 .icon {
-    background-color: #ccc !important;
+    /* background-color: #ccc !important; */
     margin-right: 5px !important;
 }
 
 .icon:hover {
-    background-color: #ddd !important;
+    /* background-color: #ddd !important; */
 }
 
 .dialog_text {

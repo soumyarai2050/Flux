@@ -467,6 +467,7 @@ const Cell = (props) => {
                     xpath={dataxpath}
                     disabled={!!(dataRemove || disabled || buttonDisable || isDisabledValue)}
                     action={collection.button.action}
+                    source={collection.source}
                     onClick={props.onButtonClick}
                 />
             </TableCell>

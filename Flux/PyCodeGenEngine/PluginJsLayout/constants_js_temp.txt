@@ -28,7 +28,7 @@ export const ColorTypes = {
     INFO: 'info',
     DEBUG: 'debug',
     SUCCESS: 'success',
-    UNSPECIFIED: 'default'
+    DEFAULT: 'default'
 }
 
 export const ColorPriority = {
@@ -37,7 +37,7 @@ export const ColorPriority = {
     [ColorTypes.WARNING]: 3,
     [ColorTypes.INFO]: 2,
     [ColorTypes.DEBUG]: 1,
-    [ColorTypes.UNSPECIFIED]: 0
+    [ColorTypes.DEFAULT]: 0
 }
 
 export const DataTypes = {

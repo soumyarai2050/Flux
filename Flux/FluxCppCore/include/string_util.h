@@ -1,3 +1,7 @@
+#include <bsoncxx/types.hpp>
+#include <chrono>
+#include <ctime>
+
 namespace FluxCppCore {
     class StringUtil {
     public:
@@ -41,6 +45,15 @@ namespace FluxCppCore {
 
             // return the result
             return result;
+        }
+
+        static bsoncxx::types::b_date convert_utc_string_to_b_date(const std::string& utc_time_str) {
+            std::tm tm = {};
+            strptime(utc_time_str.c_str(), "%Y-%m-%dT%H:%M:%S%z", &tm);
+            std::time_t tt = timegm(&tm);
+            std::chrono::system_clock::time_point tp = std::chrono::system_clock::from_time_t(tt);
+            auto duration_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch());
+            return bsoncxx::types::b_date(duration_since_epoch);
         }
     };
 }

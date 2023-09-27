@@ -4,32 +4,6 @@ import "trade_core.proto";
 
 package addressbook;
 
-
-enum CommandType {
-  COMMAND_TYPE_UNSPECIFIED = 0;
-  CLEAR_STRAT = 1;
-  RESET_STATE = 2;
-}
-
-enum OrderEventType{
-  OE_UNSPECIFIED = 0;
-  OE_NEW = 1;
-  OE_ACK = 2;
-  OE_CXL = 3;
-  OE_CXL_ACK = 4;
-  OE_CXL_REJ = 5;
-  OE_REJ = 6;
-}
-
-enum OrderStatusType{
-  OE_UNACK = 0;
-  OE_ACKED = 1;
-  OE_CXL_UNACK = 2;
-  OE_DOD = 3;
-  OE_FILLED = 4;
-  OE_OVER_FILLED = 5;
-}
-
 enum ReferencePxType{
   OPEN_PX = 1;
   CLOSE_PX = 2;
@@ -37,28 +11,6 @@ enum ReferencePxType{
   BB_PX = 4;
   BO_PX = 5;
   FILL_PX = 6;
-}
-
-enum StratState{
-  //set this state for strats just created by user
-  StratState_UNSPECIFIED = 0;
-  // set this state post required constraint validation of strat - such as system checked all required strat params are
-  // present and are as expected, do this for:
-  // 1. new strats before moving them to ready state upon user explicit save request
-  // 2. existing strats when loading them from store (if validation fails - raise alert and put them in ERROR state)
-  StratState_READY = 1;
-  // set StratStatus.ACTIVE state upon explicit user request, check:
-  // 1. all required strats and portfolio level limit checks are passing else reject user's request
-  // 2. strat is in StratStatus.READY state (user triggers a strat)
-  // 3. strat is in StratStatus.PAUSED state (resume paused strat)
-  StratState_ACTIVE = 2;
-  // set StratStatus.PAUSED state upon explicit user request, check strat is currently in StratStatus.READY state
-  StratState_PAUSED = 3;
-  // this is set in any exception scenario - dev/support/business involvement is needed to find the gap and bridge
-  // for future handling of similar scenario, day-1 block strat (only engine restart can allow strat to be restarted)
-  StratState_ERROR = 4;
-  // set StratStatus.PAUSED state when strat has completed its set target
-  StratState_DONE = 5;
 }
 
 message ReferencePx{
@@ -74,11 +26,6 @@ message MaxNotional{
   required float available_locates = 5;
 }
 
-message ResidualRestriction{
-  required float max_residual = 1 [(FluxFldValMax) = "500000", (FluxFldHelp) = "allowed max residual: pauses strat if this breaches"];
-  required int32 residual_mark_seconds = 2 [(FluxFldHelp) = "residual is only marked if this period expires but residual does not go to 0; currently restricted to minimum of 2X app refresh interval"];
-}
-
 message OrderBrief{
   required string order_id = 1;
   required Security security = 2;
@@ -89,48 +36,6 @@ message OrderBrief{
   required string underlying_account = 7;
   optional string exchange = 8;
   repeated string text = 9 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "can hold free text for instance for specific order state"];
-}
-
-message Alert{
-  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional bool dismiss = 2 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
-    unpressed_caption: "dismiss",
-    pressed_caption: "undo",
-    value_color_map: "true=DEBUG,false=INFO"
-    button_type: BUTTON_TYPE_RECTANGLE,
-    button_size: BUTTON_SIZE_MEDIUM,
-    action: "flux_toggle",
-    pressed_value_as_text: "true"
-  }];
-  required Severity severity = 3 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];
-  optional int32 alert_count = 4 ;
-  required string alert_brief = 5 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left"];
-  // must prefix strat:<strat-name> for strat alerts
-  optional string alert_details = 6 [(FluxFldAbbreviated) = "JSON"];
-  optional int64 last_update_date_time = 7 [(FluxFldValIsDateTime) = true];
-  // populated only if this alert is for one or more orders
-  repeated OrderBrief impacted_order = 8;
-}
-
-message Residual{
-  required Security security = 1 [(FluxFldHelp) = "security of leg with > residual_qty*last_px"];
-  required float residual_notional = 2 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "absolute of ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px) only if the value remains non 0 post residual_mark_seconds interval else 0 (in non 0 case mark the remaining non zero as residual and pull that qty form the market)"];
-}
-
-message MarketTradeVolumeParticipation{
-    required float max_participation_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "30", (FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
-    optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, unset value implies seconds from SOD till time of checking"];
-}
-
-message OpenInterestParticipation{
-  required float participation_rate = 1 [(FluxFldValMax) = "100", (FluxFldHelp) = 'max % participation size allowed within side specific volume of Top (depth_levels) of BBBO'];
-  required int32 depth_levels = 2 [(FluxFldValMax) = "20", (FluxFldHelp) = "allowed depth levels participating in allowed size computation - not to be confused with tick levels which may be missing depending on liquidity at specific tick level"];
-}
-
-message CancelRate{
-  required int32 max_cancel_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "20", (FluxFldHelp) = "% of total size sent to market [BUY+SELL] - ignoring what happened to the qty on exchange (e.g. reject / cancelled are also counted)"];
-  optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
-  optional int32 waived_min_orders = 3 [(FluxFldHelp) = "enforce check only after waived_min_orders have been sent to market irrespective of the participant order outcome -ack, reject, cancelled, lapsed"];
 }
 
 message RollingMaxOrderCount{

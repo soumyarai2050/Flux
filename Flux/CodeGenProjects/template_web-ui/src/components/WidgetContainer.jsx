@@ -7,10 +7,12 @@ import { Modes, Layouts } from '../constants';
 import PropTypes from 'prop-types';
 import CommonKeyWidget from './CommonKeyWidget';
 import classes from './WidgetContainer.module.css';
+import { useTheme } from '@emotion/react';
 
 const WidgetContainer = (props) => {
     const commonkeyRef = useRef(null);
     const [showLayoutOptions, setShowLayoutOptions] = useState(false);
+    const theme = useTheme();
 
     let modeMenu = '';
     if (props.onSave && props.mode === Modes.EDIT_MODE) {
@@ -68,10 +70,12 @@ const WidgetContainer = (props) => {
         height = commonkeyRef.current.offsetHeight;
     }
 
+    const backgroundColor = theme.palette.primary.dark;
+
     return (
         <Fragment>
             <Typography variant='h6'>
-                <div className={classes.widget_header}>
+                <div className={classes.widget_header} style={{background: backgroundColor }}>
                     <span>{props.title}</span>
                     <span>{props.centerText}</span>
                     <div className={classes.menu_container}>

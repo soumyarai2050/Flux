@@ -1,0 +1,63 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+
+message SymbolOverview{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 33,
+    w: 18,
+    h: 11,
+    is_repeated: true,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_model_name: "PairStrat",
+    depends_on_other_model_for_dynamic_url: true
+  };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_symbol_overview_from_symbol",
+    AggregateVarName: "get_symbol_overview_from_symbol",
+    QueryParams: "symbol",
+    QueryParamsDataType: "str"
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 2,
+    ExecutorKeySequence: "symbol-'BUY'",
+    ExecutorKeySequence: "symbol-'SELL'"
+  };
+  required int32 id = 1;
+  required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
+  optional string  company = 3;
+  optional string status = 4;
+  optional int64 lot_size = 5;
+  optional float limit_up_px = 6;
+  optional float limit_dn_px = 7;
+  optional float conv_px = 8;
+  optional float closing_px = 9;
+  optional float open_px = 10;
+  optional float high = 11;
+  optional float low = 12;
+  optional int64 volume = 13;
+  optional string last_update_date_time = 14 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  optional bool force_publish = 15 [(FluxFldHide) = "True"];
+}
+
+message SymbolOverviewList {
+  repeated SymbolOverview symbol_overview = 1[(FluxFldPk) = "true"];
+}

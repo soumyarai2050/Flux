@@ -81,7 +81,7 @@ class Execute:
 
     @staticmethod
     def run_plugin_proto(proto_file_paths_list: List[str], proto_import_path_list: List[str], plugin_path: str,
-                         out_dir: str | None = ".") -> bool:
+                         out_dir: str | None = ".", run_only_once: bool | None = None) -> bool:
         """
         Args:
             proto_file_paths_list: [List[str]]
@@ -94,6 +94,8 @@ class Execute:
             out_dir: [optional] Output Directory path.
                 Outputs in script's directory as default.
 
+            run_only_once: [Optional] Flag to indicate to run script only once with all proto models
+
         Returns:
             Bool for success
 
@@ -102,7 +104,21 @@ class Execute:
         if not os.path.exists(out_dir):
             os.mkdir(out_dir)
         try:
-            for proto_file_path in proto_file_paths_list:
+            if not run_only_once:
+                for proto_file_path in proto_file_paths_list:
+                    proto_path_str = ""
+                    for proto_import_path in proto_import_path_list:
+                        # Avoiding extra space after last proto_path in proto_path_str
+                        if proto_import_path != proto_import_path_list[-1]:
+                            proto_path_str += f"--proto_path={proto_import_path} "
+                        else:
+                            proto_path_str += f"--proto_path={proto_import_path}"
+
+                    protoc_cmd = (f"protoc {proto_path_str} --plugin=protoc-gen-plugin={plugin_path} "
+                                  f"--plugin_out={out_dir} {proto_file_path}")
+                    os.system(protoc_cmd)
+            else:
+                proto_file_path_str = " ".join(proto_file_paths_list)
                 proto_path_str = ""
                 for proto_import_path in proto_import_path_list:
                     # Avoiding extra space after last proto_path in proto_path_str
@@ -111,8 +127,10 @@ class Execute:
                     else:
                         proto_path_str += f"--proto_path={proto_import_path}"
 
-                protoc_cmd = f"protoc {proto_path_str} --plugin=protoc-gen-plugin={plugin_path} --plugin_out={out_dir} {proto_file_path}"
+                protoc_cmd = (f"protoc {proto_path_str} --plugin=protoc-gen-plugin={plugin_path} "
+                              f"--plugin_out={out_dir} {proto_file_path_str}")
                 os.system(protoc_cmd)
+            return True
         except Exception as e:
             err_str = f"Exception occurred while running proto plugins: exception: {e}"
             logging.exception(err_str)

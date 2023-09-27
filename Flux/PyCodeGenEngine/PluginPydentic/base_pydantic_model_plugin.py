@@ -270,7 +270,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             options_value_dict = \
                 self.get_complex_option_value_from_proto(message,
                                                          BasePydanticModelPlugin.flux_msg_json_root_time_series)
-        if BasePydanticModelPlugin.flux_json_root_read_websocket_field in options_value_dict:
+        if BasePydanticModelPlugin.flux_json_root_read_by_id_websocket_field in options_value_dict:
             output_str += "    read_ws_path_with_id_ws_connection_manager: " \
                           "ClassVar[PathWithIdWSConnectionManager] = PathWithIdWSConnectionManager()\n"
         # else not required: Avoid if websocket field in json root option not present
@@ -427,6 +427,12 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 output_str += (f"    projection_models: List[{message.proto.name}ProjectionFor"
                                f"{field_names_str_camel_cased}]\n\n\n")
 
+                # List class of container class
+                output_str += (f'class {message.proto.name}ProjectionContainerFor'
+                               f'{field_names_str_camel_cased}List(BaseModel):\n')
+                output_str += (f'    __root__: List[{message.proto.name}ProjectionContainerFor'
+                               f'{field_names_str_camel_cased}]\n\n\n')
+
         return output_str
 
     def _handle_config_class_and_other_root_class_versions(self, message: protogen.Message,
@@ -523,6 +529,13 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def handle_imports(self) -> str:
         raise NotImplementedError
 
+    def list_model_content(self) -> str:
+        output_str = ""
+        for message in self.root_message_list:
+            output_str += f'class {message.proto.name}BaseModelList(BaseModel):\n'
+            output_str += f'    __root__: List[{message.proto.name}BaseModel]\n\n\n'
+        return output_str
+
     def handle_pydantic_class_gen(self) -> str:
         output_str = self.handle_imports()
         output_str += f"{BasePydanticModelPlugin.default_id_type_var_name} = {self.default_id_field_type}\n"
@@ -531,6 +544,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             output_str += self.handle_enum_output(enum, self.enum_type)
         for message in self.ordered_message_list:
             output_str += self.handle_message_output(message)
+
+        output_str += self.list_model_content()
 
         # adding class to be used by max if query for models having int type of id
         output_str += f"class MaxId(BaseModel):\n"
@@ -616,8 +631,22 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
         if core_or_util_files is not None:
             for dependency_file in file.dependencies:
-                if dependency_file.proto.name in core_or_util_files:
-                    self.load_root_and_non_root_messages_in_dicts(dependency_file.messages, avoid_non_roots=True)
+                dependency_file_name: str = dependency_file.proto.name
+                if dependency_file_name in core_or_util_files:
+                    if dependency_file_name == "projects_core.proto":
+                        self.load_root_and_non_root_messages_in_dicts(dependency_file.messages)
+                    else:
+                        if dependency_file_name.endswith("_core.proto"):
+                            dependency_file_name_suffix_removed = dependency_file_name[:-len("_core.proto")]
+                            project_name_list_from_dependency_file_name = (
+                                dependency_file_name_suffix_removed.split("_n_"))
+                            if self.proto_package_name in project_name_list_from_dependency_file_name:
+                                self.load_root_and_non_root_messages_in_dicts(dependency_file.messages,
+                                                                              avoid_non_roots=True)
+                            else:
+                                continue
+                        else:
+                            continue
                 # else not required: if dependency file name not in core_or_util_files
                 # config list, avoid messages from it
         # else not required: core_or_util_files key is not in yaml dict config

@@ -37,8 +37,23 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
         routes_callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += f"from {callback_file_path} import {routes_callback_class_name_camel_cased}\n"
         output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n\n\n"
-        output_str += f'config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / "config.yaml"\n'
-        output_str += f'config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n\n'
+        output_str += 'port = os.getenv("PORT")\n'
+        output_str += 'if port is None or len(port) == 0:\n'
+        output_str += '    err_str = "Can not find PORT env var for fastapi callback override set instance"\n'
+        output_str += '    logging.exception(err_str)\n'
+        output_str += '    raise Exception(err_str)\n\n'
+        output_str += ('config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"' +
+                       f'{self.proto_file_package}'+'_{port}_config.yaml"\n')
+        output_str += 'main_config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"config.yaml"\n'
+        output_str += 'if os.path.exists(config_yaml_path):\n'
+        output_str += '    config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n'
+        output_str += 'else:\n'
+        output_str += '    err_str = f"'+f'{self.proto_file_package}'+'_{port}_config.yaml does not exist"\n'
+        output_str += '    logging.exception(err_str)\n'
+        output_str += '    raise Exception(err_str)\n\n'
+
+        output_str += 'main_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(main_config_yaml_path))\n'
+        output_str += 'is_main_server = (str(main_config_yaml_dict.get("main_server_beanie_port")) == port)\n\n'
 
         output_str += 'if (db_type := os.getenv("DBType")) is None or len(db_type) == 0:\n'
         output_str += '\terr_str = f"env var DBType must not be {db_type}"\n'
@@ -100,6 +115,11 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
         # generating override files if not exist already
         project_path = os.getenv("PROJECT_DIR")
         if project_path:
+            # checking if app dir doesn't exist
+            if not os.path.exists(PurePath(project_path) / "app"):
+                # if not exists, creating
+                os.mkdir(PurePath(project_path) / "app")
+
             base_native_callback_override_path = \
                 PurePath(project_path) / "app" / self.base_native_override_routes_callback_class_name
             beanie_native_callback_override_path = \

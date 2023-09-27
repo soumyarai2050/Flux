@@ -69,86 +69,6 @@ def get_pair_side_brief_from_side(symbol: str):
     ]}
 
 
-def get_max_market_depth_obj(symbol: str, side: str):
-    return {"aggregate": [
-        {
-            "$match": {
-                "$and": [
-                    {
-                        "symbol": symbol
-                    },
-                    {
-                        "side": side
-                    }
-                ]
-            }
-        },
-        {
-            "$sort": {
-                "position": -1.0
-            }
-        }
-    ]}
-
-
-def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
-    # Model - LastTrade
-    return {"aggregate": [
-        {
-            "$match": {
-                "$expr": {
-                    "$gte": [
-                        "$exch_time",
-                        {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
-                    ]
-                }
-            }
-        },
-        {
-            "$match": {
-                "symbol_n_exch_id.symbol": symbol
-            }
-        },
-        {
-            # add match for time to reduce
-            "$setWindowFields": {
-                "sortBy": {
-                    "exch_time": 1.0
-                },
-                "output": {
-                    "market_trade_volume.participation_period_last_trade_qty_sum": {
-                        "$sum": "$qty",
-                        "window": {
-                            "range": [
-                                -last_n_sec,
-                                "current"
-                            ],
-                            "unit": "second"
-                        }
-                    }
-                }
-            }
-        },
-        # Sorting in descending order since limit only takes first n objects
-        {
-            "$sort": {"exch_time": -1}
-        },
-        {
-            "$limit": 1
-        }
-    ]}
-
-
-def get_objs_from_symbol(symbol: str):
-    return {"aggregate": [
-        {
-            "$match": {
-                "symbol": symbol
-            }
-        }
-    ]}
-
-
 def get_bar_data_from_symbol_n_start_n_end_datetime(symbol: str, start_datetime: DateTime | None = None,
                                                     end_datetime: DateTime | None = None):
     agg_pipline = {"aggregate": [
@@ -255,37 +175,6 @@ def get_latest_bar_data_for_each_symbol():
             }
         }
     ]}
-
-
-def get_last_trade_with_symbol_n_start_n_end_time(symbol: str, start_datetime: DateTime, end_datetime: DateTime):
-    agg_pipline = {"aggregate": [
-        {
-            "$match": {
-                "symbol": symbol
-            }
-        },
-        {
-            "$match": {
-                "$and": [
-                    {
-                        '$expr': {
-                            '$gte': [
-                                '$time', start_datetime
-                            ]
-                        }
-                    },
-                    {
-                        '$expr': {
-                            '$lte': [
-                                '$time', end_datetime
-                            ]
-                        }
-                    }
-                ]
-            }
-        }
-    ]}
-    return agg_pipline
 
 
 def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, start_date_time: DateTime | None = None, end_date_time: DateTime | None = None, id_list: List[int] | None = None):

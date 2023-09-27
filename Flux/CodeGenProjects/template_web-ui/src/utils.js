@@ -7,6 +7,11 @@ import Node from './components/Node';
 import HeaderField from './components/HeaderField';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import * as workerUtils from './workerUtils';
+export const { applyFilter, applyGetAllWebsocketUpdate, descendingComparator, floatToInt, getAbbreviatedRows,
+    getActiveRows, getComparator, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
+    roundNumber, stableSort
+} = workerUtils;
 dayjs.extend(utc);
 
 // stores the tree expand/collapse states
@@ -66,6 +71,7 @@ const fieldProps = [
     { propertyName: "val_time_field", usageName: "val_time_field" },
     { propertyName: "projections", usageName: "projections" },
     { propertyName: "mapping_projection_query_field", usageName: "mapping_projection_query_field" },
+    { propertyName: "server_running_status", usageName: "server_running_status" },
     { propertyName: "mapping_underlying_meta_field", usageName: "mapping_underlying_meta_field" },
     { propertyName: "mapping_src", usageName: "mapping_src" },
 ]
@@ -201,7 +207,6 @@ export function createCollections(schema, currentSchema, callerProps, collection
                         collection.type = "progressBar";
                         collection.color = v.progress_bar.value_color_map;
                     }
-
                     if (propertyName === 'mapping_underlying_meta_field' || propertyName === 'mapping_src') {
                         collection[usageName] = v[propertyName][0];
                     }
@@ -342,7 +347,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             let ref = v.items.$ref.split('/')
             let record = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
             record = cloneDeep(record);
-            
+
             let metaId = metaFieldId;
             if (v.hasOwnProperty('mapping_underlying_meta_field')) {
                 if (!metaId) {
@@ -1281,23 +1286,23 @@ export function getNewItem(collections, abbreviated) {
     return newItem;
 }
 
-export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
-    let abbreviatedSplit = abbreviated.split('-');
-    let idIndex = -1;
-    abbreviatedSplit.map((text, index) => {
-        if (text.indexOf(DB_ID) > 0) {
-            idIndex = index;
-        }
-    })
-    if (idIndex !== -1) {
-        let abbreviatedKeySplit = abbreviatedKey.split('-');
-        let abbreviatedKeyId = parseInt(abbreviatedKeySplit[idIndex]);
-        return abbreviatedKeyId;
-    } else {
-        // abbreviated key id not found. returning -1
-        return idIndex;
-    }
-}
+// export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
+//     let abbreviatedSplit = abbreviated.split('-');
+//     let idIndex = -1;
+//     abbreviatedSplit.map((text, index) => {
+//         if (text.indexOf(DB_ID) > 0) {
+//             idIndex = index;
+//         }
+//     })
+//     if (idIndex !== -1) {
+//         let abbreviatedKeySplit = abbreviatedKey.split('-');
+//         let abbreviatedKeyId = parseInt(abbreviatedKeySplit[idIndex]);
+//         return abbreviatedKeyId;
+//     } else {
+//         // abbreviated key id not found. returning -1
+//         return idIndex;
+//     }
+// }
 
 export function getAbbreviatedKeyFromId(keyArray, abbreviated, id) {
     let abbreviatedKey;
@@ -1319,7 +1324,7 @@ export function getAlertBubbleCount(data, alertBubbleSourceXpath) {
 }
 
 export function getColorTypeFromValue(collection, value) {
-    let color = ColorTypes.UNSPECIFIED;
+    let color = ColorTypes.DEFAULT;
     if (collection && collection.color) {
         let colorSplit = collection.color.split(',');
         for (let i = 0; i < colorSplit.length; i++) {
@@ -1335,7 +1340,7 @@ export function getColorTypeFromValue(collection, value) {
 }
 
 export function getColorTypeFromPercentage(collection, percentage) {
-    let color = ColorTypes.UNSPECIFIED;
+    let color = ColorTypes.DEFAULT;
     if (collection && collection.color) {
         let colorSplit = collection.color.split(',');
         for (let i = 0; i < colorSplit.length; i++) {
@@ -1381,7 +1386,7 @@ export function getPriorityColorType(colorTypesSet) {
         })
         return colorTypesArray[0];
     } else {
-        return ColorTypes.UNSPECIFIED;
+        return ColorTypes.DEFAULT;
     }
 }
 
@@ -1500,7 +1505,7 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
             if (hide && column.hide) return;
             let fieldName = column.tableTitle;
             if (collectionView) {
-                if (column.type === 'button' || column.type === 'progressBar') {
+                if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar')) {
                     return;
                 }
                 fieldName = column.key;
@@ -1659,41 +1664,41 @@ export function getXpathKeyValuePairFromObject(object, dict = {}) {
     return dict;
 }
 
-export function getComparator(order, orderBy) {
-    return order === 'desc'
-        ? (a, b) => descendingComparator(a, b, orderBy)
-        : (a, b) => -descendingComparator(a, b, orderBy);
-}
+// export function getComparator(order, orderBy) {
+//     return order === 'desc'
+//         ? (a, b) => descendingComparator(a, b, orderBy)
+//         : (a, b) => -descendingComparator(a, b, orderBy);
+// }
 
-export function descendingComparator(a, b, orderBy) {
-    if (a[orderBy] === undefined || a[orderBy] === null) {
-        return -1;
-    }
-    if (b[orderBy] === undefined || b[orderBy] === null) {
-        return 1;
-    }
-    if (b[orderBy] < a[orderBy]) {
-        return -1;
-    }
-    if (b[orderBy] > a[orderBy]) {
-        return 1;
-    }
-    return 0;
-}
+// export function descendingComparator(a, b, orderBy) {
+//     if (a[orderBy] === undefined || a[orderBy] === null) {
+//         return -1;
+//     }
+//     if (b[orderBy] === undefined || b[orderBy] === null) {
+//         return 1;
+//     }
+//     if (b[orderBy] < a[orderBy]) {
+//         return -1;
+//     }
+//     if (b[orderBy] > a[orderBy]) {
+//         return 1;
+//     }
+//     return 0;
+// }
 
 // This method is created for cross-browser compatibility, if you don't
 // need to support IE11, you can use Array.prototype.sort() directly
-export function stableSort(array, comparator) {
-    const stabilizedThis = array.map((el, index) => [el, index]);
-    stabilizedThis.sort((a, b) => {
-        const order = comparator(a[0], b[0]);
-        if (order !== 0) {
-            return order;
-        }
-        return a[1] - b[1];
-    });
-    return stabilizedThis.map((el) => el[0]);
-}
+// export function stableSort(array, comparator) {
+//     const stabilizedThis = array.map((el, index) => [el, index]);
+//     stabilizedThis.sort((a, b) => {
+//         const order = comparator(a[0], b[0]);
+//         if (order !== 0) {
+//             return order;
+//         }
+//         return a[1] - b[1];
+//     });
+//     return stabilizedThis.map((el) => el[0]);
+// }
 
 export function getErrorDetails(error) {
     return {
@@ -1777,54 +1782,54 @@ export function applyWebSocketUpdate(arr, obj, uiLimit) {
     return updatedArr;
 }
 
-export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
-    let updatedArr = arr.filter(o => o[DB_ID] !== obj[DB_ID]);
-    // if obj is not deleted object
-    if (Object.keys(obj) !== 1) {
-        let index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);
-        // if index is not equal to -1, it is updated obj. If updated, replace the obj at the index
-        if (index !== -1) {
-            updatedArr.splice(index, 0, obj);
-        } else {
-            updatedArr.push(obj);
-        }
-    }
-    return updatedArr;
-}
+// export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
+//     let updatedArr = arr.filter(o => o[DB_ID] !== obj[DB_ID]);
+//     // if obj is not deleted object
+//     if (Object.keys(obj) !== 1) {
+//         let index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);
+//         // if index is not equal to -1, it is updated obj. If updated, replace the obj at the index
+//         if (index !== -1) {
+//             updatedArr.splice(index, 0, obj);
+//         } else {
+//             updatedArr.push(obj);
+//         }
+//     }
+//     return updatedArr;
+// }
 
-export function applyFilter(arr, filters = [], collectionView = false, collections) {
-    if (arr && arr.length > 0) {
-        let updatedArr = cloneDeep(arr);
-        const filterDict = getFilterDict(filters);
-        Object.keys(filterDict).forEach(key => {
-            let values = filterDict[key].split(",").map(val => val.trim()).filter(val => val !== "");
-            updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
-        })
-        return updatedArr;
-    }
-    return [];
-}
+// export function applyFilter(arr, filters = [], collectionView = false, collections) {
+//     if (arr && arr.length > 0) {
+//         let updatedArr = cloneDeep(arr);
+//         const filterDict = getFilterDict(filters);
+//         Object.keys(filterDict).forEach(key => {
+//             let values = filterDict[key].split(",").map(val => val.trim()).filter(val => val !== "");
+//             updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
+//         })
+//         return updatedArr;
+//     }
+//     return [];
+// }
 
-export function floatToInt(value) {
-    /* 
-    Function to convert floating point numbers to integer.
-    value: integer or floating point number
-    */
-    if (typeof value === DataTypes.NUMBER) {
-        if (Number.isInteger(value)) {
-            return value;
-        } else {
-            // floating point number
-            if (value > 0) {
-                return Math.floor(value);
-            } else {
-                return Math.ceil(value);
-            }
-        }
-    }
+// export function floatToInt(value) {
+//     /* 
+//     Function to convert floating point numbers to integer.
+//     value: integer or floating point number
+//     */
+//     if (typeof value === DataTypes.NUMBER) {
+//         if (Number.isInteger(value)) {
+//             return value;
+//         } else {
+//             // floating point number
+//             if (value > 0) {
+//                 return Math.floor(value);
+//             } else {
+//                 return Math.ceil(value);
+//             }
+//         }
+//     }
 
-    return value;
-}
+//     return value;
+// }
 
 export function groupCommonKeys(commonKeys) {
     let groupStart = false;
@@ -1898,53 +1903,53 @@ function mergeArrays(arr1, arr2) {
     return mergedArr;
 }
 
-export function roundNumber(value, precision = FLOAT_POINT_PRECISION) {
-    /* 
-    Function to round floating point numbers.
-    value: floating point number
-    precision: decimal digits to round off to. default 2 (FLOAT_POINT_PRECISION)
-    */
-    if (typeof value === DataTypes.NUMBER) {
-        if (Number.isInteger(value) || precision === 0) {
-            return value;
-        } else {
-            return +value.toFixed(precision);
-        }
-    }
-    return value;
-}
+// export function roundNumber(value, precision = FLOAT_POINT_PRECISION) {
+//     /* 
+//     Function to round floating point numbers.
+//     value: floating point number
+//     precision: decimal digits to round off to. default 2 (FLOAT_POINT_PRECISION)
+//     */
+//     if (typeof value === DataTypes.NUMBER) {
+//         if (Number.isInteger(value) || precision === 0) {
+//             return value;
+//         } else {
+//             return +value.toFixed(precision);
+//         }
+//     }
+//     return value;
+// }
 
-export function getLocalizedValueAndSuffix(metadata, value) {
-    /* 
-    Function to normalize numbers and return adornments if any
-    metadata: contains all properties of the field
-    value: field value
-    */
-    let adornment = '';
+// export function getLocalizedValueAndSuffix(metadata, value) {
+//     /* 
+//     Function to normalize numbers and return adornments if any
+//     metadata: contains all properties of the field
+//     value: field value
+//     */
+//     let adornment = '';
 
-    if (typeof value !== DataTypes.NUMBER) {
-        return [adornment, value];
-    }
-    if (metadata.numberFormat) {
-        if (metadata.numberFormat.includes('%')) {
-            adornment = ' %';
-        } else if (metadata.numberFormat.includes('bps')) {
-            adornment = ' bps';
-        }
-    }
-    if (metadata.displayType === DataTypes.INTEGER) {
-        return [adornment, floatToInt(value)]
-    }
-    if (metadata.numberFormat && metadata.numberFormat.includes('.')) {
-        let precision = metadata.numberFormat.split(".").pop();
-        precision *= 1;
-        value = roundNumber(value, precision);
-    } else {
-        value = roundNumber(value);
-    }
+//     if (typeof value !== DataTypes.NUMBER) {
+//         return [adornment, value];
+//     }
+//     if (metadata.numberFormat) {
+//         if (metadata.numberFormat.includes('%')) {
+//             adornment = ' %';
+//         } else if (metadata.numberFormat.includes('bps')) {
+//             adornment = ' bps';
+//         }
+//     }
+//     if (metadata.displayType === DataTypes.INTEGER) {
+//         return [adornment, floatToInt(value)]
+//     }
+//     if (metadata.numberFormat && metadata.numberFormat.includes('.')) {
+//         let precision = metadata.numberFormat.split(".").pop();
+//         precision *= 1;
+//         value = roundNumber(value, precision);
+//     } else {
+//         value = roundNumber(value);
+//     }
 
-    return [adornment, value];
-}
+//     return [adornment, value];
+// }
 
 export function excludeNullFromObject(obj) {
     /* 
@@ -2205,10 +2210,10 @@ export function getRowsFromAbbreviatedItems(items, itemsData, itemFieldPropertie
     return rows;
 }
 
-export function getActiveRows(rows, page, pageSize, order, orderBy) {
-    return stableSort(rows, getComparator(order, orderBy))
-        .slice(page * pageSize, page * pageSize + pageSize);
-}
+// export function getActiveRows(rows, page, pageSize, order, orderBy) {
+//     return stableSort(rows, getComparator(order, orderBy))
+//         .slice(page * pageSize, page * pageSize + pageSize);
+// }
 
 export function compareNCheckNewArrayItem(obj1, obj2) {
     for (const key in obj1) {
@@ -2729,17 +2734,17 @@ export function updateChartSchema(schema, collections, isCollectionType = false)
     return schema;
 }
 
-export function getFilterDict(filters) {
-    const filterDict = {};
-    if (filters) {
-        filters.forEach(filter => {
-            if (filter.fld_value) {
-                filterDict[filter.fld_name] = filter.fld_value;
-            }
-        })
-    }
-    return filterDict;
-}
+// export function getFilterDict(filters) {
+//     const filterDict = {};
+//     if (filters) {
+//         filters.forEach(filter => {
+//             if (filter.fld_value) {
+//                 filterDict[filter.fld_name] = filter.fld_value;
+//             }
+//         })
+//     }
+//     return filterDict;
+// }
 
 export function getFiltersFromDict(filterDict) {
     const filters = [];
@@ -2958,4 +2963,136 @@ export function updatePartitionFldSchema(schema, chartObj) {
         chartSchema.properties.partition_fld.hide = false;
     }
     return updatedSchema;
+}
+
+export function getServerUrl(widgetSchema, linkedObj, runningField) {
+    if (widgetSchema.connection_details) {
+        const connectionDetails = widgetSchema.connection_details;
+        const { host, port, project_name } = connectionDetails;
+        if (connectionDetails.dynamic_url) {
+            if (linkedObj && Object.keys(linkedObj).length > 0 && _.get(linkedObj, runningField)) {
+                const hostxpath = host.substring(host.indexOf('.') + 1);
+                const portxpath = port.substring(port.indexOf('.') + 1);
+                return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+            }
+        } else {
+            return `http://${host}:${port}/${project_name}`;
+        }
+    }
+    return null;
+}
+
+export function getAbbreviatedCollections(widgetCollectionsDict, abbreviated) {
+    const abbreviatedCollections = [];
+    abbreviated.split('^').forEach((titlePathPair, index) => {
+        let title;
+        let source;
+        // title in collection view is always expected to be present
+        if (titlePathPair.indexOf(':') !== -1) {
+            title = titlePathPair.split(':')[0];
+            source = titlePathPair.split(':')[1];
+        } else {
+            throw new Error('no title found in abbreviated split. expected title followed by colon (:)')
+        }
+        // expected all the fields in abbreviated is from its abbreviated dependent source
+        const widgetName = source.split('.')[0];
+        let xpath = source.split('-').map(path => path = path.substring(path.indexOf('.') + 1));
+        xpath = xpath.join('-');
+        const subCollections = xpath.split('-').map(path => {
+            return widgetCollectionsDict[widgetName].map(col => Object.assign({}, col))
+                .filter(col => col.tableTitle === path)[0];
+        })
+        // if a single field has values from multiple source separated by hyphen, then
+        // attributes of first field is considered as field attributes
+        source = xpath.split('-')[0];
+        const collectionsCopy = widgetCollectionsDict[widgetName].map(col => Object.assign({}, col));
+        const collection = collectionsCopy.find(col => col.tableTitle === source);
+        if (collection) {
+            // create a custom collection object
+            collection.sequenceNumber = index + 1;
+            collection.source = widgetName;
+            collection.rootLevel = false;
+            collection.key = title;
+            collection.title = title;
+            // TODO: check the scenario in which xpath and tableTitle are different
+            collection.tableTitle = xpath;
+            collection.xpath = xpath;
+            // remove default properties set on the fields
+            collection.elaborateTitle = false;
+            collection.hide = false;
+            collection.subCollections = subCollections;
+            // if field has values from multiple source, it's data-type is considered STRING
+            if (xpath.indexOf('-') !== -1) {
+                collection.type = DataTypes.STRING;
+            }
+            abbreviatedCollections.push(collection);
+        } else {
+            throw new Error('no collection (field attributes) found for the field with xpath ' + source);
+        }
+    })
+    return abbreviatedCollections;
+}
+
+export function getAbbreviatedDependentWidgets(loadListFieldAttrs) {
+    const widgetSet = new Set();
+    loadListFieldAttrs.abbreviated.split('^').forEach((keyValuePair) => {
+        const [, fieldxpath] = keyValuePair.split(':');
+        const name = fieldxpath.split('.')[0];
+        widgetSet.add(name);
+    });
+    const bubbleSource = loadListFieldAttrs.alertBubbleSource;
+    if (bubbleSource) {
+        const name = bubbleSource.split('.')[0];
+        widgetSet.add(name);
+    }
+    const bubbleColorSource = loadListFieldAttrs.alertBubbleColorSource;
+    if (bubbleColorSource) {
+        const name = bubbleColorSource.split('.')[0];
+        widgetSet.add(name);
+    }
+    return Array.from(widgetSet);
+}
+
+export function snakeToCamel(snakeCase) {
+    return snakeCase.replace(/_([a-z])/g, function (match, letter) {
+        return letter.toUpperCase();
+    });
+}
+
+export function sortColumns(collections, columnOrders, isCollectionType = false) {
+    collections.sort(function (a, b) {
+        let seqA = a.sequenceNumber;
+        let seqB = b.sequenceNumber;
+        let orderA;
+        let orderB;
+        if (columnOrders) {
+            let fieldName = 'tableTitle';
+            if (isCollectionType) {
+                fieldName = 'key';
+            }
+            orderA = columnOrders.find(order => order.column_name === a[fieldName]);
+            orderB = columnOrders.find(order => order.column_name === b[fieldName]);
+            if (orderA) {
+                seqA = orderA.sequence;
+            }
+            if (orderB) {
+                seqB = orderB.sequence;
+            }
+        }
+        if (seqA < seqB) return -1;
+        else if (seqA === seqB) {
+            if (orderA && orderB) {
+                if (orderA.sequence < orderB.sequence) return -1;
+                return 1;
+            } else if (orderA) {
+                if (orderA.sequence <= seqB) return -1;
+                return 1;
+            } else if (orderB) {
+                if (orderB.sequence <= seqA) return 1;
+                return -1;
+            }
+        }
+        return 1;
+    })
+    return collections;
 }

@@ -11,6 +11,7 @@ import _, { cloneDeep } from 'lodash';
 import classes from './CommonKeyWidget.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { useTheme } from '@emotion/react';
 dayjs.extend(utc);
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
@@ -34,7 +35,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
     commonkeys = groupCommonKeys(commonkeys);
 
     return (
-        <Box ref={ref} className={classes.container}>
+        <Box ref={ref} className={classes.container} sx={{bgcolor: 'background.commonKey'}}>
             {commonkeys.map((collection, i) => {
                 return (
                     <Fragment key={i}>
@@ -55,6 +56,8 @@ CommonKeyWidget.propTypes = {
 const CommonKey = (props) => {
     const [open, setOpen] = useState(false);
     const { collection } = props;
+
+    const theme = useTheme();
 
     const onOpenAbbreviatedField = () => {
         setOpen(true);
@@ -114,16 +117,16 @@ const CommonKey = (props) => {
         }
     }
 
-    let color;
-    if (collection.color) {
-        color = getColorTypeFromValue(collection, collection.value);
+    let commonkeyColor = theme.palette.text.white;
+    if (collection.color && !collection.progressBar && !collection.button) {
+        const color = getColorTypeFromValue(collection, collection.value);
+        commonkeyColor = theme.palette.text[color];
     }
-    let commonkeyColorClass = classes[color];
 
-    let commonkeyTitleColorClass = '';
+    let commonkeyTitleColor = theme.palette.text.tertiary;
     if (collection.nameColor) {
-        let nameColor = collection.nameColor.toLowerCase();
-        commonkeyTitleColorClass = classes[nameColor];
+        const nameColor = collection.nameColor.toLowerCase();
+        commonkeyTitleColor = theme.palette.text[nameColor];
     }
 
     let value = collection.value;
@@ -143,10 +146,12 @@ const CommonKey = (props) => {
         value = value.toLocaleString();
     }
 
+    const groupIndicatorColor = theme.palette.text.tertiary;
+
     return (
         <Box className={classes.item}>
-            {collection.groupStart && <span className={classes.group_indicator}>{collection.parentxpath}: [ </span>}
-            <span className={`${classes.key} ${commonkeyTitleColorClass}`}>
+            {collection.groupStart && <span style={{color: `${groupIndicatorColor}`}} className={classes.group_indicator}>{collection.parentxpath}: [ </span>}
+            <span style={{color: `${commonkeyTitleColor}`}}>
                 {collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}:
             </span>
             {collection.abbreviated && collection.abbreviated === "JSON" ? (
@@ -154,11 +159,11 @@ const CommonKey = (props) => {
                     {abbreviatedField}
                 </span>
             ) : (
-                <span className={commonkeyColorClass}>
+                <span style={{color: `${commonkeyColor}`}}>
                     {value}{numberSuffix}
                 </span>
             )}
-            {collection.groupEnd && <span className={classes.group_indicator}> ]</span>}
+            {collection.groupEnd && <span style={{color: `${groupIndicatorColor}`}} className={classes.group_indicator}> ]</span>}
         </Box>
     )
 }

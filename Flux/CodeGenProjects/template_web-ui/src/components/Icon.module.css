@@ -1,26 +1,28 @@
 .icon {
-    background-color: #ccc !important;
     margin-right: 2px !important;
     margin-left: 2px !important;
 }
 
-.icon:hover {
-    background-color: #aaa !important;
-}
-
 .toggle_icon {
     padding: 2px !important;
-    border-radius: 50%;
-    color: #444 !important;
-}
-
-.toggle_icon_container :global .Mui-selected>.MuiAvatar-root {
-    color: white !important;
-    background-color: blue !important;
+    border-radius: 5px;
+    margin: 2px 0;
+    background: none !important;
+    border: none !important;
 }
 
 .avatar {
+    border-radius: 5px !important;
     color: inherit !important;
     height: 35px !important;
     width: 35px !important;
+}
+
+.selected_icon {
+    background: none !important;
+    border: none !important;
+}
+
+.selected_avatar {
+    background-color: var(--blue-accent-400) !important;
 }

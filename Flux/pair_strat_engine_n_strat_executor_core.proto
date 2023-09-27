@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+
+enum CommandType {
+  COMMAND_TYPE_UNSPECIFIED = 0;
+  CLEAR_STRAT = 1;
+  RESET_STATE = 2;
+}
+
+message CommandNControl {
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required CommandType command_type = 2;
+  optional string datetime = 3 [(FluxFldValIsDateTime) = true];
+}

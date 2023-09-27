@@ -1,11 +1,13 @@
 .widget_header {
-    background-color: #0097a7;
-    color: white;
+    /* background-color: #0097a7; */
+    /* color: white; */
+    /* background-color: #121212; */
     min-height: 40px;
     display: flex;
     align-items: center;
-    padding: 0px 20px;
+    padding: 0 10px;
     justify-content: space-between;
+    /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); */
 }
 
 .widget_body {
@@ -15,33 +17,32 @@
 }
 
 .edit {
-    background-color: beige;
+    /* background-color: beige; */
 }
 
 .icon {
-    background-color: #ccc !important;
-    margin-right: 5px !important; 
+    /* background-color: #ccc !important; */
+    margin-right: 5px !important;
 }
 
 .icon:hover {
-    background-color: #ddd !important;
+    /* background-color: #ddd !important; */
 }
- 
+
 .menu_container {
     display: inline-flex;
     align-items: center;
 }
 
 .toggle_button_group {
-    background-color: #ccc;
+    /* background-color: #ccc; */
     margin: 0 2px;
 }
 
 .toggle_button_group :global .Mui-selected {
-    background-color: #aaa !important;
+    /* background-color: #aaa !important; */
 }
 
 .toggle_button {
     padding: 2px !important;
 }
-

@@ -15,7 +15,7 @@ const ValueBasedToggleButton = (props) => {
             selected={true}
             disabled={props.disabled ? props.disabled : false}
             value={props.caption}
-            onClick={(e) => props.onClick(e, props.action, props.xpath, props.value)}>
+            onClick={(e) => props.onClick(e, props.action, props.xpath, props.value, props.source)}>
             {props.caption}
         </ToggleButton>
     )

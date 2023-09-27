@@ -11,7 +11,8 @@ public:
 
     const std::string get_random_string() {
         std::string randomString;
-        for (int i = 0; i < 3; ++i) {
+        randomString.reserve(8);
+        for (int i = 0; i < 8; ++i) {
             randomString += characters[string_distribution(mt)];
         }
         return randomString;
@@ -34,7 +35,6 @@ public:
     }
 
     bool get_random_bool() {
-        std::uniform_int_distribution<int> bool_distribution(0, 1);
         return bool_distribution(mt) == 1;
     }
 
@@ -47,4 +47,6 @@ protected:
 
     const std::string characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     std::uniform_int_distribution<int> string_distribution;
+    std::uniform_int_distribution<int> bool_distribution{0, 1};
+
 };

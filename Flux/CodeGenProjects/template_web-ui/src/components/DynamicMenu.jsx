@@ -19,14 +19,14 @@ const DynamicMenu = (props) => {
     const [showFilter, setShowFilter] = useState(false);
     const [filter, setFilter] = useState(getFilterDict(props.filters));
 
-    const onClick = (e, action, xpath, value) => {
+    const onClick = (e, action, xpath, value, source) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
-            props.onButtonToggle(e, xpath, updatedData);
+            props.onButtonToggle(e, xpath, updatedData, source);
         } else if (action === 'flux_trigger_strat') {
             let updatedData = flux_trigger_strat(value);
             if (updatedData) {
-                props.onButtonToggle(e, xpath, updatedData);
+                props.onButtonToggle(e, xpath, updatedData, source);
             }
         }
     }
@@ -71,23 +71,25 @@ const DynamicMenu = (props) => {
     }
 
     let alertBubble = <></>;
-    let alertBubbleSourceXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_source : undefined;
-    let alertBubbleColorXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_color : undefined;
-    if (props.data && alertBubbleSourceXpath && alertBubbleColorXpath) {
-        alertBubbleSourceXpath = alertBubbleSourceXpath.substring(alertBubbleSourceXpath.indexOf('.') + 1);
-        alertBubbleColorXpath = alertBubbleColorXpath.substring(alertBubbleColorXpath.indexOf('.') + 1);
-        if (props.xpath) {
-            alertBubbleSourceXpath = alertBubbleSourceXpath.replace(`${props.xpath}.`, '');
-            alertBubbleColorXpath = alertBubbleColorXpath.replace(`${props.xpath}.`, '');
-        }
+    if (props.currentSchema) {
+        let alertBubbleSourceXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_source : undefined;
+        let alertBubbleColorXpath = props.currentSchema.widget_ui_data_element ? props.currentSchema.widget_ui_data_element.alert_bubble_color : undefined;
+        if (props.data && alertBubbleSourceXpath && alertBubbleColorXpath) {
+            alertBubbleSourceXpath = alertBubbleSourceXpath.substring(alertBubbleSourceXpath.indexOf('.') + 1);
+            alertBubbleColorXpath = alertBubbleColorXpath.substring(alertBubbleColorXpath.indexOf('.') + 1);
+            if (props.xpath) {
+                alertBubbleSourceXpath = alertBubbleSourceXpath.replace(`${props.xpath}.`, '');
+                alertBubbleColorXpath = alertBubbleColorXpath.replace(`${props.xpath}.`, '');
+            }
 
-        let count = getAlertBubbleCount(props.data, alertBubbleSourceXpath);
-        let color = getAlertBubbleColor(props.data, props.collections, alertBubbleSourceXpath, alertBubbleColorXpath);
+            let count = getAlertBubbleCount(props.data, alertBubbleSourceXpath);
+            let color = getAlertBubbleColor(props.data, props.collections, alertBubbleSourceXpath, alertBubbleColorXpath);
 
-        if (count > 0) {
-            alertBubble = (
-                <AlertBubble content={count} color={color} />
-            )
+            if (count > 0) {
+                alertBubble = (
+                    <AlertBubble content={count} color={color} />
+                )
+            }
         }
     }
 
@@ -177,6 +179,7 @@ const DynamicMenu = (props) => {
                             disabled={isDisabledValue}
                             xpath={xpath}
                             action={collection.button.action}
+                            source={collection.source}
                             onClick={onClick}
                         />
                     )

@@ -1,0 +1,97 @@
+syntax = "proto2";
+
+import "trade_core.proto";
+import "flux_options.proto";
+
+package strat_executor;
+
+
+enum OrderEventType{
+  OE_UNSPECIFIED = 0;
+  OE_NEW = 1;
+  OE_ACK = 2;
+  OE_CXL = 3;
+  OE_CXL_ACK = 4;
+  OE_CXL_REJ = 5;
+  OE_REJ = 6;
+}
+
+enum OrderStatusType{
+  OE_UNACK = 0;
+  OE_ACKED = 1;
+  OE_CXL_UNACK = 2;
+  OE_DOD = 3;
+  OE_FILLED = 4;
+  OE_OVER_FILLED = 5;
+}
+
+message PairSideTradingBrief{
+  required Security security = 1;
+  required Side side = 2;
+  required string last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
+  optional float consumable_open_orders = 4 [(FluxFldHelp) = "max_open_orders_per_side - open_orders for this symbol side"];
+  optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_cb_notional - filled_notional - open_notional"];
+  optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_open_cb_notional - open_notional"];
+  optional int64 consumable_concentration = 7 [(FluxFldHelp) = "(total_trading_security_size/100*max_concentration) - (open_qty + filled_qty)"];
+  optional float participation_period_order_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all order qty in the MarketTradeVolumeParticipation.applicable_period_seconds irrespective of how the order fared in the market: open, filled , cancelled; if applicable_period_seconds is 0 , directly use SymbolSideSnapshot.total_qty"];
+  optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
+  //True hybrid field - depends on both market data and order / fill update (order trigger re-evaluates these in-process (no DB update) to avoid otherwise race condition between trading and market data updates trying to update same value in DB). This means the value in DB only accounts for Trading updates - market data updates are only applied at the time of trading updates - i.e. no RT market data based recompute and setting of value in DB
+  optional float indicative_consumable_participation_qty = 10 [(FluxFldHelp) = "((participation_period_last_trade_qty_sum / 100) * MarketTradeVolumeParticipation.max_participation_rate) - participation_period_order_qty_sum"];
+  optional int64 residual_qty = 15 [(FluxFldHelp) = "For DOD order: Any un-filled qty (which is order qty - fill qty)"];
+  // Another hybrid total_trading_security_size (refer total_trading_security_size description to understand handling of such hybrids)
+  optional float indicative_consumable_residual = 11 [(FluxFldHelp) = "max_residual - ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px))"];
+  optional float all_bkr_cxlled_qty = 12 [(FluxFldHelp) = "sum of all bkr cancels for this leg"];
+  optional float open_notional = 13 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "(symbol specific total qty * symbol_avg_px) - fill notional - (cxlled/rejected qty * symbol_avg_px)"];
+  optional float open_qty = 14 [(FluxFldHelp) = "sum of all open order qty for this leg: reduce if order is filled / rejected / cancelled (symbol side snapshot based compute)"];
+}
+
+message Residual{
+  required Security security = 1 [(FluxFldHelp) = "security of leg with > residual_qty*last_px"];
+  required float residual_notional = 2 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "absolute of ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px) only if the value remains non 0 post residual_mark_seconds interval else 0 (in non 0 case mark the remaining non zero as residual and pull that qty form the market)"];
+}
+
+enum StratState{
+  //set this state for strats just created by user
+  StratState_UNSPECIFIED = 0;
+  // set this state post required constraint validation of strat - such as system checked all required strat params are
+  // present and are as expected, do this for:
+  // 1. new strats before moving them to ready state upon user explicit save request
+  // 2. existing strats when loading them from store (if validation fails - raise alert and put them in ERROR state)
+  StratState_READY = 1;
+  // set StratStatus.ACTIVE state upon explicit user request, check:
+  // 1. all required strats and portfolio level limit checks are passing else reject user's request
+  // 2. strat is in StratStatus.READY state (user triggers a strat)
+  // 3. strat is in StratStatus.PAUSED state (resume paused strat)
+  StratState_ACTIVE = 2;
+  // set StratStatus.PAUSED state upon explicit user request, check strat is currently in StratStatus.READY state
+  StratState_PAUSED = 3;
+  // this is set in any exception scenario - dev/support/business involvement is needed to find the gap and bridge
+  // for future handling of similar scenario, day-1 block strat (only engine restart can allow strat to be restarted)
+  StratState_ERROR = 4;
+  // set StratStatus.PAUSED state when strat has completed its set target
+  StratState_DONE = 5;
+  // set StratState_SNOOZED state when strat is unloaded from collection
+  StratState_SNOOZED = 6;
+}
+
+message MarketTradeVolumeParticipation{
+    required float max_participation_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "30", (FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
+    optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, unset value implies seconds from SOD till time of checking"];
+}
+
+message OpenInterestParticipation{
+  required float participation_rate = 1 [(FluxFldValMax) = "100", (FluxFldHelp) = 'max % participation size allowed within side specific volume of Top (depth_levels) of BBBO'];
+  required int32 depth_levels = 2 [(FluxFldValMax) = "20", (FluxFldHelp) = "allowed depth levels participating in allowed size computation - not to be confused with tick levels which may be missing depending on liquidity at specific tick level"];
+}
+
+message CancelRate{
+  required int32 max_cancel_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "20", (FluxFldHelp) = "% of total size sent to market [BUY+SELL] - ignoring what happened to the qty on exchange (e.g. reject / cancelled are also counted)"];
+  optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
+  optional int32 waived_min_orders = 3 [(FluxFldHelp) = "enforce check only after waived_min_orders have been sent to market irrespective of the participant order outcome -ack, reject, cancelled, lapsed"];
+}
+
+message ResidualRestriction{
+  required float max_residual = 1 [(FluxFldValMax) = "500000", (FluxFldHelp) = "allowed max residual: pauses strat if this breaches"];
+  required int32 residual_mark_seconds = 2 [(FluxFldHelp) = "residual is only marked if this period expires but residual does not go to 0; currently restricted to minimum of 2X app refresh interval"];
+}
+

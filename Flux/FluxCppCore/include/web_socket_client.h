@@ -132,7 +132,7 @@ protected:
     bool m_update_received_{false};
     websocket::stream<tcp::socket> m_ws_;
     beast::flat_buffer m_buffer_;
-    UserDataType m_user_data_;
+    UserDataType &m_user_data_;
     CallBackType m_call_back_;
     quill::Logger *mp_logger_;
 };

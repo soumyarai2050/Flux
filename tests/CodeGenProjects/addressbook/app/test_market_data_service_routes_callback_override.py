@@ -8,8 +8,8 @@ os.environ["DBType"] = "beanie"
 
 # project imports
 from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import LastTradeBaseModel
-from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_web_client import \
-    MarketDataServiceWebClient
+from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_http_client import \
+    MarketDataServiceHttpClient
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
 
 

@@ -49,8 +49,7 @@ class BaseProtoPlugin(ABC):
     flux_json_root_patch_all_field: ClassVar[str] = "PatchAllOp"
     flux_json_root_delete_field: ClassVar[str] = "DeleteOp"
     flux_json_root_delete_all_field: ClassVar[str] = "DeleteAllOp"
-    flux_json_root_read_websocket_field: ClassVar[str] = "ReadWebSocketOp"
-    flux_json_root_update_websocket_field: ClassVar[str] = "UpdateWebSocketOp"
+    flux_json_root_read_by_id_websocket_field: ClassVar[str] = "ReadByIDWebSocketOp"
     flux_json_root_set_reentrant_lock_field: ClassVar[str] = "SetReentrantLock"
     flux_json_query_name_field: ClassVar[str] = "QueryName"
     flux_json_query_aggregate_var_name_field: ClassVar[str] = "AggregateVarName"
@@ -87,6 +86,11 @@ class BaseProtoPlugin(ABC):
     flux_fld_elaborated_title: ClassVar[str] = "FluxFldElaborateTitle"
     flux_fld_name_color: ClassVar[str] = "FluxFldNameColor"
     flux_msg_widget_ui_data_element: ClassVar[str] = "FluxMsgWidgetUIDataElement"
+    widget_ui_option_depending_proto_file_name_field: ClassVar[str] = "depending_proto_file_name"
+    widget_ui_option_depending_proto_model_name_field: ClassVar[str] = "depending_proto_model_name"
+    widget_ui_option_depends_on_other_model_for_id_field: ClassVar[str] = "depends_on_other_model_for_id"
+    widget_ui_option_depends_on_other_model_for_dynamic_url_field: ClassVar[str] = \
+        "depends_on_other_model_for_dynamic_url"
     flux_msg_widget_ui_data_element_widget_ui_data_field: ClassVar[str] = "widget_ui_data"
     flux_msg_aggregate_query_var_name: ClassVar[str] = "FluxMsgAggregateQueryVarName"
     aggregation_type_update: ClassVar[str] = "AggregateType_UpdateAggregate"
@@ -128,12 +132,14 @@ class BaseProtoPlugin(ABC):
     flux_fld_mapping_projection_query_field: ClassVar[str] = "FluxFldMappingProjectionQueryField"
     flux_msg_executor_options: ClassVar[str] = "FluxMsgExecutorOptions"
     flux_fld_projections: ClassVar[str] = "FluxFldProjections"
+    flux_fld_server_running_status: ClassVar[str] = "FluxFldServerRunningStatus"
     executor_option_is_websocket_model_field: ClassVar[str] = "IsWebSocketModel"
     executor_option_enable_notify_all_field: ClassVar[str] = "EnableNotifyAll"
     executor_option_is_top_lvl_model_field: ClassVar[str] = "IsTopLvlModel"
     executor_option_executor_key_count_field: ClassVar[str] = "ExecutorKeyCounts"
     executor_option_executor_key_sequence_field: ClassVar[str] = "ExecutorKeySequence"
     executor_option_log_key_sequence_field: ClassVar[str] = "LogKeySequence"
+    flux_msg_small_sized_collection: ClassVar[str] = "FluxMsgSmallSizedCollection"
     flux_fld_PK: ClassVar[str] = "FluxFldPk"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name
@@ -193,9 +199,11 @@ class BaseProtoPlugin(ABC):
                   cleaned string with quotation marks: if value is dirty string,
                   same value: if both cases are not matched
         """
+        value = value.removeprefix('"').removesuffix('"')   # cleaning data
+
         # bool check
-        if value in ['"True"', '"False"', '"true"', '"false"', "True", "False", "true", "false"]:
-            return True if value in ['"True"', '"true"', "True", "true"] else False
+        if value in ["True", "False", "true", "false"]:
+            return True if value in ["True", "true"] else False
         # int check
         elif value.lstrip("-").isdigit():
             return int(value)
@@ -206,10 +214,7 @@ class BaseProtoPlugin(ABC):
         else:
             if value.isspace():
                 return ' '*len(value)
-            if '"' == value[-1]:
-                return str(value[1:-1].strip())
-            else:
-                return str(value.strip())
+            return str(value.strip())
 
     @staticmethod
     def is_option_enabled(msg_or_fld_or_file: protogen.Message | protogen.Field | protogen.File,
@@ -251,7 +256,9 @@ class BaseProtoPlugin(ABC):
     @staticmethod
     def _type_cast_option_str_val_to_type(val_str: str, proto_type: str):
         if proto_type.lower() == "string":
-            return f'{val_str[2:-1]}'
+            val_str = val_str.strip()
+            value = val_str.removeprefix('"').removesuffix('"')   # cleaning data
+            return value
         elif proto_type.lower() == "int32" or proto_type.lower() == "int32":
             return parse_to_int(val_str)
         elif proto_type.lower() == "bool":
@@ -268,6 +275,15 @@ class BaseProtoPlugin(ABC):
         """
         Returns List if option is_repeated else value, returns None if option is not set
         """
+        if isinstance(proto_entity, protogen.Message) or isinstance(proto_entity, protogen.Field):
+            option_type = BaseProtoPlugin.get_simple_option_type(proto_entity.parent_file, option_name)
+        elif isinstance(proto_entity, protogen.File):
+            option_type = BaseProtoPlugin.get_simple_option_type(proto_entity, option_name)
+        else:
+            err_str = f"Unexpected: proto_entity type: {type(proto_entity)}, name: {proto_entity.proto.name}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
         options_str_list = [option_str
                             for option_str in str(proto_entity.proto.options).split("\n") if ":" in option_str]
         option_val_list: List = []
@@ -276,7 +292,8 @@ class BaseProtoPlugin(ABC):
                 option_content = ":".join(str(option_str).split(":")[1:])
                 if option_content.isspace():
                     option_val_list.append(option_content)
-                option_val_list.append(BaseProtoPlugin.parse_string_to_original_types(option_content.strip()))
+                option_val_list.append(BaseProtoPlugin._type_cast_option_str_val_to_type(option_content.strip(),
+                                                                                         option_type))
         if is_repeated:
             return option_val_list
         else:
@@ -293,8 +310,8 @@ class BaseProtoPlugin(ABC):
 
     @staticmethod
     def _get_complex_option_value_from_proto(option_string: str, option_name: str | None = None,
-                                             proto_entity: protogen.Message |
-                                                           protogen.Field | protogen.File | None = None,
+                                             proto_entity:
+                                             protogen.Message | protogen.Field | protogen.File | None = None,
                                              option_type: protogen.Message | None = None) -> Dict:
         if option_type is None:
             if isinstance(proto_entity, protogen.Message) or isinstance(proto_entity, protogen.Field):
@@ -310,7 +327,7 @@ class BaseProtoPlugin(ABC):
         output_dict: Dict[str, Any] = {}
         for field in option_type.fields:
             if field.message is None:
-                field_name_search_str = f"{field.proto.name}:"
+                field_name_search_str = f" {field.proto.name}:"
                 if field_name_search_str in option_string:
                     field_name_index = option_string.index(field_name_search_str)
                     option_string_sliced = option_string[field_name_index + len(field_name_search_str):]
@@ -433,6 +450,17 @@ class BaseProtoPlugin(ABC):
                 for option_field in dependency.extensions:
                     if option_field.proto.name == option_name:
                         return option_field.message
+
+    @staticmethod
+    def get_simple_option_type(file: protogen.File, option_name: str) -> str:
+        """
+        returns option type if is of simple type or returns None otherwise
+        """
+        for dependency in file.dependencies:
+            if dependency.proto.name == BaseProtoPlugin.flux_option_file_name:
+                for option_field in dependency.extensions:
+                    if option_field.proto.name == option_name:
+                        return option_field.kind.name.lower()
 
     @staticmethod
     def get_flux_msg_cmt_option_value(message: protogen.Message) -> str:
@@ -598,47 +626,61 @@ class BaseProtoPlugin(ABC):
         """
         # @@@ May contain bug for explicit multi input files, so protoc command should
         # be used for single input file explicitly
-        for file in plugin.files_to_generate:
-            output_file_name_to_insertion_points_n_content_dict: Dict[str, Dict[str, str]] = {}
-            received_output_file_name_to_content = self.output_file_generate_handler(file)
 
-            for output_file_name, output_file_content in received_output_file_name_to_content.items():
-                if isinstance(output_file_content, dict):
-                    file_content_path = self.output_file_name_to_template_file_path_dict.get(output_file_name)
-                    if file_content_path is not None:
-                        if os.path.exists(file_content_path):
-                            with open(file_content_path, "r") as fl:
-                                file_content = fl.read()
-                        else:
-                            err_str = f"file: {file_content_path} does not exist"
-                            logging.exception(err_str)
-                            raise Exception(err_str)
-                        generator = plugin.new_generated_file(output_file_name, file.py_import_path)
-                        generator.P(file_content)
+        if len(plugin.files_to_generate) > 1:
+            plugin_arg = plugin.files_to_generate
+            file = plugin_arg[0]
+        elif len(plugin.files_to_generate) == 1:
+            plugin_arg = plugin.files_to_generate[0]
+            file = plugin_arg
+        else:
+            err_str = "Can't find input files required for plugin"
+            logging.error(err_str)
+            raise Exception(err_str)
+
+        output_file_name_to_insertion_points_n_content_dict: Dict[str, Dict[str, str]] = {}
+        # print("#######")
+        # print(plugin_arg)
+        # print("#######")
+        received_output_file_name_to_content = self.output_file_generate_handler(plugin_arg)
+
+        for output_file_name, output_file_content in received_output_file_name_to_content.items():
+            if isinstance(output_file_content, dict):
+                file_content_path = self.output_file_name_to_template_file_path_dict.get(output_file_name)
+                if file_content_path is not None:
+                    if os.path.exists(file_content_path):
+                        with open(file_content_path, "r") as fl:
+                            file_content = fl.read()
                     else:
-                        err_str = "output_file_name_to_template_file_path_dict could not find any key matching " \
-                                  f"output_file_name: {output_file_name}"
+                        err_str = f"file: {file_content_path} does not exist"
                         logging.exception(err_str)
                         raise Exception(err_str)
-
-                    output_file_name_to_insertion_points_n_content_dict[output_file_name] = {}
-                    for insert_point, replacing_content in output_file_content.items():
-                        output_file_name_to_insertion_points_n_content_dict[output_file_name][insert_point] = \
-                            replacing_content
-                elif isinstance(output_file_content, str):
                     generator = plugin.new_generated_file(output_file_name, file.py_import_path)
-                    file_content = f"# @@protoc_insertion_point({output_file_name})"
                     generator.P(file_content)
-                    output_file_name_to_insertion_points_n_content_dict[output_file_name] = {}
-                    output_file_name_to_insertion_points_n_content_dict[output_file_name][output_file_name] = \
-                        output_file_content
                 else:
-                    err_str = f"unsupported type: {type(output_file_content)} of output_file_content " \
-                              f"for output_file_name {output_file_name}"
+                    err_str = "output_file_name_to_template_file_path_dict could not find any key matching " \
+                              f"output_file_name: {output_file_name}"
                     logging.exception(err_str)
                     raise Exception(err_str)
 
-            plugin.insertion_points_to_content_dict = output_file_name_to_insertion_points_n_content_dict
+                output_file_name_to_insertion_points_n_content_dict[output_file_name] = {}
+                for insert_point, replacing_content in output_file_content.items():
+                    output_file_name_to_insertion_points_n_content_dict[output_file_name][insert_point] = \
+                        replacing_content
+            elif isinstance(output_file_content, str):
+                generator = plugin.new_generated_file(output_file_name, file.py_import_path)
+                file_content = f"# @@protoc_insertion_point({output_file_name})"
+                generator.P(file_content)
+                output_file_name_to_insertion_points_n_content_dict[output_file_name] = {}
+                output_file_name_to_insertion_points_n_content_dict[output_file_name][output_file_name] = \
+                    output_file_content
+            else:
+                err_str = f"unsupported type: {type(output_file_content)} of output_file_content " \
+                          f"for output_file_name {output_file_name}"
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+        plugin.insertion_points_to_content_dict = output_file_name_to_insertion_points_n_content_dict
 
     def process(self):
         extended_protogen_options = ExtendedProtogenOptions()

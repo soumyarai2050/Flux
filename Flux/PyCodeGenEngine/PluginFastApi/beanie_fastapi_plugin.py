@@ -17,9 +17,11 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_file_handler import Fas
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_file_handler import FastapiCallbackOverrideFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_set_instance_handler import \
     FastapiCallbackOverrideSetInstanceHandler
-from Flux.PyCodeGenEngine.PluginFastApi.fastapi_routes_file_handler import FastapiRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_routes_file_handler import FastapiHttpRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_routes_file_handler import FastapiWsRoutesFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_launcher_file_handler import FastapiLauncherFileHandler
-from Flux.PyCodeGenEngine.PluginFastApi.fastapi_client_file_handler import FastapiClientFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_client_file_handler import FastapiHttpClientFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_client_file_handler import FastapiWSClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
@@ -30,8 +32,10 @@ flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(s
 
 class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                           FastapiCallbackOverrideSetInstanceHandler,
-                          FastapiClientFileHandler,
-                          FastapiRoutesFileHandler,
+                          FastapiHttpClientFileHandler,
+                          FastapiWSClientFileHandler,
+                          FastapiHttpRoutesFileHandler,
+                          FastapiWsRoutesFileHandler,
                           FastapiLauncherFileHandler,
                           FastapiCallbackOverrideFileHandler):
     """
@@ -100,12 +104,21 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def handle_init_db(self) -> str:
         root_msg_list = [message.proto.name for message in self.root_message_list]
         output_str = "def get_mongo_server_uri():\n"
-        output_str += '    config_file_path: PurePath = ' \
-                      'PurePath(__file__).parent.parent.parent / "data" / "config.yaml"\n'
-        output_str += '    config_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))\n'
+        output_str += '    port = os.getenv("PORT")\n'
+        output_str += '    if port is None or len(port) == 0:\n'
+        output_str += '        err_str = "Can not find PORT env var for fastapi db init"\n'
+        output_str += '        logging.exception(err_str)\n'
+        output_str += '        raise Exception(err_str)\n\n'
+        output_str += '    config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"'+f'{self.proto_file_package}'+'_{port}_config.yaml"\n'
+        output_str += '    if os.path.exists(config_yaml_path):\n'
+        output_str += '        config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n'
+        output_str += '    else:\n'
+        output_str += '        err_str = f"Executor config file with port {port} in name does not exist"\n'
+        output_str += '        logging.exception(err_str)\n'
+        output_str += '        raise Exception(err_str)\n\n'
         output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := ' \
-                      'config_dict.get("mongo_server")) is None else mongo_env\n'
-        output_str += '    if config_dict.get("log_mongo_uri", True):\n'
+                      'config_yaml_dict.get("mongo_server")) is None else mongo_env\n'
+        output_str += '    if config_yaml_dict.get("log_mongo_uri", True):\n'
         output_str += '        logging.debug(f"mongo_server: {mongo_server}")\n'
         output_str += '    if (db_name := os.getenv("DB_NAME")) is not None and len(db_name):\n'
         output_str += '        mongo_server += f"/{db_name}?authSource=admin"\n'
@@ -144,13 +157,16 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def handle_fastapi_initialize_file_gen(self) -> str:
         output_str = "import os\n"
         output_str += "from fastapi import FastAPI\n"
-        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_file_name)
-        output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_file_path} import *\n"
         # else not required: if no message with custom id is found then avoiding import statement
         database_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.database_file_name)
-        output_str += f"from {database_file_path} import init_db\n\n\n"
+        output_str += f"from {database_file_path} import init_db\n\n"
+        output_str += "# Below imports are to initialize routes before launching server\n"
+        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
+        output_str += f"from {routes_file_path} import *\n"
+        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.ws_routes_file_name)
+        output_str += f"from {routes_file_path} import *\n\n"
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
         output_str += f"async def init_max_id_handler(document):\n"
         output_str += f'    max_val = await document.find_all().max("_id")\n'
@@ -162,6 +178,13 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
             if "int" == self._get_msg_id_field_type(message):
                 message_name = message.proto.name
                 output_str += f"    await init_max_id_handler({message_name})\n"
+        output_str += '    port = os.getenv("PORT")\n'
+        output_str += '    if port is None or len(port) == 0:\n'
+        output_str += '        err_str = "Can not find PORT env var for fastapi db init"\n'
+        output_str += '        logging.exception(err_str)\n'
+        output_str += '        raise Exception(err_str)\n'
+        output_str += (f'    os.environ[f"{self.proto_file_package}' + '_{port}"] = "1"  # indicator flag to tell '
+                       'callback override that service is up\n')
         output_str += "\n\n"
         output_str += "if os.getenv('DEBUG'):\n"
         output_str += "    from fastapi.middleware.cors import CORSMiddleware\n\n"
@@ -215,16 +238,26 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                 self.handle_callback_override_set_instance_file_gen(),
 
             # Adding dummy callback override class file
-            "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py": self.handle_callback_override_file_gen(),
+            "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py":
+                self.handle_callback_override_file_gen(),
 
-            # Adding project's routes.py
-            self.routes_file_name+".py": self.handle_routes_file_gen(),
+            # Adding base routes.py
+            self.base_routes_file_name + ".py": self.handle_base_routes_file_gen(),
+
+            # Adding project's http routes.py
+            self.http_routes_file_name + ".py": self.handle_http_routes_file_gen(),
+
+            # Adding project's ws routes.py
+            self.ws_routes_file_name + ".py": self.handle_ws_routes_file_gen(),
 
             # Adding project's launch file
             self.launch_file_name + ".py": self.handle_launch_file_gen(file),
 
             # Adding client file
-            self.client_file_name + ".py": self.handle_client_file_gen(file)
+            self.client_file_name + ".py": self.handle_client_file_gen(file),
+
+            # Adding WS client file
+            self.ws_client_file_name + ".py": self.handle_ws_client_file_gen(file)
         }
 
         return output_dict

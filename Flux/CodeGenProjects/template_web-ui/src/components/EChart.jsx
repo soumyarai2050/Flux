@@ -42,7 +42,6 @@ function EChart({ option, theme, loading, setSelectedData, isCollectionType }) {
         // Update chart
         if (chartRef.current !== null) {
             const chart = getInstanceByDom(chartRef.current);
-            // eslint-disable-next-line @typescript-eslint/no-unused-expressions
             loading === true ? chart.showLoading() : chart.hideLoading();
         }
     }, [loading, theme]);

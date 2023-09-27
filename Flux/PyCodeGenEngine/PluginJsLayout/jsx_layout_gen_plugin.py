@@ -123,17 +123,19 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += "            options={"+f"layoutsById.{message_name_case_styled}.widget_ui_data"+"}\n"
             output_str += "            chartData={"+ f"layoutsById.{message_name_case_styled}.chart_data"+"}\n"
             output_str += "            filters={" + f"layoutsById.{message_name_case_styled}.filters" + "}\n"
+            output_str += "            columnOrders={" + f"layoutsById.{message_name_case_styled}.column_orders" + "}\n"
             output_str += "            onChartDataChange={onChartDataChange}\n"
             output_str += "            onChartDelete={onChartDelete}\n"
             output_str += "            onChangeLayout={onLayoutTypeChange}\n"
             output_str += '            onOverrideChange={onOverrideChange}\n'
             output_str += "            onFiltersChange={onFiltersChange}\n"
+            output_str += "            onColumnOrdersChange={onColumnOrdersChange}\n"
             output_str += f'        />\n'
             output_str += f'    </Paper>\n'
             output_str += '}\n'
         return output_str
 
-    def output_file_generate_handler(self, file: protogen.File):
+    def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
 

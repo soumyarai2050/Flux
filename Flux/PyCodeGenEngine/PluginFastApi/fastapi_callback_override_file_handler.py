@@ -26,7 +26,8 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
         self.json_sample_loaded_json: Dict | None = None
 
     def _handle_field_data_manipulation(self, json_content: Dict, message: protogen.Message, id_str: str | None = None,
-                                        get_all_fields: bool | None = None, specify_message_name: str | None = None):
+                                        get_all_fields: bool | None = None, specify_message_name: str | None = None,
+                                        is_repeated: bool | None = None):
         if get_all_fields is not None and get_all_fields:
             temp_str = ""
             for field in message.fields:
@@ -38,7 +39,10 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                         field_val = json_content[message_name_snake_cased][field.proto.name]
                     else:
                         # message_name_snake_cased = convert_camel_case_to_specific_case(specify_message_name)
-                        field_val = json_content[field.proto.name]
+                        if is_repeated:
+                            field_val = json_content[0][field.proto.name]
+                        else:
+                            field_val = json_content[field.proto.name]
                     if isinstance(field_val, str):
                         field_val = f'"{field_val}"'
                     elif field_val == 'true' or field_val == 'false':
@@ -64,8 +68,9 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                             return f"{field.proto.name} = True"
                         case "message":
                             message_name_case_styled = convert_camel_case_to_specific_case(message.proto.name)
+                            is_repeated = field.cardinality.name.lower() == "repeated"
                             return f"{field.proto.name} = {field.message.proto.name}(" \
-                                   f"{self._handle_field_data_manipulation(json_content.get(message_name_case_styled).get(field.proto.name), field.message, get_all_fields=True, specify_message_name=field.proto.name)})"
+                                   f"{self._handle_field_data_manipulation(json_content.get(message_name_case_styled).get(field.proto.name), field.message, get_all_fields=True, specify_message_name=field.proto.name, is_repeated=is_repeated)})"
                 # else not required: field must not be id to be manipulated in this method's use case
             else:
                 err_str = f"Can't find any non-complex type field in this message: {message.proto.name}"
@@ -292,7 +297,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                 if query_route_path is None:
                     query_route_path = "GET"
 
-                routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_file_name)
+                routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
                 aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
 
                 if query_route_path == FastapiCallbackOverrideFileHandler.flux_json_query_route_get_type_field_val:
@@ -359,27 +364,6 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                     # If no field is found having projection enabled
                     continue
 
-                for field in message.fields:
-                    if self.is_bool_option_enabled(field,
-                                                   FastapiCallbackOverrideFileHandler.flux_fld_val_time_field):
-                        time_field_name = field.proto.name
-                        break
-                else:
-                    err_str = (f"Could not find any time field in {message.proto.name} message having "
-                               f"{FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series} option")
-                    logging.exception(err_str)
-                    raise Exception(err_str)
-
-                for field in message.fields:
-                    if self.is_bool_option_enabled(field, FastapiCallbackOverrideFileHandler.flux_fld_val_meta_field):
-                        meta_field = field
-                        break
-                else:
-                    err_str = (f"Could not find any time field in {message.proto.name} message having "
-                               f"{FastapiCallbackOverrideFileHandler.flux_msg_json_root_time_series} option")
-                    logging.exception(err_str)
-                    raise Exception(err_str)
-
                 projection_val_to_fields_dict = (
                     FastapiCallbackOverrideFileHandler.get_projection_option_value_to_fields(message))
                 projection_val_to_query_name_dict = (
@@ -400,7 +384,6 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                             field_name_list.append(field_name)
                     field_names_str = "_n_".join(field_name_list)
                     field_names_str_camel_cased = convert_to_capitalized_camel_case(field_names_str)
-                    projection_model_name = f"{message.proto.name}ProjectionFor{field_names_str_camel_cased}"
 
                     query_param_with_type_str = ""
                     for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
@@ -419,7 +402,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                         f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: "
                         f"Type[{msg_name}], {query_param_with_type_str}):\n")
                     routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
-                                                                       self.routes_file_name)
+                                                                       self.http_routes_file_name)
                     output_str += f"        from {routes_import_path} import " \
                                   f"underlying_read_{msg_name_snake_cased}_http\n"
                     output_str += (f"        # once aggregate function used below is shifted to aggregate.py "

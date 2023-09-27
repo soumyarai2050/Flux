@@ -31,6 +31,7 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
         self.core_or_util_files: List[str] = []
         self.options_files: List[str] = []
         self.dependency_file_list = []
+        self.file_enum_list = []
 
     def get_all_root_message(self, messages: List[protogen.Message]) -> None:
         for message in messages:
@@ -39,6 +40,10 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
     def get_all_root_message_name(self, messages: List[protogen.Message]) -> None:
         for message in messages:
             self.root_message_name_list.append(message.proto.name)
+
+    def get_all_enum_from_file(self, file: protogen.File) -> None:
+        for enum in file.enums:
+            self.file_enum_list.append(enum)
 
     def get_data_from_yaml(self):
         with open(yaml_file_path, "r") as yaml_file:
@@ -78,8 +83,8 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
                 field_cardinality: str = field.cardinality.name
                 if field_enum is not None:
                     if field_enum not in enum_list:
-                        nested_enum_list.append(field_enum)
                         enum_list.append(field_enum)
+                        nested_enum_list.append(field_enum)
 
                 if field_type_message is None:
                     if field_type.lower() != "enum":
@@ -116,6 +121,7 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
         self.get_all_root_message_name(file.messages)
         self.get_data_from_yaml()
         self.get_dependency_message_proto(file)
+        self.get_all_enum_from_file(file)
 
         file_name: str = str(file.proto.name).split(".")[0]
         package_name: str = str(file.proto.package)
@@ -135,6 +141,13 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
         dependency_dict = {}
         dependency_enum_list = []
         dependency_enum_dict = {}
+        message_list: List[protogen.Message] = []
+        message_name_list: List[str] = []
+        enum_list = []
+        nested_enum_list = []
+
+        file_msg_name_list = ["market_data_n_strat_executor_core.proto",
+                              "dashboards_n_market_data_n_strat_executor_core.proto"]
 
         for dependency in self.dependency_file_list:
             dependency_name: str = dependency.proto.name
@@ -144,22 +157,54 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
                     dependency_msg_list.append(dependency_msg)
                     dependency_dict[dependency_msg.proto.name] = dependency_msg
                 dependency_enum_list.append(dependency.enums)
-                output_content += f'import "{dependency_name}";\n'
+                output_content += f'import "{dependency_name}";\n\n'
+
+        dependency_file_msg_name_list = []
+
+        for file in self.dependency_file_list:
+            if file.proto.name in file_msg_name_list:
+                for msg in file.messages:
+                    num: int = 1
+                    dependency_file_msg_name_list.append(msg.proto.name)
+                    output_content += f"message {msg.proto.name} {{\n"
+                    for fld in msg.fields:
+                        if fld.enum is None:
+                            if fld.message is None:
+                                fld_name = fld.proto.name
+                                fld_cardinality = fld.cardinality.name.lower()
+                                fld_kind = fld.kind.name.lower()
+                                output_content += f"\t{fld_cardinality} {fld_kind} {fld_name} = {num};\n"
+                                num += 1
+                            else:
+                                if (fld.message.proto.name not in message_name_list and
+                                        fld.message.proto.name not in dependency_file_msg_name_list):
+                                    dependency_file_msg_name_list.append(fld.message.proto.name)
+                                    message_name_list.append(fld.message.proto.name)
+                                    message_list.append(fld.message)
+                                fld_name = fld.proto.name
+                                fld_cardinality = fld.cardinality.name.lower()
+                                fld_msg = fld.message.proto.name
+                                output_content += f"\t{fld_cardinality} {fld_msg} {fld_name} = {num};\n"
+                                num += 1
+                        else:
+                            if fld.enum not in self.file_enum_list and fld.enum not in enum_list:
+                                self.file_enum_list.append(fld.enum)
+                            fld_name = fld.proto.name
+                            fld_cardinality = fld.cardinality.name.lower()
+                            fld_enum_name = fld.enum.proto.name
+                            output_content += f"\t{fld_cardinality} {fld_enum_name} {fld_name} = {num};\n"
+                            num += 1
+                    output_content += "}\n\n"
 
         for enums in dependency_enum_list:
             for enum in enums:
                 dependency_enum_dict[enum.proto.name] = enum
 
-        message_list: List[protogen.Message] = []
-        message_name_list: List[str] = []
-        enum_list = []
-        nested_enum_list = []
-
         for enums in dependency_enum_list:
             for enum in enums:
                 enum_list.append(enum)
 
-        for enum in file.enums:
+        for enum in self.file_enum_list:
             if enum not in enum_list:
                 nested_enum_list.append(enum)
                 enum_list.append(enum)
@@ -183,37 +228,39 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
         for message in self.root_message_list:
             i: int = 1
             message_name: str = message.proto.name
-
-            output_content += f"\nmessage {message_name} {{\n"
-            for field in message.fields:
-                field_name: str = field.proto.name
-                field_type: str = field.kind.name
-                field_enum = field.enum
-                field_type_message: protogen.Message | None = field.message
-                field_cardinality: str = field.cardinality.name
-                field_enums = field.enum
-                if field_enums is not None:
-                    if field_enums not in enum_list:
-                        enum_list.append(field_enums)
-                        nested_enum_list.append(field_enums)
-                if field_type_message is None:
-                    if field_type.lower() != "enum":
-                        output_content += f"\t{field_cardinality.lower()} {field_type.lower()} {field_name} = {i};\n"
-                        i += 1
+            if message_name not in dependency_file_msg_name_list:
+                output_content += f"\nmessage {message_name} {{\n"
+                for field in message.fields:
+                    field_name: str = field.proto.name
+                    field_type: str = field.kind.name
+                    field_enum = field.enum
+                    field_type_message: protogen.Message | None = field.message
+                    field_cardinality: str = field.cardinality.name
+                    field_enums = field.enum
+                    if field_enums is not None:
+                        if field_enums not in enum_list:
+                            enum_list.append(field_enums)
+                            nested_enum_list.append(field_enums)
+                    if field_type_message is None:
+                        if field_type.lower() != "enum":
+                            output_content += f"\t{field_cardinality.lower()} {field_type.lower()} {field_name} = {i};\n"
+                            i += 1
+                        else:
+                            output_content += f"\t{field_cardinality.lower()} {field_enum.proto.name} {field_name} = {i};\n"
+                            i += 1
                     else:
-                        output_content += f"\t{field_cardinality.lower()} {field_enum.proto.name} {field_name} = {i};\n"
+                        field_type_message_name: str = field_type_message.proto.name
+                        output_content += f"\t{field_cardinality.lower()} {field_type_message_name} {field_name} = {i};\n"
                         i += 1
-                else:
-                    field_type_message_name: str = field_type_message.proto.name
-                    output_content += f"\t{field_cardinality.lower()} {field_type_message_name} {field_name} = {i};\n"
-                    i += 1
-                    if field_type_message_name not in message_name_list:
-                        message_name_list.append(field_type_message_name)
-                        message_list.append(field_type_message)
+                        if field_type_message_name not in message_name_list:
+                            message_name_list.append(field_type_message_name)
+                            message_list.append(field_type_message)
 
-            output_content += "}\n\n"
+                output_content += "}\n\n"
 
         output_content += self.generate_enum_value(nested_enum_list)
+        # for i in nested_enum_list:
+        #     print(f"------------------------{i.proto.name}")
 
         output, nested_msg_list, nested_msg_name_list, nested_enum_list = self.generate_nested_fld \
             (message_list, message_name_list, enum_list)

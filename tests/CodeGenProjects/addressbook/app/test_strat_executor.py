@@ -1,7 +1,7 @@
 
 # project imports
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
-from Flux.CodeGenProjects.addressbook.app.trading_link_base import config_file_path
+from CodeGenProjects.strat_executor.app.trading_link_base import config_file_path
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
 
@@ -429,7 +429,7 @@ def test_strat_limits_with_none_symbol_overview(static_data_, clean_and_set_limi
         sell_symbol = buy_sell_symbol_list[0][1]
 
         # Creating Strat
-        active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
+        active_pair_strat = create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                                     copy.deepcopy(expected_strat_limits_),
                                                     copy.deepcopy(expected_start_status_))
 
@@ -693,7 +693,7 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
         # running symbol_overview
         run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
         # Creating Strat
-        active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
+        active_pair_strat = create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                                     copy.deepcopy(expected_strat_limits_),
                                                     copy.deepcopy(expected_start_status_))
 
@@ -733,7 +733,7 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
         # running symbol_overview
         run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list)
         # Creating Strat
-        active_pair_strat = create_n_validate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
+        active_pair_strat = create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                                     copy.deepcopy(expected_strat_limits_),
                                                     copy.deepcopy(expected_start_status_))
 

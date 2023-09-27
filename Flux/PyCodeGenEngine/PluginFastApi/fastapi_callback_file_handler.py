@@ -240,7 +240,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                 FastapiCallbackFileHandler.flux_json_root_patch_all_field: self.handle_PATCH_all_callback_methods_gen,
                 FastapiCallbackFileHandler.flux_json_root_delete_field: self.handle_DELETE_callback_methods_gen,
                 FastapiCallbackFileHandler.flux_json_root_delete_all_field: self.handle_DELETE_all_callback_methods_gen,
-                FastapiCallbackFileHandler.flux_json_root_read_websocket_field:
+                FastapiCallbackFileHandler.flux_json_root_read_by_id_websocket_field:
                     self.handle_read_by_id_WEBSOCKET_callback_methods_gen
             }
 

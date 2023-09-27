@@ -38,7 +38,7 @@ export const ValueBasedProgressBarWithHover = (props) => {
 
     return (
         <Tooltip title={hoverText}>
-            <LinearProgress variant="determinate" value={percentage} className={`${progressBarClass} ${progressBarColorClass}`} />
+            <LinearProgress variant="determinate" color='secondary' value={percentage} className={`${progressBarClass} ${progressBarColorClass}`} />
         </Tooltip>
     )
 }

@@ -59,9 +59,8 @@ message MessageJsonRoot{
   optional AggregateType PatchAllOp = 7;
   optional AggregateType DeleteOp = 8;
   optional AggregateType DeleteAllOp = 9;
-  optional AggregateType ReadWebSocketOp = 10;
-  optional AggregateType UpdateWebSocketOp = 11;
-  optional bool SetReentrantLock = 12 [default=true];
+  optional AggregateType ReadByIDWebSocketOp = 10;
+  optional bool SetReentrantLock = 11 [default=true];
 }
 
 enum TimeSeriesGranularityType{
@@ -76,7 +75,7 @@ message MessageJsonRootTimeSeries{
   optional AggregateType CreateOp = 2;
   optional AggregateType CreateAllOp = 3;
   optional AggregateType ReadOp = 4;
-  optional AggregateType ReadWebSocketOp = 5;
+  optional AggregateType ReadByIDWebSocketOp = 5;
   optional AggregateType DeleteAllOp = 6;
   // Pending to be impl with above version
   optional AggregateType UpdateOp = 7;
@@ -85,10 +84,10 @@ message MessageJsonRootTimeSeries{
   optional AggregateType PatchAllOp = 10;
   optional AggregateType DeleteOp = 11;
 
-  optional TimeSeriesGranularityType Granularity = 14 [default=Sec];
-  optional int64 ExpireAfterSeconds = 15;
-  optional string SecondaryField = 16;  // not supported yet
-  optional bool SetReentrantLock = 17 [default=true];
+  optional TimeSeriesGranularityType Granularity = 12 [default=Sec];
+  optional int64 ExpireAfterSeconds = 13;
+  optional string SecondaryField = 14;  // not supported yet
+  optional bool SetReentrantLock = 15 [default=true];
 }
 
 enum QueryTypeEnum{
@@ -156,6 +155,7 @@ extend google.protobuf.MessageOptions
   repeated FluxMsgNestedFldValFilter FluxMsgNestedFldValFilterParam = 52158;
   optional string FluxMsgAggregateQueryVarName = 52159;
   optional FluxMsgMainCrudOperationsAgg FluxMsgMainCRUDOperationsAgg = 52160;
+  optional bool FluxMsgSmallSizedCollection = 52161;
 
 
   //Service Options - 53
@@ -272,6 +272,7 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldDisplayZero = 55271;  // Use this to show field even if its value is 0
   optional string FluxFldTextAlign = 55272;  // Use this to set text alignment
   optional string FluxFldMicroSeparator = 55273;  // Use this to replace field separator
+  optional bool FluxFldServerRunningStatus = 55274;
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

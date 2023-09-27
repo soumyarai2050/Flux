@@ -1,16 +1,17 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { 
-    Autocomplete, Box, TextField, Button, Divider, Chip, Table, TableContainer, TableBody, TableRow, TableCell, 
-    TablePagination, Select, MenuItem, FormControlLabel, Checkbox, Tooltip, Snackbar, Alert 
+import {
+    Autocomplete, Box, Button, Chip, Divider, TextField, Table, TableContainer, TableBody, TableRow, TableCell,
+    TablePagination, Select, MenuItem, FormControlLabel, Checkbox, Snackbar, Alert, Popover
 } from '@mui/material';
 import WidgetContainer from './WidgetContainer';
-import { Download, Delete, Settings, FileDownload, LiveHelp } from '@mui/icons-material';
+import { Download, Delete, Settings, FileDownload } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { Icon } from './Icon';
 import _, { cloneDeep } from 'lodash';
 import { DB_ID, Modes, DataTypes, ColorTypes, Layouts } from '../constants';
 import {
-    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId, applyFilter, getCommonKeyCollections, getTableColumns
+    getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId,
+    getCommonKeyCollections, getTableColumns, sortColumns
 } from '../utils';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { AlertErrorMessage } from './Alert';
@@ -34,66 +35,18 @@ function AbbreviatedFilterWidget(props) {
     const [page, setPage] = useState(0);
     const [rows, setRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
-    const [showSettings, setShowSettings] = useState(false);
+    const [openSettings, setOpenSettings] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const [headCells, setHeadCells] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
     const [toastMessage, setToastMessage] = useState(null);
     const [clipboardText, setClipboardText] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [settingsArchorEl, setSettingsArcholEl] = useState();
 
     useEffect(() => {
         setLoading(true);
     }, [props.collectionIndex])
-
-    const collections = useMemo(() => {
-        let collections = [];
-        if (props.abbreviated && props.itemCollections.length > 0) {
-            props.abbreviated.split('^').forEach(field => {
-                let title;
-                let source = field;
-                // title in collection view is always expected to be present
-                if (source.indexOf(":") !== -1) {
-                    title = field.split(":")[0];
-                    source = field.split(":")[1];
-                } else {
-                    throw new Error('no title found in abbreviated split. expected title followed by colon (:)')
-                }
-                // expected all the fields in abbreviated is from its abbreviated dependent source
-                let xpath = source.split("-").map(path => path = path.substring(path.indexOf(".") + 1));
-                xpath = xpath.join("-");
-                let subCollections = xpath.split("-").map(path => {
-                    return props.itemCollections.map(col => Object.assign({}, col))
-                        .filter(col => col.tableTitle === path)[0];
-                })
-                // if a single field has values from multiple source separated by hyphen, then
-                // attributes of first field is considered as field attributes
-                source = xpath.split("-")[0];
-                const collectionsCopy = props.itemCollections.map(col => Object.assign({}, col));
-                const collection = collectionsCopy.find(col => col.tableTitle === source);
-                if (collection) {
-                    // create a custom collection object
-                    collection.key = title;
-                    collection.title = title;
-                    // TODO: check the scenario in which xpath and tableTitle are different
-                    collection.tableTitle = xpath;
-                    collection.xpath = xpath;
-                    // remove default properties set on the fields
-                    collection.elaborateTitle = false;
-                    collection.hide = false;
-                    collection.subCollections = subCollections;
-                    // if field has values from multiple source, it's data-type is considered STRING
-                    if (xpath.indexOf('-') !== -1) {
-                        collection.type = DataTypes.STRING;
-                    }
-                    collections.push(collection);
-                } else {
-                    throw new Error('no collection (field attributes) found for the field with xpath ' + source);
-                }
-            })
-        }
-        return collections
-    }, [props.abbreviated, props.itemCollections])
 
     const items = useMemo(() => {
         return props.items.filter(item => {
@@ -102,14 +55,14 @@ function AbbreviatedFilterWidget(props) {
             if (metadata) return true;
             return false;
         })
-    }, [props.items, props.abbreviated, props.itemsMetadata, getIdFromAbbreviatedKey, applyFilter, props.filters])
+    }, [props.items, props.abbreviated, props.itemsMetadata])
 
     useEffect(() => {
         if (window.Worker) {
             worker.postMessage({
                 items,
-                itemsData: props.itemsMetadata,
-                itemProps: collections,
+                itemsDataDict: props.itemsMetadataDict,
+                itemProps: props.collections,
                 abbreviation: props.abbreviated,
                 loadedProps: props.loadListFieldAttrs,
                 page,
@@ -119,7 +72,7 @@ function AbbreviatedFilterWidget(props) {
                 filters: props.filters
             });
         }
-    }, [items, props.itemsMetadata, page, rowsPerPage, order, orderBy, props.filters])
+    }, [items, props.itemsMetadataDict, page, rowsPerPage, order, orderBy, props.filters])
 
     useEffect(() => {
         if (window.Worker) {
@@ -136,14 +89,18 @@ function AbbreviatedFilterWidget(props) {
     }, [worker])
 
     useEffect(() => {
-        const tableColumns = getTableColumns(collections, Modes.READ_MODE, props.enableOverride, props.disableOverride, true);
+        const tableColumns = getTableColumns(props.collections, Modes.READ_MODE, props.enableOverride, props.disableOverride, true);
         setHeadCells(tableColumns);
     }, [props.enableOverride, props.disableOverride])
 
     useEffect(() => {
-        const commonKeyCollections = getCommonKeyCollections(activeRows, headCells, false, true);
-        setCommonKeys(commonKeyCollections);
-    }, [activeRows, headCells])
+        if (props.mode === Modes.EDIT_MODE) {
+            setCommonKeys([]);
+        } else {
+            const commonKeyCollections = getCommonKeyCollections(activeRows, headCells, false, true);
+            setCommonKeys(commonKeyCollections);
+        }
+    }, [activeRows, headCells, props.mode])
 
     useEffect(() => {
         let activeItems = activeRows.map(row => getAbbreviatedKeyFromId(items, props.abbreviated, row['data-id']));
@@ -159,14 +116,14 @@ function AbbreviatedFilterWidget(props) {
         }
     }, [items, props.setSelectedItem])
 
-    const onButtonClick = (e, action, xpath, value) => {
+    const onButtonClick = (e, action, xpath, value, source) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
-            props.onButtonToggle(e, xpath, updatedData);
+            props.onButtonToggle(e, xpath, updatedData, source);
         } else if (action === 'flux_trigger_strat') {
             let updatedData = flux_trigger_strat(value);
             if (updatedData) {
-                props.onButtonToggle(e, xpath, updatedData);
+                props.onButtonToggle(e, xpath, updatedData, source);
             }
         }
     }
@@ -194,12 +151,14 @@ function AbbreviatedFilterWidget(props) {
         setPage(0);
     };
 
-    const onSettingsOpen = () => {
-        setShowSettings(true);
+    const onSettingsOpen = (e) => {
+        setOpenSettings(true);
+        setSettingsArcholEl(e.currentTarget);
     }
 
     const onSettingsClose = () => {
-        setShowSettings(false);
+        setOpenSettings(false);
+        setSettingsArcholEl(null);
     }
 
     const exportToExcel = () => {
@@ -220,7 +179,7 @@ function AbbreviatedFilterWidget(props) {
         }
         let updatedHeadCells = headCells.map(cell => cell.key === key ? { ...cell, hide: hide } : cell)
         setHeadCells(updatedHeadCells);
-        let collection = collections.filter(c => c.key === key)[0];
+        let collection = props.collections.filter(c => c.key === key)[0];
         let enableOverride = cloneDeep(props.enableOverride);
         let disableOverride = cloneDeep(props.disableOverride);
         if (hide) {
@@ -283,18 +242,42 @@ function AbbreviatedFilterWidget(props) {
         setToastMessage(null);
     }
 
-    const filteredHeadCells = headCells.filter(cell => commonKeys.filter(c => c.key === cell.key).length === 0);
+    const onColumnOrderChange = (value, xpath) => {
+        let columnOrders = cloneDeep(props.columnOrders);
+        if (columnOrders) {
+            const columnOrder = columnOrders.find(column => column.column_name === xpath);
+            if (columnOrder) {
+                columnOrder.sequence = value;
+            } else {
+                columnOrders.push({ column_name: xpath, sequence: value });
+            }
+        } else {
+            columnOrders = [{ column_name: xpath, sequence: value }]
+        }
+        props.onColumnOrdersChange(props.name, columnOrders);
+    }
+
+    const filteredHeadCells = sortColumns(headCells.filter(cell => commonKeys.filter(c => c.key === cell.key).length === 0), props.columnOrders, true);
+    const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
 
     const dynamicMenu = (
-        <DynamicMenu
-            name={props.headerProps.name}
-            collections={collections}
-            currentSchema={props.itemSchema}
-            data={props.itemsMetadata}
-            filters={props.filters}
-            onFiltersChange={props.onFiltersChange}
-            collectionView={true}
-        />
+        <>
+            {Object.keys(props.itemsMetadataDict).map(metadataName => {
+                return (
+                    <DynamicMenu
+                        key={metadataName}
+                        name={props.headerProps.name}
+                        collections={props.collections.filter(col => col.source === metadataName)}
+                        commonKeyCollections={commonKeys.filter(col => col.source === metadataName)}
+                        data={props.itemsMetadataDict[metadataName]}
+                        filters={props.filters}
+                        onFiltersChange={props.onFiltersChange}
+                        collectionView={true}
+                        onButtonToggle={props.onButtonToggle}
+                    />
+                )
+            })}
+        </>
     )
 
     let menu = (
@@ -302,18 +285,17 @@ function AbbreviatedFilterWidget(props) {
             {dynamicMenu}
             <Icon className={classes.icon} name="Settings" title="Settings" onClick={onSettingsOpen}><Settings fontSize='small' /></Icon>
             <Icon className={classes.icon} name="Export" title="Export" onClick={exportToExcel}><FileDownload fontSize='small' /></Icon>
-            <Select
-                style={{ display: showSettings ? 'inherit' : 'none' }}
-                className={classes.dropdown}
-                open={showSettings}
-                onOpen={onSettingsOpen}
-                onClose={onSettingsClose}
-                value=''
-                onChange={() => { }}
-                size='small'>
+            <Popover
+                id={`${props.name}_table_settings`}
+                open={openSettings}
+                anchorEl={settingsArchorEl}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+                onClose={onSettingsClose}>
                 <MenuItem dense={true}>
-                    <FormControlLabel size='small'
-                        label='Select All'
+                    <FormControlLabel
+                        sx={{ display: 'flex', flex: 1 }}
+                        size='small'
+                        label='Select All / Unselect All'
                         control={
                             <Checkbox
                                 size='small'
@@ -324,29 +306,39 @@ function AbbreviatedFilterWidget(props) {
                     />
                 </MenuItem>
                 {headCells.map((cell, index) => {
+                    let sequence = cell.sequenceNumber;
+                    if (props.columnOrders) {
+                        const columnOrder = props.columnOrders.find(column => column.column_name === cell.key);
+                        if (columnOrder) {
+                            sequence = columnOrder.sequence;
+                        }
+                    }
                     return (
-                        <Tooltip title={cell.key} key={index}>
-                            <MenuItem dense={true}>
-                                <FormControlLabel size='small'
-                                    label={cell.key}
-                                    control={
-                                        <Checkbox
-                                            size='small'
-                                            checked={cell.hide ? false : true}
-                                            onChange={(e) => onSettingsItemChange(e, cell.key)}
-                                        />
-                                    }
-                                />
-                                {cell.help &&
-                                    <Icon title={cell.help}>
-                                        <LiveHelp color='primary' />
-                                    </Icon>
+                        <MenuItem key={cell.key} dense={true}>
+                            <FormControlLabel
+                                sx={{ display: 'flex', flex: 1 }}
+                                size='small'
+                                label={cell.key}
+                                control={
+                                    <Checkbox
+                                        size='small'
+                                        checked={cell.hide ? false : true}
+                                        onChange={(e) => onSettingsItemChange(e, cell.key)}
+                                    />
                                 }
-                            </MenuItem>
-                        </Tooltip>
+                            />
+                            <Select
+                                size='small'
+                                value={sequence}
+                                onChange={(e) => onColumnOrderChange(e.target.value, cell.key)}>
+                                {[...Array(maxSequence).keys()].map((v, index) => (
+                                    <MenuItem key={index} value={index + 1}>{index + 1}</MenuItem>
+                                ))}
+                            </Select>
+                        </MenuItem>
                     )
                 })}
-            </Select>
+            </Popover>
             {props.headerProps.menu}
         </>
     )
@@ -385,6 +377,7 @@ function AbbreviatedFilterWidget(props) {
                                     renderInput={(params) => <TextField {...params} label={props.bufferListFieldAttrs.title} />}
                                 />
                                 <Button
+                                    color='primary'
                                     className={classes.button}
                                     disabled={props.searchValue ? false : true}
                                     disableElevation
@@ -416,17 +409,21 @@ function AbbreviatedFilterWidget(props) {
                                             {
                                                 activeRows.map((row, index) => {
                                                     let selected = row["data-id"] === props.selected;
-                                                    let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === row["data-id"])[0];
                                                     let alertBubbleCount = 0;
                                                     let alertBubbleColor = ColorTypes.INFO;
                                                     if (props.alertBubbleSource) {
-                                                        let alertBubbleData = metadata;
+                                                        let alertBubbleData;
+                                                        const source = props.alertBubbleSource.split('.')[0];
+                                                        const bubbleSourcePath = props.alertBubbleSource.substring(props.alertBubbleSource.indexOf('.') + 1);
                                                         if (props.linkedItemsMetadata) {
-                                                            alertBubbleData = props.linkedItemsMetadata.filter(o => _.get(o, DB_ID) === row["data-id"])[0];
+                                                            alertBubbleData = props.linkedItemsMetadata.find(o => _.get(o, DB_ID) === row['data-id']);
+                                                        } else {
+                                                            alertBubbleData = props.itemsMetadataDict[source].find(meta => _.get(meta, DB_ID) === row['data-id']);
                                                         }
-                                                        alertBubbleCount = getAlertBubbleCount(alertBubbleData, props.alertBubbleSource);
+                                                        alertBubbleCount = getAlertBubbleCount(alertBubbleData, bubbleSourcePath);
                                                         if (props.alertBubbleColorSource) {
-                                                            alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollections, props.alertBubbleSource, props.alertBubbleColorSource);
+                                                            const bubbleColorSourcePath = props.alertBubbleColorSource.substring(props.alertBubbleColorSource.indexOf('.') + 1);
+                                                            alertBubbleColor = getAlertBubbleColor(alertBubbleData, props.itemCollectionsDict[source], bubbleSourcePath, bubbleColorSourcePath);
                                                         }
                                                     }
                                                     let disabled = false;
@@ -442,24 +439,23 @@ function AbbreviatedFilterWidget(props) {
                                                                     {alertBubbleCount > 0 && <AlertBubble content={alertBubbleCount} color={alertBubbleColor} />}
                                                                 </TableCell>
                                                                 {filteredHeadCells.map((cell, i) => {
-
                                                                     if (cell.hide) return;
                                                                     let mode = Modes.READ_MODE;
                                                                     let rowindex = row["data-id"];
-                                                                    let collection = collections.filter(c => c.key === cell.key)[0];
+                                                                    let collection = props.collections.filter(c => c.key === cell.key)[0];
                                                                     if (collection.type === "progressBar") {
                                                                         collection = _.cloneDeep(collection);
-                                                                        let metadata = props.itemsMetadata.filter(metadata => _.get(metadata, DB_ID) === rowindex)[0];
                                                                         if (typeof (collection.min) === DataTypes.STRING) {
                                                                             let min = collection.min;
-                                                                            collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
+                                                                            const source = min.split('.')[0];
+                                                                            collection.min = _.get(props.itemsMetadataDict[source], min.substring(min.indexOf('.') + 1));
                                                                         }
                                                                         if (typeof (collection.max) === DataTypes.STRING) {
                                                                             let max = collection.max;
+                                                                            const source = max.split('.')[0];
                                                                             collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
-                                                                            collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1))
+                                                                            collection.max = _.get(props.itemsMetadataDict[source], max.substring(max.indexOf('.') + 1))
                                                                         }
-
                                                                     }
                                                                     let xpath = collection.xpath;
                                                                     let value = row[collection.key];
@@ -557,7 +553,7 @@ function AbbreviatedFilterWidget(props) {
                     chartData={props.chartData}
                     onChartDataChange={props.onChartDataChange}
                     onChartDelete={props.onChartDelete}
-                    collections={collections}
+                    collections={props.collections}
                     filters={props.filters}
                     collectionView={true}
                     setSelectedId={onRowSelect}

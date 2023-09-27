@@ -4,57 +4,74 @@
 }
 
 .previous {
-    color: red;
+    /* color: red; */
+    color: var(--red-600);
     text-decoration: line-through;
     margin-right: 10px;
 }
 
 .modified {
-    color: green;
+    /* color: green; */
+    color: var(--green-400);
 }
 
 .critical {
-    color: #9C0006 !important;
-    background-color: #ffc7ce;
+    color: white !important;
+    /* color: #9C0006 !important; */
+    background-color: var(--red-800);
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
-    color: #9C0006 !important;
-    background-color: #ffc7ce;
+    /* color: #9C0006 !important; */
+    color: white !important;
+    background-color: var(--red-600);
 }
 
 .warning {
-    color: #9c6500 !important;
-    background-color: #ffeb9c;
+    color: white !important;
+    background-color: var(--yellow-800);
+    /* color: #9c6500 !important; */
+    /* background-color: #ffeb9c; */
 }
 
 .info {
-    color: blue !important;
-    background-color: #c2d1ff;
+    color: white !important;
+    background-color: var(--blue-400);
+    /* color: blue !important;
+    background-color: #c2d1ff; */
 }
 
 .debug {
-    color: black !important;
-    background-color: #ccc;
+    color: white !important;
+    background-color: var(--grey-600);
+    /* color: black !important;
+    background-color: #ccc; */
 }
 
 .success {
-    color: darkgreen !important;
-    background-color: aquamarine;
+    color: white !important;
+    background-color: var(--green-400);
+    /* color: darkgreen !important;
+    background-color: aquamarine; */
 }
 
 .disabled {
-    background-color: #ccc;
+    /* background-color: #ccc; */
+    color: var(--grey-200) !important;
+    background-color: var(--grey-700);
+    cursor: not-allowed;
 }
 
 .remove {
-    background-color: #ffc7ce !important;
+    /* background-color: #ffc7ce !important; */
+    color: white !important;
+    background-color: var(--red-600);
     text-decoration: line-through;
 }
 
 .select {
-    background-color: white;
+    /* background-color: white; */
     width: 100%;
 }
 
@@ -63,7 +80,7 @@
 } */
 
 .text_field {
-    background-color: white;
+    /* background-color: white; */
     min-width: 70px !important;
     border-radius: 0px !important;
     width: 100%;
@@ -78,7 +95,7 @@
 }
 
 .default {
-    color: black;
+    /* color: black; */
 }
 
 .abbreviated_json_cell {
@@ -87,7 +104,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-decoration: underline;
-    color: blue !important;
+    color: var(--blue-400) !important;
     font-weight: bold !important;
 }
 

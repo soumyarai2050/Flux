@@ -15,7 +15,8 @@ def test_build_and_clean_web_project(root_dir: PurePath, build_and_clean_web_pro
                                      'strat_manager_service_pb2.py', 'strat_manager_service_routes.py',
                                      'strat_manager_service_routes_callback.py',
                                      'strat_manager_service_routes_callback_beanie_override.py',
-                                     'strat_manager_service_web_client.py', 'StratCollection.jsx',
+                                     'strat_manager_service_http_client.py',
+                                     'strat_manager_service_ws_client.py', 'StratCollection.jsx',
                                      'stratCollectionSlice.js', 'StratLimits.jsx', 'StratStatus.jsx', 'uiLayoutSlice.js'
                                      ]
     generated_files_dir_path: PurePath = root_dir / 'CodeGenProjects' / 'addressbook' / 'generated'

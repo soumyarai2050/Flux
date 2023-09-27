@@ -44,7 +44,7 @@ class CppCodecTestPlugin(BaseProtoPlugin):
         Abstract method which is responsible for generating outputs from derived plugin class.
         Must return dict having:
         1. output_file_name to output_content key-value pair - for non-insertion point based template output
-        2. output_file_name to output_content_dict key-value pair, where output_content_dict must have
+        1000. output_file_name to output_content_dict key-value pair, where output_content_dict must have
         insertion_point to replacing_content key-value pair - for non-insertion point based template output
         """
         file_name = str(file.proto.name).split(".")[0]
@@ -96,7 +96,7 @@ class CppCodecTestPlugin(BaseProtoPlugin):
                                           f"_decode.DebugString());\n\n"
 
                         output_content += f"\t{message_name_snake_cased}_json.clear();\n"
-                        output_content += f"\tfor (int i = 0; i < 2; ++i) {{\n"
+                        output_content += f"\tfor (int i = 0; i < 1000; ++i) {{\n"
                         output_content += (f'\t{package_name}_handler::{class_name}PopulateRandomValues::'
                                            f'{message_name_snake_cased}({message_name_snake_cased});\n')
                         output_content += f'\t\t{message_name_snake_cased}_list.add_{message_name_snake_cased}()->CopyFrom(' \

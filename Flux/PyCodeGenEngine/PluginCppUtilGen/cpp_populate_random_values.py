@@ -74,7 +74,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                                 elif message_field_name == "id" and message_field.kind.name.lower() == "string":
                                     output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->" \
                                               f"mutable_{parent_field}()->mutable_{field_name}()->set_{message_field_name}" \
-                                              f"(get_repeated_id_field_val());\n"
+                                              f"(random_data_gen.get_random_string());\n"
                         elif message_field.kind.name.lower() != "enum":
                             output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->mutable_{parent_field}()." \
                                       f"mutable_{field_name}()->add_{message_field_name}(random_data_gen.get_random_" \
@@ -106,7 +106,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                                           f"{message_field.kind.name.lower()}());\n"
                             else:
                                 output += f"\t\t\t{message_name_snake_cased}.mutable_{initial_parent_field}()->set_" \
-                                          f"{message_field_name}(get_repeated_id_field_val());\n"
+                                          f"{message_field_name}(random_data_gen.get_random_string());\n"
             elif message_field.message is not None and field_type != "repeated":
                 if field_name != initial_parent_field and message_field.kind.name.lower() != "enum":
                     output += self.generate_nested_fields(message_field.message, message_field_name,
@@ -142,7 +142,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                     else:
                         output += f"\t\t\t{message_field_name}->set_{field_name}(random_data_gen.get_random_{field_kind}());\n"
                 else:
-                    output += f"\t\t\t{message_field_name}->set_{field_name}(get_repeated_id_field_val());\n"
+                    output += f"\t\t\t{message_field_name}->set_{field_name}(random_data_gen.get_random_string());\n"
             elif field_type_message is None and field_type != "repeated" and field_kind == "enum":
                 enum_field_name_list: list = fields.enum.full_name.split(".")
                 enum_field_list = fields.enum.values
@@ -202,7 +202,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
         output_content += '\t\t\treturn std::string(buffer);\n'
         output_content += "\t\t}\n\n"
 
-        output_content += "\t\tstatic std::string get_repeated_id_field_val() {\n"
+        output_content += "\t\tstatic std::string get_repeated_id_field_string() {\n"
         output_content += "\t\t\tpid_t pid = getpid();\n"
         output_content += "\t\t\tstd::string id = std::to_string(pid);\n"
         output_content += '\t\t\tid += "-";\n'
@@ -278,7 +278,7 @@ class CppPopulateRandomValueHandlerPlugin(BaseProtoPlugin):
                                                               f"{nested_fields_kind}());\n"
                                         else:
                                             output_content += f"\t\t\t{field_name}->set_{nested_fields_name}" \
-                                                              f"(get_repeated_id_field_val());\n"
+                                                              f"(random_data_gen.get_random_string());\n"
 
 
                         output_content += "\t\t}\n\n"

@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.22)
+set(CMAKE_CXX_STANDARD 23)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake")
 message (WARNING ${CMAKE_MODULE_PATH})
 find_package(Mongo REQUIRED)
-find_package(POCO REQUIRED)
-find_package(RapidJSON REQUIRED)
+find_package(Protobuf REQUIRED)
+find_package(quill REQUIRED)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -13,6 +14,23 @@ FetchContent_Declare(
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+
+set(CppCodec ../../../generated/CppCodec)
+#set(CppTest ../../../generated/CppTest)
+set(CppUtilGen ../../../generated/CppUtilGen)
+set(ProtoGenCc ../../../generated/ProtoGenCc)
+#set(FluxCodeGenCore ../../../../../Flux/PyCodeGenEngine/FluxCodeGenCore)
+set(App ../../../cpp_app/include)
+set(Src ../../../cpp_app/src)
+set(FluxCppCore ../../../../../FluxCppCore/include)
+
+file(GLOB CppCodec_SRC ${CppCodec}/*)
+#file(GLOB CppTest_SRC ${CppTest}/*)
+file(GLOB CppUtilGen_SRC ${CppUtilGen}/*)
+file(GLOB ProtoGenCc_SRC ${ProtoGenCc}/*)
+file(GLOB App_SRC ${App}/*)
+file(GLOB FluxCppCore_SRC ${FluxCppCore}/*)
+
 FetchContent_MakeAvailable(googletest)
 
 project(Google_tests)
@@ -20,12 +38,26 @@ project(Google_tests)
 message(WARNING ${MONGO_INCLUDE_DIR})
 message(WARNING ${BSON_INCLUDE_DIR})
 
-include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR} ${POCO_INCLUDE_DIR} ${RapidJSON_INCLUDE_DIR})
+include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR}
+        ${PROTOBUF_INCLUDE_DIRS} ${CppCodec} ${CppCodec} ${CppUtilGen} ${ProtoGenCc} ${App} ${FluxCppCore} /usr/local/lib/quill)
+
+set(MD_MODEL ../../../generated/CppProto2)
+
+set(SRC_FILES
+        ${CppCodec_SRC}
+        ${CppTest_SRC}
+        ${CppUtilGen_SRC}
+        ${ProtoGenCc_SRC}
+        ${App_SRC}
+        ${FluxCppCore_SRC}
+)
+
+message(SRC_FILES ${SRC_FILES})
 
 # adding the Google_Tests_run target
-add_executable(Google_Tests_run MD_Test.cpp ../src/MD_TopOfBookPublisher.cpp ../src/MD_MongoDBHandler.cpp)
+add_executable(Google_Tests_run MD_Test.cpp ${SRC_FILES})
 
 # linking Google_Tests_run with DateConverter_lib which will be tested
 #target_link_libraries(Google_Tests_run DateConverter_lib)
 
-target_link_libraries(Google_Tests_run gtest gtest_main ${MONGO_LIB} ${BSON_LIB} ${POCO_LIB})
+target_link_libraries(Google_Tests_run gtest gtest_main ${MONGO_LIB} ${BSON_LIB} ${PROTOBUF_LIBRARIES} quill)

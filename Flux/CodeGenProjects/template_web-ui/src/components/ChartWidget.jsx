@@ -21,6 +21,7 @@ import FullScreenModal from './Modal';
 import TreeWidget from './TreeWidget';
 import EChart from './EChart';
 import classes from './ChartWidget.module.css';
+import { useTheme } from '@emotion/react';
 
 const CHART_SCHEMA_NAME = 'chart_data';
 
@@ -28,6 +29,7 @@ function ChartWidget(props) {
     // redux states
     const { schemaCollections } = useSelector(state => state.schema);
     // local react states
+    const theme = useTheme();
     const [storedChartObj, setStoredChartObj] = useState({});
     const [modifiedChartObj, setModifiedChartObj] = useState({});
     const [selectedIndex, setSelectedIndex] = useState();
@@ -39,7 +41,6 @@ function ChartWidget(props) {
     // const [openPartition, setOpenPartition] = useState(false);
     // const [anchorEl, setAnchorEl] = useState(null);
     const [chartObj, setChartObj] = useState({});
-    const [theme, setTheme] = useState('light');
     const [tsData, setTsData] = useState({});
     const [datasets, setDatasets] = useState([]);
     const [rows, setRows] = useState(props.rows);
@@ -65,11 +66,6 @@ function ChartWidget(props) {
     // 4. create expanded chart configuration object to be used by echart using stored chart configuration and datasets 
 
     useEffect(() => {
-        // set the theme of chart from browser preferences
-        // TODO: add listener to listen for preferences changes
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            setTheme('dark');
-        }
         const updatedSchema = updateChartSchema(props.schema, props.collections, props.collectionView);
         setSchema(updatedSchema);
     }, [])
@@ -513,7 +509,7 @@ function ChartWidget(props) {
                     {storedChartObj.chart_name && (
                         <EChart
                             loading={false}
-                            theme={theme}
+                            theme={theme.palette.mode}
                             option={{
                                 legend: {},
                                 tooltip: {

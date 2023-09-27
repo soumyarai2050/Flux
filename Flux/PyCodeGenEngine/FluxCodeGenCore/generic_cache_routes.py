@@ -15,8 +15,8 @@ from FluxPythonUtils.scripts.utility_functions import compare_n_patch_dict, conv
     compare_n_patch_list
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_beanie_routes import generic_perf_benchmark, \
     assign_missing_ids_n_handle_date_time_type
-from Flux.CodeGenProjects.pair_strat_engine.generated.FastApi.strat_manager_service_web_client import \
-    StratManagerServiceWebClient
+from Flux.CodeGenProjects.pair_strat_engine.generated.FastApi.strat_manager_service_http_client import \
+    StratManagerServiceHttpClient
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_beanie_routes import get_beanie_host_n_port, \
     underlying_generic_patch_all_http, _generic_put_all_http
 
@@ -44,7 +44,7 @@ async def generic_post_http(pydantic_class_type, project_name: str, pydantic_obj
 
             # saving to db
             host, port = get_beanie_host_n_port(project_name)
-            beanie_web_client = StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
+            beanie_web_client = StratManagerServiceHttpClient.set_or_get_if_instance_exists(host, port)
             pydantic_class_name_snake_cased = convert_camel_case_to_specific_case(pydantic_class_type.__name__)
             beanie_web_client_post = getattr(beanie_web_client, f"create_{pydantic_class_name_snake_cased}_client")
             beanie_web_client_post(pydantic_obj)
@@ -67,7 +67,7 @@ async def generic_post_all_http(pydantic_class_type: Type[DocType], project_name
 
             # saving to db
             host, port = get_beanie_host_n_port(project_name)
-            beanie_web_client = StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
+            beanie_web_client = StratManagerServiceHttpClient.set_or_get_if_instance_exists(host, port)
             pydantic_class_name_snake_cased = convert_camel_case_to_specific_case(pydantic_class_type.__name__)
             beanie_web_client_post_all = getattr(beanie_web_client, f"create_all_{pydantic_class_name_snake_cased}_client")
             beanie_web_client_post_all(pydantic_obj_list)
@@ -120,7 +120,7 @@ async def generic_put_http(pydantic_class_type, project_name: str, stored_pydant
                                                 update_agg_pipeline, has_links)
     # saving to db
     host, port = get_beanie_host_n_port(project_name)
-    beanie_web_client = StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
+    beanie_web_client = StratManagerServiceHttpClient.set_or_get_if_instance_exists(host, port)
     pydantic_class_name_snake_cased = convert_camel_case_to_specific_case(pydantic_class_type.__name__)
     beanie_web_client_put = getattr(beanie_web_client, f"put_{pydantic_class_name_snake_cased}_client")
     beanie_web_client_put(updated_obj)
@@ -141,7 +141,7 @@ async def generic_put_all_http(pydantic_class_type, project_name: str, stored_py
                                                          update_agg_pipeline, has_links)
     # saving to db
     host, port = get_beanie_host_n_port(project_name)
-    beanie_web_client = StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
+    beanie_web_client = StratManagerServiceHttpClient.set_or_get_if_instance_exists(host, port)
     pydantic_class_name_snake_cased = convert_camel_case_to_specific_case(pydantic_class_type.__name__)
     beanie_web_client_put_all = getattr(beanie_web_client, f"put_all_{pydantic_class_name_snake_cased}_client")
     beanie_web_client_put_all(updated_obj_list)
@@ -161,7 +161,7 @@ async def generic_patch_http(pydantic_class_type, project_name: str, stored_pyda
                                                 filter_agg_pipeline, update_agg_pipeline, has_links)
     # saving to db
     host, port = get_beanie_host_n_port(project_name)
-    beanie_web_client = StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
+    beanie_web_client = StratManagerServiceHttpClient.set_or_get_if_instance_exists(host, port)
     pydantic_class_name_snake_cased = convert_camel_case_to_specific_case(pydantic_class_type.__name__)
     beanie_web_client_patch = getattr(beanie_web_client, f"patch_{pydantic_class_name_snake_cased}_client")
     beanie_web_client_patch(pydantic_obj_update_json)
@@ -183,7 +183,7 @@ async def generic_patch_all_http(pydantic_class_type, project_name: str, stored_
                                                     filter_agg_pipeline, update_agg_pipeline, has_links)
     # saving to db
     host, port = get_beanie_host_n_port(project_name)
-    beanie_web_client = StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
+    beanie_web_client = StratManagerServiceHttpClient.set_or_get_if_instance_exists(host, port)
     pydantic_class_name_snake_cased = convert_camel_case_to_specific_case(pydantic_class_type.__name__)
     beanie_web_client_patch = getattr(beanie_web_client, f"patch_all_{pydantic_class_name_snake_cased}_client")
     beanie_web_client_patch(pydantic_obj_update_json_list)
@@ -202,7 +202,7 @@ async def generic_delete_http(pydantic_class_type, project_name: str, pydantic_d
 
             # saving in db
             host, port = get_beanie_host_n_port(project_name)
-            beanie_web_client = StratManagerServiceWebClient.set_or_get_if_instance_exists(host, port)
+            beanie_web_client = StratManagerServiceHttpClient.set_or_get_if_instance_exists(host, port)
             pydantic_class_name_snake_cased = convert_camel_case_to_specific_case(pydantic_class_type.__name__)
             beanie_web_client_delete = getattr(beanie_web_client, f"delete_{pydantic_class_name_snake_cased}_client")
             beanie_web_client_delete(pydantic_obj.id)

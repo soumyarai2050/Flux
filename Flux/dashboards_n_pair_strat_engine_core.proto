@@ -1,0 +1,54 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "trade_core.proto";
+
+
+message RollingMaxOrderCount{
+  required int32 max_rolling_tx_count = 1 [(FluxFldHelp) = "max new orders count allowed per period defined below"];
+  optional int32 rolling_tx_count_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above count enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
+}
+
+message PortfolioLimits{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+
+  // todo: take coordinates from yaml for projects in project_specific plugin
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 7,
+    y: 12,
+    w: 11,
+    h: 11,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    }
+  };
+
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: true
+  };
+  //Server generated unique Id
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional int32 max_open_baskets = 2 [(FluxFldValMin) = "50", (FluxFldHelp) = "max simultaneous open orders allowed per side for this portfolio"];
+  optional float max_open_notional_per_side = 3[(FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000"];
+  optional float max_gross_n_open_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "50000000", (FluxFldHelp) = "aggregated buy+sell: open+executed max allowed notional"];
+  optional RollingMaxOrderCount rolling_max_order_count = 5 [(FluxFldHelp) = "Allowed order count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
+  optional RollingMaxOrderCount rolling_max_reject_count = 6 [(FluxFldHelp) = "Allowed rejection count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
+  // auto update symbol's availability when allocated/consumed by strat(block strat creation if not enough availability), this has both limit and status in Position
+  repeated Broker eligible_brokers = 7;
+  optional int64 eligible_brokers_update_count = 8;
+}
+
+message PortfolioLimitsList {
+  repeated PortfolioLimits portfolio_limits = 1;
+}

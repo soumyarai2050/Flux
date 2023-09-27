@@ -50,12 +50,14 @@ code {
 
 /* Handle */
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  /* background: #888; */
+  background-color: var(--grey-800);
 }
 
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  /* background: #555; */
+  background-color: var(--grey-900);
 }
 
 @keyframes blink {
@@ -74,4 +76,18 @@ code {
 
 .react-json-view .copy-to-clipboard-container {
   display: inline-block !important;
+}
+
+.react-json-view {
+  background-color: var(--grey-200) !important;
+  padding: 5px;
+  border-radius: 5px;
+}
+
+.pvtAxisContainer {
+  background-color: inherit !important;
+}
+
+.pvtVals {
+  background-color: inherit !important;
 }

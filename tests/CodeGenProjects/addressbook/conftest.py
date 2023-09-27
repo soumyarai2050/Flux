@@ -6,16 +6,15 @@ import copy
 os.environ["DBType"] = "beanie"
 
 # Project Imports
-from Flux.CodeGenProjects.market_data.generated.Pydentic.market_data_service_model_imports import \
-    MarketDepthBaseModel, SymbolOverviewBaseModel
+from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_verify_limits, \
     create_n_verify_portfolio_status, create_fx_symbol_overview, clean_all_collections_ignoring_ui_layout, \
     get_ps_n_md_db_names, test_config_file_path, clean_today_activated_ticker_dict, clear_cache_in_model, \
     ps_config_yaml_dict
-from Flux.CodeGenProjects.addressbook.app.trading_link_base import TradingLinkBase, config_file_path
-from Flux.CodeGenProjects.addressbook.app.trade_simulator import TradeSimulator
+# from CodeGenProjects.strat_executor.app.trading_link_base import TradingLinkBase, executor_config_yaml_path
+# from CodeGenProjects.strat_executor.app.trade_simulator import TradeSimulator
 
 
 @pytest.fixture()
@@ -40,18 +39,19 @@ def residual_wait_sec() -> int:
     return 80
 
 
-@pytest.fixture()
-def config_dict():
-    original_yaml_content_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
-    TradingLinkBase.reload_configs()
-    TradeSimulator.reload_symbol_configs()
-    yield TradingLinkBase.config_dict
-
-    # reverting back file
-    YAMLConfigurationManager.update_yaml_configurations(original_yaml_content_str, str(config_file_path))
-    TradingLinkBase.reload_configs()
-    TradeSimulator.reload_symbol_configs()
-    time.sleep(2)
+# @pytest.fixture()
+# def config_dict():
+#     original_yaml_content_str = YAMLConfigurationManager.load_yaml_configurations(str(executor_config_yaml_path),
+#                                                                                   load_as_str=True)
+#     TradingLinkBase.reload_executor_configs()
+#     TradeSimulator.reload_symbol_configs()
+#     yield TradingLinkBase.executor_config_dict
+#
+#     # reverting back file
+#     YAMLConfigurationManager.update_yaml_configurations(original_yaml_content_str, str(executor_config_yaml_path))
+#     TradingLinkBase.reload_executor_configs()
+#     TradeSimulator.reload_symbol_configs()
+#     time.sleep(2)
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, exp
     # creating portfolio_status
     create_n_verify_portfolio_status(copy.deepcopy(expected_portfolio_status_))
 
-    # creating symbol_override for fx
+    # creating fx_symbol_overview
     create_fx_symbol_overview()
 
     # time for override get refreshed
@@ -235,7 +235,7 @@ def symbol_overview_obj_list():
 
 @pytest.fixture()
 def expected_start_status_(pair_securities_with_sides_):
-    yield StratStatus(**{
+    yield StratStatusBaseModel(**{
       "strat_state": "StratState_READY",
       "total_buy_qty": 0,
       "total_sell_qty": 0,
@@ -262,14 +262,15 @@ def expected_start_status_(pair_securities_with_sides_):
       "total_cxl_sell_notional": 0,
       "total_cxl_exposure": 0,
       "average_premium": 0,
+      "market_premium": 0,
       "balance_notional": 300000,
-      "strat_alerts": []
+      "strat_status_update_seq_num": 0
     })
 
 
 @pytest.fixture()
 def expected_strat_limits_():
-    yield StratLimits(**{
+    yield StratLimitsBaseModel(**{
       "max_open_orders_per_side": 5,
       "max_cb_notional": 300000,
       "max_open_cb_notional": 30000,
@@ -293,7 +294,8 @@ def expected_strat_limits_():
         "max_residual": 100_000,
         "residual_mark_seconds": 40
       },
-      "eligible_brokers": []
+      "eligible_brokers": [],
+      "strat_limits_update_seq_num": 0
     })
 
 
@@ -358,9 +360,7 @@ def pair_strat_(pair_securities_with_sides_):
         "common_premium": 40,
         "hedge_ratio": 5
         },
-        "pair_strat_params_update_seq_num": 0,
-        "strat_status_update_seq_num": 0,
-        "strat_limits_update_seq_num": 0
+        "pair_strat_params_update_seq_num": 0
     })
 
 
@@ -451,8 +451,7 @@ def expected_portfolio_status_():
         "overall_buy_notional": 0,
         "overall_sell_notional": 0,
         "overall_buy_fill_notional": 0,
-        "overall_sell_fill_notional": 0,
-        "alert_update_seq_num": 0
+        "overall_sell_fill_notional": 0
     })
 
 
@@ -649,7 +648,7 @@ def dash_():
                     "sec_id": "CB_Sec_1",
                     "sec_type": "TICKER"
                 },
-                "exch_id": "Exchange",
+                "exch_id": "EXCH1",
                 "vwap": 150,
                 "vwap_change": 2.5
             },
@@ -658,10 +657,12 @@ def dash_():
                     "sec_id": "EQT_Sec_1",
                     "sec_type": "TICKER"
                 },
-                "exch_id": "Exchange",
+                "exch_id": "EXCH2",
                 "vwap": 10,
                 "vwap_change": 0.5
-            }
+            },
+            "mkt_premium": "10",
+            "mkt_premium_change": "2"
         }
     }
     yield dash_json
@@ -673,7 +674,7 @@ def bar_data_():
     bar_data_json = {
         "symbol_n_exch_id": {
             "symbol": "CB_Sec_1",
-            "exch_id": "Exchange"
+            "exch_id": "EXCH"
         },
         "start_time": current_time,
         "end_time": current_time.add(seconds=1),

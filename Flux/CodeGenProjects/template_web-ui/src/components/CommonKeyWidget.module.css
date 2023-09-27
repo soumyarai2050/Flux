@@ -2,7 +2,7 @@
     padding: 5px 10px;
     display: flex;
     justify-content: flex-start;
-    background-color: cadetblue;
+    /* background-color: cadetblue; */
     flex-wrap: wrap;
     max-height: 75%;
     overflow: auto;
@@ -10,11 +10,11 @@
 
 .item {
     margin-right: 10px;
-    color: white;
+    /* color: white; */
 }
 
 .key {
-    color: yellow;
+    /* color: yellow; */
     padding-right: 5px;
 }
 
@@ -44,7 +44,7 @@
 }
 
 .default {
-    color: white;
+    /* color: white; */
 }
 
 .abbreviated_json {
@@ -71,10 +71,6 @@
     to {
         opacity: 1
     }
-}
-
-.group_indicator {
-    color: yellow;
 }
 
 .break_line {

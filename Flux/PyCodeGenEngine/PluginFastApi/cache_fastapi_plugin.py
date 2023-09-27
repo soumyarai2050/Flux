@@ -15,9 +15,11 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 import protogen
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_file_handler import FastapiCallbackFileHandler
-from Flux.PyCodeGenEngine.PluginFastApi.fastapi_client_file_handler import FastapiClientFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_client_file_handler import FastapiHttpClientFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_client_file_handler import FastapiWSClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_launcher_file_handler import FastapiLauncherFileHandler
-from Flux.PyCodeGenEngine.PluginFastApi.fastapi_routes_file_handler import FastapiRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_routes_file_handler import FastapiHttpRoutesFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_routes_file_handler import FastapiWsRoutesFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_file_handler import FastapiCallbackOverrideFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_set_instance_handler import \
     FastapiCallbackOverrideSetInstanceHandler
@@ -25,8 +27,10 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_set_instance_h
 
 class CacheFastApiPlugin(FastapiCallbackFileHandler,
                          FastapiCallbackOverrideSetInstanceHandler,
-                         FastapiClientFileHandler,
-                         FastapiRoutesFileHandler,
+                         FastapiHttpClientFileHandler,
+                         FastapiWSClientFileHandler,
+                         FastapiHttpRoutesFileHandler,
+                         FastapiWsRoutesFileHandler,
                          FastapiLauncherFileHandler,
                          FastapiCallbackOverrideFileHandler):
     """
@@ -100,7 +104,7 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
     def handle_fastapi_initialize_file_gen(self):
         output_str = "import os\n"
         output_str += "from fastapi import FastAPI\n"
-        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.routes_file_name)
+        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
         output_str += f"from {routes_file_path} import {self.api_router_app_name}\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_file_path} import *\n"
@@ -161,14 +165,23 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
             # Adding dummy callback override class file
             "dummy_" + self.beanie_native_override_routes_callback_class_name + ".py": self.handle_callback_override_file_gen(),
 
-            # Adding project's routes.py
-            self.routes_file_name + ".py": self.handle_routes_file_gen(),
+            # Adding base routes.py
+            self.base_routes_file_name + ".py": self.handle_base_routes_file_gen(),
+
+            # Adding project's http routes.py
+            self.http_routes_file_name + ".py": self.handle_http_routes_file_gen(),
+
+            # Adding project's ws routes.py
+            self.ws_routes_file_name + ".py": self.handle_ws_routes_file_gen(),
 
             # Adding project's run file
             self.launch_file_name + ".py": self.handle_launch_file_gen(file),
 
             # Adding client file
-            self.client_file_name + ".py": self.handle_client_file_gen(file)
+            self.client_file_name + ".py": self.handle_client_file_gen(file),
+
+            # Adding WS client file
+            self.ws_client_file_name + ".py": self.handle_ws_client_file_gen(file)
         }
 
         return output_dict

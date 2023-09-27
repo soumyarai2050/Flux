@@ -13,8 +13,8 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, \
-    convert_to_camel_case
+from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case,
+                                                       convert_to_capitalized_camel_case)
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
 
@@ -31,9 +31,10 @@ class StratExecutorPlugin(BaseProtoPlugin):
         self.get_log_key_required_messages = []
         self.get_cache_key_required_msg_to_key_count_dict: Dict[protogen.Message, int] = {}
         self.beanie_pydantic_model_dir_name = "Pydentic"
+        self.beanie_fastapi_model_dir_name = "FastApi"
+        self.file_name = ""
         self.file_name_cap_camel_cased = ""
         self.model_file_name = ""
-        self.ws_helper_file_name: str = ""
         self.ws_data_manager_file_name: str = ""
         self.base_strat_cache_file_name: str = ""
         self.base_strat_cache_class_name: str = ""
@@ -88,11 +89,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         return None
 
     def set_data_members(self, file: protogen.File):
-        file_name = str(file.proto.name).split(".")[0]
-        file_name_camel_cased = convert_to_camel_case(file_name)
-        self.file_name_cap_camel_cased = file_name_camel_cased[0].upper() + file_name_camel_cased[1:]
-        file_name_snake_cased = convert_camel_case_to_specific_case(file_name)
-        self.ws_helper_file_name = f"{file_name_snake_cased}_ws_helper"
+        file_name_snake_cased = convert_camel_case_to_specific_case(self.file_name)
         self.ws_data_manager_file_name = f"{file_name_snake_cased}_ws_data_manager"
         self.base_strat_cache_file_name = f"{file_name_snake_cased}_base_strat_cache"
         self.base_strat_cache_class_name = f"{self.file_name_cap_camel_cased}BaseStratCache"
@@ -131,26 +128,12 @@ class StratExecutorPlugin(BaseProtoPlugin):
                     else:
                         self.get_cache_key_required_msg_to_key_count_dict[message] = key_count
 
-    def ws_helper_file_content(self, file: protogen.File) -> str:
-        content_str = "# python imports\n"
-        content_str += "from typing import List\n"
-        content_str += "from pydantic import BaseModel\n\n"
-        content_str += "# project imports\n"
-        file_name = str(file.proto.name).split(".")[0]
-        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
-        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
-        content_str += f'from {model_file_path} import *\n\n\n'
-        for message in self.ws_manager_required_messages:
-            content_str += f'class {message.proto.name}BaseModelList(BaseModel):\n'
-            content_str += f'    __root__: List[{message.proto.name}BaseModel]\n\n\n'
-        return content_str
-
     def data_manager_model_based_handler_for_top_lvl_content(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        content_str = f'\tdef handle_{message_name_snake_cased}_ws(self, ' \
-                      f'{message_name_snake_cased}_: {message.proto.name}BaseModel):\n'
-        content_str += f"\t\twith self.{message_name_snake_cased}_ws_cont.single_obj_lock:\n"
+        content_str = f'\tdef handle_{message_name_snake_cased}_get_all_ws(self, ' \
+                      f'{message_name_snake_cased}_: {message.proto.name}BaseModel, **kwargs):\n'
+        content_str += f"\t\twith self.{message_name_snake_cased}_ws_get_all_cont.single_obj_lock:\n"
         content_str += f"\t\t\t{message_name_snake_cased}_tuple = " \
                        f"self.trading_cache.get_{message_name_snake_cased}()\n"
         content_str += f"\t\t\tif {message_name_snake_cased}_tuple is None or " \
@@ -158,7 +141,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += f"\t\t\t\tself.trading_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += "\t\t\t\tkwargs = {'"+f"{message_name_snake_cased}_"+"': "+f"{message_name_snake_cased}_"+"}\n"
         content_str += f"\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
-        content_str += f"\t\t\t\tif self.{message_name_snake_cased}_ws_cont.notify:\n"
+        content_str += f"\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
         content_str += f"\t\t\t\t\tself.strat_cache_type.notify_all()\n"
         content_str += f'\t\t\t\tlogging.info(f"Added '+f'{message_name_snake_cased}' + \
                        ' with id: {'+f'{message_name_snake_cased}'+'_.id}")\n'
@@ -166,7 +149,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += f"\t\t\t\t{message_name_snake_cased}, _ = {message_name_snake_cased}_tuple\n"
         content_str += f"\t\t\t\tif {message_name_snake_cased}.id == {message_name_snake_cased}_.id:\n"
         content_str += f"\t\t\t\t\tself.trading_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
-        content_str += f"\t\t\t\t\tif self.{message_name_snake_cased}_ws_cont.notify:\n"
+        content_str += f"\t\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
         content_str += f"\t\t\t\t\t\tself.strat_cache_type.notify_all()\n"
         content_str += '\t\t\t\t\tlogging.debug(f"updated ' + f'{message_name_snake_cased}' + \
                        ' with id: {' + f'{message_name_snake_cased}' + '_.id}")\n'
@@ -185,16 +168,15 @@ class StratExecutorPlugin(BaseProtoPlugin):
                                                                             message_name_snake_cased: str):
         content_str = f"\tdef get_key_n_strat_cache_from_{message_name_snake_cased}(self, " \
                       f"{message_name_snake_cased}_: {message_name}BaseModel):\n"
-        key_handler_class_name = convert_to_camel_case(self.key_handler_file_name)
-        key_handler_class_name = key_handler_class_name[0].upper() + key_handler_class_name[1:]
+        key_handler_class_name = convert_to_capitalized_camel_case(self.key_handler_file_name)
         content_str += f"\t\tkey = {key_handler_class_name}.get_key_from_{message_name_snake_cased}" \
                        f"({message_name_snake_cased}_)\n"
         content_str += f"\t\tstrat_cache = self.strat_cache_type.get(key)\n"
         content_str += f"\t\treturn key, strat_cache\n\n"
-        content_str += f'\tdef handle_{message_name_snake_cased}_ws(self, ' \
-                       f'{message_name_snake_cased}_: {message_name}BaseModel, ' \
-                       f'cached_pair_strat_none_cmnt: str | None = None, ' \
-                       f'strat_cache_none_cmnt: str | None = None):\n'
+        content_str += f'\tdef handle_{message_name_snake_cased}_get_all_ws(self, ' \
+                       f'{message_name_snake_cased}_: {message_name}BaseModel, **kwargs):\n'
+        content_str += f'\t\tcached_pair_strat_none_cmnt = kwargs.get("cached_pair_strat_none_cmnt")\n'
+        content_str += f'\t\tstrat_cache_none_cmnt = kwargs.get("strat_cache_none_cmnt")\n'
         content_str += f"\t\tkey, strat_cache = self.get_key_n_strat_cache_from_{message_name_snake_cased}(" \
                        f"{message_name_snake_cased}_)\n"
         content_str += f"\t\tif strat_cache is not None:\n"
@@ -206,7 +188,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
                        ', "cached_pair_strat": cached_pair_strat, "strat_cache": strat_cache, ' \
                        '"'+f'{message_name_snake_cased}_key'+'": key}\n'
         content_str += f"\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
-        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_cont.notify and " \
+        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify and " \
                        f"cached_pair_strat is not None:\n"
         content_str += f"\t\t\t\tstrat_cache.notify_semaphore.release()\n"
         content_str += f"\t\t\telif cached_pair_strat is None:\n"
@@ -231,15 +213,14 @@ class StratExecutorPlugin(BaseProtoPlugin):
                                                                            message_name_snake_cased: str):
         content_str = f"\tdef get_key_n_strat_cache_from_{message_name_snake_cased}(self, " \
                       f"{message_name_snake_cased}_: {message_name}BaseModel):\n"
-        key_handler_class_name = convert_to_camel_case(self.key_handler_file_name)
-        key_handler_class_name = key_handler_class_name[0].upper() + key_handler_class_name[1:]
+        key_handler_class_name = convert_to_capitalized_camel_case(self.key_handler_file_name)
         content_str += f"\t\tkey1, key2 = {key_handler_class_name}.get_key_from_{message_name_snake_cased}(" \
                        f"{message_name_snake_cased}_)\n"
         content_str += f"\t\tstrat_cache1 = self.strat_cache_type.get(key1)\n"
         content_str += f"\t\tstrat_cache2 = self.strat_cache_type.get(key2)\n"
         content_str += f"\t\treturn key1, key2, strat_cache1, strat_cache2\n\n"
-        content_str += f'\tdef handle_{message_name_snake_cased}_ws(self, ' \
-                       f'{message_name_snake_cased}_: {message_name}BaseModel):\n'
+        content_str += f'\tdef handle_{message_name_snake_cased}_get_all_ws(self, ' \
+                       f'{message_name_snake_cased}_: {message_name}BaseModel, **kwargs):\n'
         content_str += f"\t\tkey1, key2, strat_cache1, strat_cache2 = " \
                        f"self.get_key_n_strat_cache_from_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += f"\t\tupdated: bool = False\n"
@@ -248,7 +229,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += f"\t\t\t\tstrat_cache1.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += '\t\t\tkwargs = {}\n'
         content_str += f"\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
-        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_cont.notify:\n"
+        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
         content_str += f"\t\t\t\tstrat_cache1.notify_semaphore.release()\n"
         content_str += f"\t\t\tupdated = True\n"
         content_str += f"\t\t\t# else not required - strat does not need this update notification\n"
@@ -257,7 +238,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += f"\t\t\t\tstrat_cache2.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += '\t\t\tkwargs = {}\n'
         content_str += f"\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
-        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_cont.notify:\n"
+        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
         content_str += f"\t\t\t\tstrat_cache2.notify_semaphore.release()\n"
         content_str += f"\t\t\tupdated = True\n"
         content_str += f"\t\t\t# else not required - strat does not need this update notification\n"
@@ -310,35 +291,41 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += \
             f"from {base_trading_cache_import_path} import {self.base_trading_cache_class_name}\n"
         key_handler_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.key_handler_file_name)
-        key_handler_class_name = convert_to_camel_case(self.key_handler_file_name)
-        key_handler_class_name = key_handler_class_name[0].upper()+key_handler_class_name[1:]
+        key_handler_class_name = convert_to_capitalized_camel_case(self.key_handler_file_name)
         content_str += \
             f"from {key_handler_import_path} import {key_handler_class_name}\n"
-        content_str += "from FluxPythonUtils.scripts.ws_reader import WSReader\n"
-        ws_reader_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.ws_helper_file_name)
-        content_str += f"from {ws_reader_file_path} import *\n\n\n"
         file_name = str(file.proto.name).split(".")[0]
-        file_name_camel_cased = convert_to_camel_case(file_name)
+        ws_client_file_name = f"{self.beanie_fastapi_model_dir_name}.{file_name}_ws_client"
+        ws_client_import_path = self.import_path_from_os_path("OUTPUT_DIR",
+                                                              f"{ws_client_file_name}")
+        file_name_camel_cased = convert_to_capitalized_camel_case(file_name)
+        content_str += f'from {ws_client_import_path} import {file_name_camel_cased}WSClient\n'
+
+        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
+        content_str += f'from {model_file_path} import *\n\n\n'
+
+        file_name = str(file.proto.name).split(".")[0]
+        file_name_camel_cased = convert_to_capitalized_camel_case(file_name)
         file_name_camel_cased = file_name_camel_cased[0].upper() + file_name_camel_cased[1:]
-        content_str += f"class {file_name_camel_cased}DataManager:\n"
-        content_str += f"\tdef __init__(self, host: str, port: int):\n"
+        content_str += f"class {file_name_camel_cased}DataManager({file_name_camel_cased}WSClient):\n"
+        content_str += f"\tdef __init__(self, host: str, port: int, strat_cache_type=None):\n"
+        content_str += f"\t\tsuper().__init__(host, port)\n"
+        content_str += "\t\tif strat_cache_type is None:\n"
         content_str += \
-            f"\t\tself.strat_cache_type: Type[{self.base_strat_cache_class_name}] = {self.base_strat_cache_class_name}\n"
+            f"\t\t\tself.strat_cache_type: Type[{self.base_strat_cache_class_name}] = {self.base_strat_cache_class_name}\n"
+        content_str += "\t\telse:\n"
+        content_str += "\t\t\tself.strat_cache_type = strat_cache_type\n"
         content_str += \
             f"\t\tself.trading_cache: {self.base_trading_cache_class_name} = {self.base_trading_cache_class_name}()\n"
-        content_str += \
-            f'\t\tself.{file.proto.package}_base_url: str = f"ws://'+'{host}:{port}'+f'/{file.proto.package}"\n'
         for message in self.ws_manager_required_messages:
             message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
             option_dict = \
                 StratExecutorPlugin.get_complex_option_value_from_proto(message,
                                                                         StratExecutorPlugin.flux_msg_executor_options)
             notify_all_option_val = option_dict.get(StratExecutorPlugin.executor_option_enable_notify_all_field)
-            content_str += f'\t\tself.{message_name_snake_cased}_ws_cont = WSReader(f"' + \
-                           '{self.' + f'{file.proto.package}' + '_base_url}' + \
-                           f'/get-all-{message_name_snake_cased}-ws", {message.proto.name}BaseModel, ' \
-                           f'{message.proto.name}BaseModelList, self.handle_{message_name_snake_cased}_ws, ' \
-                           f'{notify_all_option_val})\n'
+            content_str += (f'\t\tself.{message_name_snake_cased}_ws_get_all_cont = '
+                            f'self.{message_name_snake_cased}_ws_get_all_client({notify_all_option_val})\n')
         content_str += "\n"
         content_str += "\tdef __del__(self):\n"
         content_str += '\t\t"""\n'
@@ -465,9 +452,10 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str += "from typing import Dict, Tuple, Optional, ClassVar, List\n"
         output_str += "from pendulum import DateTime\n\n"
         output_str += "# project imports\n"
-        model_path = self.import_path_from_os_path("OUTPUT_DIR",
-                                                   f"{self.beanie_pydantic_model_dir_name}.{self.model_file_name}")
-        output_str += f"from {model_path} import *\n\n\n"
+        file_name = str(file.proto.name).split(".")[0]
+        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
+        output_str += f'from {model_file_path} import *\n\n\n'
         output_str += f"class {self.base_strat_cache_class_name}:\n"
         output_str += f"\tstrat_cache_dict: Dict[str, '{self.base_strat_cache_class_name}'] = dict()\n"
         output_str += "\tadd_to_strat_cache_rlock: RLock = RLock()\n\n"
@@ -554,9 +542,10 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str += "from typing import Tuple\n"
         output_str += "from pendulum import DateTime\n\n"
         output_str += "# project imports\n"
-        model_path = self.import_path_from_os_path("OUTPUT_DIR",
-                                                   f"{self.beanie_pydantic_model_dir_name}.{self.model_file_name}")
-        output_str += f"from {model_path} import *\n\n\n"
+        file_name = str(file.proto.name).split(".")[0]
+        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
+        output_str += f'from {model_file_path} import *\n\n\n'
         trading_cache_class_name = f"{self.file_name_cap_camel_cased}BaseTradingCache"
         output_str += f"class {trading_cache_class_name}:\n\n"
         output_str += "\tdef __init__(self):\n"
@@ -579,11 +568,11 @@ class StratExecutorPlugin(BaseProtoPlugin):
     def keys_handler_file_content(self, file: protogen.File) -> str:
         output_str = "# python standard imports\n"
         output_str += "from typing import List, Tuple\n"
-        output_str += "# project imports\n"
-        model_path = self.import_path_from_os_path("OUTPUT_DIR",
-                                                   f"{self.beanie_pydantic_model_dir_name}.{self.model_file_name}")
-        output_str += f"from {model_path} import *\n\n\n"
         file_class_name = f"{self.file_name_cap_camel_cased}KeyHandler"
+        file_name = str(file.proto.name).split(".")[0]
+        model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
+        model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
+        output_str += f'from {model_file_path} import *\n\n\n'
         output_str += f"class {file_class_name}:\n"
         output_str += f"\tdef __init__(self):\n"
         output_str += f"\t\tpass\n\n"
@@ -598,10 +587,14 @@ class StratExecutorPlugin(BaseProtoPlugin):
         return output_str
 
     def output_file_generate_handler(self, file: protogen.File):
+        self.file_name = str(file.proto.name).split(".")[0]
+        self.file_name_cap_camel_cased = convert_to_capitalized_camel_case(self.file_name)
         self.set_data_members(file)
 
+        for dep_file in file.dependencies:
+            self.set_data_members(dep_file)
+
         output_dict: Dict[str, str] = {
-            self.ws_helper_file_name + f".py": self.ws_helper_file_content(file),
             self.ws_data_manager_file_name + f".py": self.ws_data_manager_file_content(file),
             self.base_strat_cache_file_name + f".py": self.base_strat_cache_file_content(file),
             self.key_handler_file_name + ".py": self.keys_handler_file_content(file),

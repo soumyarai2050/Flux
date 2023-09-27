@@ -1,8 +1,6 @@
-from pathlib import PurePath
-
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
+from FluxPythonUtils.scripts.utility_functions import configure_logger
 from tests.CodeGenProjects.addressbook.app.test_strat_manager_service_routes_callback_override import *
-from Flux.CodeGenProjects.addressbook.app.log_trade_simulator import LogTradeSimulator
+from CodeGenProjects.strat_executor.app.log_trade_simulator import LogTradeSimulator
 
 
 def test_place_order_and_check_fill(pair_strat_, expected_start_status_,

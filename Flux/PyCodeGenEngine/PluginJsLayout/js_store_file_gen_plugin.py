@@ -57,7 +57,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
 
         return output_str
 
-    def output_file_generate_handler(self, file: protogen.File):
+    def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
 

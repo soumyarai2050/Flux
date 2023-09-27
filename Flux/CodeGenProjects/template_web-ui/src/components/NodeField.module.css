@@ -1,12 +1,12 @@
 .autocomplete {
     flex: 1;
-    background-color: white;
+    /* background-color: white; */
 }
 
 .autocomplete :global .Mui-disabled {
     cursor: not-allowed !important;
-    background-color: rgba(0,0,0,0.1);
-    -webkit-text-fill-color: #444 !important;
+    /* background-color: rgba(0,0,0,0.1); */
+    /* -webkit-text-fill-color: #444 !important; */
     font-weight: bold;
 }
 
@@ -17,7 +17,7 @@
 
 .select {
     flex: 1;
-    background-color: white;
+    /* background-color: white; */
 }
 
 .select :global .MuiSelect-outlined {
@@ -26,8 +26,8 @@
 
 .select :global .Mui-disabled {
     cursor: not-allowed !important;
-    background-color: rgba(0,0,0,0.1);
-    -webkit-text-fill-color: #444 !important;
+    /* background-color: rgba(0,0,0,0.1);
+    -webkit-text-fill-color: #444 !important; */
     font-weight: bold;
 }
 
@@ -37,14 +37,14 @@
 
 .text_field {
     flex: 1;
-    background-color: white;
+    /* background-color: white; */
     min-width: 100px !important;
 }
 
 .text_field :global .Mui-disabled {
     cursor: not-allowed;
-    background-color: rgba(0,0,0,0.1);
-    -webkit-text-fill-color: #444 !important;
+    /* background-color: rgba(0,0,0,0.1);
+    -webkit-text-fill-color: #444 !important; */
     font-weight: bold;
 }
 
