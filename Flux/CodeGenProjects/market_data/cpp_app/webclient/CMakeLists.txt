@@ -46,5 +46,6 @@ set(SRC_FILES
 message(SRC_FILES ${SRC_FILES})
 
 add_executable(market_data_web_client main.cpp ${SRC_FILES})
+target_compile_options(market_data_web_client PRIVATE -g)
 
 target_link_libraries(market_data_web_client ${MONGO_LIB} ${BSON_LIB} ${Protobuf_LIBRARIES} quill::quill)

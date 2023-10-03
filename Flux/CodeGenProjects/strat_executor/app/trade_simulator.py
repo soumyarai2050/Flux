@@ -27,6 +27,9 @@ class TradeSimulator(TradingLinkBase):
 
     @classmethod
     def reload_symbol_configs(cls):
+        # reloading executor configs
+        TradingLinkBase.reload_executor_configs()
+
         cls.symbol_configs = init_symbol_configs()
 
     @classmethod
@@ -81,24 +84,29 @@ class TradeSimulator(TradingLinkBase):
                 return False
 
     @classmethod
-    def process_order_reject(cls, order_brief: OrderBrief):
+    async def process_order_reject(cls, order_brief: OrderBrief):
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_create_order_journal_http)
         create_date_time = DateTime.utcnow()
-        order_journal = OrderJournalBaseModel(order=order_brief,
-                                              order_event_date_time=create_date_time,
-                                              order_event=OrderEventType.OE_REJ)
+        order_journal = OrderJournal(order=order_brief,
+                                     order_event_date_time=create_date_time,
+                                     order_event=OrderEventType.OE_REJ)
         msg = f"SIM:Order REJ for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
               f"and side {order_journal.order.side}"
         add_to_texts(order_brief, msg)
-        TradeSimulator.strat_executor_web_client.create_order_journal_client(order_journal)
+        await underlying_create_order_journal_http(order_journal)
 
     @classmethod
-    def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
-                        account: str, exchange: str | None = None, text: List[str] | None = None):
+    async def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
+                              account: str, exchange: str | None = None, text: List[str] | None = None):
         """
         when invoked form log analyzer - all params are passed as strings
         pydantic default conversion handles conversion - any util functions called should be called with
         explicit type convertors or pydantic object converted values
         """
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_create_order_journal_http)
+
         create_date_time = DateTime.utcnow()
         order_id: str = f"{trading_sec_id}-{create_date_time}"
         # use system_sec_id to create system's internal order brief / journal
@@ -109,20 +117,21 @@ class TradeSimulator(TradingLinkBase):
         msg = f"SIM: Ordering {trading_sec_id}/{system_sec_id}, qty {qty} and px {px}"
         add_to_texts(order_brief, msg)
 
-        order_journal = OrderJournalBaseModel(order=order_brief,
-                                              order_event_date_time=create_date_time,
-                                              order_event=OrderEventType.OE_NEW)
-        TradeSimulator.strat_executor_web_client.create_order_journal_client(order_journal)
+        order_journal = OrderJournal(order=order_brief,
+                                     order_event_date_time=create_date_time,
+                                     order_event=OrderEventType.OE_NEW)
+        await underlying_create_order_journal_http(order_journal)
 
         symbol_configs = cls.get_symbol_configs(system_sec_id)
+
         if symbol_configs is not None and symbol_configs.get("simulate_reverse_path"):
             if symbol_configs.get("simulate_new_to_reject_orders") and cls.is_special_order(system_sec_id):
-                cls.process_order_reject(order_brief)
+                await cls.process_order_reject(order_brief)
             elif symbol_configs.get("simulate_new_unsolicited_cxl_orders") and cls.is_special_order(system_sec_id):
-                cls.process_cxl_ack(order_brief)
+                await cls.process_cxl_ack(order_brief)
             else:
-                cls.process_order_ack(order_id, order_brief.px, order_brief.qty, order_brief.side, system_sec_id,
-                                      account)
+                await cls.process_order_ack(order_id, order_brief.px, order_brief.qty, order_brief.side, system_sec_id,
+                                            account)
         return True  # indicates order send success (send false otherwise)
 
     @classmethod
@@ -136,8 +145,7 @@ class TradeSimulator(TradingLinkBase):
 
     @classmethod
     def _process_order_ack(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
-                           text: List[str] | None = None, return_db_obj: bool | None = None
-                           ) -> OrderJournalBaseModel | OrderJournal:
+                           text: List[str] | None = None) -> OrderJournal:
         security = Security(sec_id=sec_id, sec_type=SecurityType.TICKER)
 
         qty = cls.get_partial_allowed_ack_qty(sec_id, qty)
@@ -146,58 +154,42 @@ class TradeSimulator(TradingLinkBase):
         msg = f"SIM: ACK received for {sec_id}, qty {qty} and px {px}"
         add_to_texts(order_brief_obj, msg)
 
-        # simulate ack
-        if return_db_obj:
-            order_journal_obj = OrderJournal(order=order_brief_obj,
-                                             order_event_date_time=DateTime.utcnow(),
-                                             order_event=OrderEventType.OE_ACK)
-        else:
-            order_journal_obj = OrderJournalBaseModel(order=order_brief_obj,
-                                                      order_event_date_time=DateTime.utcnow(),
-                                                      order_event=OrderEventType.OE_ACK)
+        order_journal_obj = OrderJournal(order=order_brief_obj,
+                                         order_event_date_time=DateTime.utcnow(),
+                                         order_event=OrderEventType.OE_ACK)
         return order_journal_obj
 
     @classmethod
-    def _process_order_ack_symbol_specfic_handling(cls, order_journal_obj: OrderJournalBaseModel):
+    async def _process_order_ack_symbol_specfic_handling(cls, order_journal_obj: OrderJournal):
         symbol_configs = cls.get_symbol_configs(order_journal_obj.order.security.sec_id)
         if symbol_configs is not None and symbol_configs.get("simulate_reverse_path"):
             if (symbol_configs.get("simulate_ack_to_reject_orders") and
                     cls.is_special_order(order_journal_obj.order.security.sec_id)):
-                cls.process_order_reject(order_journal_obj.order)
+                await cls.process_order_reject(order_journal_obj.order)
             elif (symbol_configs.get("simulate_ack_unsolicited_cxl_orders") and
                   cls.is_special_order(order_journal_obj.order.security.sec_id)):
-                cls.process_cxl_ack(order_journal_obj.order)
+                await cls.process_cxl_ack(order_journal_obj.order)
             else:
-                cls.process_fill(order_journal_obj.order.order_id, order_journal_obj.order.px,
-                                 order_journal_obj.order.qty, order_journal_obj.order.side,
-                                 order_journal_obj.order.security.sec_id, order_journal_obj.order.underlying_account)
+                await cls.process_fill(order_journal_obj.order.order_id, order_journal_obj.order.px,
+                                       order_journal_obj.order.qty, order_journal_obj.order.side,
+                                       order_journal_obj.order.security.sec_id,
+                                       order_journal_obj.order.underlying_account)
                 if (symbol_configs.get("simulate_cxl_rej_orders") and
                         cls.is_special_order(order_journal_obj.order.security.sec_id)):
                     cls.cxl_rej_symbol_to_bool_dict[order_journal_obj.order.security.sec_id] = True
-                    cls.place_cxl_order(order_journal_obj.order.order_id, order_journal_obj.order.side,
-                                        order_journal_obj.order.security.sec_id,
-                                        order_journal_obj.order.underlying_account)
+                    await cls.place_cxl_order(order_journal_obj.order.order_id, order_journal_obj.order.side,
+                                              order_journal_obj.order.security.sec_id,
+                                              order_journal_obj.order.underlying_account)
 
     @classmethod
-    def process_order_ack(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
-                          text: List[str] | None = None):
-        """simulate order's Ack """
-        order_journal_obj = cls._process_order_ack(order_id, px, qty, side, sec_id, underlying_account, text)
-        TradeSimulator.strat_executor_web_client.create_order_journal_client(order_journal_obj)
-        cls._process_order_ack_symbol_specfic_handling(order_journal_obj)
-
-
-    @classmethod
-    async def async_process_order_ack(cls, order_id, px: float, qty: int, side: Side, sec_id: str,
-                                      underlying_account: str, text: List[str] | None = None):
+    async def process_order_ack(cls, order_id, px: float, qty: int, side: Side, sec_id: str,
+                                underlying_account: str, text: List[str] | None = None):
         """simulate order's Ack """
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
             underlying_create_order_journal_http)
-        order_journal_obj = cls._process_order_ack(order_id, px, qty, side, sec_id, underlying_account, text,
-                                                   return_db_obj=True)
-        # TradeSimulator.strat_executor_web_client.create_order_journal_client(order_journal_obj)
+        order_journal_obj = cls._process_order_ack(order_id, px, qty, side, sec_id, underlying_account, text)
         await underlying_create_order_journal_http(order_journal_obj)
-        cls._process_order_ack_symbol_specfic_handling(order_journal_obj)
+        await cls._process_order_ack_symbol_specfic_handling(order_journal_obj)
 
     @classmethod
     def get_partial_qty_from_total_qty_and_percentage(cls, fill_percent: int, total_qty: int) -> int:
@@ -224,19 +216,7 @@ class TradeSimulator(TradingLinkBase):
         return qty, total_fill_count
 
     @classmethod
-    def process_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
-        """Simulates Order's fills"""
-        qty, total_fill_count = cls._process_fill(sec_id, qty)
-
-        for fill_count in range(total_fill_count):
-            fill_journal = FillsJournalBaseModel(order_id=order_id, fill_px=px, fill_qty=qty, fill_symbol=sec_id,
-                                                 fill_side=side, underlying_account=underlying_account,
-                                                 fill_date_time=DateTime.utcnow(),
-                                                 fill_id=f"F{order_id[1:]}")
-            TradeSimulator.strat_executor_web_client.create_fills_journal_client(fill_journal)
-
-    @classmethod
-    async def async_process_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
+    async def process_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
         """Simulates Order's fills"""
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
             underlying_create_fills_journal_http)
@@ -251,34 +231,39 @@ class TradeSimulator(TradingLinkBase):
             await underlying_create_fills_journal_http(fill_journal)
 
     @classmethod
-    def process_cxl_rej(cls, order_brief: OrderBrief):
-        order_journal = OrderJournalBaseModel(order=order_brief,
-                                              order_event_date_time=DateTime.utcnow(),
-                                              order_event=OrderEventType.OE_CXL_REJ)
+    async def process_cxl_rej(cls, order_brief: OrderBrief):
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_create_order_journal_http)
+        order_journal = OrderJournal(order=order_brief, order_event_date_time=DateTime.utcnow(),
+                                     order_event=OrderEventType.OE_CXL_REJ)
         msg = f"SIM:Cancel REJ for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
               f"and side {order_journal.order.side}"
         add_to_texts(order_brief, msg)
-        TradeSimulator.strat_executor_web_client.create_order_journal_client(order_journal)
+        await underlying_create_order_journal_http(order_journal)
 
     @classmethod
-    def process_cxl_ack(cls, order_brief: OrderBrief):
-        order_journal = OrderJournalBaseModel(order=order_brief,
-                                              order_event_date_time=DateTime.utcnow(),
-                                              order_event=OrderEventType.OE_CXL_ACK)
+    async def process_cxl_ack(cls, order_brief: OrderBrief):
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_create_order_journal_http)
+        order_journal = OrderJournal(order=order_brief,
+                                     order_event_date_time=DateTime.utcnow(),
+                                     order_event=OrderEventType.OE_CXL_ACK)
         msg = f"SIM:Cancel ACK for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
               f"and side {order_journal.order.side}"
         add_to_texts(order_brief, msg)
-        TradeSimulator.strat_executor_web_client.create_order_journal_client(order_journal)
+        await underlying_create_order_journal_http(order_journal)
 
     @classmethod
-    def place_cxl_order(cls, order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
-                        system_sec_id: str | None = None, underlying_account: str | None = "trading-account"):
+    async def place_cxl_order(cls, order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
+                              system_sec_id: str | None = None, underlying_account: str | None = "trading-account"):
         """
         cls.simulate_reverse_path or not - always simulate cancel order's Ack/Rejects (unless configured for unack)
         when invoked form log analyzer - all params are passed as strings
         pydantic default conversion handles conversion - any util functions called should be called with
         explicit type convertors or pydantic object converted values
         """
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_create_order_journal_http)
         security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
         # query order
         order_brief = OrderBrief(order_id=order_id, security=security, side=side,
@@ -286,27 +271,28 @@ class TradeSimulator(TradingLinkBase):
         msg = f"SIM:Cancel Request for {trading_sec_id}/{system_sec_id}, order_id {order_id} and side {side}"
         add_to_texts(order_brief, msg)
         # simulate cancel ack
-        order_journal = OrderJournalBaseModel(order=order_brief,
-                                              order_event_date_time=DateTime.utcnow(),
-                                              order_event=OrderEventType.OE_CXL)
-        TradeSimulator.strat_executor_web_client.create_order_journal_client(order_journal)
+        order_journal = OrderJournal(order=order_brief, order_event_date_time=DateTime.utcnow(),
+                                     order_event=OrderEventType.OE_CXL)
+        await underlying_create_order_journal_http(order_journal)
 
         if system_sec_id in cls.cxl_rej_symbol_to_bool_dict and cls.cxl_rej_symbol_to_bool_dict.get(system_sec_id):
             cls.cxl_rej_symbol_to_bool_dict[system_sec_id] = False
-            cls.process_cxl_rej(order_brief)
+            await cls.process_cxl_rej(order_brief)
         else:
-            cls.process_cxl_ack(order_brief)
+            await cls.process_cxl_ack(order_brief)
 
     @classmethod
     def trigger_kill_switch(cls) -> bool:
         portfolio_status_id = 1
+
         portfolio_status = \
-            TradeSimulator.strat_executor_web_client.get_portfolio_status_client(portfolio_status_id)
+            TradeSimulator.pair_strat_web_client.get_portfolio_status_client(portfolio_status_id)
 
         if not portfolio_status.kill_switch:
             portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1)
             portfolio_status_basemodel.kill_switch = True
-            TradeSimulator.strat_executor_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
+            TradeSimulator.pair_strat_web_client.patch_portfolio_status_client(
+                jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
             logging.debug("Portfolio_status - Kill Switch turned to True")
             return True
         else:
@@ -317,12 +303,13 @@ class TradeSimulator(TradingLinkBase):
     def revoke_kill_switch_n_resume_trading(cls) -> bool:
         portfolio_status_id = 1
         portfolio_status = \
-            TradeSimulator.strat_executor_web_client.get_portfolio_status_client(portfolio_status_id)
+            TradeSimulator.pair_strat_web_client.get_portfolio_status_client(portfolio_status_id)
 
         if portfolio_status.kill_switch:
             portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1)
             portfolio_status_basemodel.kill_switch = False
-            TradeSimulator.strat_executor_web_client.patch_portfolio_status_client(jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
+            TradeSimulator.pair_strat_web_client.patch_portfolio_status_client(
+                jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
             logging.debug("Portfolio_status - Kill Switch turned to False")
             return True
         else:

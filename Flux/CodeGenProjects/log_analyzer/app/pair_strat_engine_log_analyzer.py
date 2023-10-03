@@ -6,30 +6,32 @@ from queue import Queue
 
 os.environ["DBType"] = "beanie"
 # Project imports
-from FluxPythonUtils.scripts.utility_functions import configure_logger, get_primary_native_host_n_port_from_config_dict
+from FluxPythonUtils.scripts.utility_functions import configure_logger, get_symbol_side_key
 from FluxPythonUtils.log_analyzer.log_analyzer import LogDetail, get_transaction_counts_n_timeout_from_config
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_analyzer import AppLogAnalyzer
 from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_client import \
     LogAnalyzerServiceHttpClient
+from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
+    StratExecutorServiceHttpClient)
 from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import *
+from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
-    PairStrat
-from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import create_alert
-from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import is_service_up
+    PairStratBaseModel
+from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import *
 
 LOG_ANALYZER_DATA_DIR = (
     PurePath(__file__).parent.parent / "data"
 )
 
-PAIR_STRAT_ENGINE_DATA_DIR = code_gen_projects_path / "pair_strat_engine" / "data"
-
-config_yaml_path = LOG_ANALYZER_DATA_DIR / "config.yaml"
-config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
-# host, port = get_primary_native_host_n_port_from_config_dict(config_yaml_dict, LOG_ANALYZER_DATA_DIR)
-debug_mode: bool = False if (debug_env := os.getenv("DEBUG")) is None or len(debug_env) == 0 or debug_env == "0" \
-    else True
-host, port = config_yaml_dict.get("main_server_beanie_host"), config_yaml_dict.get("main_server_beanie_port")
-log_analyzer_service_http_client = LogAnalyzerServiceHttpClient.set_or_get_if_instance_exists(host, port)
+# PAIR_STRAT_ENGINE_DATA_DIR = code_gen_projects_path / "pair_strat_engine" / "data"
+#
+# config_yaml_path = LOG_ANALYZER_DATA_DIR / "config.yaml"
+# config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
+# # host, port = get_primary_native_host_n_port_from_config_dict(config_yaml_dict, LOG_ANALYZER_DATA_DIR)
+debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
+                             len(debug_env) == 0 or debug_env == "0") else True
+# host, port = config_yaml_dict.get("main_server_beanie_host"), config_yaml_dict.get("main_server_beanie_port")
+# log_analyzer_service_http_client = LogAnalyzerServiceHttpClient.set_or_get_if_instance_exists(host, port)
 
 # pair_strat_engine_config_yaml_path = PAIR_STRAT_ENGINE_DATA_DIR / "config.yaml"
 # pair_strat_engine_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(
@@ -53,12 +55,14 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                          debug_mode=debug_mode)
         logging.info(f"starting pair_strat log analyzer. monitoring logs: {log_details}")
         self.simulation_mode = simulation_mode
+        self.portfolio_alerts_model_exist: bool = False
         self.portfolio_alerts_cache: List[Alert] = list()
         self.strat_id_by_symbol_side_dict: Dict[str, int] = dict()
         self.strat_alert_cache_by_strat_id_dict: Dict[int, List[Alert]] = dict()
         self.service_up: bool = False
         self.portfolio_alert_queue: Queue = Queue()
         self.strat_alert_queue: Queue = Queue()
+        self.port_to_executor_web_client: Dict[int, StratExecutorServiceHttpClient] = {}
         if self.simulation_mode:
             print("CRITICAL: log analyzer running in simulation mode...")
             alert_brief: str = "Log analyzer running in simulation mode"
@@ -67,17 +71,29 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         self.run_queue_handler()
         self.run()
 
+    def _handle_portfolio_alert_queue_err_handler(self, *args):
+        pass
+
+    def _handle_strat_alert_queue_err_handler(self, *args):
+        alerts_list = []
+        for pydantic_obj_json in args[0]:
+            alerts_json = pydantic_obj_json.get("alerts")
+            for alerts_json_ in alerts_json:
+                alerts_list.append(Alert(**alerts_json_))
+        portfolio_alert = PortfolioAlertBaseModel(_id=1, alerts=alerts_list)
+        self.portfolio_alert_queue.put(jsonable_encoder(portfolio_alert, by_alias=True, exclude_none=True))
+
     def _handle_portfolio_alert_queue(self):
         PairStratEngineLogAnalyzer.queue_handler(
             self.portfolio_alert_queue, portfolio_alert_bulk_update_counts_per_call,
             portfolio_alert_bulk_update_timeout,
-            self.webclient_object.patch_all_portfolio_alert_client)
+            self.webclient_object.patch_all_portfolio_alert_client, self._handle_portfolio_alert_queue_err_handler)
 
     def _handle_strat_alert_queue(self):
         PairStratEngineLogAnalyzer.queue_handler(
             self.strat_alert_queue, strat_alert_bulk_update_counts_per_call,
             strat_alert_bulk_update_timeout,
-            self.webclient_object.patch_all_strat_alert_client)
+            self.webclient_object.patch_all_strat_alert_client, self._handle_strat_alert_queue_err_handler)
 
     def run_queue_handler(self):
         portfolio_alert_handler_thread = Thread(target=self._handle_portfolio_alert_queue, daemon=True)
@@ -85,11 +101,31 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         portfolio_alert_handler_thread.start()
         strat_alert_handler_thread.start()
 
+    def _is_executor_service_up(self, strat_executor_http_client: StratExecutorServiceHttpClient,
+                                sec_id: str, side: Side) -> StratDetails | None:
+        try:
+            strat_details_list: List[StratDetails] = strat_executor_http_client.is_strat_ongoing_query_client()
+            if strat_details_list:
+                strat_details = strat_details_list[0]
+                return strat_details
+            else:
+                err_str_ = ("Received empty strat_details list from is_strat_ongoing_query_client call "
+                            f"of strat_executor for port {strat_executor_http_client.port}, symbol_side_key: "
+                            f"{get_symbol_side_key([(sec_id, side)])}")
+                logging.error(err_str_)
+                raise HTTPException(status_code=500, detail=err_str_)
+
+        except Exception as _e:
+            logging.exception("is_executor_service_up test failed - tried "
+                              "is_strat_ongoing_query_client ;;;"
+                              f"exception: {_e}", exc_info=True)
+            return None
+
     def _init_service(self) -> bool:
         if self.service_up:
             return True
         else:
-            self.service_up = is_service_up(ignore_error=True)
+            self.service_up = is_log_analyzer_service_up(ignore_error=True)
             if self.service_up:
                 portfolio_alert: PortfolioAlertBaseModel = \
                     self.webclient_object.get_portfolio_alert_client(1)
@@ -99,34 +135,6 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                     self.portfolio_alerts_cache = list()
                 return True
             return False
-
-    def _send_alerts(self, severity: str, alert_brief: str, alert_details: str) -> None:
-        logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
-                      f"alert_details: {alert_details}")
-        created: bool = False
-        while self.run_mode and not created:
-            try:
-                if not self.service_up:
-                    service_ready: bool = self._init_service()
-                    if not service_ready:
-                        raise Exception("service up check failed. waiting for the service to start...")
-                    # else not required: proceed to creating alert
-                # else not required
-
-                if not alert_details:
-                    alert_details = None
-                severity: Severity = self.get_severity_type_from_severity_str(severity_str=severity)
-                alert_obj: Alert = self.create_or_update_alert(self.portfolio_alerts_cache, severity, alert_brief,
-                                                               alert_details)
-                updated_portfolio_alert: PortfolioAlertBaseModel = \
-                    PortfolioAlertBaseModel(_id=1, alerts=[alert_obj])
-                self.portfolio_alert_queue.put(jsonable_encoder(updated_portfolio_alert,
-                                                                by_alias=True, exclude_none=True))
-                created = True
-            except Exception as e:
-                logging.exception(f"_send_alerts failed;;;exception: {e}")
-                self.service_up = False
-                time.sleep(30)
 
     def create_or_update_alert(self, alerts: List[Alert] | None, severity: Severity, alert_brief: str,
                                alert_details: str | None) -> Alert:
@@ -192,30 +200,54 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         severity = self._get_severity(error_dict["type"])
         return [severity, alert_brief, alert_details]
 
+    def _get_pair_strat_obj_from_symbol_side(self, symbol: str, side: Side) -> PairStratBaseModel | None:
+        pair_strat_list: List[PairStratBaseModel] = \
+            strat_manager_service_http_client.get_pair_strat_from_symbol_side_query_client(
+                sec_id=symbol, side=side)
+
+        if len(pair_strat_list) == 0:
+            raise None
+        elif len(pair_strat_list) == 1:
+            pair_strat_obj: PairStratBaseModel = pair_strat_list[0]
+            return pair_strat_obj
+
+    def _get_executor_http_client_from_pair_strat(self, port_: int, host_: str) -> StratExecutorServiceHttpClient:
+        executor_web_client = self.port_to_executor_web_client.get(port_)
+        if executor_web_client is None:
+            executor_web_client = (
+                StratExecutorServiceHttpClient.set_or_get_if_instance_exists(host_, port_))
+            self.port_to_executor_web_client[port_] = executor_web_client
+        return executor_web_client
+
     def _process_trade_simulator_message(self, message: str) -> None:
-        pass
-        # try:
-        #     if not self.simulation_mode:
-        #         raise Exception("Received trade simulator message but log analyzer not running in simulation mode")
-        #     # remove $$$ from beginning of message
-        #     message: str = message[3:]
-        #     args: List[str] = message.split("~~")
-        #     method_name: str = args.pop(0)
-        #
-        #     kwargs: Dict[str, str] = dict()
-        #     # get method kwargs separated by "^^" if any
-        #     for arg in args:
-        #         key, value = arg.split("^^")
-        #         kwargs[key] = value
-        #
-        #     callback_method: Callable = getattr(TradeSimulator, method_name)
-        #     callback_method(**kwargs)
-        # except Exception as e:
-        #     alert_brief: str = f"_process_trade_simulator_message failed in log analyzer"
-        #     alert_details: str = f"message: {message}, exception: {e}"
-        #     logging.exception(f"{alert_brief};;; {alert_details}")
-        #     self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
-        #                       alert_details=alert_details)
+        try:
+            if not self.simulation_mode:
+                raise Exception("Received trade simulator message but log analyzer not running in simulation mode")
+            # remove $$$ from beginning of message
+            message: str = message[3:]
+            args: List[str] = message.split("~~")
+            method_name: str = args.pop(0)
+            host: str = args.pop(0)
+            port: int = parse_to_int(args.pop(0))
+
+            kwargs: Dict[str, str] = dict()
+            # get method kwargs separated by "^^" if any
+            for arg in args:
+                key, value = arg.split("^^")
+                kwargs[key] = value
+
+            executor_web_client = self._get_executor_http_client_from_pair_strat(port, host)
+
+            callback_method: Callable = getattr(executor_web_client, method_name)
+            callback_method(**kwargs)
+            logging.info(f"@@@@@@@ calling cxl_order_id: {kwargs.get('order_id')} Datetime: {DateTime.utcnow()}")
+
+        except Exception as e:
+            alert_brief: str = f"_process_trade_simulator_message failed in log analyzer"
+            alert_details: str = f"message: {message}, exception: {e}"
+            logging.exception(f"{alert_brief};;; {alert_details}")
+            self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
+                              alert_details=alert_details)
 
     def _process_strat_alert_message(self, prefix: str, message: str) -> None:
         try:
@@ -242,31 +274,41 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                 break
 
             if len(symbol_side_set) == 0:
-                raise Exception("no symbol-side pair found while creating strat alert")
+                raise Exception("no symbol-side pair found while creating strat alert, ")
             else:
                 symbol_side: str = list(symbol_side_set)[0]
                 symbol, side = symbol_side.split("-")
                 strat_id: int | None = self.strat_id_by_symbol_side_dict.get(symbol_side)
                 if strat_id is None or self.strat_alert_cache_by_strat_id_dict.get(strat_id) is None:
-                    pair_strat_list: List[PairStrat] = \
-                        strat_manager_service_http_client.get_ongoing_strat_from_symbol_side_query_client(
-                            sec_id=symbol, side=side)
-                    if len(pair_strat_list) == 0:
-                        raise Exception(f"no ongoing pair strat found for symbol_side: {symbol_side} while creating "
-                                        f"strat alert")
-                    elif len(pair_strat_list) == 1:
-                        pair_strat_obj: PairStrat = pair_strat_list[0]
+
+                    pair_strat_obj: PairStratBaseModel = self._get_pair_strat_obj_from_symbol_side(symbol, side)
+
+                    if pair_strat_obj is None:
+                        pass
+                    else:
+                        if pair_strat_obj.is_executor_running:
+                            executor_web_client = self._get_executor_http_client_from_pair_strat(pair_strat_obj.port,
+                                                                                                 pair_strat_obj.host)
+                            strat_details_list: List[StratDetails] = executor_web_client.is_strat_ongoing_query_client()
+                            if len(strat_details_list) == 1:
+                                strat_details = strat_details_list[0]
+                                if not strat_details.is_ongoing:
+                                    Exception(f"Strat Executor for symbol & side: {symbol} & {side} is not in "
+                                              f"ongoing state while creating strat_alert, pair_strat: {pair_strat_obj}")
+                            else:
+                                Exception("Received empty list from is_strat_ongoing_query_client query for executor"
+                                          f"of pair_strat: {pair_strat_obj}")
+                        else:
+                            Exception(f"StartExecutor Server not running for pair_strat: {pair_strat_obj}")
+
                         strat_id = pair_strat_obj.id
-                        strat_alert: StratAlertBaseModel = \
-                            log_analyzer_service_http_client.get_strat_alert_client(strat_id)
+                        strat_alert: StratAlertBaseModel = self.webclient_object.get_strat_alert_client(strat_id)
                         if strat_alert.alerts is not None:
                             self.strat_alert_cache_by_strat_id_dict[strat_id] = \
                                 strat_alert.alerts
                         else:
                             self.strat_alert_cache_by_strat_id_dict[strat_id] = list()
-                    else:
-                        raise Exception(f"multiple pair strat found for symbol_side: {symbol_side} while creating "
-                                        f"strat alert, expected 1")
+                        self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
                 # else not required: alert cache exists
 
                 severity, alert_brief, alert_details = self._create_alert(error_dict=error_dict)
@@ -278,6 +320,36 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
             self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
                               alert_details=alert_details)
 
+    # portfolio lvl alerts handling
+    def _send_alerts(self, severity: str, alert_brief: str, alert_details: str) -> None:
+        logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
+                      f"alert_details: {alert_details}")
+        created: bool = False
+        while self.run_mode and not created:
+            try:
+                if not self.service_up:
+                    service_ready: bool = self._init_service()
+                    if not service_ready:
+                        raise Exception("service up check failed. waiting for the service to start...")
+                    # else not required: proceed to creating alert
+                # else not required
+
+                if not alert_details:
+                    alert_details = None
+                severity: Severity = self.get_severity_type_from_severity_str(severity_str=severity)
+                alert_obj: Alert = self.create_or_update_alert(self.portfolio_alerts_cache, severity, alert_brief,
+                                                               alert_details)
+                updated_portfolio_alert: PortfolioAlertBaseModel = \
+                    PortfolioAlertBaseModel(_id=1, alerts=[alert_obj])
+                self.portfolio_alert_queue.put(jsonable_encoder(updated_portfolio_alert,
+                                                                by_alias=True, exclude_none=True))
+                created = True
+            except Exception as e:
+                logging.exception(f"_send_alerts failed;;;exception: {e}")
+                self.service_up = False
+                time.sleep(30)
+
+    # strat lvl alert handling
     def _send_strat_alerts(self, strat_id: int, severity: str, alert_brief: str, alert_details: str) -> None:
         logging.debug(f"sending strat alert with strat_id: {strat_id} severity: {severity}, alert_brief: "
                       f"{alert_brief}, alert_details: {alert_details}")

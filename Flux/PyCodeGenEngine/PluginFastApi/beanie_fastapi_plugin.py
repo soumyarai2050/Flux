@@ -109,11 +109,11 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += '        err_str = "Can not find PORT env var for fastapi db init"\n'
         output_str += '        logging.exception(err_str)\n'
         output_str += '        raise Exception(err_str)\n\n'
-        output_str += '    config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"'+f'{self.proto_file_package}'+'_{port}_config.yaml"\n'
+        output_str += '    config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"config.yaml"\n'
         output_str += '    if os.path.exists(config_yaml_path):\n'
         output_str += '        config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n'
         output_str += '    else:\n'
-        output_str += '        err_str = f"Executor config file with port {port} in name does not exist"\n'
+        output_str += '        err_str = f"data/config.yaml does not exist"\n'
         output_str += '        logging.exception(err_str)\n'
         output_str += '        raise Exception(err_str)\n\n'
         output_str += '    mongo_server = "mongodb://localhost:27017" if (mongo_env := ' \

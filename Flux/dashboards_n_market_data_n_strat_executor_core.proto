@@ -39,7 +39,8 @@ message SymbolOverview{
     IsTopLvlModel: false,
     ExecutorKeyCounts: 2,
     ExecutorKeySequence: "symbol-'BUY'",
-    ExecutorKeySequence: "symbol-'SELL'"
+    ExecutorKeySequence: "symbol-'SELL'",
+    IsRepeated: true
   };
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];

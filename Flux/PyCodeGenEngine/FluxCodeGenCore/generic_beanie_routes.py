@@ -57,8 +57,8 @@ def get_beanie_host_n_port(project_name: str):
 
     project_path = code_gen_projects_path / project_name
     config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(
-        str(project_path / "data" / f"{project_name}_{server_port}_config.yaml"))
-    return config_yaml_dict.get("beanie_host"), parse_to_int(config_yaml_dict.get("beanie_port"))
+        str(project_path / "data" / f"config.yaml"))
+    return config_yaml_dict.get("server_host"), parse_to_int(server_port)
 
 
 # Decorator Function
@@ -606,6 +606,19 @@ async def generic_read_http(pydantic_class_type: Type[DocType], proto_package_na
         await get_obj_list(pydantic_class_type, read_ids_list,
                            filter_agg_pipeline=filter_agg_pipeline, has_links=has_links,
                            projection_model=projection_model)
+    if read_ids_list and len(pydantic_list) != len(set(read_ids_list)):
+        existing_ids = set()
+        for pydantic_obj in pydantic_list:
+            if pydantic_obj.id in read_ids_list:
+                existing_ids.add(pydantic_obj.id)
+        non_existing_ids = set(read_ids_list) - existing_ids
+        # Attention: Below err_str is being used by log_analyzer inn regex pattern match,
+        # avoid changing it or fix its use-case
+        err_str: Final[str] = (f"Couldn't find {pydantic_class_type.__name__} objects with ids: {non_existing_ids} "
+                               f"out of requested {read_ids_list}")
+        logging.error(err_str)
+        raise HTTPException(detail=err_str, status_code=500)
+
     return pydantic_list
 
 
@@ -873,7 +886,7 @@ async def get_obj_list(pydantic_class_type: Type[DocType], find_ids: List[Any] |
         return pydantic_list
     except ValidationError as e:
         logging.exception(f"Pydantic validation error: {e}")
-        raise e
+        raise Exception(e)
 
 
 async def get_filtered_obj_list(filter_agg_pipeline: Dict, pydantic_class_type: Type[DocType],

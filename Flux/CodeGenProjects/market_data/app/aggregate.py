@@ -1,53 +1,6 @@
 from pendulum import DateTime
 from typing import List
 
-# Market Depth cumulative average
-cum_px_qty_aggregate_query = {"aggregate": [
-    {
-        "$setWindowFields": {
-            "partitionBy": {"symbol": "$symbol", "side": "$side"},
-            "sortBy": {
-                "position": 1.0
-            },
-            "output": {
-                "cumulative_notional": {
-                    "$sum": {
-                        "$multiply": [
-                            "$px",
-                            "$qty"
-                        ]
-                    },
-                    "window": {
-                        "documents": [
-                            "unbounded",
-                            "current"
-                        ]
-                    }
-                },
-                "cumulative_qty": {
-                    "$sum": "$qty",
-                    "window": {
-                        "documents": [
-                            "unbounded",
-                            "current"
-                        ]
-                    }
-                }
-            }
-        }
-    },
-    {
-        "$addFields": {
-            "cumulative_avg_px": {
-                "$divide": [
-                    "$cumulative_notional",
-                    "$cumulative_qty"
-                ]
-            }
-        }
-    }
-]}
-
 
 def get_pair_side_brief_from_side(symbol: str):
     return {"aggregate": [

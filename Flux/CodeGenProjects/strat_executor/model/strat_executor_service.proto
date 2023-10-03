@@ -57,7 +57,8 @@ message OrderJournal{
     IsTopLvlModel: false,
     ExecutorKeyCounts: 1,
     ExecutorKeySequence: "order.security.sec_id-order.side",
-    LogKeySequence: "order.order_id"
+    LogKeySequence: "order.order_id",
+    IsRepeated: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional OrderBrief order = 2;
@@ -105,7 +106,8 @@ message OrderSnapshot{
     IsTopLvlModel: false,
     ExecutorKeyCounts: 1,
     ExecutorKeySequence: "order_brief.security.sec_id-order_brief.side",
-    LogKeySequence: "order_brief.order_id-order_status"
+    LogKeySequence: "order_brief.order_id-order_status",
+    IsRepeated: true
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
@@ -151,7 +153,8 @@ message SymbolSideSnapshot{
       QueryType: WS
   };
   option (FluxMsgExecutorOptions) = {
-    LogKeySequence: "id"
+    LogKeySequence: "id",
+    IsRepeated: true
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 8,
@@ -229,6 +232,7 @@ message FillsJournal{
     ExecutorKeyCounts: 1,
     ExecutorKeySequence: "fill_symbol-fill_side",
     LogKeySequence: "fill_id"
+    IsRepeated: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string order_id = 2;
@@ -257,7 +261,6 @@ message StratBrief{
     y: 50,
     w: 8,
     h: 8,
-    is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
@@ -286,6 +289,7 @@ message StratBrief{
     ExecutorKeySequence: "pair_buy_side_trading_brief.security.sec_id-pair_buy_side_trading_brief.side",
     ExecutorKeySequence: "pair_sell_side_trading_brief.security.sec_id-pair_sell_side_trading_brief.side",
     LogKeySequence: "id"
+    IsRepeated: false
   };
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -322,7 +326,8 @@ message StratStatus{
     IsWebSocketModel: true,
     EnableNotifyAll: false,
     ExecutorKeyCounts: 1,
-    ExecutorKeySequence: "id"
+    ExecutorKeySequence: "id",
+    IsRepeated: false,
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "update_residuals",
@@ -425,7 +430,8 @@ message StratLimits{
     EnableNotifyAll: false,
     IsTopLvlModel: false,
     ExecutorKeyCounts: 1,
-    ExecutorKeySequence: "id"
+    ExecutorKeySequence: "id",
+    IsRepeated: false
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 max_open_orders_per_side = 2 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open orders allowed per side for this strat"];
@@ -454,6 +460,7 @@ message NewOrder{
     EnableNotifyAll: true,
     IsTopLvlModel: false,
     ExecutorKeySequence: "security.sec_id-side"
+    IsRepeated: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required Security security = 2;
@@ -474,6 +481,7 @@ message CancelOrder{
     EnableNotifyAll: true,
     IsTopLvlModel: false,
     ExecutorKeySequence: "security.sec_id-side"
+    IsRepeated: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string order_id = 2;
@@ -534,6 +542,44 @@ message LastNSecMarketTradeVol{
   optional int64 last_n_sec_trade_vol = 1;
 }
 
+message TradeSimulatorProcessNewOrder{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "trade_simulator_place_new_order",
+    QueryParams: "px",
+    QueryParamsDataType: "float",
+    QueryParams: "qty",
+    QueryParamsDataType: "int",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "trading_sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "system_sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "exchange",
+    QueryParamsDataType: "str | None = None"
+  };
+  required bool resp = 1;
+}
+
+message TradeSimulatorProcessCxlOrder{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "trade_simulator_place_cxl_order",
+    QueryParams: "order_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side | None = None",
+    QueryParams: "trading_sec_id",
+    QueryParamsDataType: "str | None = None",
+    QueryParams: "system_sec_id",
+    QueryParamsDataType: "str | None = None",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str | None = None"
+  };
+  required bool resp = 1;
+}
+
 message TradeSimulatorProcessOrderAck{
   option (FluxMsgJsonQuery) = {
     QueryName: "trade_simulator_process_order_ack",
@@ -568,6 +614,13 @@ message TradeSimulatorProcessFill{
     QueryParamsDataType: "str",
     QueryParams: "underlying_account",
     QueryParamsDataType: "str"
+  };
+  required bool resp = 1;
+}
+
+message TradeSimulatorReloadConfig{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "trade_simulator_reload_config"
   };
   required bool resp = 1;
 }

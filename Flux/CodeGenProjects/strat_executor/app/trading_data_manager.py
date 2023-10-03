@@ -6,7 +6,7 @@ from Flux.CodeGenProjects.strat_executor.app.trading_cache import *
 from Flux.CodeGenProjects.strat_executor.app.strat_cache import StratCache
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import \
-    get_consumable_participation_qty_http, create_alert, get_symbol_side_key, \
+    get_consumable_participation_qty_http, get_symbol_side_key, \
     get_strat_brief_log_key, get_fills_journal_log_key, get_order_journal_log_key, is_ongoing_strat
 from Flux.CodeGenProjects.strat_executor.app.trading_link import TradingLinkBase, get_trading_link
 from Flux.CodeGenProjects.pair_strat_engine.generated.StratExecutor.strat_manager_service_ws_data_manager import \
@@ -65,7 +65,6 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
             logging.exception(err_str_)
 
     def handle_strat_status_get_all_ws(self, strat_status_: StratStatusBaseModel | StratStatus, **kwargs):
-        logging.info("##### entered ss handler")
         key_leg_1, key_leg_2 = StratManagerServiceKeyHandler.get_key_from_pair_strat(self.pair_strat_obj)
         if is_ongoing_strat(strat_status_):
             # only pair strat should use guaranteed_get_by_key as it is the only handler that removes the strat cache
@@ -77,7 +76,6 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
             if StratCache.get(str(strat_status_.id)) is None:
                 StratCache.add(str(strat_status_.id), strat_cache)
 
-            logging.info(f"##### stratCache: {strat_cache}")
             with strat_cache.re_ent_lock:
                 strat_status_tuple = strat_cache.get_strat_status()
                 cached_strat_status = None
@@ -86,7 +84,6 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
                 if cached_strat_status is None:
                     # this is a new pair strat for processing, start its own thread with new strat executor object
                     strat_cache.set_strat_status(strat_status_)
-                    logging.info(f"##### setting pair_strat: {self.pair_strat_obj}")
                     strat_cache.set_pair_strat(self.pair_strat_obj)
                     strat_cache.stopped = False
                     strat_executor, strat_executor_thread = self.executor_trigger_method(self, strat_cache)
@@ -105,7 +102,6 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
             logging.debug(f"Updated strat_status cache for key: {key_leg_1}, pair_strat_key: "
                           f"{get_pair_strat_log_key(self.pair_strat_obj)} ;;; strat_status: {strat_status_}")
         else:
-            logging.info("##### entered else of ss handler")
             strat_cache: StratCache = StratCache.get(key_leg_1)
             if strat_cache is not None:
                 # remove if this pair strat is in our cache - it's no more ongoing

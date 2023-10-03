@@ -9,6 +9,23 @@ import "dashboards_n_market_data_n_strat_executor_core.proto";
 
 package market_data;
 
+// Set the FluxImportFileModelOptions option
+option (FluxFileImportDependencyModel) = {
+  ImportFileName: "dashboards_n_market_data_n_strat_executor_core.proto",
+  ImportModelName: "SymbolOverview",
+  ImportModelName: "SymbolOverviewList"
+};
+
+option (FluxFileImportDependencyModel) = {
+  ImportFileName: "market_data_n_strat_executor_core.proto",
+  ImportModelName: "TopOfBook",
+  ImportModelName: "MarketDepth",
+  ImportModelName: "LastTrade",
+  ImportModelName: "TopOfBookList",
+  ImportModelName: "MarketDepthList",
+  ImportModelName: "LastTradeList"
+};
+
 option (FluxFileCRUDPortOffset) = 40;
 
 message SideSpecificMarketDataBrief{

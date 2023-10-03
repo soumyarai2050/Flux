@@ -413,3 +413,49 @@ def get_open_order_snapshots_for_symbol(symbol: str):
         }]}
 
 
+# Market Depth cumulative average
+cum_px_qty_aggregate_query = {"aggregate": [
+    {
+        "$setWindowFields": {
+            "partitionBy": {"symbol": "$symbol", "side": "$side"},
+            "sortBy": {
+                "position": 1.0
+            },
+            "output": {
+                "cumulative_notional": {
+                    "$sum": {
+                        "$multiply": [
+                            "$px",
+                            "$qty"
+                        ]
+                    },
+                    "window": {
+                        "documents": [
+                            "unbounded",
+                            "current"
+                        ]
+                    }
+                },
+                "cumulative_qty": {
+                    "$sum": "$qty",
+                    "window": {
+                        "documents": [
+                            "unbounded",
+                            "current"
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    {
+        "$addFields": {
+            "cumulative_avg_px": {
+                "$divide": [
+                    "$cumulative_notional",
+                    "$cumulative_qty"
+                ]
+            }
+        }
+    }
+]}

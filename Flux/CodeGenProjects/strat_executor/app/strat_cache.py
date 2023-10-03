@@ -73,12 +73,6 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         self.leg1_fx_tob: TopOfBookBaseModel | None = None
         self.leg1_fx_symbol_overview: FxSymbolOverviewBaseModel | None = None
 
-        self._pair_strats: PairStratBaseModel | None = None
-        self._pair_strats_update_date_time: DateTime = DateTime.utcnow()
-
-        self._strat_briefs: StratBriefBaseModel | None = None
-        self._strat_briefs_update_date_time: DateTime = DateTime.utcnow()
-
         self._symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]  # pre-create space for 2 legs
         self._symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
 
@@ -104,9 +98,6 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         key: str | None = StratExecutorServiceKeyHandler.get_key_from_fills_journal(fills_journal)
         return key, symbol
 
-    def get_pair_strat_(self) -> PairStratBaseModel | None:
-        return self._pair_strats
-
     def get_metadata(self, system_symbol: str) -> Tuple[str, str, str]:
         """function to check system symbol's corresponding trading_symbol, account, exchange (maybe fx in future ?)"""
         trading_symbol: str = system_symbol
@@ -115,23 +106,18 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         return trading_symbol, account, exchange
 
     def get_trading_symbols(self):
-        primary_ticker = self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id
-        secondary_ticker = self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id
+        primary_ticker = self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+        secondary_ticker = self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id
         return primary_ticker, secondary_ticker
 
     # pass None to remove pair strat
     def set_pair_strat(self, pair_strat: PairStratBaseModel | None) -> DateTime:
-        self._pair_strats = pair_strat
-        self._pair_strats_update_date_time = DateTime.utcnow()
-        if self._pair_strats is not None:
+        self._pair_strat = pair_strat
+        self._pair_strat_update_date_time = DateTime.utcnow()
+        if self._pair_strat is not None:
             self.leg1_trading_symbol, self.leg2_trading_symbol = self.get_trading_symbols()
         # else not required: passing None to clear pair_strat form cache is valid
-        return self._pair_strats_update_date_time
-
-    def set_strat_brief(self, strat_brief: StratBriefBaseModel) -> DateTime:
-        self._strat_briefs = strat_brief
-        self._strat_briefs_update_date_time = DateTime.utcnow()
-        return self._strat_briefs_update_date_time
+        return self._pair_strat_update_date_time
 
     def get_symbol_overview(self, symbol, date_time: DateTime | None = None) -> Tuple[SymbolOverviewBaseModel, DateTime] | None:
         if date_time is None or date_time < self._symbol_overviews_update_date_time:
@@ -143,22 +129,22 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         return None
 
     def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel):
-        if symbol_overview_.symbol == self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id:
-            self._symbol_overviews[0] = symbol_overview_
-            self._symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
-            return symbol_overview_.last_update_date_time
-        elif symbol_overview_.symbol == self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id:
-            self._symbol_overviews[1] = symbol_overview_
-            self._symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
-            return symbol_overview_.last_update_date_time
-        else:
-            logging.error(f"set_symbol_overview called with non matching symbol: {symbol_overview_.symbol}, "
-                          f"supported symbols: {self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id}, "
-                          f"{self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id}")
-            return None
+        if self._pair_strat is not None:
+            if symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+                self._symbol_overviews[0] = symbol_overview_
+                self._symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
+                return symbol_overview_.last_update_date_time
+            elif symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+                self._symbol_overviews[1] = symbol_overview_
+                self._symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
+                return symbol_overview_.last_update_date_time
+            else:
+                logging.error(f"set_symbol_overview called with non matching symbol: {symbol_overview_.symbol}, "
+                              f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
+                              f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+        return None
 
     def get_top_of_book(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
-        logging.info(f"##### entered get tob, {self._top_of_books}")
         if date_time is None or date_time < self._top_of_books_update_date_time:
             with self.re_ent_lock:
                 if self._top_of_books[0] is not None and self._top_of_books[1] is not None:
@@ -171,18 +157,18 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
 
     def set_top_of_book(self, top_of_book: TopOfBookBaseModel) -> DateTime | None:
         if top_of_book.last_update_date_time > self._top_of_books_update_date_time:
-            if top_of_book.symbol == self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id:
+            if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
                 self._top_of_books[0] = top_of_book
                 self._top_of_books_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
-            elif top_of_book.symbol == self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id:
+            elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
                 self._top_of_books[1] = top_of_book
                 self._top_of_books_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
             else:
                 logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "
-                              f"supported symbols: {self._pair_strats.pair_strat_params.strat_leg1.sec.sec_id}, "
-                              f"{self._pair_strats.pair_strat_params.strat_leg2.sec.sec_id}")
+                              f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
+                              f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
                 return None
         else:
             logging.debug(f"set_top_of_book called with old last_update_date_time, ignoring this TOB, "
@@ -237,13 +223,13 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         return self.unack_leg2
 
     def get_key(self):
-        return f"{get_pair_strat_log_key(self._pair_strats)}-{self.stopped}"
+        return f"{get_pair_strat_log_key(self._pair_strat)}-{self.stopped}"
 
     def __str__(self):
         return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.leg1_trading_symbol},  " \
-               f"secondary_leg_trading_symbol: {self.leg2_trading_symbol}, pair_strat: {self._pair_strats}, " \
+               f"secondary_leg_trading_symbol: {self.leg2_trading_symbol}, pair_strat: {self._pair_strat}, " \
                f"unack_leg1 {self.unack_leg1}, unack_leg2 {self.unack_leg2}" \
-               f"strat_brief: {self._strat_briefs}, cancel_orders: [{self._cancel_orders}], " \
+               f"strat_brief: {self._strat_brief}, cancel_orders: [{self._cancel_orders}], " \
                f"new_orders: [{self._new_orders}], order_snapshots: {self._order_snapshots}, " \
                f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
                f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self._symbol_overviews] if self._symbol_overviews else str(None)}, " \

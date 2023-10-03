@@ -46,7 +46,8 @@ message TopOfBook {
     IsTopLvlModel: false,
     ExecutorKeyCounts: 2,
     ExecutorKeySequence: "symbol-'BUY'",
-    ExecutorKeySequence: "symbol-'SELL'"
+    ExecutorKeySequence: "symbol-'SELL'",
+    IsRepeated: true
   };
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
@@ -61,14 +62,14 @@ message TopOfBook {
 
 message MarketDepth {
   option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_UNSPECIFIED,
-    CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
+    CreateOp: AggregateType_UpdateAggregate,
+    CreateAllOp: AggregateType_UpdateAggregate, // currently set for tests, once real use-case is found can be removed
     ReadOp: AggregateType_UNSPECIFIED,
-    UpdateOp: AggregateType_UNSPECIFIED,
-    UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
-    PatchOp: AggregateType_UNSPECIFIED,
-    PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
-    DeleteOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UpdateAggregate,
+    UpdateAllOp: AggregateType_UpdateAggregate,  // currently set for tests, once real use-case is found can be removed
+    PatchOp: AggregateType_UpdateAggregate,
+    PatchAllOp: AggregateType_UpdateAggregate,   // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UpdateAggregate,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {

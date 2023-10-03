@@ -114,7 +114,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + \
                               (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
@@ -124,7 +124,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                               (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"{message_name_snake_cased}, {self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case other:
                 output_str += " " * indent_count + \
@@ -196,7 +196,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"{message_name_snake_cased}_list, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
                                f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
@@ -207,7 +207,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"{message_name_snake_cased}_list, {self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case other:
                 output_str += " " * indent_count + \
@@ -283,7 +283,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
                                f"{message_name_snake_cased}_updated, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
                                f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
@@ -294,7 +294,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
                                f"{message_name_snake_cased}_updated, {self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case other:
                 output_str += " " * indent_count + \
@@ -374,7 +374,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
                                f"{message_name_snake_cased}_updated_list, obj_id_list, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
                                f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
@@ -386,7 +386,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
                                f"{message_name_snake_cased}_updated_list, obj_id_list, "
                                f"{self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case other:
                 output_str += " " * indent_count + \
@@ -475,7 +475,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
                                f"{message_name_snake_cased}_update_req_json, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
@@ -486,7 +486,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
                                f"{message_name_snake_cased}_update_req_json, {self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case other:
                 output_str += " " * indent_count + \
@@ -640,8 +640,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                               f"        updated_{message_name_snake_cased}_obj =  await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                              f"{message_name_snake_cased}_update_req_json_list, " \
-                              f"{self._get_filter_configs_var_name(message)}, obj_id_list, " \
+                              f"{message_name_snake_cased}_update_req_json_list, obj_id_list, " \
+                              f"{self._get_filter_configs_var_name(message)}, " \
                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
             case FastapiHttpRoutesFileHandler.aggregation_type_update:
                 update_agg_pipeline_var_name = \
@@ -652,7 +652,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
                                f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, "
+                               f"update_agg_pipeline={update_agg_pipeline_var_name}, "
                                f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
             case FastapiHttpRoutesFileHandler.aggregation_type_both:
                 update_agg_pipeline_var_name = \
@@ -664,7 +664,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
                                f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
                                f"{self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case other:
                 output_str += " " * indent_count + \
@@ -739,7 +739,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                               (f"    delete_web_resp = await generic_callable({message.proto.name}, "
                                f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
+                               f"{update_agg_pipeline_var_name}, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
             case other:
                 output_str += " " * indent_count + \

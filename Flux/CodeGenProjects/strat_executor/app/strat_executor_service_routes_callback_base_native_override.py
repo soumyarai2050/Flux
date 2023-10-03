@@ -13,25 +13,27 @@ from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_servic
     StratExecutorServiceRoutesCallback)
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import (
-    get_order_journal_log_key, except_n_log_alert, get_symbol_side_key, get_order_snapshot_log_key,
+    get_order_journal_log_key, get_symbol_side_key, get_order_snapshot_log_key,
     get_symbol_side_snapshot_log_key, is_pair_strat_engine_service_up, executor_config_yaml_dict, server_port,
     strat_manager_service_http_client, strat_executor_http_client, get_consumable_participation_qty,
-    create_alert, get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
-    EXECUTOR_PROJECT_DATA_DIR, is_ongoing_strat)
-from FluxPythonUtils.scripts.utility_functions import (avg_of_new_val_sum_to_avg, store_json_or_dict_to_file,
-                                                       load_json_dict_from_file)
+    get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
+    EXECUTOR_PROJECT_DATA_DIR, is_ongoing_strat, log_analyzer_service_http_client, is_log_analyzer_service_up,
+    main_config_yaml_dict)
+from FluxPythonUtils.scripts.utility_functions import (
+    avg_of_new_val_sum_to_avg, store_json_or_dict_to_file, load_json_dict_from_file, except_n_log_alert)
 from Flux.CodeGenProjects.pair_strat_engine.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.pair_strat_engine.app.service_state import ServiceState
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import (
     PortfolioStatusOptional, PortfolioLimitsBaseModel, StratLeg, FxSymbolOverviewBaseModel)
 from Flux.CodeGenProjects.strat_executor.app.strat_executor import StratExecutor, TradingDataManager
 from Flux.CodeGenProjects.strat_executor.app.trade_simulator import TradeSimulator
+from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import StratAlertBaseModel
 
 pair_strat_id: int = executor_config_yaml_dict.get("pair_strat_id")
 strat_leg1_dict: Dict = executor_config_yaml_dict.get("strat_leg_1")
 strat_leg2_dict: Dict = executor_config_yaml_dict.get("strat_leg_2")
 if pair_strat_id is None:
-    err_str = "Can't find key attribute 'pair_strat_key' in start_executor_{server_port}_config.yaml"
+    err_str = f"Can't find key attribute 'pair_strat_key' in start_executor_{server_port}_config.yaml"
     logging.error(err_str)
     raise Exception(err_str)
 if strat_leg1_dict is None:
@@ -66,6 +68,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     def __init__(self):
         super().__init__()
         self.pair_strat_service_up: bool = False
+        self.log_analyzer_service_up: bool = False
         self.service_ready: bool = False
         self.static_data: SecurityRecordManager | None = None
         # restricted variable: don't overuse this will be extended to multi-currency support
@@ -73,17 +76,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         self.fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | None] = {self.usd_fx_symbol: None}
         self.usd_fx = None
 
-        # dict of pair_strat_id and their activated tickers from today
-        self.active_ticker_pair_strat_id_dict_lock: asyncio.Lock = asyncio.Lock()
-        self.pair_strat_id_n_today_activated_tickers_dict_file_name: str = \
-            f'pair_strat_id_n_today_activated_tickers_dict_{DateTime.date(DateTime.utcnow())}'
-        self.pair_strat_id_n_today_activated_tickers_dict: Dict[str, int] | None = \
-            load_json_dict_from_file(self.pair_strat_id_n_today_activated_tickers_dict_file_name,
-                                     EXECUTOR_PROJECT_DATA_DIR, must_exist=False)
-        if self.pair_strat_id_n_today_activated_tickers_dict is None:
-            self.pair_strat_id_n_today_activated_tickers_dict = dict()
-
-        self.min_refresh_interval: int = parse_to_int(executor_config_yaml_dict.get("min_refresh_interval"))
+        self.min_refresh_interval: int = parse_to_int(main_config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
         self.strat_leg_1 = None
@@ -107,7 +100,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     # Start-Up Methods
     #####################
 
-    def _apply_checks_n_alert(self, strat_status_obj: StratStatus, is_create: bool = False) -> List[Alert]:
+    def _apply_checks_n_log_error(self, strat_status_obj: StratStatus, is_create: bool = False) -> List[Alert]:
         """
         implement any strat management checks here (create / update strats)
         """
@@ -116,7 +109,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     def static_data_periodic_refresh(self):
         pass
 
-    @except_n_log_alert(severity=Severity.Severity_CRITICAL)
+    @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
         """
         sleep wait till engine is up, then create portfolio limits if required
@@ -127,7 +120,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         static_data_service_state: ServiceState = ServiceState(
             error_prefix=error_prefix + "static_data_service failed, exception: ")
         symbol_overview_for_symbol_exists: bool = False
-        service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
+        ps_service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
+        la_service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
         should_sleep: bool = False
         while True:
             if should_sleep:
@@ -137,16 +131,17 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
                 # static data and md service are considered essential
-                if (self.pair_strat_service_up and static_data_service_state.ready and self.usd_fx is not None and
+                if (self.pair_strat_service_up and self.log_analyzer_service_up and
+                        static_data_service_state.ready and self.usd_fx is not None and
                         symbol_overview_for_symbol_exists and self.trading_data_manager is not None):
                     if not self.service_ready:
                         self.service_ready = True
                         logging.debug("Service Marked Ready")
                         # creating required models for this strat
-                        self._create_related_models_for_strat()
+                        self._check_n_create_related_models_for_strat()
                 if not self.pair_strat_service_up:
                     try:
-                        if is_pair_strat_engine_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
+                        if is_pair_strat_engine_service_up(ignore_error=(ps_service_up_no_error_retry_count > 0)):
                             self.pair_strat_service_up = True
                             logging.debug("Marked pair_strat_service_up True")
                             should_sleep = False
@@ -166,7 +161,20 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
                         else:
                             should_sleep = True
-                            service_up_no_error_retry_count -= 1
+                            ps_service_up_no_error_retry_count -= 1
+                    except Exception as e:
+                        logging.error("unexpected: strat_executor service startup threw exception, "
+                                      f"we'll retry periodically in: {self.min_refresh_interval} seconds"
+                                      f";;;exception: {e}", exc_info=True)
+                elif not self.log_analyzer_service_up:
+                    try:
+                        if is_log_analyzer_service_up(ignore_error=(la_service_up_no_error_retry_count > 0)):
+                            self.log_analyzer_service_up = True
+                            logging.debug("Marked log_analyzer_service_up True")
+                            should_sleep = False
+                        else:
+                            should_sleep = True
+                            la_service_up_no_error_retry_count -= 1
                     except Exception as e:
                         logging.error("unexpected: strat_executor service startup threw exception, "
                                       f"we'll retry periodically in: {self.min_refresh_interval} seconds"
@@ -184,7 +192,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
                     if self.usd_fx is None:
                         if not self.update_fx_symbol_overview_dict_from_http():
-                            if not (service_up_no_error_retry_count > 0):
+                            if not (ps_service_up_no_error_retry_count > 0):
                                 logging.error(f"Can't find any symbol_overview with symbol {self.usd_fx_symbol} "
                                               f"in pair_strat_engine service, retrying in next periodic cycle",
                                               exc_info=True)
@@ -194,7 +202,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         for symbol in symbols_list:
                             symbol_overview_list = (
                                 strat_executor_http_client.get_symbol_overview_from_symbol_query_client(symbol))
-                            logging.info(f"##### symbol_overview: {symbol_overview_list}, symbol_list: {symbols_list}")
                             if symbol_overview_list:
                                 symbol_overview_for_symbol_exists = True
                                 logging.debug("Marked symbol_overview_for_symbol_exists True")
@@ -340,7 +347,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 return updated_strat_status
             return existing_strat_status
 
-    async def _snooze_strat_status(self) -> bool:
+    async def _snooze_strat_status(self) -> StratStatus | None:
         strat_status = await self._get_strat_status()
         if strat_status:
             from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
@@ -348,12 +355,12 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             updated_strat_status = StratStatus(id=strat_status.id,
                                                strat_state=StratState.StratState_SNOOZED)
             await underlying_update_strat_status_http(updated_strat_status)
-            return True
+            return strat_status
         else:
             err_str_ = ("Can't find any strat_status to update state to snoozed, ignoring snooze update, "
                         f"symbol_side_key: {get_symbol_side_key([(strat_leg1.sec.sec_id, strat_leg1.side)])}")
             logging.error(err_str_)
-            return False
+            return None
 
     async def _create_strat_brief_for_ready_to_active_pair_strat(self, strat_limits: StratLimits):
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import \
@@ -540,9 +547,28 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             # from symbol_overview, since service_ready flag is only enabled unless symbol_overviews with
             # these symbols are found
 
-    def _create_related_models_for_strat(self) -> None:
+    def _check_n_create_strat_alert(self, strat_id: int):
+        try:
+            strat_alert = log_analyzer_service_http_client.get_strat_alert_client(strat_id)
+        except Exception as e:
+            if "Id not Found: " in str(e):
+                logging.info(f"get_strat_alert_client can't find strat_alert with id: {strat_id}, "
+                              f"creating one, caught exception: {e}")
+
+                # creating strat_alert for this strat in log_analyzer server
+                strat_alert: StratAlertBaseModel = StratAlertBaseModel(_id=strat_id, alerts=[], alert_update_seq_num=0)
+                log_analyzer_service_http_client.create_strat_alert_client(strat_alert)
+
+            else:
+                err_str_ = (f"Some Error Occurred while creating strat_alert for id: {strat_id}, "
+                            f"exception: {e}")
+                logging.error(err_str_)
+                raise Exception(err_str_)
+
+    def _check_n_create_related_models_for_strat(self) -> None:
         strat_limits = self._check_n_create_default_strat_limits()
         strat_status = self._check_n_create_or_update_strat_status(strat_limits)
+        self._check_n_create_strat_alert(strat_status.id)
 
         pair_strat = strat_manager_service_http_client.get_pair_strat_client(pair_strat_id)
         if not pair_strat.is_executor_running:
@@ -578,7 +604,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             if residual_notional > (max_residual := strat_limits.residual_restriction.max_residual):
                 alert_brief: str = f"residual notional: {residual_notional} > max residual: {max_residual}"
                 alert_details: str = f"updated_strat_status: {updated_strat_status}, strat_limits: {strat_limits}"
-                alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
+                # alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
+                logging.error(f"{alert_brief}, symbol_side_snapshot_key: "
+                              f"{get_symbol_side_snapshot_log_key(symbol_side_snapshot_)};;; {alert_details}")
                 updated_strat_status.strat_state = StratState.StratState_PAUSED
                 # todo: Alert handling
                 # updated_strat_status.strat_alerts = [alert]
@@ -595,7 +623,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         alert_details: str = (f"updated_strat_status: {updated_strat_status}, "
                                               f"strat_limits: {strat_limits}, "
                                               f"symbol_side_snapshot: {symbol_side_snapshot_}")
-                        alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
+                        logging.error(f"{alert_brief}, symbol_side_snapshot_key: "
+                                      f"{get_symbol_side_snapshot_log_key(symbol_side_snapshot_)};;; {alert_details}")
+                        # alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
                         updated_strat_status.strat_state = StratState.StratState_PAUSED
                         # todo: Alert handling
                         # updated_strat_status.strat_alerts = [alert]
@@ -612,8 +642,10 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         alert_details: str = (f"updated_strat_status: {updated_strat_status}, "
                                               f"strat_limits: {strat_limits}, "
                                               f"symbol_side_snapshot: {symbol_side_snapshot_}")
-                        alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
+                        # alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
                         updated_strat_status.strat_state = StratState.StratState_PAUSED
+                        logging.error(f"{alert_brief}, symbol_side_snapshot_key: "
+                                      f"{get_symbol_side_snapshot_log_key(symbol_side_snapshot_)};;; {alert_details}")
                         # todo: Alert handling
                         # updated_strat_status.strat_alerts = [alert]
                     # else not required: if consumable_cxl-qty is allowed then ignore
@@ -860,11 +892,11 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     async def create_command_n_control_pre(self, command_n_control_obj: CommandNControl):
         match command_n_control_obj.command_type:
             case CommandType.CLEAR_STRAT:
-                async with self.active_ticker_pair_strat_id_dict_lock:
-                    self.pair_strat_id_n_today_activated_tickers_dict.clear()
-                    store_json_or_dict_to_file(self.pair_strat_id_n_today_activated_tickers_dict_file_name,
-                                               self.pair_strat_id_n_today_activated_tickers_dict,
-                                               EXECUTOR_PROJECT_DATA_DIR)
+                for symbol, side in [(strat_leg1.sec.sec_id, strat_leg1.side),
+                                     (strat_leg2.sec.sec_id, strat_leg2.side)]:
+                    file_path = EXECUTOR_PROJECT_DATA_DIR / f"{symbol}_{side}_{DateTime.date(DateTime.utcnow())}.json.lock"
+                    if os.path.exists(file_path):
+                        os.remove(file_path)
             case CommandType.RESET_STATE:
                 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_beanie_database \
                     import document_models
@@ -909,32 +941,17 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         """
         raised_alert = False
         if updated_strat_status_obj.strat_state == StratState.StratState_ACTIVE:
-            strat_alerts = self._apply_checks_n_alert(updated_strat_status_obj)
-            if len(strat_alerts) != 0:
+            raised_alert = self._apply_checks_n_log_error(updated_strat_status_obj)
+            if raised_alert:
                 # some check is violated, move strat to error
                 updated_strat_status_obj.strat_state = StratState.StratState_ERROR
-                # todo: alert handling
-                # if updated_strat_status_obj.strat_alerts is None:
-                #     updated_strat_status_obj.strat_alerts = strat_alerts
-                # else:
-                #     updated_strat_status_obj.strat_alerts.extend(strat_alerts)
-                raised_alert = True
             # else not required - no alerts - all checks passed
             if stored_strat_status_obj.strat_state != StratState.StratState_ACTIVE:
-                dict_dirty: bool = False
-                async with self.active_ticker_pair_strat_id_dict_lock:
-                    if strat_leg1.sec.sec_id not in self.pair_strat_id_n_today_activated_tickers_dict:
-                        self.pair_strat_id_n_today_activated_tickers_dict[
-                            strat_leg1.sec.sec_id] = updated_strat_status_obj.id
-                        dict_dirty = True
-                    if strat_leg2.sec.sec_id not in self.pair_strat_id_n_today_activated_tickers_dict:
-                        self.pair_strat_id_n_today_activated_tickers_dict[
-                            strat_leg2.sec.sec_id] = updated_strat_status_obj.id
-                        dict_dirty = True
-                if dict_dirty:
-                    store_json_or_dict_to_file(self.pair_strat_id_n_today_activated_tickers_dict_file_name,
-                                               self.pair_strat_id_n_today_activated_tickers_dict,
-                                               EXECUTOR_PROJECT_DATA_DIR)
+                for symbol, side in [(strat_leg1.sec.sec_id, strat_leg1.side),
+                                     (strat_leg2.sec.sec_id, strat_leg2.side)]:
+                    file_path = EXECUTOR_PROJECT_DATA_DIR / f"{symbol}_{side}_{DateTime.date(DateTime.utcnow())}.json.lock"
+                    with open(file_path, "w") as fl:
+                        pass
 
             # else not required: pair_strat_id_n_today_activated_tickers_dict is updated only if we activate a new strat
         return raised_alert
@@ -948,11 +965,14 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
+        if updated_strat_status_obj.strat_status_update_seq_num is None:
+            updated_strat_status_obj.strat_status_update_seq_num = 0
+        updated_strat_status_obj.strat_status_update_seq_num += 1
         updated_strat_status_obj.last_update_date_time = DateTime.utcnow()
 
         res = await self._update_strat_status_pre(stored_strat_status_obj, updated_strat_status_obj)
         if res:
-            logging.debug(f"Alerts updated by _update_pair_strat_pre, symbol_side_key: "
+            logging.debug(f"Alerts updated by _update_strat_status_pre, symbol_side_key: "
                           f"{get_symbol_side_key([(strat_leg1.sec.sec_id, strat_leg1.side)])};;; "
                           f"strat_status: {updated_strat_status_obj}")
         return updated_strat_status_obj
@@ -973,11 +993,10 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        if updated_strat_status_obj_json.get("strat_status") is not None:
-            if stored_strat_status_obj.strat_status_update_seq_num is None:
-                updated_strat_status_obj_json["strat_status_update_seq_num"] = 0
-            updated_strat_status_obj_json[
-                "strat_status_update_seq_num"] = stored_strat_status_obj.strat_status_update_seq_num + 1
+        if stored_strat_status_obj.strat_status_update_seq_num is None:
+            updated_strat_status_obj_json["strat_status_update_seq_num"] = 0
+        updated_strat_status_obj_json[
+            "strat_status_update_seq_num"] = stored_strat_status_obj.strat_status_update_seq_num + 1
         updated_strat_status_obj_json["last_update_date_time"] = DateTime.utcnow()
 
         updated_pydantic_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_strat_status_obj.dict(by_alias=True)),
@@ -2146,7 +2165,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
     async def create_strat_status_post(self, strat_status_obj: StratStatus):
         # updating trading_data_manager's strat_cache
-        logging.info("##### create ss post")
         self.trading_data_manager.handle_strat_status_get_all_ws(strat_status_obj)
 
     # async def create_strat_limits_post(self, strat_limits_obj: StratLimits):
@@ -2268,9 +2286,10 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             if strat_status is not None:
                 updated_residual = await self.__get_residual_obj(side, updated_strat_brief)
                 if updated_residual is not None:
-                    strat_status = StratStatusOptional(residual=updated_residual)
+                    strat_status = StratStatusOptional(_id=strat_status.id, residual=updated_residual)
                     await underlying_partial_update_strat_status_http(
-                        json.loads(strat_status.json(by_alias=True, exclude_none=True)))
+                        jsonable_encoder(strat_status, by_alias=True, exclude_none=True)
+                    )
                 else:
                     err_str_ = f"Something went wrong while computing residual for security_side_key: " \
                                f"{get_symbol_side_key([(security_id, side)])}"
@@ -2505,12 +2524,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             err_str_ = "Some Error occurred while removing strat_limits in snoozing strat process"
             raise HTTPException(detail=err_str_, status_code=500)
 
-        # Updating strat_state to SNOOZED and setting default values of strat_status
-        res = await self._snooze_strat_status()
-        if not res:
-            err_str_ = "Some Error occurred while updating strat_status in snoozing strat process"
-            raise HTTPException(detail=err_str_, status_code=500)
-
         if strat_details.current_state == StratState.StratState_DONE:
             # deleting strat's both leg's symbol_side_snapshots
             res = await self._delete_symbol_side_snapshot_from_unload_strat()
@@ -2529,19 +2542,63 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             if not res:
                 err_str_ = "Some Error occurred while updating strat_overview in snoozing strat process"
                 raise HTTPException(detail=err_str_, status_code=500)
+
+        # Updating strat_state to SNOOZED and setting default values of strat_status
+        snoozed_strat_status = await self._snooze_strat_status()
+        if not snoozed_strat_status:
+            err_str_ = "Some Error occurred while updating strat_status in snoozing strat process"
+            raise HTTPException(detail=err_str_, status_code=500)
+
+        # # taking time for strat_alert patch to publish last generated alerts
+        # time.sleep(strat_alert_bulk_update_timeout*2)
+
+        # removing strat_alert
+        try:
+            log_analyzer_service_http_client.delete_strat_alert_client(snoozed_strat_status.id)
+        except Exception as e:
+            err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
+            raise HTTPException(detail=err_str_, status_code=500)
+
+        return []
+
+    #########################
+    # Trade Simulator Queries
+    #########################
+
+    async def trade_simulator_place_new_order_query_pre(
+            self, trade_simulator_process_new_order_class_type: Type[TradeSimulatorProcessNewOrder],
+            px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
+            underlying_account: str, exchange: str | None = None):
+        await TradeSimulator.place_new_order(px, qty, side, trading_sec_id, system_sec_id, underlying_account, exchange)
+        return []
+
+    async def trade_simulator_place_cxl_order_query_pre(
+            self, trade_simulator_process_cxl_order_class_type: Type[TradeSimulatorProcessCxlOrder],
+            order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
+            system_sec_id: str | None = None, underlying_account: str | None = None):
+        await TradeSimulator.place_cxl_order(order_id, side, trading_sec_id, system_sec_id, underlying_account)
         return []
 
     async def trade_simulator_process_order_ack_query_pre(
             self, trade_simulator_process_order_ack_class_type: Type[TradeSimulatorProcessOrderAck], order_id: str,
             px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
-        await TradeSimulator.async_process_order_ack(order_id, px, qty, side, sec_id, underlying_account)
+        await TradeSimulator.process_order_ack(order_id, px, qty, side, sec_id, underlying_account)
         return []
 
     async def trade_simulator_process_fill_query_pre(
             self, trade_simulator_process_fill_class_type: Type[TradeSimulatorProcessFill], order_id: str,
             px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
-        await TradeSimulator.async_process_fill(order_id, px, qty, side, sec_id, underlying_account)
+        await TradeSimulator.process_fill(order_id, px, qty, side, sec_id, underlying_account)
         return []
+
+    async def trade_simulator_reload_config_query_pre(
+            self, trade_simulator_reload_config_class_type: Type[TradeSimulatorReloadConfig]):
+        TradeSimulator.reload_symbol_configs()
+        return []
+
+    ###################
+    # Filter WS queries
+    ###################
 
     async def filtered_notify_tob_update_query_ws_pre(self):
         return tob_filter_callable

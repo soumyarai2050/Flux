@@ -1,15 +1,10 @@
-main_server_beanie_host: "127.0.0.1"
+server_host: "127.0.0.1"
 main_server_beanie_port: "8050"
-main_server_cache_host: "127.0.0.1"
 main_server_cache_port: "8060"
 min_refresh_interval: 20
 
-strat_leg_1:
-  exch_id: "CB_Sec_1"
-  sec: "CB_Sec_1"
-  side: "CB_Sec_1"
-  company: "CB_Sec_1"
-
+log_mongo_uri: True
+mongo_server: "mongodb://localhost:27017"
 
 # to be used in pair_strat_log_analyzer to take out counts of created from waiting queue to execute create in db
 portfolio_alert_configs:
@@ -27,6 +22,3 @@ raw_performance_data_processor_loop_wait: 2  # sec
 
 is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
-
-# to run log analyzer in simulator mode
-simulate_log_analyzer: True

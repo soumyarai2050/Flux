@@ -14,13 +14,14 @@ os.environ["DBType"] = "beanie"
 
 from Flux.CodeGenProjects.strat_executor.app.trading_data_manager import TradingDataManager
 from Flux.CodeGenProjects.strat_executor.app.strat_cache import *
-from Flux.CodeGenProjects.strat_executor.app.trading_link import get_trading_link, TradingLinkBase, config_dict
+from Flux.CodeGenProjects.strat_executor.app.trading_link import get_trading_link, TradingLinkBase, is_test_run
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import \
-    get_consumable_participation_qty_http, create_alert, get_symbol_side_key, \
+    get_consumable_participation_qty_http, get_symbol_side_key, \
     get_strat_brief_log_key
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
+
 
 class StratExecutor:
     trading_link: ClassVar[TradingLinkBase] = get_trading_link()
@@ -28,7 +29,6 @@ class StratExecutor:
     @staticmethod
     def executor_trigger(trading_data_manager: TradingDataManager, strat_cache: StratCache):
         strat_executor: StratExecutor = StratExecutor(trading_data_manager, strat_cache)
-        logging.info("##### starting executor")
         strat_executor_thread = Thread(target=strat_executor.run, daemon=True).start()
         return strat_executor, strat_executor_thread
 
@@ -36,7 +36,7 @@ class StratExecutor:
 
     def __init__(self, trading_data_manager: TradingDataManager, strat_cache: StratCache):
         self.pair_strat_executor_id: str | None = None
-        self.is_test_run: bool = config_dict.get("is_test_run")
+        self.is_test_run: bool = is_test_run
 
         self.trading_data_manager: TradingDataManager = trading_data_manager
         self.strat_cache: StratCache = strat_cache
@@ -227,18 +227,19 @@ class StratExecutor:
             self.strat_cache.set_has_unack_leg2(unack_state)
 
     def check_unack(self, symbol: str):
-        if self.strat_cache.get_pair_strat_().pair_strat_params.strat_leg1.sec.sec_id == symbol:
+        pair_strat, _ = self.strat_cache.get_pair_strat()
+        if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == symbol:
             if self.strat_cache.has_unack_leg1():
                 return True
 
-        elif self.strat_cache.get_pair_strat_().pair_strat_params.strat_leg2.sec.sec_id == symbol:
+        elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == symbol:
             if self.strat_cache.has_unack_leg2():
                 return True
 
         else:
             logging.error(f"check_unack: unknown symbol: {symbol}, check ignored for strat_cache: "
                           f"{self.strat_cache.get_key()}, "
-                          f"pair_strat_key_key: {get_pair_strat_log_key(self.strat_cache.get_pair_strat_())}")
+                          f"pair_strat_key_key: {get_pair_strat_log_key(pair_strat)}")
 
         return False
 
@@ -546,7 +547,8 @@ class StratExecutor:
             done = True  # done is left unchanged (True) implies all required data checks succeeded
             try:
                 if not self.pair_strat_executor_id:
-                    self.pair_strat_executor_id = get_pair_strat_log_key(self.strat_cache.get_pair_strat_())
+                    pair_strat, _ = self.strat_cache.get_pair_strat()
+                    self.pair_strat_executor_id = get_pair_strat_log_key(pair_strat)
                     done = False
                 if not self.strat_cache.get_strat_limits():
                     self.update_strat_limits_from_http()
@@ -584,33 +586,23 @@ class StratExecutor:
             except Exception as e:
                 logging.error(f"Run returned with exception - sending again, exception: {e}")
             finally:
-                if ret_val != 0:
-                    logging.error(f"Error: Run returned, code: {ret_val} - sending again")
-                elif ret_val == 1:
+                if ret_val == 1:
                     logging.info(f"explicit strat shutdown requested for: {self.pair_strat_executor_id}, going down")
                     break
+                elif ret_val != 0:
+                    logging.error(f"Error: Run returned, code: {ret_val} - sending again")
                 else:
                     pair_strat, _ = self.strat_cache.get_pair_strat()
-                    strat_status = self.strat_cache.get_strat_status()
-                    if strat_status is not None:
-                        strat_status_list, strat_status_update_date_time = strat_status
-                        if len(strat_status_list):
-                            strat_status_ = strat_status_list[0]
-                        else:
-                            logging.error(
-                                f"strat_status_list must have strat_status object for: {self.strat_cache}")
-                            ret_val = -3000  # helps find the error location
-                            return ret_val
-                        alert_brief: str = f"graceful shut down processing for strat: {self.pair_strat_executor_id} " \
-                                           f"{get_pair_strat_log_key(pair_strat)}"
-                        # todo: alert handling
-                        # alert_details: str = f"strat details: {self.strat_cache.get_pair_strat()}"
-                        # alert: Alert = create_alert(alert_brief, alert_details, None, Severity.Severity_INFO)
+                    strat_status_tuple = self.strat_cache.get_strat_status()
+                    if strat_status_tuple is not None:
+                        strat_status_, strat_status_update_date_time = strat_status_tuple
                         if strat_status_.strat_state != StratState.StratState_DONE:
                             strat_status_basemodel = StratStatusBaseModel(_id=pair_strat.id)
                             strat_status_basemodel.strat_state = StratState.StratState_DONE
-                            # todo: alert handling
-                            # pair_strat_basemodel.strat_status.strat_alerts = [alert]
+                            alert_str: str = \
+                                (f"graceful shut down processing for strat: {self.pair_strat_executor_id} "
+                                 f"{get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
+                            logging.info(alert_str)
                             self.trading_link.strat_executor_web_client.patch_strat_status_client(
                                 jsonable_encoder(strat_status_basemodel, by_alias=True, exclude_none=True))
                             logging.debug(f"StratStatus with id: {self.pair_strat_executor_id} Marked Done, "
@@ -847,6 +839,8 @@ class StratExecutor:
                     if not cancel_order.cxl_confirmed:
                         self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side, None,
                                                           cancel_order.security.sec_id, underlying_account="NA")
+                        logging.info(f"@@@@@@@ Logging cxl_order_id: {cancel_order.order_id} Datetime: {DateTime.utcnow()}")
+
                 if unprocessed_cancel_orders:
                     return True
         # all else return false - no cancel_order to process
@@ -889,24 +883,13 @@ class StratExecutor:
                     return -1
                 strat_status_tuple = self.strat_cache.get_strat_status()
                 if strat_status_tuple is not None:
-                    strat_status_list, strat_status_update_date_time = strat_status_tuple
-                    if len(strat_status_tuple):
-                        strat_status = strat_status_list[0]
-                        # If strat status not active, don't act, just return
-                        if strat_status.strat_state != StratState.StratState_ACTIVE:
-                            continue
-                        else:
-                            strat_limits_tuple = self.strat_cache.get_strat_limits()
-                            strat_limits_list, strat_limits_update_date_time = strat_limits_tuple
-                            if len(strat_limits_list):
-                                self.strat_limit = strat_limits_list[0]
-                            else:
-                                logging.error(
-                                    f"strat_limits_list must have strat_limits object for: {self.strat_cache}")
-                                return -1
+                    strat_status, strat_status_update_date_time = strat_status_tuple
+                    # If strat status not active, don't act, just return
+                    if strat_status.strat_state != StratState.StratState_ACTIVE:
+                        continue
                     else:
-                        logging.error(f"strat_status_list must have strat_status object for: {self.strat_cache}")
-                        return -1
+                        strat_limits_tuple = self.strat_cache.get_strat_limits()
+                        self.strat_limit, strat_limits_update_date_time = strat_limits_tuple
                 else:
                     logging.error(f"strat_status_tuple is None for: {self.strat_cache}")
                     return -1

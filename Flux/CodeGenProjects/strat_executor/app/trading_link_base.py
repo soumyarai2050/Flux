@@ -24,23 +24,15 @@ def load_configs(config_path):
 
 class TradingLinkBase(ABC):
     executor_config_dict = load_configs(str(executor_config_yaml_path))
-    executor_host, executor_port = get_native_host_n_port_from_config_dict(executor_config_dict)
-    strat_executor_web_client: ClassVar[StratExecutorServiceHttpClient] = \
-        StratExecutorServiceHttpClient.set_or_get_if_instance_exists(executor_host, executor_port)
-    pair_strat_config_dict = load_configs(str(pair_strat_port_config_yaml_path))
-    pair_strat_host, pair_strat_port = get_native_host_n_port_from_config_dict(pair_strat_config_dict)
-    pair_strat_web_client: ClassVar[StratManagerServiceHttpClient] = \
-        StratManagerServiceHttpClient.set_or_get_if_instance_exists(pair_strat_host, pair_strat_port)
+    executor_host, executor_port = host, port
+    strat_executor_web_client: ClassVar[StratExecutorServiceHttpClient] = strat_executor_http_client
+    pair_strat_config_dict = pair_strat_config_yaml_dict
+    pair_strat_web_client: ClassVar[StratManagerServiceHttpClient] = strat_manager_service_http_client
 
     @classmethod
     @final
     def reload_executor_configs(cls):
         cls.executor_config_dict = load_configs(str(executor_config_yaml_path))
-
-    @classmethod
-    @final
-    def reload_pair_strat_configs(cls):
-        cls.pair_strat_config_dict = load_configs(str(pair_strat_config_yaml_path))
 
     @classmethod
     @abstractmethod

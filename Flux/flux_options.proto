@@ -119,6 +119,12 @@ message ExecutorUtilOptions{
   optional int32 ExecutorKeyCounts = 4 [default=1];
   repeated string ExecutorKeySequence = 5; // field names delimited by '-'
   optional string LogKeySequence = 6; // field names delimited by '-'
+  optional bool IsRepeated = 7 [default=true];
+}
+
+message FluxImportFileModel {
+  required string ImportFileName = 1;
+  repeated string ImportModelName = 2;
 }
 
 
@@ -132,6 +138,8 @@ extend google.protobuf.FileOptions
   optional WebPageUIData FluxFileWebPageUIData = 55251;
   optional string FluxFileCRUDHost = 55253;
   optional int32 FluxFileCRUDPortOffset = 55254;
+  repeated FluxImportFileModel FluxFileImportDependencyModel = 55255;
+
 }
 
 extend google.protobuf.MessageOptions

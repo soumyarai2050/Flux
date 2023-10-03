@@ -53,7 +53,11 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
         output_str += '    raise Exception(err_str)\n\n'
 
         output_str += 'main_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(main_config_yaml_path))\n'
-        output_str += 'is_main_server = (str(main_config_yaml_dict.get("main_server_beanie_port")) == port)\n\n'
+        output_str += 'host = main_config_yaml_dict.get("server_host")\n\n'
+        output_str += 'if host is None:\n\n'
+        output_str += '    err_str = "Can not find \'server_host\' key in data/config.yaml file loaded dict"\n'
+        output_str += '    logging.exception(err_str)\n'
+        output_str += '    raise Exception(err_str)\n\n'
 
         output_str += 'if (db_type := os.getenv("DBType")) is None or len(db_type) == 0:\n'
         output_str += '\terr_str = f"env var DBType must not be {db_type}"\n'

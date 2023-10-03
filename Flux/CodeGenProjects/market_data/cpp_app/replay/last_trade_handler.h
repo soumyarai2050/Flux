@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../cpp_app/include/market_data_mongo_db_handler.h"
+#include "../../FluxCppCore/include/mongo_db_handler.h"
 #include "../../FluxCppCore/include/mongo_db_codec.h"
 #include "../../FluxCppCore/include/base_web_client.h"
 #include "../../generated/CppUtilGen/market_data_populate_random_values.h"
@@ -13,7 +13,7 @@ namespace market_data_handler {
 
     class LastTradeHandler {
     public:
-        explicit LastTradeHandler(std::shared_ptr<MarketData_MongoDBHandler> mongo_db_,
+        explicit LastTradeHandler(std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_,
                                   quill::Logger *logger = quill::get_logger()) :
         m_sp_mongo_db_(std::move(mongo_db_)), mp_logger_(logger), m_last_trade_db_codec_(m_sp_mongo_db_),
         m_top_of_book_db_codec_(m_sp_mongo_db_), m_top_of_book_publisher_(host, port) {
@@ -65,7 +65,7 @@ namespace market_data_handler {
         }
 
     protected:
-        std::shared_ptr<MarketData_MongoDBHandler> m_sp_mongo_db_;
+        std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_;
         quill::Logger *mp_logger_;
         FluxCppCore::MongoDBCodec<market_data::LastTrade, market_data::LastTradeList> m_last_trade_db_codec_;
         FluxCppCore::MongoDBCodec<market_data::TopOfBook, market_data::TopOfBookList> m_top_of_book_db_codec_;

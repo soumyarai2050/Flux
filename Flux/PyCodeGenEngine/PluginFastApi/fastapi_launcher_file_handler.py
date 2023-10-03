@@ -25,7 +25,7 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
             self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.callback_override_set_instance_file_name)
         output_str = "# below import is to set derived callback's instance if implemented in the script\n"
         callback_override_set_instance_file_path = ".".join(callback_override_set_instance_file_path.split("."))
-        output_str += f"from {callback_override_set_instance_file_path} import port, config_yaml_dict\n"
+        output_str += f"from {callback_override_set_instance_file_path} import port, config_yaml_dict, host\n"
         callback_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", f"{self.routes_callback_class_name}")
         routes_callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += f"from {callback_file_path} import {routes_callback_class_name_camel_cased}\n\n\n"
@@ -37,7 +37,7 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
             host = self.get_simple_option_value_from_proto(file,
                                                            FastapiLauncherFileHandler.flux_file_crud_host)
         else:
-            host = '"127.0.0.1"'
+            host = 'host'   # var name imported in generated file
 
         if self.is_option_enabled(file, FastapiLauncherFileHandler.flux_file_crud_port_offset):
             port_offset = \
@@ -78,8 +78,6 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'    # WARNING: 30\n'
         output_str += f'    # ERROR: 40\n'
         output_str += f'    # CRITICAL: 50\n'
-        output_str += \
-            f'    host = {host} if ((env_host := os.getenv("HOST")) is None or len(env_host) == 0) else env_host\n'
         output_str += f'    if (fastapi_file_name := os.getenv("FASTAPI_FILE_NAME")) is None or ' \
                       f'len(fastapi_file_name) == 0:\n'
         output_str += '        err_str = f"Env Var FASTAPI_FILE_NAME received as {fastapi_file_name}"\n'
@@ -87,7 +85,7 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'        raise Exception(err_str)\n'
         output_str += f'    # else not required: if fastapi file name received successfully then running server\n'
         output_str += f'    uvicorn.run(reload=reload_status, \n'
-        output_str += f'                host=host, \n'
+        output_str += f'                host={host} if ((env_host := os.getenv("HOST")) is None or len(env_host) == 0) else env_host, \n'
         output_str += f'                port=parse_to_int(port), \n'
         output_str += '                app=f"FastApi.{fastapi_file_name}'+f':{self.fastapi_app_name}", \n'
         output_str += f'                log_level=20)\n'

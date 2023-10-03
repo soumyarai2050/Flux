@@ -2,7 +2,7 @@
 
 #include "quill/Quill.h"
 
-#include "../include/market_data_mongo_db_handler.h"
+#include "../../FluxCppCore/include/mongo_db_handler.h"
 #include "../../generated/CppUtilGen/market_data_constants.h"
 #include "../../generated/CppUtilGen/market_data_key_handler.h"
 #include "../../FluxCppCore/include/mongo_db_codec.h"
@@ -18,19 +18,37 @@ namespace market_data_handler {
 
     class MarketDepthHandler {
     public:
-        explicit MarketDepthHandler(std::shared_ptr<MarketData_MongoDBHandler> mongo_db_,
+        explicit MarketDepthHandler(std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_,
                                     quill::Logger *logger = quill::get_logger()) :
         m_sp_mongo_db_(std::move(mongo_db_)), mp_logger_(logger), m_market_depth_db_codec_(m_sp_mongo_db_),
-        m_top_of_book_db_codec_(m_sp_mongo_db_), m_top_of_book_publisher_(host_, port_), m_market_depth_obj_(),
+        m_top_of_book_db_codec_(m_sp_mongo_db_), m_top_of_book_publisher_(host_, port_),
+        m_market_depth_publisher_(host_, port_), m_market_depth_obj_(),
         m_websocket_server_(m_market_depth_obj_) {
             
             update_market_depth_cache_();
             update_top_of_book_cache_();
 
-            m_market_depth_websocket_thread_ = std::thread([&]() {
-                m_websocket_server_.run();
-            });
-            
+//            m_market_depth_websocket_thread_ = std::thread([&]() {
+//                m_websocket_server_.run();
+//            });
+
+        }
+
+        void insert_or_update_market_depth_web_client(const market_data::MarketDepth &market_depth_obj) {
+            market_data::MarketDepth market_depth_obj_copy = market_depth_obj;
+            std::string market_depth_key;
+            bool status;
+            MarketDataKeyHandler::get_key_out(market_depth_obj, market_depth_key);
+            auto found = m_market_depth_db_codec_.m_root_model_key_to_db_id.find(market_depth_key);
+            if (found == m_market_depth_db_codec_.m_root_model_key_to_db_id.end()) {
+                status = m_market_depth_publisher_.create_client(market_depth_obj_copy);
+                auto db_id = m_market_depth_publisher_.get_max_id_client();
+                m_market_depth_db_codec_.m_root_model_key_to_db_id[market_depth_key] = db_id;
+            } else {
+                auto db_id = m_market_depth_db_codec_.m_root_model_key_to_db_id.at(market_depth_key);
+                market_depth_obj_copy.set_id(db_id);
+                status = m_market_depth_publisher_.put_client(market_depth_obj_copy);
+            }
         }
 
         void insert_or_update_market_depth(const market_data::MarketDepth &market_depth_obj) {
@@ -42,8 +60,8 @@ namespace market_data_handler {
         }
 
         void handle_md_update(market_data::MarketDepth &market_depth_obj) {
-            insert_or_update_market_depth(market_depth_obj);
-            m_websocket_server_.NewClientCallBack(market_depth_obj, -1);
+            insert_or_update_market_depth_web_client(market_depth_obj);
+//            m_websocket_server_.NewClientCallBack(market_depth_obj, -1);
             int32_t db_id;
             if (market_depth_obj.position() == 0) {
                 market_data::TopOfBook top_of_book_obj;
@@ -109,13 +127,13 @@ namespace market_data_handler {
             } // else not required: for every symbol TopOfBook should be only 1
         }
 
-        ~MarketDepthHandler() {
-            m_websocket_server_.shutdown();
-            m_market_depth_websocket_thread_.join();
-        }
+//        ~MarketDepthHandler() {
+//            m_websocket_server_.shutdown();
+//            m_market_depth_websocket_thread_.join();
+//        }
 
     protected:
-        std::shared_ptr<MarketData_MongoDBHandler> m_sp_mongo_db_;
+        std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_;
         quill::Logger *mp_logger_;
         FluxCppCore::MongoDBCodec<market_data::MarketDepth, market_data::MarketDepthList> m_market_depth_db_codec_;
         FluxCppCore::MongoDBCodec<market_data::TopOfBook, market_data::TopOfBookList> m_top_of_book_db_codec_;
@@ -123,6 +141,10 @@ namespace market_data_handler {
         FluxCppCore::RootModelWebClient<market_data::TopOfBook, create_top_of_book_client_url, get_top_of_book_client_url,
         get_top_of_book_max_id_client_url, put_top_of_book_client_url, patch_top_of_book_client_url,
         delete_top_of_book_client_url> m_top_of_book_publisher_;
+        FluxCppCore::RootModelWebClient<market_data::MarketDepth, create_market_depth_client_url,
+                get_market_depth_client_url, get_market_depth_max_id_client_url, put_market_depth_client_url,
+                patch_market_depth_client_url, delete_market_depth_client_url> m_market_depth_publisher_;
+
         market_data::MarketDepth m_market_depth_obj_;
 
         MarketDataMarketDepthWebSocketServer<market_data::MarketDepth> m_websocket_server_;

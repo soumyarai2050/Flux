@@ -72,7 +72,8 @@ message OrderLimits{
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
     EnableNotifyAll: false,
-    IsTopLvlModel: True
+    IsTopLvlModel: true,
+    IsRepeated: false
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -118,12 +119,11 @@ message PortfolioStatus{
     QueryParams: "overall_sell_fill_notional",
     QueryParamsDataType: "float | None = None",
   };
-//  option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
-//  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_portfolio_alerts_obj", agg_params: ["-100"]};
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
     EnableNotifyAll: false,
-    IsTopLvlModel: true
+    IsTopLvlModel: true,
+    IsRepeated: false
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -162,7 +162,7 @@ message PairStrat{
       QueryParamsDataType: "str"
   };
     option (FluxMsgJsonQuery) = {
-    QueryName: "get_ongoing_strat_from_symbol_side",
+    QueryName: "get_pair_strat_from_symbol_side",
     QueryParams: "sec_id",
     QueryParamsDataType: "str",
     QueryParams: "side",
@@ -174,18 +174,17 @@ message PairStrat{
       QueryParamsDataType: "List[str]",
       QueryType: WS
   };
-    option (FluxMsgExecutorOptions) = {
+  option (FluxMsgExecutorOptions) = {
       IsWebSocketModel: true,
       EnableNotifyAll: false,
       IsTopLvlModel: false,
       ExecutorKeyCounts: 2,
       ExecutorKeySequence: "pair_strat_params.strat_leg1.sec.sec_id-pair_strat_params.strat_leg1.side",
       ExecutorKeySequence: "pair_strat_params.strat_leg2.sec.sec_id-pair_strat_params.strat_leg2.side",
-      LogKeySequence: "pair_strat_params.strat_leg1.sec.sec_id-pair_strat_params.strat_leg2.sec.sec_id-id"
+      LogKeySequence: "pair_strat_params.strat_leg1.sec.sec_id-pair_strat_params.strat_leg2.sec.sec_id-id",
+      IsRepeated: false
     };
     option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
-//    option (FluxMsgNestedFldValFilterParam) = {field_name: "dismiss", bool_val_filters: [False]};
-//    option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_strat_alerts_obj", agg_params: ["-100"]};
 
     //Server generated unique Id
     required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID",  (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -267,7 +266,8 @@ message FxSymbolOverview{
     EnableNotifyAll: false,
     IsTopLvlModel: true,
     ExecutorKeyCounts: 1,
-    ExecutorKeySequence: "id-symbol"
+    ExecutorKeySequence: "id-symbol",
+    IsRepeated: true
   };
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];

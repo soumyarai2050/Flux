@@ -30,10 +30,11 @@ class LogTradeSimulator(TradingLinkBase):
                           f"px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}{cls.fld_sep}side{cls.val_sep}{side}"
                           f"{cls.fld_sep}trading_sec_id{cls.val_sep}{trading_sec_id}{cls.fld_sep}system_sec_id: "
                           f"{system_sec_id}{cls.fld_sep}account{cls.val_sep}{account}{exchange_str}")
-        logging.info(f"$$$place_new_order{cls.fld_sep}px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}"
+        logging.info(f"$$$trade_simulator_place_new_order_query_client{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
+                     f"{cls.executor_port}{cls.fld_sep}px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}"
                      f"{cls.fld_sep}side{cls.val_sep}{side}{cls.fld_sep}trading_sec_id{cls.val_sep}{trading_sec_id}"
-                     f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}{cls.fld_sep}account{cls.val_sep}"
-                     f"{account}{exchange_str}")
+                     f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}{cls.fld_sep}underlying_account"
+                     f"{cls.val_sep}{account}{exchange_str}")
         return True
 
     @classmethod
@@ -44,7 +45,8 @@ class LogTradeSimulator(TradingLinkBase):
         system_sec_id_str: str = f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}" if system_sec_id else ""
         underlying_account_str: str = \
             f"{cls.fld_sep}underlying_account{cls.val_sep}{underlying_account}" if underlying_account else ""
-        logging.info(f"$$$place_cxl_order{cls.fld_sep}order_id{cls.val_sep}{order_id}{side_str}{trading_sec_id_str}"
+        logging.info(f"$$$trade_simulator_place_cxl_order_query_client{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
+                     f"{cls.executor_port}{cls.fld_sep}order_id{cls.val_sep}{order_id}{side_str}{trading_sec_id_str}"
                      f"{system_sec_id_str}"
                      f"{underlying_account_str}")
         return True

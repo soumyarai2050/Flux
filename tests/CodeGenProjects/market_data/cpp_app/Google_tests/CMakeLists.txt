@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 set(CMAKE_CXX_STANDARD 23)
-list(APPEND CMAKE_MODULE_PATH "/mnt/e/FluxCodeGenEn/FluxCodeGenEngine/tests/CodeGenProjects/market_data/cpp_app/cmake")
+list(APPEND CMAKE_MODULE_PATH "../cmake")
 message (WARNING ${CMAKE_MODULE_PATH})
 project(Google_tests CXX)
 find_package(Mongo REQUIRED)

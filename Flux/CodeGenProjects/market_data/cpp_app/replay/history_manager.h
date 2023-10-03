@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../include/market_data_mongo_db_handler.h"
+#include "../../FluxCppCore/include/mongo_db_handler.h"
 #include "last_trade_handler.h"
 #include "market_depth_handler.h"
 
@@ -8,7 +8,7 @@ namespace market_data_handler {
 
     class HistoryManager {
     public:
-        explicit HistoryManager(std::shared_ptr<MarketData_MongoDBHandler> &mongo_db_,
+        explicit HistoryManager(std::shared_ptr<FluxCppCore::MongoDBHandler> &mongo_db_,
                                 LastTradeHandler &r_last_trade_handler,
                                 MarketDepthHandler &r_market_depth_handler,
                                 quill::Logger *logger = quill::get_logger()) :
@@ -57,7 +57,7 @@ namespace market_data_handler {
         }
 
     protected:
-        std::shared_ptr<MarketData_MongoDBHandler> m_sp_mongo_db_;
+        std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db_;
         LastTradeHandler &mr_last_trade_handler;
         MarketDepthHandler &mr_market_depth_handler;
         quill::Logger *m_p_logger_;

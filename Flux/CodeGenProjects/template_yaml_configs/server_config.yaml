@@ -1,7 +1,4 @@
-mongo_server: "mongodb://localhost:27017"
-beanie_host: 127.0.0.1
 beanie_port: '8000'
-cache_host: 127.0.0.1
 cache_port: '8010'
 log_mongo_uri: True
 log_level: "debug"
@@ -9,7 +6,6 @@ custom_logger_lvls:
   - TIMING: 15
   - JUNK: 5
 
-min_refresh_interval: 20
 is_test_run: True
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script

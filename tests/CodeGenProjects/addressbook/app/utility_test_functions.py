@@ -9,26 +9,33 @@ import pexpect
 from csv import writer
 import os
 os.environ["PORT"] = "8081"
+os.environ["DBType"] = "beanie"
 
 # project imports
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
+from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_client import \
     StratManagerServiceHttpClient
 from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_http_client import \
     MarketDataServiceHttpClient
-from CodeGenProjects.strat_executor.app.trade_simulator import TradeSimulator
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
 from FluxPythonUtils.scripts.utility_functions import clean_mongo_collections, YAMLConfigurationManager, parse_to_int, \
-    get_native_host_n_port_from_config_dict
+    get_mongo_db_list
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
     StratExecutorServiceHttpClient)
+from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_client import (
+    LogAnalyzerServiceHttpClient)
 
 code_gen_projects_dir_path = PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects"
 
 PAIR_STRAT_ENGINE_DIR = code_gen_projects_dir_path / "addressbook"
 ps_config_yaml_path: PurePath = PAIR_STRAT_ENGINE_DIR / "data" / "config.yaml"
 ps_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ps_config_yaml_path))
+
+LOG_ANALYZER_DIR = code_gen_projects_dir_path / "log_analyzer"
+la_config_yaml_path = LOG_ANALYZER_DIR / "data" / "config.yaml"
+la_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(la_config_yaml_path))
 
 MARKET_DATA_DIR = code_gen_projects_dir_path / "market_data"
 md_config_yaml_path = MARKET_DATA_DIR / "data" / "config.yaml"
@@ -37,13 +44,23 @@ md_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(md_c
 STRAT_EXECUTOR = code_gen_projects_dir_path / "strat_executor"
 
 HOST: Final[str] = "127.0.0.1"
+PAIR_STRAT_CACHE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
+PAIR_STRAT_BEANIE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
 PAIR_STRAT_CACHE_PORT: Final[str] = ps_config_yaml_dict.get("main_server_cache_port")
 PAIR_STRAT_BEANIE_PORT: Final[str] = ps_config_yaml_dict.get("main_server_beanie_port")
+
+LOG_ANALYZER_CACHE_HOST: Final[str] = la_config_yaml_dict.get("server_host")
+LOG_ANALYZER_BEANIE_HOST: Final[str] = la_config_yaml_dict.get("server_host")
+LOG_ANALYZER_CACHE_PORT: Final[str] = la_config_yaml_dict.get("main_server_cache_port")
+LOG_ANALYZER_BEANIE_PORT: Final[str] = la_config_yaml_dict.get("main_server_beanie_port")
 os.environ["HOST"] = HOST
 os.environ["PAIR_STRAT_BEANIE_PORT"] = PAIR_STRAT_BEANIE_PORT
 
 strat_manager_service_native_web_client: StratManagerServiceHttpClient = \
-    StratManagerServiceHttpClient(host=HOST, port=parse_to_int(PAIR_STRAT_BEANIE_PORT))
+    StratManagerServiceHttpClient(host=PAIR_STRAT_BEANIE_HOST, port=parse_to_int(PAIR_STRAT_BEANIE_PORT))
+log_analyzer_web_client: LogAnalyzerServiceHttpClient = (
+    LogAnalyzerServiceHttpClient.set_or_get_if_instance_exists(host=LOG_ANALYZER_BEANIE_HOST,
+                                                               port=parse_to_int(LOG_ANALYZER_BEANIE_PORT)))
 
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
 project_dir_path = \
@@ -54,110 +71,94 @@ test_config_file_path: PurePath = test_project_dir_path / "config.yaml"
 static_data_dir: PurePath = project_dir_path / "data"
 
 
-def clean_all_collections_ignoring_ui_layout(ps_db_name: str, md_db_name: str) -> None:
+def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
     mongo_server_uri: str = get_mongo_server_uri()
-    clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=ps_db_name,
-                            ignore_collections=["UILayout"])
-    clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=md_db_name,
-                            ignore_collections=["UILayout"])
+    for db_name in get_mongo_db_list(mongo_server_uri):
+        if "log_analyzer_80" in db_name:
+            clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
+                                    ignore_collections=["UILayout", "PortfolioAlert", "StratAlert"])
+        elif "strat_executor_80" in db_name or "addressbook_80":
+            clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
+                                    ignore_collections=["UILayout"])
+
+#
+# def run_pair_strat_log_analyzer(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
+#     log_analyzer = pexpect.spawn("python addressbook_log_analyzer.py &",
+#                                  cwd=project_app_dir_path)
+#     log_analyzer.timeout = None
+#     log_analyzer.logfile = sys.stdout.buffer
+#     executor_n_log_analyzer.pair_strat_log_analyzer_pid = log_analyzer.pid
+#     print(f"pair_strat_log_analyzer PID: {log_analyzer.pid}")
+#     log_analyzer.expect("CRITICAL: log analyzer running in simulation mode...")
+#     log_analyzer.interact()
+#
+#
+# def run_executor(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
+#     executor = pexpect.spawn("python strat_executor.py &", cwd=project_app_dir_path)
+#     executor.timeout = None
+#     executor.logfile = sys.stdout.buffer
+#     executor_n_log_analyzer.executor_pid = executor.pid
+#     print(f"executor PID: {executor.pid}")
+#     executor.expect(pexpect.EOF)
+#     executor.interact()
+#
+#
+# def kill_process(kill_pid: str | int | None):
+#     if kill_pid is not None:
+#         os.kill(kill_pid, signal.SIGINT)
+#         try:
+#             # raises OSError if pid still exists
+#             os.kill(kill_pid, 0)
+#         except OSError:
+#             return False
+#         else:
+#             return True
+#     else:
+#         return False
+
+#
+# class ExecutorNLogAnalyzerManager:
+#     """
+#     Context manager to handle running of trade_executor and log_analyzer in threads and after test is completed,
+#     handling killing of the both processes and cleaning the slate
+#     """
+#
+#     def __init__(self):
+#         # p_id(s) are getting populated by their respective thread target functions
+#         self.executor_pid = None
+#         self.pair_strat_log_analyzer_pid = None
+#
+#     def __enter__(self):
+#         executor_thread = threading.Thread(target=run_executor, args=(self,))
+#         pair_strat_log_analyzer_thread = threading.Thread(target=run_pair_strat_log_analyzer, args=(self,))
+#         executor_thread.start()
+#         pair_strat_log_analyzer_thread.start()
+#         # delay for executor and log_analyzer to get started and ready
+#         time.sleep(20)
+#         return self
+#
+#     def __exit__(self, exc_type, exc_value, exc_traceback):
+#         assert kill_process(self.executor_pid), \
+#             f"Something went wrong while killing trade_executor process, pid: {self.executor_pid}"
+#         assert kill_process(self.pair_strat_log_analyzer_pid), \
+#             f"Something went wrong while killing pair_strat_log_analyzer process, " \
+#             f"pid: {self.pair_strat_log_analyzer_pid}"
+#
+#         # Env var based post test cleaning
+#         clean_env_var = os.environ.get("ENABLE_CLEAN_SLATE")
+#         if clean_env_var is not None and len(clean_env_var) and parse_to_int(clean_env_var) == 1:
+#             # cleaning db
+#             clean_slate_post_test()
+#
+#         # Env var based delay in test
+#         post_test_delay = os.environ.get("POST_TEST_DELAY")
+#         if post_test_delay is not None and len(post_test_delay):
+#             # cleaning db
+#             time.sleep(parse_to_int(post_test_delay))
 
 
-def get_ps_n_md_db_names(test_config_file_path: str | PurePath):
-    if os.path.isfile(str(test_config_file_path)):
-        test_config = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
-        ps_db_name = \
-            fetched_ps_db_name if (fetched_ps_db_name := test_config.get(
-                "ps_db_name")) is not None else "addressbook"
-        md_db_name = \
-            fetched_md_db_name if (fetched_md_db_name := test_config.get("md_db_name")) is not None else "market_data"
-    else:
-        ps_db_name = "addressbook"
-        md_db_name = "market_data"
-    return ps_db_name, md_db_name
-
-
-def clean_slate_post_test():
-    ps_db_name, md_db_name = get_ps_n_md_db_names(test_config_file_path)
-    clean_all_collections_ignoring_ui_layout(ps_db_name, md_db_name)
-
-
-def run_pair_strat_log_analyzer(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
-    log_analyzer = pexpect.spawn("python addressbook_log_analyzer.py &",
-                                 cwd=project_app_dir_path)
-    log_analyzer.timeout = None
-    log_analyzer.logfile = sys.stdout.buffer
-    executor_n_log_analyzer.pair_strat_log_analyzer_pid = log_analyzer.pid
-    print(f"pair_strat_log_analyzer PID: {log_analyzer.pid}")
-    log_analyzer.expect("CRITICAL: log analyzer running in simulation mode...")
-    log_analyzer.interact()
-
-
-def run_executor(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
-    executor = pexpect.spawn("python strat_executor.py &", cwd=project_app_dir_path)
-    executor.timeout = None
-    executor.logfile = sys.stdout.buffer
-    executor_n_log_analyzer.executor_pid = executor.pid
-    print(f"executor PID: {executor.pid}")
-    executor.expect(pexpect.EOF)
-    executor.interact()
-
-
-def kill_process(kill_pid: str | int | None):
-    if kill_pid is not None:
-        os.kill(kill_pid, signal.SIGINT)
-        try:
-            # raises OSError if pid still exists
-            os.kill(kill_pid, 0)
-        except OSError:
-            return False
-        else:
-            return True
-    else:
-        return False
-
-
-class ExecutorNLogAnalyzerManager:
-    """
-    Context manager to handle running of trade_executor and log_analyzer in threads and after test is completed,
-    handling killing of the both processes and cleaning the slate
-    """
-
-    def __init__(self):
-        # p_id(s) are getting populated by their respective thread target functions
-        self.executor_pid = None
-        self.pair_strat_log_analyzer_pid = None
-
-    def __enter__(self):
-        executor_thread = threading.Thread(target=run_executor, args=(self,))
-        pair_strat_log_analyzer_thread = threading.Thread(target=run_pair_strat_log_analyzer, args=(self,))
-        executor_thread.start()
-        pair_strat_log_analyzer_thread.start()
-        # delay for executor and log_analyzer to get started and ready
-        time.sleep(20)
-        return self
-
-    def __exit__(self, exc_type, exc_value, exc_traceback):
-        assert kill_process(self.executor_pid), \
-            f"Something went wrong while killing trade_executor process, pid: {self.executor_pid}"
-        assert kill_process(self.pair_strat_log_analyzer_pid), \
-            f"Something went wrong while killing pair_strat_log_analyzer process, " \
-            f"pid: {self.pair_strat_log_analyzer_pid}"
-
-        # Env var based post test cleaning
-        clean_env_var = os.environ.get("ENABLE_CLEAN_SLATE")
-        if clean_env_var is not None and len(clean_env_var) and parse_to_int(clean_env_var) == 1:
-            # cleaning db
-            clean_slate_post_test()
-
-        # Env var based delay in test
-        post_test_delay = os.environ.get("POST_TEST_DELAY")
-        if post_test_delay is not None and len(post_test_delay):
-            # cleaning db
-            time.sleep(parse_to_int(post_test_delay))
-
-
-def get_continuous_order_configs(symbol: str) -> Tuple[int | None, int | None]:
-    symbol_configs = TradeSimulator.get_symbol_configs(symbol)
+def get_continuous_order_configs(symbol: str, config_dict: Dict) -> Tuple[int | None, int | None]:
+    symbol_configs = get_symbol_configs(symbol, config_dict)
     return symbol_configs.get("continues_order_count"), symbol_configs.get("continues_special_order_count")
 
 
@@ -1358,6 +1359,7 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     activated_strat_status = executor_web_client.patch_strat_status_client(jsonable_encoder(strat_status, by_alias=True, exclude_none=True))
     expected_strat_status.strat_state = activated_strat_status.strat_state
     expected_strat_status.last_update_date_time = activated_strat_status.last_update_date_time
+    expected_strat_status.strat_status_update_seq_num = expected_strat_status.strat_status_update_seq_num + 1
     assert activated_strat_status == expected_strat_status, \
         (f"StratStatus Mismatched, expected StratStatus: {expected_strat_status}, "
          f"received strat_status: {activated_strat_status}")
@@ -1372,34 +1374,35 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     return updated_pair_strat, executor_web_client
 
 
-def create_if_not_exists_and_validate_strat_collection(pair_strat_: PairStratBaseModel):
-    strat_collection_obj_list = strat_manager_service_native_web_client.get_all_strat_collection_client()
-
-    strat_key = f"{pair_strat_.pair_strat_params.strat_leg2.sec.sec_id}-" \
-                f"{pair_strat_.pair_strat_params.strat_leg1.sec.sec_id}-" \
-                f"{pair_strat_.pair_strat_params.strat_leg1.side}-{pair_strat_.id}"
-    if len(strat_collection_obj_list) == 0:
-        strat_collection_basemodel = StratCollectionBaseModel(**{
-            "_id": 1,
-            "loaded_strat_keys": [
-                strat_key
-            ],
-            "buffered_strat_keys": []
-        })
-        created_strat_collection = \
-            strat_manager_service_native_web_client.create_strat_collection_client(strat_collection_basemodel)
-
-        assert created_strat_collection == strat_collection_basemodel, \
-            f"Mismatch strat_collection: expected {strat_collection_basemodel} received {created_strat_collection}"
-
-    else:
-        strat_collection_obj = strat_collection_obj_list[0]
-        strat_collection_obj.loaded_strat_keys.append(strat_key)
-        updated_strat_collection_obj = \
-            strat_manager_service_native_web_client.put_strat_collection_client(jsonable_encoder(strat_collection_obj, by_alias=True, exclude_none=True))
-
-        assert updated_strat_collection_obj == strat_collection_obj, \
-            f"Mismatch strat_collection: expected {strat_collection_obj} received {updated_strat_collection_obj}"
+# @@@ deprecated: strat_collection is now handled by pair_strat override itself
+# def create_if_not_exists_and_validate_strat_collection(pair_strat_: PairStratBaseModel):
+#     strat_collection_obj_list = strat_manager_service_native_web_client.get_all_strat_collection_client()
+#
+#     strat_key = f"{pair_strat_.pair_strat_params.strat_leg2.sec.sec_id}-" \
+#                 f"{pair_strat_.pair_strat_params.strat_leg1.sec.sec_id}-" \
+#                 f"{pair_strat_.pair_strat_params.strat_leg1.side}-{pair_strat_.id}"
+#     if len(strat_collection_obj_list) == 0:
+#         strat_collection_basemodel = StratCollectionBaseModel(**{
+#             "_id": 1,
+#             "loaded_strat_keys": [
+#                 strat_key
+#             ],
+#             "buffered_strat_keys": []
+#         })
+#         created_strat_collection = \
+#             strat_manager_service_native_web_client.create_strat_collection_client(strat_collection_basemodel)
+#
+#         assert created_strat_collection == strat_collection_basemodel, \
+#             f"Mismatch strat_collection: expected {strat_collection_basemodel} received {created_strat_collection}"
+#
+#     else:
+#         strat_collection_obj = strat_collection_obj_list[0]
+#         strat_collection_obj.loaded_strat_keys.append(strat_key)
+#         updated_strat_collection_obj = \
+#             strat_manager_service_native_web_client.put_strat_collection_client(jsonable_encoder(strat_collection_obj, by_alias=True, exclude_none=True))
+#
+#         assert updated_strat_collection_obj == strat_collection_obj, \
+#             f"Mismatch strat_collection: expected {strat_collection_obj} received {updated_strat_collection_obj}"
 
 
 def run_symbol_overview(buy_symbol: str, sell_symbol: str,
@@ -1457,6 +1460,54 @@ def wait_for_get_new_order_placed_from_tob(wait_stop_px: int | float, symbol_to_
         if loop_counter == loop_limit:
             assert False, f"Could not find any update after {last_update_date_time} in tob_list {tob_obj_list}, " \
                           f"symbol - {symbol_to_check} and wait_stop_px - {wait_stop_px}"
+
+
+def renew_portfolio_alert():
+    portfolio_alert_list = log_analyzer_web_client.get_all_portfolio_alert_client()
+    if len(portfolio_alert_list) == 1:
+        portfolio_alert = portfolio_alert_list[0]
+    else:
+        err_str_ = (f"PortfolioAlert must have exactly 1 object, received {len(portfolio_alert_list)}, "
+                    f"portfolio_alert_list: {portfolio_alert_list}")
+        logging.error(err_str_)
+        raise Exception(err_str_)
+
+    for alert in portfolio_alert.alerts:
+        if "Log analyzer running in simulation mode" in alert.alert_brief:
+            break
+    else:
+        err_str_ = (f"Can't find alert saying 'Log analyzer running in simulation mode', "
+                    f"portfolio_alert: {portfolio_alert}")
+        logging.error(err_str_)
+        raise Exception(err_str_)
+    portfolio_alert_obj = PortfolioAlertBaseModel(_id=portfolio_alert.id,
+                                                  alerts=[alert],
+                                                  alert_update_seq_num=0)
+    log_analyzer_web_client.put_portfolio_alert_client(portfolio_alert_obj)
+
+
+def clean_executors_and_today_activated_symbol_side_lock_file():
+    existing_pair_strat = strat_manager_service_native_web_client.get_all_pair_strat_client()
+    for pair_strat in existing_pair_strat:
+        if not pair_strat.is_executor_running:
+            err_str_ = ("strat exists but is not running, can't delete strat when not running, "
+                        "delete it manually")
+            logging.error(err_str_)
+            raise Exception(err_str_)
+
+        strat_executor_http_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
+                                                                                                  pair_strat.port)
+        strat_status = StratStatusBaseModel(_id=pair_strat.id, strat_state=StratState.StratState_DONE)
+        strat_executor_http_client.patch_strat_status_client(jsonable_encoder(strat_status, by_alias=True,
+                                                                              exclude_none=True))
+
+        # removing today_activated_symbol_side_lock_file
+        command_n_control_obj: CommandNControlBaseModel = CommandNControlBaseModel(command_type=CommandType.CLEAR_STRAT,
+                                                                                   datetime=DateTime.utcnow())
+        strat_executor_http_client.create_command_n_control_client(command_n_control_obj)
+
+        strat_manager_service_native_web_client.delete_pair_strat_client(pair_strat.id)
+        time.sleep(2)
 
 
 def set_n_verify_limits(expected_order_limits_obj, expected_portfolio_limits_obj):
@@ -1736,7 +1787,6 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
             current_itr_expected_buy_order_journal_.order.security.sec_id,
             current_itr_expected_buy_order_journal_.order.underlying_account
         )
-        print("###### check")
 
         placed_order_journal_obj_ack_response = \
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
@@ -1938,69 +1988,64 @@ def verify_rej_orders(check_ack_to_reject_orders: bool, last_order_id: int | Non
     return last_order_id
 
 
-def handle_rej_order_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
-                          expected_start_status_, symbol_overview_obj_list,
-                          last_trade_fixture_list, market_depth_basemodel_list,
-                          top_of_book_list_, max_loop_count_per_side, check_ack_to_reject_orders: bool,
-                          executor_web_client: StratExecutorServiceHttpClient):
-    for buy_symbol, sell_symbol in buy_sell_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list)
+def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
+                          last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
+                          check_ack_to_reject_orders: bool, executor_web_client: StratExecutorServiceHttpClient,
+                          config_dict):
+    # explicitly setting waived_min_orders to 10 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_orders = 10
 
-        # buy fills check
-        continues_order_count, continues_special_order_count = get_continuous_order_configs(buy_symbol)
-        buy_order_count = 0
-        buy_special_order_count = 0
-        last_id = None
-        for loop_count in range(1, max_loop_count_per_side + 1):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_web_client, top_of_book_list_)
-            time.sleep(2)  # delay for order to get placed
+    # buy fills check
+    continues_order_count, continues_special_order_count = get_continuous_order_configs(buy_symbol, config_dict)
+    buy_order_count = 0
+    buy_special_order_count = 0
+    last_id = None
+    for loop_count in range(1, max_loop_count_per_side + 1):
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_web_client, top_of_book_list_)
+        time.sleep(2)  # delay for order to get placed
 
-            if buy_order_count < continues_order_count:
-                check_order_event = OrderEventType.OE_CXL_ACK
-                buy_order_count += 1
+        if buy_order_count < continues_order_count:
+            check_order_event = OrderEventType.OE_CXL_ACK
+            buy_order_count += 1
+        else:
+            if buy_special_order_count < continues_special_order_count:
+                check_order_event = OrderEventType.OE_REJ
+                buy_special_order_count += 1
             else:
-                if buy_special_order_count < continues_special_order_count:
-                    check_order_event = OrderEventType.OE_REJ
-                    buy_special_order_count += 1
-                else:
-                    check_order_event = OrderEventType.OE_CXL_ACK
-                    buy_order_count = 1
-                    buy_special_order_count = 0
-
-            # internally contains assert checks
-            last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
-                                        buy_symbol, executor_web_client)
-
-        # sell fills check
-        continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol)
-        last_id = None
-        sell_order_count = 0
-        sell_special_order_count = 0
-        for loop_count in range(1, max_loop_count_per_side + 1):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_sell_top_of_book(sell_symbol, executor_web_client)
-            time.sleep(2)  # delay for order to get placed
-
-            if sell_order_count < continues_order_count:
                 check_order_event = OrderEventType.OE_CXL_ACK
-                sell_order_count += 1
-            else:
-                if sell_special_order_count < continues_special_order_count:
-                    check_order_event = OrderEventType.OE_REJ
-                    sell_special_order_count += 1
-                else:
-                    check_order_event = OrderEventType.OE_CXL_ACK
-                    sell_order_count = 1
-                    sell_special_order_count = 0
+                buy_order_count = 1
+                buy_special_order_count = 0
 
-            # internally contains assert checks
-            last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
-                                        sell_symbol, executor_web_client)
+        # internally contains assert checks
+        last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
+                                    buy_symbol, executor_web_client)
+
+    # sell fills check
+    continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol, config_dict)
+    last_id = None
+    sell_order_count = 0
+    sell_special_order_count = 0
+    for loop_count in range(1, max_loop_count_per_side + 1):
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+        run_sell_top_of_book(sell_symbol, executor_web_client)
+        time.sleep(2)  # delay for order to get placed
+
+        if sell_order_count < continues_order_count:
+            check_order_event = OrderEventType.OE_CXL_ACK
+            sell_order_count += 1
+        else:
+            if sell_special_order_count < continues_special_order_count:
+                check_order_event = OrderEventType.OE_REJ
+                sell_special_order_count += 1
+            else:
+                check_order_event = OrderEventType.OE_CXL_ACK
+                sell_order_count = 1
+                sell_special_order_count = 0
+
+        # internally contains assert checks
+        last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
+                                    sell_symbol, executor_web_client)
 
 
 def verify_cxl_rej(last_cxl_order_id: str | None, last_cxl_rej_order_id: str | None,
@@ -2137,22 +2182,10 @@ def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id:
     return last_id, last_cxl_ack_id, order_count, cxl_count
 
 
-def handle_unsolicited_cxl(buy_sell_symbol_list, expected_strat_limits_, expected_start_status_, pair_strat_,
-                           symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-                           max_loop_count_per_side, top_of_book_list_,
-                           executor_web_client: StratExecutorServiceHttpClient):
-    # updating fixture values for this test-case
-    max_loop_count_per_side = 5
-    buy_sell_symbol_list = buy_sell_symbol_list[:2]
-
-    for buy_symbol, sell_symbol in buy_sell_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list)
+def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list, max_loop_count_per_side, top_of_book_list_,
+                           executor_web_client: StratExecutorServiceHttpClient, config_dict):
         # buy fills check
-        continues_order_count, continues_special_order_count = get_continuous_order_configs(buy_symbol)
+        continues_order_count, continues_special_order_count = get_continuous_order_configs(buy_symbol, config_dict)
         buy_order_count = 0
         buy_cxl_order_count = 0
         last_id = None
@@ -2169,7 +2202,7 @@ def handle_unsolicited_cxl(buy_sell_symbol_list, expected_strat_limits_, expecte
                                                  executor_web_client)
 
         # sell fills check
-        continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol)
+        continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol, config_dict)
         sell_order_count = 0
         sell_cxl_order_count = 0
         last_id = None
@@ -2186,13 +2219,22 @@ def handle_unsolicited_cxl(buy_sell_symbol_list, expected_strat_limits_, expecte
                                                  executor_web_client)
 
 
+def get_partial_allowed_ack_qty(symbol: str, qty: int, config_dict: Dict):
+    symbol_configs = get_symbol_configs(symbol, config_dict)
+
+    if symbol_configs is not None:
+        if (ack_percent := symbol_configs.get("ack_percent")) is not None:
+            qty = int((ack_percent / 100) * qty)
+    return qty
+
+
 def handle_partial_ack_checks(symbol: str, new_order_id: str, acked_order_id: str,
-                              executor_web_client: StratExecutorServiceHttpClient):
+                              executor_web_client: StratExecutorServiceHttpClient, config_dict):
     new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                         symbol, executor_web_client,
                                                                         last_order_id=new_order_id)
     new_order_id = new_order_journal.order.order_id
-    partial_ack_qty = TradeSimulator.get_partial_allowed_ack_qty(symbol, new_order_journal.order.qty)
+    partial_ack_qty = get_partial_allowed_ack_qty(symbol, new_order_journal.order.qty, config_dict)
 
     ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                         symbol, executor_web_client,
@@ -2207,19 +2249,21 @@ def handle_partial_ack_checks(symbol: str, new_order_id: str, acked_order_id: st
 def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                              expected_start_status_, symbol_overview_obj_list,
                                              last_trade_fixture_list, market_depth_basemodel_list,
-                                             top_of_book_list_, executor_web_client: StratExecutorServiceHttpClient):
+                                             top_of_book_list_):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
 
-    create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                       expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                       market_depth_basemodel_list)
+    activated_strat, executor_http_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list))
 
     # buy test
-    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+    run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
     loop_count = 1
-    run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_web_client,
+    run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client,
                         top_of_book_list_, is_non_systematic_run=True)
+    return buy_symbol, sell_symbol, activated_strat, executor_http_client
 
 
 def handle_place_order_for_portfolio_lvl_limit_test(symbol: str, side: Side, px: float, qty: int,
@@ -2247,6 +2291,7 @@ def handle_place_order_for_portfolio_lvl_limit_test(symbol: str, side: Side, px:
 
 def handle_place_order_and_check_str_in_alert_for_executor_limits(symbol: str, side: Side, px: float, qty: int,
                                                                   check_str: str, assert_fail_msg: str,
+                                                                  activated_pair_strat_id: int,
                                                                   executor_web_client: StratExecutorServiceHttpClient,
                                                                   last_order_id: str | None = None):
     # placing new non-systematic new_order
@@ -2258,12 +2303,8 @@ def handle_place_order_and_check_str_in_alert_for_executor_limits(symbol: str, s
                                                                         expect_no_order=True,
                                                                         last_order_id=last_order_id)
 
-    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
-    # assuming only one strat exists
-    # Todo: Alert Handling
-    strat_alerts = pair_strat_list[0].strat_status.strat_alerts
-
-    for alert in strat_alerts:
+    strat_alert = log_analyzer_web_client.get_strat_alert_client(activated_pair_strat_id)
+    for alert in strat_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
     else:
@@ -2271,24 +2312,11 @@ def handle_place_order_and_check_str_in_alert_for_executor_limits(symbol: str, s
     assert True
 
 
-def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_sell_symbol_list, pair_strat_,
-                                                                        expected_strat_limits_,
-                                                                        expected_start_status_,
-                                                                        symbol_overview_obj_list,
+def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symbol, sell_symbol, active_pair_strat_id,
                                                                         last_trade_fixture_list,
-                                                                        market_depth_basemodel_list,
                                                                         top_of_book_list_, side: Side,
                                                                         executor_web_client:
                                                                         StratExecutorServiceHttpClient):
-    buy_symbol = buy_sell_symbol_list[0][0]
-    sell_symbol = buy_sell_symbol_list[0][1]
-
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
-    expected_strat_limits_.cancel_rate.max_cancel_rate = 1
-    create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                       expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                       market_depth_basemodel_list)
 
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
@@ -2309,13 +2337,10 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_sell
 
     new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, check_symbol,
                                                                         executor_web_client)
-    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
-    # since only one strat exists for current test
-    assert len(pair_strat_list) == 1
-    pair_strat_obj = pair_strat_list[0]
+    time.sleep(2)
+    strat_alert = log_analyzer_web_client.get_strat_alert_client(active_pair_strat_id)
 
-    # todo: Alert Handling
-    for alert in pair_strat_obj.strat_status.strat_alerts:
+    for alert in strat_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
     else:
@@ -2324,18 +2349,8 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_sell
 
 
 def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
-        buy_sell_symbol_list, pair_strat_, expected_strat_limits_, expected_start_status_,
-        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
+        buy_symbol, sell_symbol, active_pair_strat_id, last_trade_fixture_list,
         top_of_book_list_, side, executor_web_client: StratExecutorServiceHttpClient):
-    buy_symbol = buy_sell_symbol_list[0][0]
-    sell_symbol = buy_sell_symbol_list[0][1]
-
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
-    expected_strat_limits_.cancel_rate.max_cancel_rate = 19
-    create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                       expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                       market_depth_basemodel_list)
 
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
@@ -2358,13 +2373,9 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
                                                                         executor_web_client)
     cxl_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, check_symbol,
                                                                         executor_web_client)
-    pair_strat_list = strat_manager_service_native_web_client.get_all_pair_strat_client()
-    # since only one strat exists for current test
-    assert len(pair_strat_list) == 1
-    pair_strat_obj = pair_strat_list[0]
 
-    # todo: Alert Handling
-    for alert in pair_strat_obj.strat_status.strat_alerts:
+    strat_alert = log_analyzer_web_client.get_strat_alert_client(active_pair_strat_id)
+    for alert in strat_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
     else:
@@ -2372,9 +2383,46 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
     assert True
 
 
+def get_symbol_configs(symbol: str, config_dict: Dict) -> Dict | None:
+    """
+    WARNING : This Function is duplicate test function of what we have in trade simulator to keep test
+    disconnected from main code, keep it sync with original
+    """
+    symbol_configs: Dict | None = config_dict.get("symbol_configs") \
+        if config_dict is not None else None
+    if symbol_configs:
+        symbol_configs: Dict = {re.compile(k, re.IGNORECASE): v for k, v in symbol_configs.items()}
+
+        found_symbol_config_list: List = []
+        if symbol_configs is not None:
+            for k, v in symbol_configs.items():
+                if k.match(symbol):
+                    found_symbol_config_list.append(v)
+            if found_symbol_config_list:
+                if len(found_symbol_config_list) == 1:
+                    return found_symbol_config_list[0]
+                else:
+                    logging.error(f"bad configuration : multiple symbol matches found for passed symbol: {symbol};;;"
+                                  f"found_symbol_configurations: "
+                                  f"{[str(found_symbol_config) for found_symbol_config in found_symbol_config_list]}")
+    return None
+
+
+def get_partial_allowed_fill_qty(check_symbol: str, config_dict: Dict, qty: int):
+    """
+    ATTENTION: This Function is dummy of original impl present in trade_executor, keep it sync with original
+    """
+    symbol_configs = get_symbol_configs(check_symbol, config_dict)
+    partial_filled_qty: int | None = None
+    if symbol_configs is not None:
+        if (fill_percent := symbol_configs.get("fill_percent")) is not None:
+            partial_filled_qty = int((fill_percent / 100) * qty)
+    return partial_filled_qty
+
+
 def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy_symbol,
                                                    sell_symbol, last_trade_fixture_list,
-                                                   top_of_book_list_, last_order_id,
+                                                   top_of_book_list_, last_order_id, config_dict,
                                                    executor_web_client: StratExecutorServiceHttpClient):
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     if check_symbol == buy_symbol:
@@ -2387,8 +2435,8 @@ def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy
                                                                         last_order_id=last_order_id)
     last_order_id = order_ack_journal.order.order_id
 
-    # TradeSimulator.reload_configs()
-    partial_filled_qty = TradeSimulator.get_partial_allowed_fill_qty(check_symbol, order_ack_journal.order.qty)
+    # ATTENTION: Below code is dummy of original impl present in trade_executor, keep it sync with original
+    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, order_ack_journal.order.qty)
 
     latest_fill_journal = get_latest_fill_journal_from_order_id(last_order_id, executor_web_client)
     assert latest_fill_journal.fill_qty == partial_filled_qty, f"fill_qty mismatch: expected {partial_filled_qty}, " \
@@ -2400,7 +2448,7 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
                                                          sell_symbol, last_trade_fixture_list,
                                                          top_of_book_list_, last_order_id,
                                                          executor_web_client: StratExecutorServiceHttpClient,
-                                                         fill_id: str | None = None):
+                                                         config_dict, fill_id: str | None = None):
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     if check_symbol == buy_symbol:
         run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_web_client, top_of_book_list_)
@@ -2411,9 +2459,11 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
                                                                         check_symbol, executor_web_client,
                                                                         last_order_id=last_order_id)
     last_order_id = new_order_journal.order.order_id
-    partial_filled_qty = TradeSimulator.get_partial_allowed_fill_qty(check_symbol, new_order_journal.order.qty)
 
-    fills_count = TradeSimulator.get_symbol_configs(check_symbol).get("total_fill_count")
+    # ATTENTION: Below code is dummy of original impl present in trade_executor, keep it sync with original
+    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, new_order_journal.order.qty)
+
+    fills_count = get_symbol_configs(check_symbol, config_dict).get("total_fill_count")
     time.sleep(5)
     time_out_loop_count = 5
     latest_fill_journals = []

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pathlib import PurePath
 from typing import List
 import os
 import time
@@ -10,8 +11,11 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, YAMLConfigurationManager
 from Flux.PyCodeGenEngine.PluginStratExecutor.strat_executor_plugin import StratExecutorPlugin
+
+flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
 
 
 class CppWebsocketTestPlugin(BaseProtoPlugin):
@@ -33,6 +37,33 @@ class CppWebsocketTestPlugin(BaseProtoPlugin):
                 for field_name in field_names:
                     if field_name not in self.field:
                         self.field.append(field_name)
+
+    def dependency_message_proto_msg_handler(self, file: protogen.File):
+        # Adding messages from core proto files having json_root option
+        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        if core_or_util_files is not None:
+            for dependency_file in file.dependencies:
+                dependency_file_name: str = dependency_file.proto.name
+                if dependency_file_name in core_or_util_files:
+                    if dependency_file_name.endswith("_core.proto"):
+                        if self.is_option_enabled \
+                                    (file, self.flux_file_import_dependency_model):
+                            msg_list = []
+                            import_data = (self.get_complex_option_value_from_proto
+                                           (file, self.flux_file_import_dependency_model, True))
+                            for item in import_data:
+                                import_file_name = item['ImportFileName']
+                                import_model_name = item['ImportModelName']
+
+                                if import_file_name == dependency_file_name:
+                                    for msg in dependency_file.messages:
+                                        if msg.proto.name in import_model_name:
+                                            if msg not in msg_list:
+                                                msg_list.append(msg)
+                            self.root_message_list.extend(msg_list)
+                # else not required: if dependency file name not in core_or_util_files
+                # config list, avoid messages from it
+        # else not required: core_or_util_files key is not in yaml dict config
 
     @staticmethod
     def header_generate_handler(file_name: str, class_name: str):
@@ -168,6 +199,7 @@ class CppWebsocketTestPlugin(BaseProtoPlugin):
     def output_file_generate_handler(self, file: protogen.File):
 
         self.get_all_root_message(file.messages)
+        self.dependency_message_proto_msg_handler(file)
         self.get_field_names(self.root_message_list)
 
         file_name: str = str(file.proto.name).split(".")[0]

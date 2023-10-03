@@ -36,6 +36,7 @@ class BaseProtoPlugin(ABC):
     msg_options_standard_prefix = "FluxMsg"
     fld_options_standard_prefix = "FluxFld"
     flux_fld_val_is_datetime: ClassVar[str] = "FluxFldValIsDateTime"
+    flux_file_import_dependency_model: ClassVar[str] = "FluxFileImportDependencyModel"
     flux_fld_alias: ClassVar[str] = "FluxFldAlias"
     flux_msg_json_root: ClassVar[str] = "FluxMsgJsonRoot"
     flux_msg_json_root_time_series: ClassVar[str] = "FluxMsgJsonRootTimeSeries"
@@ -139,6 +140,7 @@ class BaseProtoPlugin(ABC):
     executor_option_executor_key_count_field: ClassVar[str] = "ExecutorKeyCounts"
     executor_option_executor_key_sequence_field: ClassVar[str] = "ExecutorKeySequence"
     executor_option_log_key_sequence_field: ClassVar[str] = "LogKeySequence"
+    executor_option_is_repeated_field: ClassVar[str] = "IsRepeated"
     flux_msg_small_sized_collection: ClassVar[str] = "FluxMsgSmallSizedCollection"
     flux_fld_PK: ClassVar[str] = "FluxFldPk"
     default_id_field_name: ClassVar[str] = "id"
@@ -171,7 +173,7 @@ class BaseProtoPlugin(ABC):
         self.insertion_points_to_content_dict: Dict[str, str] | Dict[str, Dict[str, str]] = {}
 
     @abstractmethod
-    def output_file_generate_handler(self, file: protogen.File):
+    def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
         """
             Abstract method which is responsible for generating outputs from derived plugin class.
             Must return dict having:
@@ -639,9 +641,6 @@ class BaseProtoPlugin(ABC):
             raise Exception(err_str)
 
         output_file_name_to_insertion_points_n_content_dict: Dict[str, Dict[str, str]] = {}
-        # print("#######")
-        # print(plugin_arg)
-        # print("#######")
         received_output_file_name_to_content = self.output_file_generate_handler(plugin_arg)
 
         for output_file_name, output_file_content in received_output_file_name_to_content.items():

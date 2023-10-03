@@ -954,7 +954,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                                   other_project_name / "data" / "config.yaml")
                 other_project_config_yaml_dict = (
                     YAMLConfigurationManager.load_yaml_configurations(str(other_project_config_file_path)))
-                host = other_project_config_yaml_dict.get("main_server_beanie_host")
+                host = other_project_config_yaml_dict.get("server_host")
                 port = other_project_config_yaml_dict.get("main_server_beanie_port")
 
                 json_msg_str += (" " * indent_count) + f'"host": "{host}",\n'

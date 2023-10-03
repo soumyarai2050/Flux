@@ -116,9 +116,6 @@ class PluginExecuteScript:
 
     def get_required_param_values(self):
         # List of full paths of proto models in model directory
-        print("#####")
-        print(self.base_dir_path)
-        print("#####")
         if isinstance(self.base_dir_path, list):
             proto_file_path_list = []
             for dir_path in self.base_dir_path:

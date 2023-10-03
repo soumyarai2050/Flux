@@ -1,7 +1,10 @@
-main_server_beanie_host: "127.0.0.1"
+server_host: "127.0.0.1"
 main_server_beanie_port: "8020"
-main_server_cache_host: "127.0.0.1"
 main_server_cache_port: "8030"
+min_refresh_interval: 20
+
+log_mongo_uri: True
+mongo_server: "mongodb://localhost:27017"
 
 # to be used in pair_strat_log_analyzer to take out counts of created from waiting queue to execute create in db
 portfolio_alert_configs:
@@ -17,10 +20,8 @@ raw_perf_data_config:
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
 
+is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
-
-# to run log analyzer in simulator mode
-simulate_log_analyzer: True
 
 # to be used by plugins to take proto files form these projects to generated combined output
 multi_project_plugin:

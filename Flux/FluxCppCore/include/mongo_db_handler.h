@@ -11,22 +11,22 @@
 #include "../../generated/CppUtilGen/market_data_constants.h"
 #include "quill/Quill.h"
 
-namespace market_data_handler {
+namespace FluxCppCore {
 
     using bsoncxx::builder::basic::make_array;
     using bsoncxx::builder::basic::make_document;
     using bsoncxx::builder::basic::kvp;
 
     inline void get_symbol_side_query(const std::string &symbol, const std::string &side, bsoncxx::builder::stream::document &query_out){
-        query_out << security_fld_name << symbol << side_fld_name << side
+        query_out << market_data_handler::symbol_fld_name << symbol << market_data_handler::side_fld_name << side
                   << bsoncxx::builder::stream::finalize;
     }
 
-    class MarketData_MongoDBHandler {
+    class MongoDBHandler {
     public:
-        MarketData_MongoDBHandler(quill::Logger* p_logger = quill::get_logger(), const int min_pool_size = 2, const int max_pool_size = 2):
-        str_uri(db_uri + "/?minPoolSize=" + std::to_string(min_pool_size) + "&maxPoolSize=" + std::to_string(max_pool_size)),
-        client(pool.acquire()), market_data_service_db((*client)[market_data_service_db_name]), m_min_pool_size_(min_pool_size),
+        MongoDBHandler(quill::Logger* p_logger = quill::get_logger(), const int min_pool_size = 2, const int max_pool_size = 2):
+        str_uri(market_data_handler::db_uri + "/?minPoolSize=" + std::to_string(min_pool_size) + "&maxPoolSize=" + std::to_string(max_pool_size)),
+        client(pool.acquire()), market_data_service_db((*client)[market_data_handler::market_data_service_db_name]), m_min_pool_size_(min_pool_size),
         m_max_pool_size_(max_pool_size), m_p_logger_(p_logger) {
             LOG_INFO(m_p_logger_, "Mongo URI: {}", str_uri);
         }

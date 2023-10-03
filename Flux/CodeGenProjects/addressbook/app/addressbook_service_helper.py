@@ -1,50 +1,39 @@
 import sys
 
-from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
+from Flux.CodeGenProjects.addressbook.app.aggregate import get_pair_strat_filter
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_client import \
     StratManagerServiceHttpClient
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, get_native_host_n_port_from_config_dict, get_symbol_side_key
-
-server_port = os.environ.get("PORT")
-if server_port is None or len(server_port) == 0:
-    err_str = f"Env var 'Port' received as {server_port}"
-    logging.exception(err_str)
-    raise Exception(err_str)
+from FluxPythonUtils.scripts.utility_functions import (
+    YAMLConfigurationManager, get_symbol_side_key, except_n_log_alert)
 
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent
 CURRENT_PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
-config_yaml_path: PurePath = CURRENT_PROJECT_DATA_DIR / f"addressbook_{server_port}_config.yaml"
+
+config_yaml_path: PurePath = CURRENT_PROJECT_DATA_DIR / f"config.yaml"
 config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
+ps_host, ps_port = (config_yaml_dict.get("server_host"),
+                    parse_to_int(config_yaml_dict.get("main_server_beanie_port")))
 
-native_host, native_port = get_native_host_n_port_from_config_dict(config_yaml_dict)
-strat_manager_service_native_http_client = \
-    StratManagerServiceHttpClient.set_or_get_if_instance_exists(native_host, native_port)
+server_port = os.environ.get("PORT")
+if server_port is not None and parse_to_int(server_port) != ps_port:
+    err_str = (f"Env var 'PORT' can't be different from 'main_server_beanie_port' key present in data/config.yaml of "
+               f"this project, change config.yaml instead to use custom ports")
+    logging.exception(err_str)
+    raise Exception(err_str)
 
-update_portfolio_status_lock: asyncio.Lock = asyncio.Lock()
+strat_manager_service_http_client = \
+    StratManagerServiceHttpClient.set_or_get_if_instance_exists(ps_host, ps_port)
 
+# loading strat_executor's project's config.yaml
+ROOT_DIR = PurePath(__file__).parent.parent.parent
+STRAT_EXECUTOR_DATA_DIR = ROOT_DIR / 'strat_executor' / 'data'
 
-def except_n_log_alert(severity: Severity = Severity.Severity_ERROR):
-    def decorator_function(original_function):
-        def wrapper_function(*args, **kwargs):
-            result = None
-            try:
-                result = original_function(*args, **kwargs)
-            except Exception as e:
-                exc_type, exc_obj, exc_tb = sys.exc_info()
-                filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                alert_brief: str = f"exception: {e} while attempting {original_function.__name__}, " \
-                                   f"date-time: {DateTime.now()}"
-                alert_details: str = f"{exc_type}: file: {filename}, line: {exc_tb.tb_lineno}, args: {args}, " \
-                                     f"kwargs: {kwargs}"
-                logging.error(f"{alert_brief};;; {alert_details}")
-            return result
+strat_executor_config_yaml_path: PurePath = STRAT_EXECUTOR_DATA_DIR / f"config.yaml"
+strat_executor_config_yaml_dict = (
+    YAMLConfigurationManager.load_yaml_configurations(str(strat_executor_config_yaml_path)))
 
-        return wrapper_function
-
-    return decorator_function
-
-#
+# update_portfolio_status_lock: asyncio.Lock = asyncio.Lock()
 # def update_portfolio_status(overall_buy_notional: float | None, overall_sell_notional: float | None,
 #                             portfolio_alerts: List[Alert] | None = None):
 #     """
@@ -108,7 +97,7 @@ def except_n_log_alert(severity: Severity = Severity.Severity_ERROR):
 def is_service_up(ignore_error: bool = False):
     try:
         portfolio_status_list: List[
-            PortfolioStatusBaseModel] = strat_manager_service_native_http_client.get_all_portfolio_status_client()
+            PortfolioStatusBaseModel] = strat_manager_service_http_client.get_all_portfolio_status_client()
         if 0 == len(portfolio_status_list):  # no portfolio status set yet, create one
             portfolio_status: PortfolioStatusBaseModel = \
                 PortfolioStatusBaseModel(_id=1, kill_switch=False,
@@ -118,7 +107,7 @@ def is_service_up(ignore_error: bool = False):
                                          overall_buy_fill_notional=0,
                                          overall_sell_fill_notional=0,
                                          alert_update_seq_num=0)
-            strat_manager_service_native_http_client.create_portfolio_status_client(portfolio_status)
+            strat_manager_service_http_client.create_portfolio_status_client(portfolio_status)
         return True
     except Exception as e:
         if not ignore_error:
@@ -144,19 +133,19 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Po
     return portfolio_limits_obj
 
 
-@except_n_log_alert(severity=Severity.Severity_ERROR)
+@except_n_log_alert()
 def create_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> PortfolioLimitsBaseModel:
     portfolio_limits_obj = get_new_portfolio_limits(eligible_brokers)
     portfolio_limits: PortfolioLimitsBaseModel = \
-        strat_manager_service_native_http_client.create_portfolio_limits_client(portfolio_limits_obj)
+        strat_manager_service_http_client.create_portfolio_limits_client(portfolio_limits_obj)
     logging.info(f"created portfolio_limits;;; {portfolio_limits_obj}")
     return portfolio_limits
 
 
-@except_n_log_alert(severity=Severity.Severity_ERROR)
+@except_n_log_alert()
 def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
     portfolio_limits_list: List[
-        PortfolioLimitsBaseModel] = strat_manager_service_native_http_client.get_all_portfolio_limits_client()
+        PortfolioLimitsBaseModel] = strat_manager_service_http_client.get_all_portfolio_limits_client()
     if portfolio_limits_list is None or len(portfolio_limits_list) <= 0:
         return None
     elif len(portfolio_limits_list) > 1:
@@ -181,7 +170,7 @@ def get_new_order_limits():
 
 def get_order_limits() -> OrderLimitsBaseModel | None:
     order_limits_list: List[
-        OrderLimitsBaseModel] = strat_manager_service_native_http_client.get_all_order_limits_client()
+        OrderLimitsBaseModel] = strat_manager_service_http_client.get_all_order_limits_client()
     if order_limits_list is None or len(order_limits_list) <= 0:
         return None
     elif len(order_limits_list) > 1:
@@ -199,7 +188,7 @@ def get_order_limits() -> OrderLimitsBaseModel | None:
 
 def create_order_limits():
     ord_limit_obj = get_new_order_limits()
-    strat_manager_service_native_http_client.create_order_limits_client(ord_limit_obj)
+    strat_manager_service_http_client.create_order_limits_client(ord_limit_obj)
 
 
 def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
@@ -218,10 +207,10 @@ def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
 
 
 # caller must take any locks as required for any read-write consistency - function operates without lock
-async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
+async def get_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
     from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
         underlying_read_pair_strat_http
-    read_pair_strat_filter = get_ongoing_pair_strat_filter(sec_id)
+    read_pair_strat_filter = get_pair_strat_filter(sec_id)
     pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
 
     match_level_1_pair_strats: List[PairStrat] = list()
@@ -236,8 +225,8 @@ async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tupl
     return match_level_1_pair_strats, match_level_2_pair_strats
 
 
-async def get_single_exact_match_ongoing_strat_from_symbol_n_side(sec_id: str, side: Side) -> PairStrat | None:
-    match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
+async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Side) -> PairStrat | None:
+    match_level_1_pair_strats, match_level_2_pair_strats = await get_strats_from_symbol_n_side(sec_id, side)
     if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
         logging.error(f"error: No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
         return

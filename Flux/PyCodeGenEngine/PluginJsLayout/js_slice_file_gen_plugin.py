@@ -324,33 +324,38 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str = f"        [getAll{message_name}.pending]: (state) => "+"{\n"
         output_str += f"            state.loading = true;\n"
         output_str += f"            state.error = null;\n"
-        if not self.current_message_is_dependent and (message_name not in self.repeated_layout_msg_name_list):
+        option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+            message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+        if (not self.current_message_is_dependent and (message_name not in self.repeated_layout_msg_name_list) and
+                not option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field)):
             output_str += f"            state.selected{message_name}Id = null;\n"
         output_str += "        },\n"
         output_str += f"        [getAll{message_name}.fulfilled]: (state, action) => " + "{\n"
         if not self.current_message_is_dependent and message_name not in self.repeated_layout_msg_name_list:
             if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
-                option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
-                    message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                if option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
+                if (option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field) and
+                        option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_dynamic_url_field)):
                     output_str += (f"            const updatedArray = state.{message_name_camel_cased}Array.filter(obj => "
                                    "action.payload[0][DB_ID] !== obj[DB_ID]);\n")
                     output_str += (f"            state.{message_name_camel_cased}Array = [...updatedArray, "
                                    f"...action.payload];\n")
+                else:
+                    output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
             else:
                 output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
             if message_name != self.__ui_layout_msg_name:
-                output_str += "            if (action.payload.length === 0) {\n"
-                output_str += f"                state.{message_name_camel_cased} = " \
-                              f"initialState.{message_name_camel_cased};\n"
-                output_str += f"                state.modified{message_name} = " \
-                              f"initialState.modified{message_name};\n"
-                output_str += f"                state.selected{message_name}Id = " \
-                              f"initialState.selected{message_name}Id;\n"
-                output_str += "            } else if (action.payload.length > 0) {\n"
-                output_str += f"                let object = getObjectWithLeastId(action.payload);\n"
-                output_str += f"                state.selected{message_name}Id = object[DB_ID];\n"
-                output_str += "            }\n"
+                if not option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
+                    output_str += "            if (action.payload.length === 0) {\n"
+                    output_str += f"                state.{message_name_camel_cased} = " \
+                                  f"initialState.{message_name_camel_cased};\n"
+                    output_str += f"                state.modified{message_name} = " \
+                                  f"initialState.modified{message_name};\n"
+                    output_str += f"                state.selected{message_name}Id = " \
+                                  f"initialState.selected{message_name}Id;\n"
+                    output_str += "            } else if (action.payload.length > 0) {\n"
+                    output_str += f"                let object = getObjectWithLeastId(action.payload);\n"
+                    output_str += f"                state.selected{message_name}Id = object[DB_ID];\n"
+                    output_str += "            }\n"
         elif self.current_message_is_dependent:
             output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
         elif message_name in self.repeated_layout_msg_name_list:
@@ -602,12 +607,11 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        },\n"
             if not self.current_message_is_dependent:
                 output_str += f"        set{message_name}ArrayWs: (state, action) => " + "{\n"
-                if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
-                    option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
-                        message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                    if option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
-                        output_str += "            const { data, collections} = action.payload;\n"
-                        output_str += f"            state.{message_name_camel_cased}Array = data;\n"
+                option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                    message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+                if option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
+                    output_str += "            const { data, collections} = action.payload;\n"
+                    output_str += f"            state.{message_name_camel_cased}Array = data;\n"
                 else:
                     output_str += f"            const dict = action.payload;\n"
                     output_str += f"            let updatedArray = state.{message_name_camel_cased}Array;\n"

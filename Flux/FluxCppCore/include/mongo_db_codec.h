@@ -2,7 +2,7 @@
 
 #include "../../CodeGenProjects/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
 #include "../../CodeGenProjects/market_data/generated/CppUtilGen/market_data_key_handler.h"
-#include "../../cpp_app/include/market_data_mongo_db_handler.h"
+#include "mongo_db_handler.h"
 #include "json_codec.h"
 
 using namespace market_data_handler;
@@ -13,7 +13,7 @@ namespace FluxCppCore {
     class MongoDBCodec {
 
     public:
-        explicit MongoDBCodec(std::shared_ptr<market_data_handler::MarketData_MongoDBHandler> sp_mongo_db_,
+        explicit MongoDBCodec(std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db_,
                               quill::Logger *p_logger = quill::get_logger())
                               :m_sp_mongo_db(std::move(sp_mongo_db_)),
                               m_mongo_db_collection(m_sp_mongo_db->market_data_service_db[get_root_model_name()]),
@@ -157,9 +157,9 @@ namespace FluxCppCore {
         }
 
         bool update_or_patch(const int32_t &kr_model_doc_id, const bsoncxx::builder::basic::document &kr_bson_doc) {
-            auto update_filter = market_data_handler::make_document(market_data_handler::kvp("_id", kr_model_doc_id));
-            auto update_document = market_data_handler::make_document(
-                    market_data_handler::kvp("$set", kr_bson_doc.view()));
+            auto update_filter = FluxCppCore::make_document(FluxCppCore::kvp("_id", kr_model_doc_id));
+            auto update_document = FluxCppCore::make_document(
+                    FluxCppCore::kvp("$set", kr_bson_doc.view()));
             auto result = m_mongo_db_collection.update_many(update_filter.view(), update_document.view());
             if (result->modified_count() > 0) {
                 return true;
@@ -212,9 +212,9 @@ namespace FluxCppCore {
                                         const std::vector<bsoncxx::builder::basic::document> &kr_bson_doc_list) {
             auto bulk_write = m_mongo_db_collection.create_bulk_write();
             for (int i = 0; i < kr_model_doc_ids.size(); ++i) {
-                auto update_filter = market_data_handler::make_document(market_data_handler::kvp("_id", kr_model_doc_ids[i]));
-                auto update_document = market_data_handler::make_document(
-                        market_data_handler::kvp("$set", kr_bson_doc_list[i]));
+                auto update_filter = FluxCppCore::make_document(FluxCppCore::kvp("_id", kr_model_doc_ids[i]));
+                auto update_document = FluxCppCore::make_document(
+                        FluxCppCore::kvp("$set", kr_bson_doc_list[i]));
                 mongocxx::model::update_one updateOne(update_filter.view(), update_document.view());
                 updateOne.upsert(false);
                 bulk_write.append(updateOne);
@@ -395,7 +395,7 @@ namespace FluxCppCore {
             return c_cur_unused_max_id -1 ;
         }
 
-        std::shared_ptr<market_data_handler::MarketData_MongoDBHandler> m_sp_mongo_db;
+        std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db;
         quill::Logger* m_p_logger_;
         mongocxx::collection m_mongo_db_collection;
         static inline int32_t c_cur_unused_max_id = 1;

@@ -5,6 +5,7 @@ import threading
 
 # project imports
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
+from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import *
 from Flux.CodeGenProjects.strat_executor.generated.StratExecutor.strat_executor_service_key_handler import (
     StratExecutorServiceKeyHandler)
 from FluxPythonUtils.scripts.utility_functions import get_symbol_side_key
@@ -20,7 +21,7 @@ def is_pair_strat_engine_service_up(ignore_error: bool = False):
     try:
         portfolio_status_list: List[PortfolioStatusBaseModel] = (
             strat_manager_service_http_client.get_all_portfolio_status_client())
-        if not portfolio_status_list:  # no portfolio status set yet, create one
+        if not portfolio_status_list:
             if not ignore_error:
                 logging.exception("pair_strat_engine service is up but no portfolio_status exists", exc_info=True)
             return False
@@ -46,48 +47,52 @@ def is_pair_strat_engine_service_up(ignore_error: bool = False):
         return False
 
 
-def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, alert_brief: str,
-                                             alert_details: str | None = None,
-                                             severity: Severity = Severity.Severity_ERROR,
-                                             impacted_orders: List[OrderBrief] | None = None):
-    impacted_orders = [] if impacted_orders is None else impacted_orders
-    alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
-    with update_strat_status_lock:
-        pair_strat: PairStratBaseModel = \
-            strat_manager_service_http_client.get_ongoing_strat_from_symbol_side_query_client(sec_id, side)
-        updated_strat_status: StratStatus = pair_strat.strat_status
-        updated_strat_status.strat_state = pair_strat.strat_status.strat_state
-        updated_strat_status.strat_alerts.append(alert)
-        pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=updated_strat_status)
-        strat_manager_service_http_client.patch_pair_strat_client(pair_strat_updated.dict(by_alias=True,
-                                                                                          exclude_none=True),
-                                                                  return_obj_copy=False)
+def is_log_analyzer_service_up(ignore_error: bool = False):
+    try:
+        portfolio_alert_list: List[PortfolioAlertBaseModel] = (
+            log_analyzer_service_http_client.get_all_portfolio_alert_client())
+        if not portfolio_alert_list:
+            if not ignore_error:
+                logging.exception("pair_strat_engine service is up but no portfolio_alert exists", exc_info=True)
+            return False
+        return True
+    except Exception as _e:
+        if not ignore_error:
+            logging.exception("is_pair_strat_engine_service_up test failed - tried "
+                              f"get_all_portfolio_alert_client;;; exception: {_e}", exc_info=True)
+        # else not required - silently ignore error is true
+        return False
 
+# def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, alert_brief: str,
+#                                              alert_details: str | None = None,
+#                                              severity: Severity = Severity.Severity_ERROR,
+#                                              impacted_orders: List[OrderBrief] | None = None):
+#     impacted_orders = [] if impacted_orders is None else impacted_orders
+#     alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
+#     with update_strat_status_lock:
+#         pair_strat: PairStratBaseModel = \
+#             strat_manager_service_http_client.get_ongoing_strat_from_symbol_side_query_client(sec_id, side)
+#         updated_strat_status: StratStatus = pair_strat.strat_status
+#         updated_strat_status.strat_state = pair_strat.strat_status.strat_state
+#         updated_strat_status.strat_alerts.append(alert)
+#         pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=updated_strat_status)
+#         strat_manager_service_http_client.patch_pair_strat_client(pair_strat_updated.dict(by_alias=True,
+#                                                                                           exclude_none=True),
+#                                                                   return_obj_copy=False)
 
-def update_strat_alert_async(strat_id: int, alert_brief: str, alert_details: str | None = None,
-                             impacted_orders: List[OrderBrief] | None = None,
-                             severity: Severity = Severity.Severity_ERROR):
-    alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
-    with update_strat_status_lock:
-        pair_strat: PairStrat = strat_manager_service_http_client.get_pair_strat_client(strat_id)
-        strat_status: StratStatus = StratStatus(strat_state=pair_strat.strat_status.strat_state,
-                                                strat_alerts=(pair_strat.strat_status.strat_alerts.append(alert)))
-        pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=strat_status)
-    strat_manager_service_http_client.patch_pair_strat_client(pair_strat_updated.dict(by_alias=True,
-                                                                                      exclude_none=True),
-                                                              return_obj_copy=False)
-
-
-def create_alert(alert_brief: str, alert_details: str | None = None, impacted_order: List[OrderBrief] | None = None,
-                 severity: Severity = Severity.Severity_ERROR) -> Alert:
-    kwargs = {}
-    kwargs.update(severity=severity, alert_brief=alert_brief, dismiss=False, last_update_date_time=DateTime.utcnow(),
-                  alert_count=1)
-    if alert_details is not None:
-        kwargs.update(alert_details=alert_details)
-    if impacted_order is not None:
-        kwargs.update(impacted_order=impacted_order)
-    return Alert(**kwargs)
+#
+# def update_strat_alert_async(strat_id: int, alert_brief: str, alert_details: str | None = None,
+#                              impacted_orders: List[OrderBrief] | None = None,
+#                              severity: Severity = Severity.Severity_ERROR):
+#     alert: Alert = create_alert(alert_brief, alert_details, impacted_orders, severity)
+#     with update_strat_status_lock:
+#         pair_strat: PairStrat = strat_manager_service_http_client.get_pair_strat_client(strat_id)
+#         strat_status: StratStatus = StratStatus(strat_state=pair_strat.strat_status.strat_state,
+#                                                 strat_alerts=(pair_strat.strat_status.strat_alerts.append(alert)))
+#         pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=strat_status)
+#     strat_manager_service_http_client.patch_pair_strat_client(pair_strat_updated.dict(by_alias=True,
+#                                                                                       exclude_none=True),
+#                                                               return_obj_copy=False)
 
 
 def get_order_journal_log_key(order_journal: OrderJournal | OrderJournalBaseModel | OrderJournalOptional):
@@ -132,27 +137,6 @@ def get_strat_brief_log_key(strat_brief: StratBrief | StratBriefBaseModel | Stra
     symbol_side_key = get_symbol_side_key([(buy_sec_id, buy_side), (sell_sec_id, sell_side)])
     base_strat_brief_key = StratExecutorServiceKeyHandler.get_log_key_from_strat_brief(strat_brief)
     return f"{symbol_side_key}-{base_strat_brief_key}"
-
-
-def except_n_log_alert(severity: Severity = Severity.Severity_ERROR):
-    def decorator_function(original_function):
-        def wrapper_function(*args, **kwargs):
-            result = None
-            try:
-                result = original_function(*args, **kwargs)
-            except Exception as e:
-                exc_type, exc_obj, exc_tb = sys.exc_info()
-                filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-                alert_brief: str = f"exception: {e} while attempting {original_function.__name__}, " \
-                                   f"date-time: {DateTime.now()}"
-                alert_details: str = f"{exc_type}: file: {filename}, line: {exc_tb.tb_lineno}, args: {args}, " \
-                                     f"kwargs: {kwargs}"
-                logging.error(f"{alert_brief};;; {alert_details}")
-            return result
-
-        return wrapper_function
-
-    return decorator_function
 
 
 def get_consumable_participation_qty(

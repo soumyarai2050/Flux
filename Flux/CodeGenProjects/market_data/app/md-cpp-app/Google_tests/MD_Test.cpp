@@ -2,8 +2,8 @@
 
 #include "gtest/gtest.h"
 
-#include "../../cpp_app/src/market_depth_handler.h"
-#include "../../cpp_app/src/last_trade_handler.h"
+#include "../../cpp_app/replay/market_depth_handler.h"
+#include "../../cpp_app/replay/last_trade_handler.h"
 #include "market_data_mongo_db_handler.h"
 #include "mongo_db_codec.h"
 
