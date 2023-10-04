@@ -465,6 +465,12 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
                     flux_prefix_removed_option_name_case_styled = \
                         self.__case_style_convert_method(flux_prefix_removed_option_name)
+
+                    if option in [JsonSchemaConvertPlugin.flux_fld_val_min, JsonSchemaConvertPlugin.flux_fld_val_max]:
+                        option_value = BaseProtoPlugin.parse_string_to_original_types(option_value)
+                    # else not required: # flux_fld_val_min and flux_fld_val_max needs special handling that
+                    # if value is message path then it will be str but if is float as str then value must be float type
+
                     json_msg_str += ' ' * init_space_count + \
                                     (f'"{flux_prefix_removed_option_name_case_styled}": '
                                      f'{self.parse_python_type_to_json_type_str(option_value)},\n')

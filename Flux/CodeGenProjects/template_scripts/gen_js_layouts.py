@@ -53,6 +53,7 @@ if __name__ == "__main__":
 
     env_var_dict["PLUGIN_FILE_NAME"] = "package_json_gen_plugin.py"
     env_var_dict["TEMPLATE_FILE_NAME"] = "package_json_temp.txt"
+    env_var_dict["UI_PORT"] = config_dict.get("ui_port")
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",
                                                              "PluginJsLayout", env_var_dict)
     plugin_execute_script = PluginExecuteScript(str(code_gen_engine_env_manager.project_dir), "service.proto")

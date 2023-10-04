@@ -1318,7 +1318,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         base_routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.base_routes_file_name)
         output_str = f"from {base_routes_file_path} import *\n\n"
         output_str += self.handle_CRUD_task()
-        output_str += "\n\ntemplates = Jinja2Templates(directory='templates')\n\n"
+        output_str += 'host = os.environ.get("HOST")\n'
+        output_str += 'if host is None or len(host) == 0:\n'
+        output_str += '    err_str = "Couldn\'t find \'HOST\' key in data/config.yaml of current project"\n'
+        output_str += '    logging.error(err_str)\n'
+        output_str += '    raise Exception(err_str)\n'
+        output_str += "\n\ntemplates = Jinja2Templates(directory=f'{host}/templates')\n\n"
         output_str += f"@{self.api_router_app_name}.get('/')\n"
         output_str += "async def serve_spa(request: Request):\n"
         output_str += "    return templates.TemplateResponse('index.html', {'request': request})\n"

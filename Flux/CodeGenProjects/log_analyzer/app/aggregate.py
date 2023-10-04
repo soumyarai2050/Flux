@@ -3,7 +3,6 @@ from typing import Dict, Tuple, Type
 import os
 
 os.environ["DBType"] = "beanie"
-os.environ["PORT"] = "8030"
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import (
     PortfolioAlertBaseModel, StratAlertBaseModel)

@@ -1,3 +1,9 @@
+# ui specific configs
+  # ui_port needs code regeneration if changed and it should ideally be symmetric with server port like
+  # if server port is 8020 then ui_port should be 3020
+ui_port: "3030"
+
+# server specific configs
 server_host: "127.0.0.1"
 main_server_beanie_port: "8030"
 main_server_cache_port: "8035"

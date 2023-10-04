@@ -17,7 +17,6 @@ class CodeGenEngineEnvManager:
         "PB2_IMPORT_GENERATOR_PATH": "",
         "RESPONSE_FIELD_CASE_STYLE": "snake",  # snake or camel supported
         "DEBUG_SLEEP_TIME": "0",
-        "HOST": "127.0.0.1",
         "PORT": "8080",
         "MONGO_SERVER": "mongodb://localhost:27017",
         "LOG_LEVEL": "debug"

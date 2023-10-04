@@ -6,7 +6,7 @@ export const Theme = {
 }
 
 export function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name);
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 const typography = {

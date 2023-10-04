@@ -10,8 +10,6 @@ import "dashboards_core.proto";
 
 package dashboards;
 
-option (FluxFileCRUDPortOffset) = 90;
-
 message RTDash {
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,

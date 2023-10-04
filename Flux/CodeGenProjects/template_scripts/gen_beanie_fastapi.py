@@ -5,14 +5,19 @@ from pathlib import PurePath
 home_dir_path = PurePath(__file__).parent.parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
 from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, parse_to_int
 from Flux.code_gen_engine_env import CodeGenEngineEnvManager
 
 
 if __name__ == "__main__":
+    project_dir: PurePath = PurePath(__file__).parent.parent
+    config_yaml_path = project_dir / "data" / "config.yaml"
+    config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
+    host = config_yaml_dict.get("server_host")
     code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
     env_var_dict = CodeGenEngineEnvManager.default_gen_env_var_dict
     env_var_dict["PLUGIN_FILE_NAME"] = "beanie_fastapi_plugin.py"
-
+    env_var_dict["HOST"] = host
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",
                                                              "PluginFastApi", env_var_dict)
 

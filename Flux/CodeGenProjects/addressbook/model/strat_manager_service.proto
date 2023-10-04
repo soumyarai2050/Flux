@@ -14,8 +14,6 @@ option (FluxFileWebPageUIData) = {
   theme: THEME_LIGHT
 };
 
-option (FluxFileCRUDPortOffset) = 20;
-
 message StratLeg{
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
   required Security sec = 2;

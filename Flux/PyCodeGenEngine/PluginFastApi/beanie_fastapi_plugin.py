@@ -199,7 +199,13 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += f'{self.fastapi_app_name}.include_router({self.api_router_app_name}, ' \
                       f'prefix="/{self.proto_file_package}")\n'
         output_str += f"from fastapi.staticfiles import StaticFiles\n\n"
-        output_str += f"{self.fastapi_app_name}.mount('/static', StaticFiles(directory='static'), name='static')\n\n"
+        output_str += 'host = os.environ.get("HOST")\n'
+        output_str += 'if host is None or len(host) == 0:\n'
+        output_str += '    err_str = "Couldn\'t find \'HOST\' key in data/config.yaml of current project"\n'
+        output_str += '    logging.error(err_str)\n'
+        output_str += '    raise Exception(err_str)\n'
+        output_str += (f"{self.fastapi_app_name}.mount('/static', "
+                       "StaticFiles(directory=f'{host}/static'), name='static')\n\n")
         return output_str
 
     def set_req_data_members(self, file: protogen.File):

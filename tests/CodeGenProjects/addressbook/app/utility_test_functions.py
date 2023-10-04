@@ -77,7 +77,7 @@ def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
         if "log_analyzer_80" in db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout", "PortfolioAlert", "StratAlert"])
-        elif "strat_executor_80" in db_name or "addressbook_80":
+        elif "strat_executor_80" in db_name or "addressbook_80" in db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout"])
 
@@ -1775,11 +1775,6 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
                                         expected_strat_brief_obj, expected_portfolio_status, executor_web_client)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order of order_id {order_id}")
 
-        # TradeSimulator.process_order_ack(order_id, current_itr_expected_buy_order_journal_.order.px,
-        #                                  current_itr_expected_buy_order_journal_.order.qty,
-        #                                  current_itr_expected_buy_order_journal_.order.side,
-        #                                  current_itr_expected_buy_order_journal_.order.security.sec_id,
-        #                                  current_itr_expected_buy_order_journal_.order.underlying_account)
         executor_web_client.trade_simulator_process_order_ack_query_client(
             order_id, current_itr_expected_buy_order_journal_.order.px,
             current_itr_expected_buy_order_journal_.order.qty,

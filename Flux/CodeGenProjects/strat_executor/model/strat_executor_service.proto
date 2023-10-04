@@ -264,6 +264,7 @@ message StratBrief{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
+    is_repeated: true,
     depending_proto_file_name: "strat_manager_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true

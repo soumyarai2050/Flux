@@ -24,14 +24,9 @@ class PackageJsonGenPlugin(BaseJSLayoutPlugin):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
         self.proto_package_name: str | None = None
-        self.port_offset = 0
 
     def get_option_values(self, file: protogen.File):
         self.proto_package_name = str(file.proto.package)
-        if self.is_option_enabled(file, PackageJsonGenPlugin.flux_file_crud_port_offset):
-            self.port_offset = \
-                int(self.get_simple_option_value_from_proto(file,
-                                                            PackageJsonGenPlugin.flux_file_crud_port_offset))
 
     def handle_temp_project_name(self, file: protogen.File) -> str:
         # Loading root messages to data member
@@ -41,8 +36,13 @@ class PackageJsonGenPlugin(BaseJSLayoutPlugin):
         return output_str
 
     def handle_port(self, file: protogen.File) -> str:
-        port = 3000 + self.port_offset
-        output_str = f'"start": "cross-env PORT={port} react-scripts start",'
+        ui_port = os.environ.get("UI_PORT")
+        if ui_port is None or len(ui_port) == 0:
+            err_str = (f"Env var 'UI_PORT' found as '{ui_port}', "
+                       f"likely bug in setting env var from launch of this plugin")
+            logging.error(err_str)
+            raise Exception(err_str)
+        output_str = f'"start": "cross-env PORT={ui_port} react-scripts start",'
         return output_str
 
     def output_file_generate_handler(self, file: protogen.File):

@@ -21,8 +21,6 @@ cd - # back in script folder
 cd ../../../PyCodeGenEngine/FluxCodeGenCore
 python gen_core_proto_pb2.py
 cd - # back in script folder
-mkdir -p static
-mkdir -p templates
 mkdir -p  ../log
 mkdir -p ../generated
 mkdir -p ../web-ui/src/widgets
