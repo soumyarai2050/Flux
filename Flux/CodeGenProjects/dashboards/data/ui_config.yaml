@@ -1,0 +1,12 @@
+ui_coordinates:
+  SymbolOverview:
+    x: 0
+    y: 36
+    w: 18
+    h: 14
+  PortfolioLimits:
+    x: 0
+    y: 50
+    w: 18
+    h: 14
+

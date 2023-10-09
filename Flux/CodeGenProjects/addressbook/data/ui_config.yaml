@@ -1,0 +1,83 @@
+ui_coordinates:
+  StratLimits:
+    x: 7
+    y: 0
+    w: 11
+    h: 12
+  PortfolioLimits:
+    x: 7
+    y: 12
+    w: 11
+    h: 13
+  StratStatus:
+    x: 4
+    y: 25
+    w: 7
+    h: 8
+  StratAlert:
+    x: 0
+    y: 33
+    w: 18
+    h: 12
+  PortfolioAlert:
+    x: 0
+    y: 45
+    w: 18
+    h: 12
+  StratBrief:
+    x: 0
+    y: 57
+    w: 10
+    h: 10
+  FxSymbolOverview:
+    x: 10
+    y: 57
+    w: 8
+    h: 10
+  SymbolSideSnapshot:
+    x: 0
+    y: 67
+    w: 18
+    h: 10
+  SymbolOverview:
+    x: 0
+    y: 77
+    w: 18
+    h: 10
+  TopOfBook:
+    x: 0
+    y: 87
+    w: 18
+    h: 10
+  MarketDepth:
+    x: 0
+    y: 97
+    w: 18
+    h: 14
+  LastTrade:
+    x: 0
+    y: 111
+    w: 18
+    h: 14
+  FillsJournal:
+    x: 0
+    y: 125
+    w: 18
+    h: 20
+  OrderSnapshot:
+    x: 0
+    y: 145
+    w: 18
+    h: 20
+  OrderJournal:
+    x: 0
+    y: 165
+    w: 18
+    h: 20
+  ProcessedPerformanceAnalysis:
+    x: 0
+    y: 185
+    w: 18
+    h: 20
+
+
