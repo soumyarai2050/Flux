@@ -114,18 +114,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            additional_data = ""
-                            if self._if_any_field_mentioned_in_abb_option_has_button_option(message, dep_msg_name):
-                                additional_data = (f", setActiveChanges as set{dep_msg_name}ActiveChanges, "
-                                                   "setOpenConfirmSavePopup as "
-                                                   f"set{dep_msg_name}OpenConfirmSavePopup")
-                            output_str += ("import { setSelected"+f"{dep_msg_name}"+f"Id, set{dep_msg_name}ArrayWs, set{dep_msg_name}Array" +
-                                           additional_data + " } " + f"from '../features/{dep_msg_camel_cased}Slice';\n")
-                        else:
-                            output_str += ("import { setSelected"+f"{dep_msg_name}"+"Id } from '../features/" +
-                                           f"{dep_msg_camel_cased}Slice';\n")
+                        additional_data = (f", setActiveChanges as set{dep_msg_name}ActiveChanges, "
+                                           "setOpenConfirmSavePopup as "
+                                           f"set{dep_msg_name}OpenConfirmSavePopup")
+                        output_str += ("import { setSelected"+f"{dep_msg_name}"+f"Id, set{dep_msg_name}ArrayWs, set{dep_msg_name}Array" +
+                                       additional_data + " } " + f"from '../features/{dep_msg_camel_cased}Slice';\n")
                     for msg in self.root_msg_list:
                         if msg in self.repeated_tree_layout_msg_list or msg in self.repeated_table_layout_msg_list:
                             # taking all repeated root types
@@ -209,10 +202,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"const getAll{dep_msg_name}WsWorker = new Worker("
-                                           "new URL('../workers/getAllWsHandler.js', import.meta.url));\n")
+                        output_str += (f"const getAll{dep_msg_name}WsWorker = new Worker("
+                                       "new URL('../workers/getAllWsHandler.js', import.meta.url));\n")
             output_str += "\n"
         else:
             output_str += "\n\n"
@@ -470,6 +461,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += f"        {other_file_dependent_msg_name_camel_cased}\n"
                     output_str += ("    }" +
                                    f" = useSelector(state => state.{other_file_dependent_msg_name_camel_cased});\n")
+                    output_str += f"    const {other_file_dependent_msg_name_camel_cased}Mode = " \
+                                  f"useSelector(state => state.{other_file_dependent_msg_name_camel_cased}.mode);\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    /* local react states */\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
@@ -499,6 +492,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += f"        {other_file_dependent_msg_name_camel_cased}\n"
                     output_str += ("    }" +
                                    f" = useSelector(state => state.{other_file_dependent_msg_name_camel_cased});\n")
+                    output_str += f"    const {other_file_dependent_msg_name_camel_cased}Mode = " \
+                                  f"useSelector(state => state.{other_file_dependent_msg_name_camel_cased}.mode);\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    /* local react states */\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
@@ -547,13 +542,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     if dependent_msg_list_from_another_proto:
                         for dep_msg_name in dependent_msg_list_from_another_proto:
                             dep_msg_name_camel_cased = convert_to_camel_case(dep_msg_name)
-                            if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                      dep_msg_name):
-                                additional_data = ""
-                                if self._if_any_field_mentioned_in_abb_option_has_button_option(message, dep_msg_name):
-                                    additional_data = f", {dep_msg_name_camel_cased}, modified{dep_msg_name}"
-                                output_str += ("    const { "+f"{dep_msg_name_camel_cased}Array"+additional_data+" }" +
-                                               f" = useSelector(state => state.{dep_msg_name_camel_cased});\n")
+                            additional_data = f", {dep_msg_name_camel_cased}, modified{dep_msg_name}"
+                            output_str += ("    const { "+f"{dep_msg_name_camel_cased}Array"+additional_data+" }" +
+                                           f" = useSelector(state => state.{dep_msg_name_camel_cased});\n")
                 if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                     dependent_abb_msg = self.parent_abb_msg_name_to_linked_abb_msg_name_dict[message_name]
                     dependent_abb_msg_camel_cased = convert_to_camel_case(dependent_abb_msg)
@@ -585,11 +576,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     if dependent_msg_list_from_another_proto:
                         for dep_msg_name in dependent_msg_list_from_another_proto:
                             dep_msg_name_camel_cased = convert_to_camel_case(dep_msg_name)
-                            if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                      dep_msg_name):
-                                output_str += f"    const getAll{dep_msg_name}Dict = "+"useRef({});\n"
-                                output_str += f"    const {dep_msg_name_camel_cased}SocketDict = "+"useRef({});\n"
-                                output_str += f"    const {dep_msg_name_camel_cased}ArrayRef = "+"useRef([]);\n"
+                            output_str += f"    const getAll{dep_msg_name}Dict = "+"useRef({});\n"
+                            output_str += f"    const {dep_msg_name_camel_cased}SocketDict = "+"useRef({});\n"
+                            output_str += f"    const {dep_msg_name_camel_cased}ArrayRef = "+"useRef([]);\n"
 
                 output_str += f"    const {dependent_message_camel_cased}ArrayRef = useRef([]);\n"
                 output_str += f"    const runFlush = useRef(false);\n"
@@ -683,10 +672,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 for dep_msg in dependent_msg_list_from_another_proto:
                     dep_msg_camel_cased = convert_to_camel_case(dep_msg)
                     dep_msg_snake_cased = convert_camel_case_to_specific_case(dep_msg)
-                    if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                              dep_msg):
-                        output_str += (f"                        '{dep_msg_snake_cased}': "
-                                       f"{dep_msg_camel_cased}Array,\n")
+                    output_str += (f"                        '{dep_msg_snake_cased}': "
+                                   f"{dep_msg_camel_cased}Array,\n")
         output_str += "                    }}\n"
         output_str += "                    itemSchema={dependentWidgetSchema}\n"
         output_str += "                    itemCollectionsDict={dependentWidgetCollectionsDict}\n"
@@ -1161,12 +1148,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += "    useEffect(() => {\n"
-                            output_str += (f"        {dep_msg_camel_cased}ArrayRef.current = "
-                                           f"{dep_msg_camel_cased}Array;\n")
-                            output_str += "    }, "+f"[{dep_msg_camel_cased}Array])\n\n"
+                        output_str += "    useEffect(() => {\n"
+                        output_str += (f"        {dep_msg_camel_cased}ArrayRef.current = "
+                                       f"{dep_msg_camel_cased}Array;\n")
+                        output_str += "    }, "+f"[{dep_msg_camel_cased}Array])\n\n"
 
             output_str += "    useEffect(() => {\n"
             output_str += f"        let loadedKeys = _.get(modified{message_name}, loadListFieldAttrs.key);\n"
@@ -1346,14 +1331,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += f"            if (Object.keys(getAll{dep_msg_name}Dict.current).length > 0) "+"{\n"
-                            output_str += (f"                getAll{dep_msg_name}"+"WsWorker.postMessage({ getAllDict: "
-                                           f"cloneDeep(getAll{dep_msg_name}Dict.current), storedArray: "
-                                           f"{dep_msg_camel_cased}ArrayRef.current"+" });\n")
-                            output_str += f"                getAll{dep_msg_name}Dict.current ="+" {};\n"
-                            output_str += "            }\n"
+                        output_str += f"            if (Object.keys(getAll{dep_msg_name}Dict.current).length > 0) "+"{\n"
+                        output_str += (f"                getAll{dep_msg_name}"+"WsWorker.postMessage({ getAllDict: "
+                                       f"cloneDeep(getAll{dep_msg_name}Dict.current), storedArray: "
+                                       f"{dep_msg_camel_cased}ArrayRef.current"+" });\n")
+                        output_str += f"                getAll{dep_msg_name}Dict.current ="+" {};\n"
+                        output_str += "            }\n"
             output_str += "        }\n"
             output_str += "    }, " + f"[])\n\n"
             output_str += "    useEffect(() => {\n"
@@ -1370,14 +1353,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += f"            getAll{dep_msg_name}"+"WsWorker.onmessage = (e) => {\n"
-                            output_str += "                const [updatedArray] = e.data;\n"
-                            output_str += (f"                dispatch(set{dep_msg_name}"+"ArrayWs({ data: updatedArray, "
-                                           f"collections: dependentWidgetCollectionsDict['{dep_msg_snake_cased}']" +
-                                           " }));\n")
-                            output_str += "            }\n"
+                        output_str += f"            getAll{dep_msg_name}"+"WsWorker.onmessage = (e) => {\n"
+                        output_str += "                const [updatedArray] = e.data;\n"
+                        output_str += (f"                dispatch(set{dep_msg_name}"+"ArrayWs({ data: updatedArray, "
+                                       f"collections: dependentWidgetCollectionsDict['{dep_msg_snake_cased}']" +
+                                       " }));\n")
+                        output_str += "            }\n"
             output_str += "        }\n"
             output_str += "        return () => {\n"
             output_str += "            getAllWsWorker.terminate();\n"
@@ -1385,10 +1366,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
-                        dep_msg_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += f"            getAll{dep_msg_name}WsWorker.terminate();\n"
+                        output_str += f"            getAll{dep_msg_name}WsWorker.terminate();\n"
             output_str += "        }\n"
             output_str += "    }, [getAllWsWorker])\n\n"
             output_str += "    useEffect(() => {\n"
@@ -1401,23 +1379,17 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                const {dep_msg_camel_cased}Socket = "
-                                           f"{dep_msg_camel_cased}SocketDict.current[socketId];\n")
+                        output_str += (f"                const {dep_msg_camel_cased}Socket = "
+                                       f"{dep_msg_camel_cased}SocketDict.current[socketId];\n")
                     output_str += "                if (socket) socket.close();\n"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                if ({dep_msg_camel_cased}Socket) "
-                                           f"{dep_msg_camel_cased}Socket.close();\n")
+                        output_str += (f"                if ({dep_msg_camel_cased}Socket) "
+                                       f"{dep_msg_camel_cased}Socket.close();\n")
                     output_str += "                delete socketDict.current[socketId];\n"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += f"                delete {dep_msg_camel_cased}SocketDict.current[socketId];\n"
+                        output_str += f"                delete {dep_msg_camel_cased}SocketDict.current[socketId];\n"
 
                 else:
                     output_str += "                if (socket) socket.close();\n"
@@ -1443,11 +1415,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                        let {dep_msg_camel_cased}Socket = "
-                                           f"{dep_msg_camel_cased}SocketDict.current.hasOwnProperty(id) ? "
-                                           f"{dep_msg_camel_cased}SocketDict.current[id] : null;\n")
+                        output_str += (f"                        let {dep_msg_camel_cased}Socket = "
+                                       f"{dep_msg_camel_cased}SocketDict.current.hasOwnProperty(id) ? "
+                                       f"{dep_msg_camel_cased}SocketDict.current[id] : null;\n")
             output_str += "                        if (!socket || (socket.readyState === WebSocket.CLOSING || " \
                           "socket.readyState === WebSocket.CLOSED)) {\n"
             output_str += "                            if (socket) socket.close();\n"
@@ -1456,10 +1426,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
-                                           f"{dep_msg_camel_cased}Socket.close();\n")
+                        output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
+                                       f"{dep_msg_camel_cased}Socket.close();\n")
             output_str += "                            socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
                           "'ws')}/get-"+f"{abbreviated_dependent_msg_snake_cased}"+"-ws/${id}`);\n"
             output_str += "                            socketDict.current = { ...socketDict.current, [id]: socket };\n"
@@ -1478,30 +1446,28 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
                         dep_msg_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                                const {dep_msg_camel_cased}Schema "
-                                           f"= schema['{dep_msg_snake_cased}'];\n")
-                            output_str += (f"                                const {dep_msg_camel_cased}Url = "
-                                           f"getServerUrl({dep_msg_camel_cased}Schema, updatedObj, "
-                                           f"isRunningCheckField);\n")
-                            output_str += f"                                if ({dep_msg_camel_cased}Url)"+" {\n"
-                            output_str += (f"                                    {dep_msg_camel_cased}Socket = " +
-                                           "new WebSocket(`${" + f"{dep_msg_camel_cased}Url.replace('http', 'ws')"+
-                                           "}/get"+f"-{dep_msg_snake_cased}-ws/$"+"{id}`);\n")
-                            output_str += (f"                                    {dep_msg_camel_cased}Socket"
-                                           ".onmessage = (event) => {\n")
-                            output_str += ("                                        let updatedObj = "
-                                           "JSON.parse(event.data);\n")
-                            output_str += (f"                                        getAll{dep_msg_name}Dict"
-                                           ".current[updatedObj[DB_ID]] = updatedObj;\n")
-                            output_str += "                                    }\n"
-                            output_str += (f"                                    {dep_msg_camel_cased}"
-                                           "Socket.onclose = () => {\n")
-                            output_str += (f"                                        delete {dep_msg_camel_cased}Socket"
-                                           "Dict.current[id];\n")
-                            output_str += "                                    }\n"
-                            output_str += "                                }\n"
+                        output_str += (f"                                const {dep_msg_camel_cased}Schema "
+                                       f"= schema['{dep_msg_snake_cased}'];\n")
+                        output_str += (f"                                const {dep_msg_camel_cased}Url = "
+                                       f"getServerUrl({dep_msg_camel_cased}Schema, updatedObj, "
+                                       f"isRunningCheckField);\n")
+                        output_str += f"                                if ({dep_msg_camel_cased}Url)"+" {\n"
+                        output_str += (f"                                    {dep_msg_camel_cased}Socket = " +
+                                       "new WebSocket(`${" + f"{dep_msg_camel_cased}Url.replace('http', 'ws')"+
+                                       "}/get"+f"-{dep_msg_snake_cased}-ws/$"+"{id}`);\n")
+                        output_str += (f"                                    {dep_msg_camel_cased}Socket"
+                                       ".onmessage = (event) => {\n")
+                        output_str += ("                                        let updatedObj = "
+                                       "JSON.parse(event.data);\n")
+                        output_str += (f"                                        getAll{dep_msg_name}Dict"
+                                       ".current[updatedObj[DB_ID]] = updatedObj;\n")
+                        output_str += "                                    }\n"
+                        output_str += (f"                                    {dep_msg_camel_cased}"
+                                       "Socket.onclose = () => {\n")
+                        output_str += (f"                                        delete {dep_msg_camel_cased}Socket"
+                                       "Dict.current[id];\n")
+                        output_str += "                                    }\n"
+                        output_str += "                                }\n"
             output_str += f"                                getAll{dependent_message}Dict.current[updatedObj[DB_ID]] " \
                           f"= updatedObj;\n"
             output_str += "                                setTimeout(() => resolve(), 250);\n"
@@ -1520,11 +1486,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        dep_msg_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
-                                           f"{dep_msg_camel_cased}Socket.close();\n")
+                        output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
+                                       f"{dep_msg_camel_cased}Socket.close();\n")
             output_str += "                        }\n"
             output_str += "                    })\n"
             output_str += "                }\n\n"
@@ -1540,25 +1503,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                            let {dep_msg_camel_cased}Socket = "
-                                           f"{dep_msg_camel_cased}SocketDict.current[id];\n")
+                        output_str += (f"                            let {dep_msg_camel_cased}Socket = "
+                                       f"{dep_msg_camel_cased}SocketDict.current[id];\n")
                     output_str += "                            /* close the websocket on cleanup */\n"
                     output_str += "                            if (socket) socket.close();\n"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
-                                           f"{dep_msg_camel_cased}Socket.close();\n")
+                        output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
+                                       f"{dep_msg_camel_cased}Socket.close();\n")
                     output_str += "                            delete socketDict.current[id];\n"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                                  dep_msg_name):
-                            output_str += (f"                            delete {dep_msg_camel_cased}SocketDict."
-                                           f"current[id];\n")
+                        output_str += (f"                            delete {dep_msg_camel_cased}SocketDict."
+                                       f"current[id];\n")
                 else:
                     output_str += "                            /* close the websocket on cleanup */\n"
                     output_str += "                            if (socket) socket.close();\n"
@@ -1589,7 +1546,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        )\n"
         output_str += "    }\n\n"
         output_str += "    /* if get-all websocket is disconnected, render connection lost view */\n"
-        output_str += "    if (mode === Modes.DISABLED_MODE) {\n"
+        output_str += "    if (mode === Modes.DISABLED_MODE"
+        other_file_dependent_msg_name = self._get_ui_msg_dependent_msg_name_from_another_proto(message)
+        if other_file_dependent_msg_name:
+            other_file_dependent_msg_name_camel_cased = convert_to_camel_case(other_file_dependent_msg_name)
+            output_str += f" || {other_file_dependent_msg_name_camel_cased}Mode === Modes.DISABLED_MODE"
+        output_str += ") {\n"
         output_str += "        return (\n"
         output_str += "            <WidgetContainer title={title}>\n"
         output_str += "                <h1>Connection lost. Please refresh...</h1>\n"
@@ -2017,11 +1979,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             if dependent_msg_list_from_another_proto:
                 for dep_msg_name in dependent_msg_list_from_another_proto:
                     dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                    if self._is_dependent_msg_from_other_proto_present_in_abb_n_bubble_option(message,
-                                                                                              dep_msg_name):
-                        output_str += f"        const updated{dep_msg_name}Array = {dep_msg_camel_cased}Array.filter(" \
-                                      "obj => obj[DB_ID] !== id);\n"
-                        output_str += f"        dispatch(set{dep_msg_name}Array(updated{dep_msg_name}Array));\n"
+                    output_str += f"        const updated{dep_msg_name}Array = {dep_msg_camel_cased}Array.filter(" \
+                                  "obj => obj[DB_ID] !== id);\n"
+                    output_str += f"        dispatch(set{dep_msg_name}Array(updated{dep_msg_name}Array));\n"
             output_str += "    }\n\n"
             output_str += "    const onDiscard = () => {\n"
             output_str += "        onReload();\n"

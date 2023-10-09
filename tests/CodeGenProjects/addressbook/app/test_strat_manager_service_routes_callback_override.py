@@ -446,7 +446,6 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             market_depth_basemodel_list, expected_order_limits_,
                                             expected_portfolio_limits_, max_loop_count_per_side,
                                             buy_sell_symbol_list, residual_wait_sec):
-    # with ExecutorNLogAnalyzerManager():
     symbol_pair_counter = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         results = [executor.submit(handle_test_buy_sell_order, buy_symbol, sell_symbol, max_loop_count_per_side,

@@ -448,13 +448,26 @@ function AbbreviatedFilterWidget(props) {
                                                                         if (typeof (collection.min) === DataTypes.STRING) {
                                                                             let min = collection.min;
                                                                             const source = min.split('.')[0];
-                                                                            collection.min = _.get(props.itemsMetadataDict[source], min.substring(min.indexOf('.') + 1));
+                                                                            collection.minFieldName = min.split('.').pop();
+                                                                            const metadataArray = props.itemsMetadataDict[source];
+                                                                            if (metadataArray) {
+                                                                                const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === row['data-id']);
+                                                                                if (metadata) {
+                                                                                    collection.min = _.get(metadata, min.substring(min.indexOf('.') + 1));
+                                                                                }
+                                                                            }
                                                                         }
                                                                         if (typeof (collection.max) === DataTypes.STRING) {
                                                                             let max = collection.max;
                                                                             const source = max.split('.')[0];
-                                                                            collection.maxFieldName = max.substring(max.lastIndexOf('.') + 1);
-                                                                            collection.max = _.get(props.itemsMetadataDict[source], max.substring(max.indexOf('.') + 1))
+                                                                            collection.maxFieldName = max.split('.').pop();
+                                                                            const metadataArray = props.itemsMetadataDict[source];
+                                                                            if (metadataArray) {
+                                                                                const metadata = metadataArray.find(meta => _.get(meta, DB_ID) === row['data-id']);
+                                                                                if (metadata) {
+                                                                                    collection.max = _.get(metadata, max.substring(max.indexOf('.') + 1));
+                                                                                }
+                                                                            }
                                                                         }
                                                                     }
                                                                     let xpath = collection.xpath;

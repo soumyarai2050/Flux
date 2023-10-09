@@ -3,8 +3,11 @@ import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, B
 import { Edit, Delete, ThumbUp, Save } from '@mui/icons-material';
 import ReactJson from 'react-json-view';
 import classes from './Popup.module.css';
+import { useTheme } from '@emotion/react';
 
 export const ConfirmSavePopup = (props) => {
+    const theme = useTheme();
+    const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
 
     return (
         <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
@@ -12,6 +15,7 @@ export const ConfirmSavePopup = (props) => {
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText>Review changes:</DialogContentText>
                 <ReactJson
+                    theme={jsonViewTheme}
                     displayDataTypes={false}
                     displayObjectSize={false}
                     indentWidth={6}
@@ -31,12 +35,15 @@ export const ConfirmSavePopup = (props) => {
 }
 
 export const WebsocketUpdatePopup = (props) => {
+    const theme = useTheme();
+    const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
     return (
         <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
             <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText>New update detected from server. Your changes may be lost. Following unsaved changes are discarded:</DialogContentText>
                 <ReactJson
+                    theme={jsonViewTheme}
                     displayDataTypes={false}
                     displayObjectSize={false}
                     indentWidth={6}
@@ -55,6 +62,8 @@ export const WebsocketUpdatePopup = (props) => {
 }
 
 export const FormValidation = (props) => {
+    const theme = useTheme();
+    const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
 
     return (
         <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
@@ -62,6 +71,7 @@ export const FormValidation = (props) => {
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText className={classes.dialog_text}>Form validation failed due to following errors:</DialogContentText>
                 <ReactJson
+                    theme={jsonViewTheme}
                     displayDataTypes={false}
                     displayObjectSize={false}
                     indentWidth={6}

@@ -142,7 +142,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += "\t\t\t\tkwargs = {'"+f"{message_name_snake_cased}_"+"': "+f"{message_name_snake_cased}_"+"}\n"
         content_str += f"\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
         content_str += f"\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
-        content_str += f"\t\t\t\t\tself.strat_cache_type.notify_all()\n"
+        content_str += f"\t\t\t\t\tself.strat_cache.notify_all()\n"
         content_str += f'\t\t\t\tlogging.info(f"Added '+f'{message_name_snake_cased}' + \
                        ' with id: {'+f'{message_name_snake_cased}'+'_.id}")\n'
         content_str += f"\t\t\telse:\n"
@@ -158,7 +158,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += f"\t\t\t\tif {message_name_snake_cased}.id == {message_name_snake_cased}_.id:\n"
         content_str += f"\t\t\t\t\tself.trading_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += f"\t\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
-        content_str += f"\t\t\t\t\t\tself.strat_cache_type.notify_all()\n"
+        content_str += f"\t\t\t\t\t\tself.strat_cache.notify_all()\n"
         content_str += '\t\t\t\t\tlogging.debug(f"updated ' + f'{message_name_snake_cased}' + \
                        ' with id: {' + f'{message_name_snake_cased}' + '_.id}")\n'
         content_str += f"\t\t\t\telse:\n"
@@ -172,110 +172,19 @@ class StratExecutorPlugin(BaseProtoPlugin):
                        ': {' + f'{message_name_snake_cased}' + '_} ")\n'
         return content_str
 
-    def data_manager_model_based_handler_for_single_key_non_top_lvl_content(self, message_name: str,
-                                                                            message_name_snake_cased: str):
-        content_str = f"\tdef get_key_n_strat_cache_from_{message_name_snake_cased}(self, " \
-                      f"{message_name_snake_cased}_: {message_name}BaseModel | {message_name}):\n"
-        key_handler_class_name = convert_to_capitalized_camel_case(self.key_handler_file_name)
-        content_str += f"\t\tkey = {key_handler_class_name}.get_key_from_{message_name_snake_cased}" \
-                       f"({message_name_snake_cased}_)\n"
-        content_str += f"\t\tstrat_cache = self.strat_cache_type.get(key)\n"
-        content_str += f"\t\treturn key, strat_cache\n\n"
-        content_str += f'\tdef handle_{message_name_snake_cased}_get_all_ws(self, ' \
-                       f'{message_name_snake_cased}_: {message_name}BaseModel | {message_name}, **kwargs):\n'
-        content_str += f'\t\tcached_pair_strat_none_cmnt = kwargs.get("cached_pair_strat_none_cmnt")\n'
-        content_str += f'\t\tstrat_cache_none_cmnt = kwargs.get("strat_cache_none_cmnt")\n'
-        content_str += f"\t\tkey, strat_cache = self.get_key_n_strat_cache_from_{message_name_snake_cased}(" \
-                       f"{message_name_snake_cased}_)\n"
-        content_str += f"\t\tif strat_cache is not None:\n"
-        content_str += f"\t\t\twith strat_cache.re_ent_lock:\n"
-        content_str += f"\t\t\t\tstrat_cache.set_{message_name_snake_cased}(" \
-                       f"{message_name_snake_cased}_)\n"
-        content_str += f"\t\t\tcached_pair_strat, _ = strat_cache.get_pair_strat()\n"
-        content_str += '\t\t\tkwargs = {'+f'"{message_name_snake_cased}_"'+f': {message_name_snake_cased}_' + \
-                       ', "cached_pair_strat": cached_pair_strat, "strat_cache": strat_cache, ' \
-                       '"'+f'{message_name_snake_cased}_key'+'": key}\n'
-        content_str += f"\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
-        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify and " \
-                       f"cached_pair_strat is not None:\n"
-        content_str += f"\t\t\t\tstrat_cache.notify_semaphore.release()\n"
-        content_str += f"\t\t\telif cached_pair_strat is None:\n"
-        content_str += f"\t\t\t\tif cached_pair_strat_none_cmnt is None:\n"
-        content_str += f"\t\t\t\t\tlogging.error('cached_pair_strat found as None, showing default " \
-                       f"error message since cached_pair_strat_none_cmnt param is None')\n"
-        content_str += f"\t\t\t\telse:\n"
-        content_str += f"\t\t\t\t\tlogging.error(cached_pair_strat_none_cmnt)\n"
-        content_str += f"\t\t\t# else not required - strat does not need this update notification\n"
-        content_str += f'\t\t\tlogging.debug(f"Updated {message_name_snake_cased} cache for key: ' + \
-                       '{key}' + f';;;{message_name_snake_cased}_: ' + '{' + f'{message_name_snake_cased}' + '_}' + '")\n'
-        content_str += f"\t\telse:\n"
-        content_str += f"\t\t\tif strat_cache_none_cmnt is None:\n"
-        content_str += f"\t\t\t\tlogging.error('strat_cache found as None for {message_name_snake_cased} in " \
-                       f"handle_{message_name_snake_cased}_ws, showing default error message since " \
-                       f"strat_cache_none_cmnt param is None')\n"
-        content_str += f"\t\t\telse:\n"
-        content_str += f"\t\t\t\tlogging.error(strat_cache_none_cmnt)\n"
-        return content_str
-
-    def data_manager_model_based_handler_for_multi_key_non_top_lvl_content(self, message_name: str,
-                                                                           message_name_snake_cased: str):
-        content_str = f"\tdef get_key_n_strat_cache_from_{message_name_snake_cased}(self, " \
-                      f"{message_name_snake_cased}_: {message_name}BaseModel | {message_name}):\n"
-        key_handler_class_name = convert_to_capitalized_camel_case(self.key_handler_file_name)
-        content_str += f"\t\tkey1, key2 = {key_handler_class_name}.get_key_from_{message_name_snake_cased}(" \
-                       f"{message_name_snake_cased}_)\n"
-        content_str += f"\t\tstrat_cache1 = self.strat_cache_type.get(key1)\n"
-        content_str += f"\t\tstrat_cache2 = self.strat_cache_type.get(key2)\n"
-        content_str += f"\t\treturn key1, key2, strat_cache1, strat_cache2\n\n"
-        content_str += f'\tdef handle_{message_name_snake_cased}_get_all_ws(self, ' \
-                       f'{message_name_snake_cased}_: {message_name}BaseModel | {message_name}, **kwargs):\n'
-        content_str += f"\t\tkey1, key2, strat_cache1, strat_cache2 = " \
-                       f"self.get_key_n_strat_cache_from_{message_name_snake_cased}({message_name_snake_cased}_)\n"
-        content_str += f"\t\tupdated: bool = False\n"
-        content_str += f"\t\tif strat_cache1 is not None:\n"
-        content_str += f"\t\t\twith strat_cache1.re_ent_lock:\n"
-        content_str += f"\t\t\t\tstrat_cache1.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
-        content_str += '\t\t\tkwargs = {}\n'
-        content_str += f"\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
-        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
-        content_str += f"\t\t\t\tstrat_cache1.notify_semaphore.release()\n"
-        content_str += f"\t\t\tupdated = True\n"
-        content_str += f"\t\t\t# else not required - strat does not need this update notification\n"
-        content_str += f"\t\tif strat_cache2 is not None:\n"
-        content_str += f"\t\t\twith strat_cache2.re_ent_lock:\n"
-        content_str += f"\t\t\t\tstrat_cache2.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
-        content_str += '\t\t\tkwargs = {}\n'
-        content_str += f"\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
-        content_str += f"\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
-        content_str += f"\t\t\t\tstrat_cache2.notify_semaphore.release()\n"
-        content_str += f"\t\t\tupdated = True\n"
-        content_str += f"\t\t\t# else not required - strat does not need this update notification\n"
-        content_str += f"\t\tif updated:\n"
-        content_str += f'\t\t\tlogging.debug(f"Updated {message_name_snake_cased} cache for keys: ' \
-                       '{key1}, {key2} ;;;detail: '+'{'+f'{message_name_snake_cased}'+'_}'+'")\n'
-        content_str += f"\t\telse:\n"
-        content_str += f'\t\t\tlogging.debug(f"no matching strat: for {message_name_snake_cased} keys: ' \
-                       '{key1}, {key2};;;detail: {'+f'{message_name_snake_cased}'+'_}")\n'
-        return content_str
-
     def data_manager_model_based_handler_for_non_top_lvl_content(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        key_count = self.get_cache_key_required_msg_to_key_count_dict.get(message)
-        if key_count is not None:
-            if key_count == 1:
-                content_str = \
-                    self.data_manager_model_based_handler_for_single_key_non_top_lvl_content(message_name,
-                                                                                             message_name_snake_cased)
-            else:
-                content_str = \
-                    self.data_manager_model_based_handler_for_multi_key_non_top_lvl_content(message_name,
-                                                                                            message_name_snake_cased)
-        else:
-            err_str = f"Could not find key_count for message {message_name_snake_cased} in " \
-                      f"self.executor_option_enabled_msg_to_key_dict"
-            logging.exception(err_str)
-            raise Exception(err_str)
+        content_str = f'\tdef handle_{message_name_snake_cased}_get_all_ws(self, ' \
+                      f'{message_name_snake_cased}_: {message_name}BaseModel | {message_name}, **kwargs):\n'
+        content_str += "\t\twith self.strat_cache.re_ent_lock:\n"
+        content_str += f"\t\t\tself.strat_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
+        content_str += '\t\tkwargs = {' + f'"{message_name_snake_cased}_"' + f': {message_name_snake_cased}_' + '}\n'
+        content_str += f"\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
+        content_str += f"\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
+        content_str += f"\t\t\tself.strat_cache.notify_semaphore.release()\n"
+        content_str += (f'\t\tlogging.debug(f"Updated {message_name_snake_cased} cache;;;'
+                        f'{message_name_snake_cased}_: ') + '{' + f'{message_name_snake_cased}' + '_}' + '")\n'
         return content_str
 
     def data_manager_model_based_handler_content(self, message: protogen.Message) -> str:
@@ -317,13 +226,9 @@ class StratExecutorPlugin(BaseProtoPlugin):
         file_name_camel_cased = convert_to_capitalized_camel_case(file_name)
         file_name_camel_cased = file_name_camel_cased[0].upper() + file_name_camel_cased[1:]
         content_str += f"class {file_name_camel_cased}DataManager({file_name_camel_cased}WSClient):\n"
-        content_str += f"\tdef __init__(self, host: str, port: int, strat_cache_type=None):\n"
+        content_str += f"\tdef __init__(self, host: str, port: int, strat_cache: {self.base_strat_cache_class_name}):\n"
         content_str += f"\t\tsuper().__init__(host, port)\n"
-        content_str += "\t\tif strat_cache_type is None:\n"
-        content_str += \
-            f"\t\t\tself.strat_cache_type: Type[{self.base_strat_cache_class_name}] = {self.base_strat_cache_class_name}\n"
-        content_str += "\t\telse:\n"
-        content_str += "\t\t\tself.strat_cache_type = strat_cache_type\n"
+        content_str += "\t\tself.strat_cache = strat_cache\n"
         content_str += \
             f"\t\tself.trading_cache: {self.base_trading_cache_class_name} = {self.base_trading_cache_class_name}()\n"
         for message in self.ws_manager_required_messages:

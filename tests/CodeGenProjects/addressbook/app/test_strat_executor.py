@@ -862,3 +862,26 @@ def test_strat_limits_with_high_consumable_open_notional(static_data_, clean_and
     handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                   check_str, assert_fail_message,
                                                                   activated_strat.id, executor_http_client)
+
+
+# order limits
+def test_max_contract_qty(static_data_, clean_and_set_limits):
+    raise NotImplementedError
+
+
+# portfolio limits
+def test_max_open_baskets(static_data_, clean_and_set_limits):
+    raise NotImplementedError
+
+
+def test_max_open_notional_per_side(static_data_, clean_and_set_limits):
+    raise NotImplementedError
+
+
+def test_max_gross_n_open_notional(static_data_, clean_and_set_limits):
+    raise NotImplementedError
+
+
+def test_rolling_max_reject_count(static_data_, clean_and_set_limits):
+    raise NotImplementedError
+

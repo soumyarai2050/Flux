@@ -176,7 +176,7 @@ const Cell = (props) => {
             validationError.current = validateConstraints(collection, value);
 
             const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+                <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
             ) : null;
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
@@ -238,7 +238,7 @@ const Cell = (props) => {
         } else if (type === DataTypes.ENUM) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+                <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
             ) : null;
             return (
                 <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
@@ -302,7 +302,7 @@ const Cell = (props) => {
                         <InputAdornment position='end'>bps</InputAdornment>
                     )}
                     {validationError.current && (
-                        <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+                        <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
                     )}
                 </>
             ) : null;
@@ -343,7 +343,7 @@ const Cell = (props) => {
         } else if (type === DataTypes.DATE_TIME) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+                <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
             ) : null;
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
@@ -377,7 +377,7 @@ const Cell = (props) => {
         } else if (type === DataTypes.STRING && !collection.abbreviated) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+                <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
             ) : null;
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
@@ -596,7 +596,7 @@ const Cell = (props) => {
                 {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
                 {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
                 {validationError.current && (
-                    <Tooltip sx={{ marginLeft: '20px' }} title={validationError.current}><Error color='error' /></Tooltip>
+                    <Tooltip sx={{ marginLeft: '20px' }} title={validationError.current} disableInteractive><Error color='error' /></Tooltip>
                 )}
             </TableCell>
         )
@@ -605,7 +605,7 @@ const Cell = (props) => {
             <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`} align={textAlign} size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
                 {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
                 {validationError.current && (
-                    <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }}><Error color='error' /></Tooltip>
+                    <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }} disableInteractive><Error color='error' /></Tooltip>
                 )}
             </TableCell>
         )

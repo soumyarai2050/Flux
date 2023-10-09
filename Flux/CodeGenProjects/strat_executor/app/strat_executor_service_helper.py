@@ -12,56 +12,31 @@ from FluxPythonUtils.scripts.utility_functions import get_symbol_side_key
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import (
     PairStrat, PairStratBaseModel, PortfolioStatusBaseModel, PairStratOptional, OrderLimitsBaseModel)
 from Flux.CodeGenProjects.strat_executor.app.get_pair_strat_n_executor_client import *
-
+from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
+    StratExecutorServiceHttpClient)
 
 update_strat_status_lock: threading.Lock = threading.Lock()
 
 
-def is_pair_strat_engine_service_up(ignore_error: bool = False):
+def all_service_up_check(executor_client: StratExecutorServiceHttpClient, ignore_error: bool = False):
     try:
-        portfolio_status_list: List[PortfolioStatusBaseModel] = (
-            strat_manager_service_http_client.get_all_portfolio_status_client())
-        if not portfolio_status_list:
-            if not ignore_error:
-                logging.exception("pair_strat_engine service is up but no portfolio_status exists", exc_info=True)
-            return False
-        order_limits: List[OrderLimitsBaseModel] = strat_manager_service_http_client.get_all_order_limits_client()
-        if not order_limits:
-            if not ignore_error:
-                logging.exception("pair_strat_engine service is up but no order_limits exists", exc_info=True)
-            return False
-        portfolio_limits: List[OrderLimitsBaseModel] = (
-            strat_manager_service_http_client.get_all_portfolio_limits_client())
-        if not portfolio_limits:
-            if not ignore_error:
-                logging.exception("pair_strat_engine service is up but no portfolio_limits exists", exc_info=True)
-            return False
+        ui_layout_list: List[UILayoutBaseModel] = (
+            strat_manager_service_http_client.get_all_ui_layout_client())
+
+        ui_layout_list: List[UILayoutBaseModel] = (
+            log_analyzer_service_http_client.get_all_ui_layout_client())
+
+        ui_layout_list: List[UILayoutBaseModel] = (
+            executor_client.get_all_ui_layout_client())
         return True
     except Exception as _e:
         if not ignore_error:
-            logging.exception("is_pair_strat_engine_service_up test failed - tried "
-                              "get_all_portfolio_status_client, get_all_order_limits_client and "
-                              "get_all_portfolio_limits_client ;;;"
+            logging.exception("all_service_up_check test failed - tried "
+                              "get_all_ui_layout_client of pair_strat_engine, strat_executor and log_analyzer ;;;"
                               f"exception: {_e}", exc_info=True)
         # else not required - silently ignore error is true
         return False
 
-
-def is_log_analyzer_service_up(ignore_error: bool = False):
-    try:
-        portfolio_alert_list: List[PortfolioAlertBaseModel] = (
-            log_analyzer_service_http_client.get_all_portfolio_alert_client())
-        if not portfolio_alert_list:
-            if not ignore_error:
-                logging.exception("pair_strat_engine service is up but no portfolio_alert exists", exc_info=True)
-            return False
-        return True
-    except Exception as _e:
-        if not ignore_error:
-            logging.exception("is_pair_strat_engine_service_up test failed - tried "
-                              f"get_all_portfolio_alert_client;;; exception: {_e}", exc_info=True)
-        # else not required - silently ignore error is true
-        return False
 
 # def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, alert_brief: str,
 #                                              alert_details: str | None = None,
@@ -156,9 +131,26 @@ def get_consumable_participation_qty(
 
 
 def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_period_seconds: int,
-                                          max_participation_rate: float) -> int | None:
+                                          max_participation_rate: float, asyncio_loop) -> int | None:
+    run_coro = get_consumable_participation_qty_underlying_http(symbol, side, applicable_period_seconds,
+                                                                max_participation_rate)
+    future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
+
+    # block for task to finish
+    try:
+        return future.result()
+    except Exception as e_:
+        logging.exception(f"get_consumable_participation_qty_underlying_http failed with exception: {e_}")
+
+
+async def get_consumable_participation_qty_underlying_http(symbol: str, side: Side, applicable_period_seconds: int,
+                                                           max_participation_rate: float) -> int | None:
+    from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+        underlying_get_executor_check_snapshot_query_http)
+
     executor_check_snapshot_list: List[ExecutorCheckSnapshot] = \
-        strat_executor_http_client.get_executor_check_snapshot_query_client(symbol, side, applicable_period_seconds)
+        await underlying_get_executor_check_snapshot_query_http(symbol, side, applicable_period_seconds)
+
     if len(executor_check_snapshot_list) == 1:
         return get_consumable_participation_qty(executor_check_snapshot_list, max_participation_rate)
     else:

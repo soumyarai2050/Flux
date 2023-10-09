@@ -37,25 +37,16 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
         routes_callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
         output_str += f"from {callback_file_path} import {routes_callback_class_name_camel_cased}\n"
         output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n\n\n"
-        output_str += 'port = os.getenv("PORT")\n'
-        output_str += 'if port is None or len(port) == 0:\n'
-        output_str += '    err_str = "Can not find PORT env var for fastapi callback override set instance"\n'
-        output_str += '    logging.exception(err_str)\n'
-        output_str += '    raise Exception(err_str)\n\n'
-        output_str += ('config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"' +
-                       f'{self.proto_file_package}'+'_{port}_config.yaml"\n')
-        output_str += 'main_config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"config.yaml"\n'
+        output_str += 'config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"config.yaml"\n'
         output_str += 'if os.path.exists(config_yaml_path):\n'
         output_str += '    config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n'
+        output_str += '    host = config_yaml_dict.get("server_host")\n\n'
+        output_str += '    if host is None:\n\n'
+        output_str += '        err_str = "Can not find \'server_host\' key in data/config.yaml file loaded dict"\n'
+        output_str += '        logging.exception(err_str)\n'
+        output_str += '        raise Exception(err_str)\n'
         output_str += 'else:\n'
-        output_str += '    err_str = f"'+f'{self.proto_file_package}'+'_{port}_config.yaml does not exist"\n'
-        output_str += '    logging.exception(err_str)\n'
-        output_str += '    raise Exception(err_str)\n\n'
-
-        output_str += 'main_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(main_config_yaml_path))\n'
-        output_str += 'host = main_config_yaml_dict.get("server_host")\n\n'
-        output_str += 'if host is None:\n\n'
-        output_str += '    err_str = "Can not find \'server_host\' key in data/config.yaml file loaded dict"\n'
+        output_str += '    err_str = f"'+f'data/config.yaml does not exist"\n'
         output_str += '    logging.exception(err_str)\n'
         output_str += '    raise Exception(err_str)\n\n'
 

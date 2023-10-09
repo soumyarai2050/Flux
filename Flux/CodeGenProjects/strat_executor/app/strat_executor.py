@@ -2,6 +2,7 @@ import inspect
 import logging
 import os
 import sys
+import threading
 import time
 from threading import Thread
 import math
@@ -21,24 +22,25 @@ from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper impor
     get_strat_brief_log_key
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
-
+from FluxPythonUtils.scripts.utility_functions import clear_semaphore
 
 class StratExecutor:
     trading_link: ClassVar[TradingLinkBase] = get_trading_link()
+    asyncio_loop: asyncio.AbstractEventLoop
 
     @staticmethod
-    def executor_trigger(trading_data_manager: TradingDataManager, strat_cache: StratCache):
-        strat_executor: StratExecutor = StratExecutor(trading_data_manager, strat_cache)
+    def executor_trigger(trading_data_manager_: TradingDataManager, strat_cache: StratCache):
+        strat_executor: StratExecutor = StratExecutor(trading_data_manager_, strat_cache)
         strat_executor_thread = Thread(target=strat_executor.run, daemon=True).start()
         return strat_executor, strat_executor_thread
 
     """ 1 instance = 1 thread = 1 pair strat"""
 
-    def __init__(self, trading_data_manager: TradingDataManager, strat_cache: StratCache):
+    def __init__(self, trading_data_manager_: TradingDataManager, strat_cache: StratCache):
         self.pair_strat_executor_id: str | None = None
         self.is_test_run: bool = is_test_run
 
-        self.trading_data_manager: TradingDataManager = trading_data_manager
+        self.trading_data_manager: TradingDataManager = trading_data_manager_
         self.strat_cache: StratCache = strat_cache
         self.leg1_fx: float | None = None
 
@@ -80,89 +82,36 @@ class StratExecutor:
             else:
                 return False
 
-    def update_market_depth_snapshot_from_http(self):
-        market_depths: List[MarketDepthBaseModel] = \
-            self.trading_link.strat_executor_web_client.get_all_market_depth_client()
-        if market_depths:
-            for market_depth in market_depths:
-                self.trading_data_manager.handle_market_depth_get_all_ws(market_depth)
+    def get_aggressive_market_depths(self, symbol: str, side: Side) -> List[MarketDepth]:
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_get_market_depth_from_index_fields_http)
 
-    def update_fx_symbol_overviews_from_http(self):
-        fx_symbol_overviews: List[FxSymbolOverviewBaseModel] = \
-            self.trading_link.pair_strat_web_client.get_all_fx_symbol_overview_client()
-        if fx_symbol_overviews:
-            for fx_symbol_overview_ in fx_symbol_overviews:
-                self.trading_data_manager.handle_fx_symbol_overview_get_all_ws(fx_symbol_overview_)
-            self.get_leg1_fx()  # internally looks up the updated fx symbol overview form above and updates it
+        # coro needs public method
+        run_coro = underlying_get_market_depth_from_index_fields_http(symbol)
+        future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
 
-    def update_strat_limits_from_http(self):
-        strat_limits_list: List[StratLimitsBaseModel] = (
-            self.trading_link.strat_executor_web_client.get_all_strat_limits_client())
-        if strat_limits_list is not None and len(strat_limits_list) == 1:
-            strat_limits = strat_limits_list[0]
-            self.trading_data_manager.handle_strat_limits_get_all_ws(strat_limits)
-            return True
-        elif len(strat_limits_list) > 1:
-            err_str_ = (f"StratLimits must only have one object, received {len(strat_limits_list)};;; "
-                        f"strat_limits_list: {strat_limits_list}")
-            logging.error(err_str_)
-            raise Exception(err_str_)
-
-    def update_symbol_overviews_from_http(self):
-        symbol_overviews: List[SymbolOverviewBaseModel] = \
-            self.trading_link.strat_executor_web_client.get_all_symbol_overview_client()
-        if symbol_overviews:
-            for symbol_overview_ in symbol_overviews:
-                self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_)
-
-    def update_tobs_from_http(self):
-        tobs: List[TopOfBookBaseModel] = \
-            self.trading_link.strat_executor_web_client.get_all_top_of_book_client()  # Never returns None
-        if tobs:
-            for tob in tobs:
-                self.trading_data_manager.handle_top_of_book_get_all_ws(tob)
-            # if we need fx TOB: self.strat_cache needs to collect reference here (like we do in symbol_overview)
-
-    def update_strat_brief_from_http(self) -> bool:
-        strat_briefs: List[StratBriefBaseModel] | None = \
-            self.trading_link.strat_executor_web_client.get_all_strat_brief_client()
-        if strat_briefs:
-            for strat_brief in strat_briefs:
-                self.trading_data_manager.handle_strat_brief_get_all_ws(strat_brief)
-            return True
-        else:
-            return False
-
-    def update_portfolio_limits_from_http(self):
-        portfolio_limits_list: List[PortfolioLimitsBaseModel] = (
-            self.trading_link.pair_strat_web_client.get_all_portfolio_limits_client())
-        if portfolio_limits_list is not None and len(portfolio_limits_list) == 1:
-            portfolio_limits = portfolio_limits_list[0]
-            self.trading_data_manager.trading_cache.set_portfolio_limits(portfolio_limits)
-        elif len(portfolio_limits_list) > 1:
-            err_str_ = f"multiple: ({len(portfolio_limits_list)}) portfolio_limits entries not supported at this time!" \
-                       f" use swagger UI to delete redundant entries: {portfolio_limits_list} from DB and retry"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-
-    def get_aggressive_market_depths(self, symbol: str, side: Side) -> List[MarketDepthBaseModel]:
-        market_depths = self.trading_link.strat_executor_web_client.get_market_depth_from_index_client(symbol)
-        # store for subsequent reference
-        if market_depths:
-            for market_depth in market_depths:
-                self.strat_cache.set_market_depth(market_depth)
-        side_ = "BID" if side == Side.BUY else "ASK"
-        filtered_market_depths: List[MarketDepthBaseModel] = []
-        if market_depths:
-            for market_depth in market_depths:
-                if market_depth.side == side_ and market_depth.qty != 0 and (not math.isclose(market_depth.px, 0)):
-                    filtered_market_depths.append(market_depth)
-        if not filtered_market_depths:
-            logging.error(f"No market_depth object found for symbol_side_key: {get_symbol_side_key([(symbol, side)])}")
-        else:
-            # sort the smallest position to largest
-            filtered_market_depths.sort(reverse=(side == Side.SELL), key=lambda x: x.px)
-        return filtered_market_depths  # return empty if none found
+        # block for task to finish
+        try:
+            market_depths = future.result()
+            # store for subsequent reference
+            if market_depths:
+                for market_depth in market_depths:
+                    self.strat_cache.set_market_depth(market_depth)
+            side_ = "BID" if side == Side.BUY else "ASK"
+            filtered_market_depths: List[MarketDepth] = []
+            if market_depths:
+                for market_depth in market_depths:
+                    if market_depth.side == side_ and market_depth.qty != 0 and (not math.isclose(market_depth.px, 0)):
+                        filtered_market_depths.append(market_depth)
+            if not filtered_market_depths:
+                logging.error(
+                    f"No market_depth object found for symbol_side_key: {get_symbol_side_key([(symbol, side)])}")
+            else:
+                # sort the smallest position to largest
+                filtered_market_depths.sort(reverse=(side == Side.SELL), key=lambda x: x.px)
+            return filtered_market_depths  # return empty if none found
+        except Exception as e:
+            logging.exception(f"get_aggressive_market_depths failed with exception: {e}")
 
     def extract_strat_specific_legs_from_tobs(self, pair_strat, top_of_books) -> Tuple[TopOfBook | None,
                                                                                        TopOfBook | None]:
@@ -214,11 +163,26 @@ class StratExecutor:
         else:
             return leg1_tob, leg2_tob
 
+    def trading_link_internal_order_state_update(
+            self, order_event: OrderEventType, order_id: str, side: Side | None = None,
+            trading_sec_id: str | None = None, system_sec_id: str | None = None,
+            underlying_account: str | None = None, msg: str | None = None):
+        # coro needs public method
+        run_coro = self.trading_link.internal_order_state_update(order_event, order_id, side, trading_sec_id,
+                                                                 system_sec_id, underlying_account, msg)
+        future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
+        # block for start_executor_server task to finish
+        try:
+            return future.result()
+        except Exception as e:
+            logging.exception(f"_internal_reject_new_order failed with exception: {e}")
+
     def internal_reject_new_order(self, new_order: NewOrderBaseModel, reject_msg: str):
         self.internal_reject_count += 1
         internal_reject_order_id: str = str(self.internal_reject_count * -1) + str(DateTime.utcnow())
-        self.trading_link.internal_order_state_update(OrderEventType.OE_REJ, internal_reject_order_id, new_order.side,
-                                                      None, new_order.security.sec_id, None, reject_msg)
+        self.trading_link_internal_order_state_update(
+            OrderEventType.OE_REJ, internal_reject_order_id, new_order.side, None,
+            new_order.security.sec_id, None, reject_msg)
 
     def set_unack(self, symbol: str, unack_state: bool):
         if self.strat_cache.leg1_trading_symbol == symbol:
@@ -265,7 +229,7 @@ class StratExecutor:
                                 exchange):
             # set unack for subsequent orders this symbol to be blocked until this order goes through
             self.set_unack(system_symbol, True)
-            if not self.trading_link.place_new_order(px, qty, side, trading_symbol, system_symbol, account, exchange):
+            if not self.trading_link_place_new_order(px, qty, side, trading_symbol, system_symbol, account, exchange):
                 # reset unack for subsequent orders to go through - this order did fail to go through
                 self.set_unack(system_symbol, False)
                 return False
@@ -273,6 +237,17 @@ class StratExecutor:
                 return True  # order sent out successfully
         else:
             return False
+
+    def trading_link_place_new_order(self, px, qty, side, trading_symbol, system_symbol, account, exchange):
+        run_coro = self.trading_link.place_new_order(px, qty, side, trading_symbol, system_symbol,
+                                                     account, exchange)
+        future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
+
+        # block for task to finish
+        try:
+            return future.result()
+        except Exception as e_:
+            logging.exception(f"get_consumable_participation_qty_underlying_http failed with exception: {e_}")
 
     def check_strat_limits(self, strat_brief: StratBriefBaseModel, px: float, usd_px: float, qty: int, side: Side,
                            order_usd_notional: float, system_symbol: str):
@@ -302,7 +277,8 @@ class StratExecutor:
                               f"{self.strat_cache.get_key()}, strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
 
-            # covers: max cb notional, max open cb notional & max net filled notional ( TODO Urgent: validate and add this description to log detail section ;;;)
+            # covers: max cb notional, max open cb notional & max net filled notional
+            # ( TODO Urgent: validate and add this description to log detail section ;;;)
             if order_usd_notional > strat_brief.pair_sell_side_trading_brief.consumable_notional:
                 logging.error(f"blocked generated SELL order, breaches available consumable notional, expected less "
                               f"than: {strat_brief.pair_sell_side_trading_brief.consumable_notional}, order needs: "
@@ -371,7 +347,7 @@ class StratExecutor:
 
         consumable_participation_qty: int = get_consumable_participation_qty_http(
             system_symbol, side, self.strat_limit.market_trade_volume_participation.applicable_period_seconds,
-            self.strat_limit.market_trade_volume_participation.max_participation_rate)
+            self.strat_limit.market_trade_volume_participation.max_participation_rate, StratExecutor.asyncio_loop)
         if consumable_participation_qty is not None:
             if consumable_participation_qty - qty < 0:
                 logging.error(f"blocked generated order, not enough consumable_participation_qty available, "
@@ -388,11 +364,24 @@ class StratExecutor:
 
         return check_passed
 
+    def get_executor_check_snapshot_query_client(self, symbol: str, side: Side, applicable_period_seconds: int):
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_get_executor_check_snapshot_query_http)
+
+        # coro needs public method
+        run_coro = underlying_get_executor_check_snapshot_query_http(symbol, side, applicable_period_seconds)
+        future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
+
+        # block for task to finish
+        try:
+            return future.result()
+        except Exception as e:
+            logging.exception(f"underlying_get_executor_check_snapshot_query_http failed with exception: {e}")
+
     def check_portfolio_limits(self, symbol, side, strat_limits_: StratLimits) -> bool:
         applicable_period_seconds = strat_limits_.market_trade_volume_participation.applicable_period_seconds
-        executor_check_snapshot_list: List[ExecutorCheckSnapshotBaseModel] = \
-            self.trading_link.strat_executor_web_client.get_executor_check_snapshot_query_client(
-                symbol, side, applicable_period_seconds)
+        executor_check_snapshot_list: List[ExecutorCheckSnapshot] = (
+            self.get_executor_check_snapshot_query_client(symbol, side, applicable_period_seconds))
 
         executor_check_snapshot = None
         if executor_check_snapshot_list:  # has at least 1 element
@@ -412,7 +401,7 @@ class StratExecutor:
             logging.error(f"check_portfolio_limits blocked generated order, portfolio limits not found!")
             return False  # unable to proceed - not enough data to continue further - return
 
-    def _check_portfolio_limits(self, executor_check_snapshot: ExecutorCheckSnapshotBaseModel,
+    def _check_portfolio_limits(self, executor_check_snapshot: ExecutorCheckSnapshot,
                                 portfolio_limits: PortfolioLimitsBaseModel, symbol: str, side: Side) -> bool:
         checks_passed = True
         if executor_check_snapshot.rolling_new_order_count >= \
@@ -442,7 +431,7 @@ class StratExecutor:
 
         px_by_max_level: float = 0
         aggressive_side = Side.BUY if side == Side.SELL else Side.SELL
-        market_depths: List[MarketDepthBaseModel] = self.get_aggressive_market_depths(system_symbol, aggressive_side)
+        market_depths: List[MarketDepth] = self.get_aggressive_market_depths(system_symbol, aggressive_side)
         for market_depth in market_depths:
             if market_depth.position <= order_limits.max_px_levels:
                 px_by_max_level = market_depth.px
@@ -541,45 +530,8 @@ class StratExecutor:
 
         return checks_passed
 
-    def retry_init_strat_cache(self):
-        while True:
-            time.sleep(1)  # retry every one sec (sleep first on purpose for other strat specific updates to apply)
-            done = True  # done is left unchanged (True) implies all required data checks succeeded
-            try:
-                if not self.pair_strat_executor_id:
-                    pair_strat, _ = self.strat_cache.get_pair_strat()
-                    self.pair_strat_executor_id = get_pair_strat_log_key(pair_strat)
-                    done = False
-                if not self.strat_cache.get_strat_limits():
-                    self.update_strat_limits_from_http()
-                    done = False
-                if not self.strat_cache.get_symbol_overviews:
-                    self.update_symbol_overviews_from_http()
-                    done = False
-                if not self.strat_cache.get_top_of_book():
-                    self.update_tobs_from_http()
-                    done = False
-                if not self.leg1_fx:
-                    self.update_fx_symbol_overviews_from_http()  # internally updates fx if available
-                    done = False
-                if not self.strat_cache.get_strat_brief():
-                    self.update_strat_brief_from_http()
-                    done = False
-                if not self.trading_data_manager.trading_cache.get_portfolio_limits():
-                    self.update_portfolio_limits_from_http()
-                    done = False
-                if done:
-                    return
-            except Exception as e:
-                logging.error(f"strat retry-init failed! unable to proceed with strat: {self.pair_strat_executor_id}, "
-                              f"retrying! ;;;exception: {e}, strat_cache: {self.strat_cache}, "
-                              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-
     def run(self):
         ret_val: int = -5000
-        logging.info(f"strat init started for: {self.pair_strat_executor_id}")
-        self.retry_init_strat_cache()
-        logging.info(f"strat init done for: {self.pair_strat_executor_id}, firing up internal run")
         while 1:
             try:
                 ret_val = self.internal_run()
@@ -603,8 +555,22 @@ class StratExecutor:
                                 (f"graceful shut down processing for strat: {self.pair_strat_executor_id} "
                                  f"{get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
                             logging.info(alert_str)
-                            self.trading_link.strat_executor_web_client.patch_strat_status_client(
+
+                            from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+                                underlying_partial_update_strat_status_http)
+
+                            # coro needs public method
+                            run_coro = underlying_partial_update_strat_status_http(
                                 jsonable_encoder(strat_status_basemodel, by_alias=True, exclude_none=True))
+                            future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
+
+                            # block for start_executor_server task to finish
+                            try:
+                                future.result()
+                            except Exception as e:
+                                logging.exception(f"underlying_partial_update_strat_status_http failed "
+                                                  f"with exception: {e}")
+
                             logging.debug(f"StratStatus with id: {self.pair_strat_executor_id} Marked Done, "
                                           f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
                             ret_val = 0
@@ -837,16 +803,28 @@ class StratExecutor:
                 self._cancel_orders_processed_slice = final_slice
                 for cancel_order in unprocessed_cancel_orders:
                     if not cancel_order.cxl_confirmed:
-                        self.trading_link.place_cxl_order(cancel_order.order_id, cancel_order.side, None,
-                                                          cancel_order.security.sec_id, underlying_account="NA")
-                        logging.info(f"@@@@@@@ Logging cxl_order_id: {cancel_order.order_id} Datetime: {DateTime.utcnow()}")
+                        self.trading_link_place_cxl_order(
+                            cancel_order.order_id, cancel_order.side, None, cancel_order.security.sec_id,
+                            underlying_account="NA")
 
                 if unprocessed_cancel_orders:
                     return True
         # all else return false - no cancel_order to process
         return False
 
+    def trading_link_place_cxl_order(self, order_id, side, trading_sec_id, system_sec_id, underlying_account):
+        # coro needs public method
+        run_coro = self.trading_link.place_cxl_order(order_id, side, trading_sec_id, system_sec_id, underlying_account)
+        future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
+
+        # block for start_executor_server task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"executor run failed with exception: {e}")
+
     def internal_run(self):
+        logging.debug("Started strat_executor run")
         while 1:
             self.strat_limit = None
             try:
@@ -854,8 +832,8 @@ class StratExecutor:
                     self.strat_cache.set_pair_strat(None)
                     return 1  # indicates explicit shutdown requested from server
                 self.strat_cache.notify_semaphore.acquire()
-
-                logging.info("##### released semaphore")
+                # remove all unprocessed signals from semaphore, logic handles all new updates in single iteration
+                clear_semaphore(self.strat_cache.notify_semaphore)
 
                 # 1. check if portfolio status has updated since we last checked
                 portfolio_status: PortfolioStatusBaseModel | None = None
@@ -872,12 +850,6 @@ class StratExecutor:
                 pair_strat_tuple = self.strat_cache.get_pair_strat()
                 if pair_strat_tuple is not None:
                     pair_strat, pair_strat_update_date_time = pair_strat_tuple
-                    # if len(pair_strat_list):
-                    #     pair_strat = pair_strat_list[0]
-                    # else:
-                    #     logging.error(
-                    #         f"pair_strat_list must have pair_strat object for: {self.strat_cache}")
-                    #     return -1
                 else:
                     logging.error(f"pair_strat_tuple is None for: {self.strat_cache}")
                     return -1
@@ -961,7 +933,7 @@ class StratExecutor:
                                       f"{[str(tob) for tob in top_of_books] if top_of_books is not None else None}!")
                         continue  # go next run - we don't stop processing for one faulty tob update
                 else:
-                    logging.error(f"unexpected top_of_book_and_date_tuple is None for strat: {self.strat_cache}")
+                    logging.error(f"No TOB exits yet, top_of_book_and_date_tuple is None for strat: {self.strat_cache}")
                     continue  # go next run - we don't stop processing for one faulty tob update
 
                 # 5. ensure leg1_fx is present - otherwise don't proceed - retry later
@@ -1008,14 +980,3 @@ class StratExecutor:
                 return -1
         # we are outside while 1 (strat processing loop) - graceful shut down this strat processing
         return 0
-
-
-if __name__ == "__main__":
-    from datetime import datetime
-    log_dir: PurePath = PurePath(__file__).parent.parent / "log"
-    datetime_str: str = datetime.now().strftime("%Y%m%d")
-    configure_logger('debug', str(log_dir), f'strat_executor_{datetime_str}.log')
-
-    trading_data_manager = TradingDataManager(StratExecutor.executor_trigger)
-    while 1:
-        time.sleep(10)

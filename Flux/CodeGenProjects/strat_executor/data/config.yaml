@@ -8,9 +8,17 @@ server_host: "127.0.0.1"
 main_server_beanie_port: "8040"
 main_server_cache_port: "8035"
 min_refresh_interval: 20
+custom_logger_lvls:
+  - TIMING: 15
+  - JUNK: 5
 
 log_mongo_uri: True
 mongo_server: "mongodb://localhost:27017"
+
+# below 2 configs are used to check types of override files to be initialized by fastapi launch script
+# supported values: "native" or "bare"
+beanie_override_type: "native"
+cache_override_type: "bare"
 
 # to be used in pair_strat_log_analyzer to take out counts of created from waiting queue to execute create in db
 portfolio_alert_configs:

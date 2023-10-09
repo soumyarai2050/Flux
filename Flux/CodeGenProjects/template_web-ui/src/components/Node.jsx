@@ -36,7 +36,7 @@ const Node = (props) => {
                         <span className={classes.node_title} style={{color: nodeTitleColor}}>{props.data.title ? props.data.title : props.data.name}</span>
                         {props.data.showDataType && <span className={classes.type}>{capitalizeFirstLetter(props.data.type)}</span>}
                         <div style={{ minWidth: '20px', display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
-                            {props.data.help && <Tooltip title={props.data.help}><HelpOutline sx={{cursor: 'pointer'}} fontSize='small' /></Tooltip>}
+                            {props.data.help && <Tooltip title={props.data.help} disableInteractive><HelpOutline sx={{cursor: 'pointer'}} fontSize='small' /></Tooltip>}
                         </div>
                     </div>
                 )}

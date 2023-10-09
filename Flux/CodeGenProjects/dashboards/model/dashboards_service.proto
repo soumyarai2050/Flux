@@ -13,9 +13,9 @@ package dashboards;
 message RTDash {
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
-    y: 14,
+    y: 22,
     w: 14,
-    h: 19,
+    h: 14,
     widget_ui_data: {
       view_layout: UI_TABLE,
       edit_layout: UI_TREE,
@@ -84,7 +84,7 @@ message DashCollection {
     x: 4,
     y: 0,
     w: 14,
-    h: 14,
+    h: 22,
     disable_ws_on_edit: true,
     bind_id_fld: "DashCollection.id",
     dynamic_widget_title_fld: "DashCollection.dash_name"
@@ -115,7 +115,7 @@ message DashFilters {
     x: 0,
     y: 14,
     w: 4,
-    h: 19,
+    h: 22,
     widget_ui_data: {
       view_layout: UI_TREE
     }

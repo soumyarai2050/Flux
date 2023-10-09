@@ -55,7 +55,7 @@ const CustomHeadCell = (props) => {
                             padding='normal'
                             sortDirection={orderBy === cellKey ? order : false}>
                             {props.copyColumnHandler && (
-                                <Tooltip title="Click to copy column">
+                                <Tooltip title="Click to copy column" disableInteractive>
                                     <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cellKey)}>
                                         <ContentCopy fontSize='small' />
                                     </IconButton>

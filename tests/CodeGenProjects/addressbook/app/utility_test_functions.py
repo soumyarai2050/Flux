@@ -74,10 +74,10 @@ static_data_dir: PurePath = project_dir_path / "data"
 def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
     mongo_server_uri: str = get_mongo_server_uri()
     for db_name in get_mongo_db_list(mongo_server_uri):
-        if "log_analyzer_80" in db_name:
+        if "log_analyzer" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout", "PortfolioAlert", "StratAlert"])
-        elif "strat_executor_80" in db_name or "addressbook_80" in db_name:
+        elif "strat_executor_" in db_name or "addressbook" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout"])
 
@@ -1265,8 +1265,8 @@ def run_last_trade(buy_symbol: str, sell_symbol: str, last_trade_json_list: List
 def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: PairStratBaseModel,
                             expected_strat_limits: StratLimits,
                             expected_strat_status: StratStatus,
-                            symbol_overview_obj_list: List[SymbolOverviewBaseModel]) -> Tuple[PairStratBaseModel,
-                                                                         StratExecutorServiceHttpClient]:
+                            symbol_overview_obj_list: List[SymbolOverviewBaseModel]
+                            ) -> Tuple[PairStratBaseModel, StratExecutorServiceHttpClient]:
     pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id = buy_symbol
     pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id = sell_symbol
     stored_pair_strat_basemodel = \
@@ -1282,13 +1282,11 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
         f"{stored_pair_strat_basemodel.pair_strat_params_update_seq_num}"
     print(f"{buy_symbol} - strat created, {stored_pair_strat_basemodel}")
 
-    executor_web_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(
-        stored_pair_strat_basemodel.host, stored_pair_strat_basemodel.port)
-
     for _ in range(30):
         # checking is_partially_running of executor
         try:
-            updated_pair_strat = strat_manager_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id)
+            updated_pair_strat = (
+                strat_manager_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id))
             if updated_pair_strat.is_partially_running:
                 break
             time.sleep(1)
@@ -1297,6 +1295,13 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
     else:
         assert False, (f"is_partially_running state must be True, found false, "
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+    assert updated_pair_strat.port is not None, (
+        "Once pair_strat is partially running it also must contain port, updated object has port field as None, "
+        f"updated pair_strat: {updated_pair_strat}")
+
+    executor_web_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(
+        updated_pair_strat.host, updated_pair_strat.port)
 
     # running symbol_overview
     run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list, executor_web_client)
@@ -2298,12 +2303,19 @@ def handle_place_order_and_check_str_in_alert_for_executor_limits(symbol: str, s
                                                                         expect_no_order=True,
                                                                         last_order_id=last_order_id)
 
+    # Checking alert in strat_alert
     strat_alert = log_analyzer_web_client.get_strat_alert_client(activated_pair_strat_id)
     for alert in strat_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
     else:
-        assert False, assert_fail_msg
+        # Checking alert in portfolio_alert if reason failed to add in strat_alert
+        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+        for alert in portfolio_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                break
+        else:
+            assert False, assert_fail_msg
     assert True
 
 

@@ -56,7 +56,7 @@ const HeaderField = (props) => {
                 </Typography>
                 {
                     props.data.help && (
-                        <Tooltip title={props.data.help}>
+                        <Tooltip title={props.data.help} disableInteractive>
                             <HelpOutline fontSize='small' />
                         </Tooltip>
                         // <Box className={classes.option}>

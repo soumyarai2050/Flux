@@ -88,7 +88,7 @@ const NodeField = (props) => {
         validationError.current = validateConstraints(props.data, value);
 
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
         ) : null;
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
@@ -130,7 +130,7 @@ const NodeField = (props) => {
         let value = props.data.value ? props.data.value : props.data.value === false ? false : null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
         ) : null;
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
@@ -152,7 +152,7 @@ const NodeField = (props) => {
         let value = props.data.value ? props.data.value : null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
         ) : null;
         return (
             <Select
@@ -213,7 +213,7 @@ const NodeField = (props) => {
                     <InputAdornment position='end'>bps</InputAdornment>
                 )}
                 {validationError.current && (
-                    <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+                    <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
                 )}
 
             </>
@@ -252,7 +252,7 @@ const NodeField = (props) => {
         let value = props.data.value ? new Date(props.data.value) : null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
         ) : null;
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
@@ -284,7 +284,7 @@ const NodeField = (props) => {
         let value = inputValue ? inputValue : '';
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current}><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
         ) : null;
         const inputProps = endAdornment ? {
             endAdornment: endAdornment

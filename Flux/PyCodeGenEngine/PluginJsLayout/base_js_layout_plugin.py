@@ -24,6 +24,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
+        self.project_name: str | None = None
         self.root_msg_list: List[protogen.Message] = []
         self.layout_msg_list: List[protogen.Message] = []
         self.tree_layout_msg_list: List[protogen.Message] = []
@@ -70,6 +71,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
         if isinstance(file, list):
             message_list = []
             current_full_file_name: str = file[0].proto.name   # since first file in list is current proto file
+            self.project_name = file[0].proto.package
             self.current_proto_file_name = current_full_file_name.split(os.sep)[-1]
             for f in file:
                 message_list.extend(f.messages)
@@ -81,6 +83,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
         else:
             message_list = file.messages
             self.handle_dependency_files(file, message_list)
+            self.project_name = file.proto.package
 
         # handling current file
         for message in set(message_list):

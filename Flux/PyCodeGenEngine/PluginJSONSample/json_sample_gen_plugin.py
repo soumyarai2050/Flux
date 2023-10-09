@@ -165,7 +165,6 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         # handling accessing and replacing list name to the value in option_value
         new_option_value = self.__handle_replacement_of_autocomplete_list_wth_value(option_value)
         output_str = ""
-        # print("####", new_option_value)
         for field_value_pair in new_option_value[1:-1].split(","):
             field_name, value = field_value_pair.split("=")
             if self.__response_field_case_style == "camel":

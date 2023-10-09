@@ -24,10 +24,9 @@ from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_m
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_routes_callback import \
     StratManagerServiceRoutesCallback
 from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import is_service_up, \
-    get_single_exact_match_strat_from_symbol_n_side, get_portfolio_limits, \
-    create_portfolio_limits, get_order_limits, create_order_limits, except_n_log_alert, \
+    get_single_exact_match_strat_from_symbol_n_side, except_n_log_alert, \
     get_symbol_side_key, get_strats_from_symbol_n_side, config_yaml_dict, \
-    CURRENT_PROJECT_DIR, server_port, YAMLConfigurationManager, strat_executor_config_yaml_dict
+    CURRENT_PROJECT_DIR, YAMLConfigurationManager, strat_executor_config_yaml_dict, ps_port
 from Flux.CodeGenProjects.addressbook.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
@@ -46,8 +45,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         self.usd_fx_symbol: Final[str] = "USD|SGD"
         self.fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | None] = {"USD|SGD": None}
         self.usd_fx = None
-        self.port_to_process_dict: Dict[int, subprocess.Popen] = {}
-        self.port_to_web_client_dict: Dict[int, StratExecutorServiceHttpClient] = {}
+        self.pair_strat_id_to_executor_process_dict: Dict[int, subprocess.Popen] = {}
 
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
@@ -55,12 +53,62 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
         super().__init__()
 
-    def _check_and_create_order_and_portfolio_limits(self) -> None:
-        if (order_limits := get_order_limits()) is None:
-            order_limits = create_order_limits()
-        if (portfolio_limits := get_portfolio_limits()) is None:
-            portfolio_limits = create_portfolio_limits()
-        return
+    @staticmethod
+    async def _check_n_create_portfolio_status():
+        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
+            underlying_read_portfolio_status_http, underlying_create_portfolio_status_http)
+
+        async with PortfolioStatus.reentrant_lock:
+            portfolio_status_list: List[PortfolioStatus] = await underlying_read_portfolio_status_http()
+            if 0 == len(portfolio_status_list):  # no portfolio status set yet, create one
+                portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, kill_switch=False,
+                                                                    portfolio_alerts=[],
+                                                                    overall_buy_notional=0,
+                                                                    overall_sell_notional=0,
+                                                                    overall_buy_fill_notional=0,
+                                                                    overall_sell_fill_notional=0,
+                                                                    alert_update_seq_num=0)
+                await underlying_create_portfolio_status_http(portfolio_status)
+
+    @staticmethod
+    async def _check_n_create_order_limits():
+        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
+            underlying_read_order_limits_http, underlying_create_order_limits_http)
+
+        async with OrderLimits.reentrant_lock:
+            order_limits_list: List[OrderLimits] = await underlying_read_order_limits_http()
+            if 0 == len(order_limits_list):  # no order_limits set yet, create one
+                order_limits: OrderLimits = OrderLimits(_id=1, max_basis_points=1500, max_px_deviation=20,
+                                                        max_px_levels=5, max_order_qty=500, min_order_notional=100,
+                                                        max_order_notional=90_000)
+                await underlying_create_order_limits_http(order_limits)
+
+    @staticmethod
+    async def _check_n_create_portfolio_limits():
+        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
+            underlying_read_portfolio_limits_http, underlying_create_portfolio_limits_http)
+
+        async with PortfolioLimits.reentrant_lock:
+            portfolio_limits_list: List[PortfolioLimits] = await underlying_read_portfolio_limits_http()
+            if 0 == len(portfolio_limits_list):  # no portfolio_limits set yet, create one
+                rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5,
+                                                               rolling_tx_count_period_seconds=2)
+                rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5,
+                                                                rolling_tx_count_period_seconds=2)
+
+                portfolio_limits = PortfolioLimits(_id=1, max_open_baskets=20,
+                                                   max_open_notional_per_side=100_000,
+                                                   max_gross_n_open_notional=2_400_000,
+                                                   rolling_max_order_count=rolling_max_order_count,
+                                                   rolling_max_reject_count=rolling_max_reject_count,
+                                                   eligible_brokers=None)
+                await underlying_create_portfolio_limits_http(portfolio_limits)
+
+    @staticmethod
+    async def _check_and_create_portfolio_status_and_order_n_portfolio_limits() -> None:
+        await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_status()
+        await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_order_limits()
+        await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_limits()
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -75,7 +123,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            service_up_flag_env_var = os.environ.get(f"addressbook_{server_port}")
+            service_up_flag_env_var = os.environ.get(f"addressbook_{ps_port}")
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
@@ -86,7 +134,16 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                         if is_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
                             self.service_up = True
                             should_sleep = False
-                            self._check_and_create_order_and_portfolio_limits()
+
+                            run_coro = self._check_and_create_portfolio_status_and_order_n_portfolio_limits()
+                            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                            # block for task to finish
+                            try:
+                                future.result()
+                            except Exception as e:
+                                logging.exception(f"_check_and_create_portfolio_status_and_order_n_portfolio_limits "
+                                                  f"failed with exception: {e}")
+
                             self.run_existing_executors()
                         else:
                             should_sleep = True
@@ -152,9 +209,20 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         else:
             logging.debug("executor server started")
 
-    async def read_all_portfolio_status_pre(self):
-        if not self.asyncio_loop:
-            self.asyncio_loop = asyncio.get_running_loop()
+    async def read_all_ui_layout_pre(self):
+        # Setting asyncio_loop in ui_layout_pre since it called to check current service up
+        attempt_counts = 3
+        for _ in range(attempt_counts):
+            if not self.asyncio_loop:
+                self.asyncio_loop = asyncio.get_running_loop()
+                time.sleep(1)
+            else:
+                break
+        else:
+            err_str_ = (f"self.asyncio_loop couldn't set as asyncio.get_running_loop() returned None for "
+                        f"{attempt_counts} attempts")
+            logging.critical(err_str_)
+            raise HTTPException(detail=err_str_, status_code=500)
 
     def get_usd_px(self, px: float, system_symbol: str):
         """
@@ -167,6 +235,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         return px_or_notional * self.usd_fx
 
     def app_launch_pre(self):
+        self.port = ps_port
         app_launch_pre_thread = threading.Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
         logging.debug("Triggered server launch pre override")
@@ -295,14 +364,9 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         pair_strat_obj.pair_strat_params_update_seq_num = 0
         pair_strat_obj.last_active_date_time = DateTime.utcnow()
 
-        port_list = list(self.port_to_process_dict)
-        if not port_list:
-            port = 8041
-        else:
-            port = max(port_list) + 1
         pair_strat_obj.host = strat_executor_config_yaml_dict.get("server_host")
-        pair_strat_obj.port = port
         pair_strat_obj.is_executor_running = False
+        pair_strat_obj.is_partially_running = False
 
         # starting executor server for current pair strat
         await self._start_executor_server(pair_strat_obj)
@@ -364,7 +428,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
         if updated_pair_strat_obj_dict.get("pair_strat_params") is not None:
             if stored_pair_strat_obj.pair_strat_params_update_seq_num is None:
-                updated_pair_strat_obj_dict["pair_strat_params_update_seq_num"] = 0
+                stored_pair_strat_obj.pair_strat_params_update_seq_num = 0
             updated_pair_strat_obj_dict["pair_strat_params_update_seq_num"] = \
                 stored_pair_strat_obj.pair_strat_params_update_seq_num + 1
 
@@ -372,47 +436,13 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         return updated_pair_strat_obj_dict
 
     async def _start_executor_server(self, pair_strat: PairStrat) -> None:
-        port = pair_strat.port
-        # creating config file for this server run if not exists
         code_gen_projects_dir = PurePath(__file__).parent.parent.parent
-        config_file_path = (code_gen_projects_dir / "strat_executor" /
-                            "data" / f"strat_executor_{port}_config.yaml")
-
-        temp_config_file_path = code_gen_projects_dir / "template_yaml_configs" / "server_config.yaml"
-        with open(temp_config_file_path, "r") as temp_config:
-            config_lines = temp_config.readlines()
-
-        with open(config_file_path, "w") as new_config_file:
-            # first writing strat info to config
-            strat_leg: StratLeg
-            new_config_file.write(f"pair_strat_id: {pair_strat.id}\n")
-            for index, strat_leg in enumerate([pair_strat.pair_strat_params.strat_leg1,
-                                               pair_strat.pair_strat_params.strat_leg2]):
-                if strat_leg is not None:
-                    new_config_file.write(f"strat_leg_{index + 1}:\n")
-                    new_config_file.write(f'  exch_id: "{strat_leg.exch_id}"\n')
-                    new_config_file.write(f'  sec:\n')
-                    new_config_file.write(f'    sec_id: {strat_leg.sec.sec_id}\n')
-                    new_config_file.write(f'    sec_type: {strat_leg.sec.sec_type}\n')
-                    new_config_file.write(f'  side: "{strat_leg.side}"\n')
-                    new_config_file.write(f'  company: "{strat_leg.company}"\n')
-            new_config_file.write("\n")
-
-            for config_line in config_lines:
-                if "beanie_port:" in config_line:
-                    config_line = f"beanie_port: '{port}'\n"
-                new_config_file.write(config_line)
-
         path = code_gen_projects_dir / "strat_executor" / "scripts"
-        executor = subprocess.Popen(['python', 'launch_beanie_fastapi.py', f'{port}', '&'], cwd=path)
-        self.port_to_process_dict[port] = executor
-        current_port_web_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(
-            pair_strat.host, pair_strat.port)
+        executor = subprocess.Popen(['python', 'launch_beanie_fastapi.py', f'{pair_strat.id}', '&'], cwd=path)
+        self.pair_strat_id_to_executor_process_dict[pair_strat.id] = executor
 
-        self.port_to_web_client_dict[port] = current_port_web_client
-
-    def _close_executor_server(self, port: int) -> None:
-        process = self.port_to_process_dict[port]
+    def _close_executor_server(self, pair_strat_id: int) -> None:
+        process = self.pair_strat_id_to_executor_process_dict[pair_strat_id]
         process.terminate()
 
     async def get_ongoing_strats_symbol_n_exch_query_pre(self,
@@ -452,31 +482,33 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         parts: List[str] = (unloaded_strat_key.split("-"))
         return parse_to_int(parts[-1])
 
-    def _drop_executor_db_for_deleting_pair_strat(self, mongo_server_uri: str, port: int, sec_id: str, side: Side):
-        if mongo_server_uri is not None:
-            mongo_client = MongoClient(mongo_server_uri)
-            db_name: str = f"strat_executor_{port}"
+    def _drop_executor_db_for_deleting_pair_strat(self, mongo_server_uri: str, pair_strat_id: int,
+                                                  sec_id: str, side: Side):
+        mongo_client = MongoClient(mongo_server_uri)
+        db_name: str = f"strat_executor_{pair_strat_id}"
 
-            if db_name in mongo_client.list_database_names():
-                mongo_client.drop_database(db_name)
-            else:
-                err_str_ = (f"Unexpected: Database: '{db_name}' not found in mongo_client for uri: "
-                            f"{mongo_server_uri} being used by current strat, "
-                            f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
-                logging.error(err_str_)
-                raise HTTPException(status_code=500, detail=err_str_)
+        if db_name in mongo_client.list_database_names():
+            mongo_client.drop_database(db_name)
         else:
-            err_str_ = (f"key 'mongo_server' missing in strat_executor_{port}_config.yaml, ignoring this"
-                        f"strat delete, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+            err_str_ = (f"Unexpected: Database: '{db_name}' not found in mongo_client for uri: "
+                        f"{mongo_server_uri} being used by current strat, "
+                        f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=400)
+            raise HTTPException(status_code=500, detail=err_str_)
 
     async def delete_pair_strat_pre(self, pydantic_obj_to_be_deleted: PairStrat):
         port: int = pydantic_obj_to_be_deleted.port
         sec_id = pydantic_obj_to_be_deleted.pair_strat_params.strat_leg1.sec.sec_id
         side = pydantic_obj_to_be_deleted.pair_strat_params.strat_leg1.side
         if pydantic_obj_to_be_deleted.is_executor_running:
-            strat_web_client: StratExecutorServiceHttpClient = self.port_to_web_client_dict.get(port)
+            if pydantic_obj_to_be_deleted.port is not None:
+                strat_web_client: StratExecutorServiceHttpClient = (
+                    StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pydantic_obj_to_be_deleted.host,
+                                                                                 pydantic_obj_to_be_deleted.port))
+            else:
+                err_str_ = f"pair_strat object has no port;;; pair_strat: {pydantic_obj_to_be_deleted}"
+                logging.error(err_str_)
+                raise HTTPException(detail=err_str_, status_code=500)
 
             if strat_web_client is None:
                 err_str_ = ("Can't find any web_client present in server cache dict for ongoing strat of "
@@ -512,17 +544,24 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                             f"exception: {e}, ;;; pair_strat: {pydantic_obj_to_be_deleted}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
-            self._close_executor_server(port)  # closing executor
+            self._close_executor_server(pydantic_obj_to_be_deleted.id)  # closing executor
 
             # Dropping database for this strat
             code_gen_projects_dir = PurePath(__file__).parent.parent.parent
-            server_config_file_path = (code_gen_projects_dir / "strat_executor" /
-                                       "data" / f"strat_executor_{port}_config.yaml")
-            if os.path.exists(server_config_file_path):
+            executor_config_file_path = (code_gen_projects_dir / "strat_executor" /
+                                         "data" / f"config.yaml")
+            if os.path.exists(executor_config_file_path):
                 server_config_yaml_dict = (
-                    YAMLConfigurationManager.load_yaml_configurations(str(server_config_file_path)))
+                    YAMLConfigurationManager.load_yaml_configurations(str(executor_config_file_path)))
                 mongo_server_uri = server_config_yaml_dict.get("mongo_server")
-                self._drop_executor_db_for_deleting_pair_strat(mongo_server_uri, port, sec_id, side)
+                if mongo_server_uri is not None:
+                    self._drop_executor_db_for_deleting_pair_strat(mongo_server_uri, pydantic_obj_to_be_deleted.id,
+                                                                   sec_id, side)
+                else:
+                    err_str_ = (f"key 'mongo_server' missing in strat_executor/data/config.yaml, ignoring this"
+                                f"strat delete, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+                    logging.error(err_str_)
+                    raise HTTPException(detail=err_str_, status_code=400)
             else:
                 err_str_ = (f"Config file for port: {port} missing, must exists since executor is running from this"
                             f"config, ignoring this strat delete, symbol_side_key: "
@@ -530,11 +569,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 logging.error(err_str_)
                 raise HTTPException(detail=err_str_, status_code=400)
 
-            # Finally removing config file for this strat
-            os.remove(server_config_file_path)
-
-            del self.port_to_process_dict[port]
-            del self.port_to_web_client_dict[port]
+            del self.pair_strat_id_to_executor_process_dict[pydantic_obj_to_be_deleted.id]
 
         else:
             err_str_ = ("Strat is not running, Deletion of strat that is not in running_state is not supported, "
@@ -558,13 +593,19 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 if unloaded_strat_key in updated_strat_collection_obj.buffered_strat_keys:  # unloaded not deleted
                     pair_strat_id: int = self.get_id_from_strat_key(unloaded_strat_key)
                     pair_strat = await underlying_read_pair_strat_by_id_http(pair_strat_id)
-                    strat_web_client: StratExecutorServiceHttpClient = self.port_to_web_client_dict.get(pair_strat.port)
+                    if pair_strat.port is not None:
+                        strat_web_client: StratExecutorServiceHttpClient = (
+                            StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
+                                                                                         pair_strat.port))
+                    else:
+                        err_str_ = f"pair_strat object has no port;;; pair_strat: {pair_strat}"
+                        logging.error(err_str_)
+                        raise HTTPException(detail=err_str_, status_code=500)
 
                     if strat_web_client is None:
                         err_str_ = ("Can't find any web_client present in server cache dict for ongoing strat of "
-                                    f"port: {pair_strat.port}, ignoring this strat unload, "
-                                    f"likely bug in server cache dict handling;;; "
-                                    f"pair_strat: {pair_strat}")
+                                    f"port: {pair_strat.port}, ignoring this strat unload,"
+                                    f"likely bug in server cache dict handling;;; pair_strat: {pair_strat}")
                         logging.error(err_str_)
                         raise HTTPException(status_code=500, detail=err_str_)
 
@@ -595,7 +636,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                                 f"pair_strat: {pair_strat}")
                             logging.error(err_str_)
                             raise HTTPException(status_code=500, detail=err_str_)
-                        self._close_executor_server(pair_strat.port)    # closing executor
+                        self._close_executor_server(pair_strat.id)    # closing executor
                     elif strat_details.current_state == StratState.StratState_SNOOZED:
                         err_str_ = (f"Unloading strat with strat_state: {strat_details.current_state} is not supported,"
                                     f"pair_strat_key: "
@@ -612,7 +653,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     async def reload_pair_strats(self, stored_strat_collection_obj: StratCollection,
                                  updated_strat_collection_obj: StratCollection) -> None:
         from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
-            underlying_read_pair_strat_by_id_http, underlying_delete_pair_strat_http, underlying_create_pair_strat_http
+            underlying_read_pair_strat_by_id_http
         updated_strat_collection_buffered_strat_keys_frozenset = frozenset(
             updated_strat_collection_obj.buffered_strat_keys)
         stored_strat_collection_buffered_strat_keys_frozenset = frozenset(

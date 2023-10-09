@@ -4,42 +4,23 @@ import logging
 import os
 
 # project imports
-from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
-    StratExecutorServiceHttpClient)
 from Flux.CodeGenProjects.pair_strat_engine.generated.FastApi.strat_manager_service_http_client import (
     StratManagerServiceHttpClient)
 from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_client import (
     LogAnalyzerServiceHttpClient)
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, parse_to_int
 
-
-# Current server client handling
-server_port = os.environ.get("PORT")
-if server_port is None or len(server_port) == 0:
-    err_str = f"Env var 'PORT' received as {server_port}"
-    logging.exception(err_str)
-    raise Exception(err_str)
-
 EXECUTOR_PROJECT_DIR = PurePath(__file__).parent.parent
 EXECUTOR_PROJECT_DATA_DIR = EXECUTOR_PROJECT_DIR / 'data'
-mian_config_aml_path: PurePath = EXECUTOR_PROJECT_DATA_DIR / "config.yaml"
-executor_config_yaml_path: PurePath = EXECUTOR_PROJECT_DATA_DIR / f"strat_executor_{server_port}_config.yaml"
+main_config_yaml_path: PurePath = EXECUTOR_PROJECT_DATA_DIR / "config.yaml"
 try:
-    main_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(mian_config_aml_path))
+    main_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(main_config_yaml_path))
 except FileNotFoundError as e:
     err_str = f"Can't find data/config.yaml"
     logging.exception(err_str)
     raise FileNotFoundError(err_str)
 
-try:
-    executor_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(executor_config_yaml_path))
-except FileNotFoundError as e:
-    err_str = f"Can't find config file for executor with port {server_port} in data dir"
-    logging.exception(err_str)
-    raise FileNotFoundError(err_str)
-
-host, port = main_config_yaml_dict.get("server_host"), parse_to_int(server_port)
-strat_executor_http_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(host, port)
+host = main_config_yaml_dict.get("server_host")
 
 # pair_strat_engine client handling
 pair_strat_config_yaml_path = PurePath(__file__).parent.parent.parent / "pair_strat_engine" / "data" / "config.yaml"

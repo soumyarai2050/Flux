@@ -25,30 +25,45 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
         super().__init__(base_dir_path)
         self.output_file_name_to_template_file_path_dict: Dict[str, str] = {}
         self.proto_package_name: str | None = None
-        self.host = "127.0.0.1"
-        self.port_offset = 0
+        self.host: str | None = None
 
     def get_option_values(self, file: protogen.File):
         self.proto_package_name = str(file.proto.package)
-        if self.is_option_enabled(file, JsConstantsGenPlugin.flux_file_crud_host):
-            self.host = self.get_simple_option_value_from_proto(file,
-                                                                JsConstantsGenPlugin.flux_file_crud_host)
-        if self.is_option_enabled(file, JsConstantsGenPlugin.flux_file_crud_port_offset):
-            self.port_offset = \
-                int(self.get_simple_option_value_from_proto(file,
-                                                            JsConstantsGenPlugin.flux_file_crud_port_offset))
+        host = os.environ.get("HOST")
+        if host is None or len(host) == 0:
+            err_str = (f"Env var 'HOST' found as '{host}', "
+                       f"likely bug in setting env var from launch of this plugin")
+            logging.error(err_str)
+            raise Exception(err_str)
+        self.host = host
 
     def handle_api_root_url(self, file: protogen.File) -> str:
-        port = 8000 + self.port_offset
-        cache_offset = 10
-        output_str = f"export const API_ROOT_URL = 'http://{self.host}:{port}/{self.proto_package_name}';\n"
-        output_str += f"export const API_ROOT_CACHE_URL = 'http://{self.host}:{port + cache_offset}/" \
+        beanie_port = os.environ.get("BEANIE_PORT")
+        if beanie_port is None or len(beanie_port) == 0:
+            err_str = (f"Env var 'BEANIE_PORT' found as '{beanie_port}', "
+                       f"likely bug in setting env var from launch of this plugin")
+            logging.error(err_str)
+            raise Exception(err_str)
+        output_str = f"export const API_ROOT_URL = 'http://{self.host}:{beanie_port}/{self.proto_package_name}';\n"
+
+        cache_port = os.environ.get("CACHE_PORT")
+        if cache_port is None or len(cache_port) == 0:
+            err_str = (f"Env var 'CACHE_PORT' found as '{cache_port}', "
+                       f"likely bug in setting env var from launch of this plugin")
+            logging.error(err_str)
+            raise Exception(err_str)
+        output_str += f"export const API_ROOT_CACHE_URL = 'http://{self.host}:{cache_port}/" \
                       f"{self.proto_package_name}';"
         return output_str
 
     def handle_api_public_url(self, file: protogen.File) -> str:
-        port = 3000 + self.port_offset
-        output_str = f"export const API_PUBLIC_URL = 'http://{self.host}:{port}';"
+        ui_port = os.environ.get("UI_PORT")
+        if ui_port is None or len(ui_port) == 0:
+            err_str = (f"Env var 'UI_PORT' found as '{ui_port}', "
+                       f"likely bug in setting env var from launch of this plugin")
+            logging.error(err_str)
+            raise Exception(err_str)
+        output_str = f"export const API_PUBLIC_URL = 'http://{self.host}:{ui_port}';"
         return output_str
 
     def handle_cookie_name(self, file: protogen.File) -> str:

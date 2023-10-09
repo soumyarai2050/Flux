@@ -36,7 +36,7 @@ const WidgetContainer = (props) => {
                 {props.supportedLayouts?.map(layout => {
                     return (
                         <ToggleButton key={layout} className={classes.toggle_button} name={layout} value={layout} onClick={() => onChangeLayout(layout)}>
-                            <Tooltip title={layout}>
+                            <Tooltip title={layout} disableInteractive>
                                 <span>
                                     {layout === Layouts.TABLE_LAYOUT && <TableChartSharp fontSize='medium' />}
                                     {layout === Layouts.TREE_LAYOUT && <AccountTree fontSize='medium' />}

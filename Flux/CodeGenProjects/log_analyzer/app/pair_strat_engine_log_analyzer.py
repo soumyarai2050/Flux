@@ -18,6 +18,8 @@ from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_servi
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
     PairStratBaseModel
 from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import *
+from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
+    strat_manager_service_http_client)
 
 LOG_ANALYZER_DATA_DIR = (
     PurePath(__file__).parent.parent / "data"

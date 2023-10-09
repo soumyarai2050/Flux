@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 import json
 import os
-from typing import List, Callable
+from typing import List, Callable, Dict
 import time
 import logging
+from pathlib import PurePath
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
@@ -14,7 +15,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, YAMLConfigurationManager
 
 
 class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
@@ -28,6 +29,14 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
     def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
+
+        ui_config_file_path = (
+                PurePath(__file__).parent.parent.parent / "CodeGenProjects" /
+                self.project_name / "data" / "ui_config.yaml")
+        ui_coordinates_override_msg_dict: Dict[str, Dict[str, str]] = {}
+        if os.path.exists(ui_config_file_path):
+            ui_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ui_config_file_path))
+            ui_coordinates_override_msg_dict = ui_config_yaml_dict.get("ui_coordinates")
 
         output_str = "export const defaultLayouts = [\n"
         for index, message in enumerate(self.layout_msg_list):
@@ -54,13 +63,23 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
                 for old_item, new_item in [('"true"', 'true'), ('"false"', 'false')]:
                     widget_ui_data_list_str = widget_ui_data_list_str.replace(old_item, new_item)
 
-                output_str += '    { ' + \
-                              f'i: "{title_val}", ' + \
-                              f'x: {widget_ui_data_option_value_dict["x"]}, ' + \
-                              f'y: {widget_ui_data_option_value_dict["y"]}, ' + \
-                              f'w: {widget_ui_data_option_value_dict["w"]}, ' + \
-                              f'h: {widget_ui_data_option_value_dict["h"]}, ' + \
-                              f'widget_ui_data: {widget_ui_data_list_str}' + \
+                output_str += '    { ' + f'i: "{title_val}", '
+
+                msg_coordinates_override = ui_coordinates_override_msg_dict.get(message.proto.name)
+
+                for coordinate in ["x", "y", "w", "h"]:
+                    if msg_coordinates_override is None:
+                        val: str = widget_ui_data_option_value_dict[coordinate]
+                    else:
+                        val: str = msg_coordinates_override.get(coordinate)
+                        if val is None:
+                            err_str = (f"key '{message.proto.name}' in ui_coordinates dict in data/ui_config.yaml "
+                                       f"of current project has no key '{coordinate}'")
+                            logging.error(err_str)
+                            raise Exception(err_str)
+                    output_str += f'{coordinate}: {val}, '
+
+                output_str += f'widget_ui_data: {widget_ui_data_list_str}' + \
                               ' },\n'
         output_str += "]\n\n"
         output_str += "export function flux_toggle(value) {\n"

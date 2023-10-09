@@ -13,8 +13,8 @@ from Flux.CodeGenProjects.strat_executor.app.trading_link_base import TradingLin
 
 
 def init_symbol_configs():
-    symbol_configs: Dict | None = TradingLinkBase.executor_config_dict.get("symbol_configs") \
-        if TradingLinkBase.executor_config_dict is not None else None
+    symbol_configs: Dict | None = TradingLinkBase.simulate_config_dict.get("symbol_configs") \
+        if TradingLinkBase.simulate_config_dict is not None else None
     if symbol_configs:
         regex_symbol_configs: Dict = {re.compile(k, re.IGNORECASE): v for k, v in symbol_configs.items()}
         return regex_symbol_configs

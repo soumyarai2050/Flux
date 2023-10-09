@@ -22,8 +22,8 @@ class LogTradeSimulator(TradingLinkBase):
         return True
 
     @classmethod
-    def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
-                        account: str, exchange: str | None = None, text: List[str] | None = None) -> bool:
+    async def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
+                              account: str, exchange: str | None = None, text: List[str] | None = None) -> bool:
         exchange_str: str = f"{cls.fld_sep}exchange{cls.val_sep}{exchange}" if exchange else ""
         if text:
             logging.error(f"logit_simulator does not support list arguments, found: {text} for order: "
@@ -38,8 +38,8 @@ class LogTradeSimulator(TradingLinkBase):
         return True
 
     @classmethod
-    def place_cxl_order(cls, order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
-                        system_sec_id: str | None = None, underlying_account: str | None = None):
+    async def place_cxl_order(cls, order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
+                              system_sec_id: str | None = None, underlying_account: str | None = None):
         side_str: str = f"{cls.fld_sep}side{cls.val_sep}{side}" if side else ""
         trading_sec_id_str: str = f"{cls.fld_sep}trading_sec_id{cls.val_sep}{trading_sec_id}" if trading_sec_id else ""
         system_sec_id_str: str = f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}" if system_sec_id else ""

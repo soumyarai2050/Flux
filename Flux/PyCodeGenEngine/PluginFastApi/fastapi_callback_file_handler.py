@@ -164,8 +164,11 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         return output_str
 
     def handle_launch_pre_and_post_callback(self) -> str:
-        output_str = "    def app_launch_pre(self):\n"
+        output_str = "    @abstractmethod\n"
+        output_str += "    def app_launch_pre(self):\n"
         output_str += '        logging.debug("Pre launch Fastapi app")\n\n'
+        output_str += '        NotImplementedError("derived app_launch_pre not implemented to set self.port")\n\n'
+
         output_str += "    def app_launch_post(self):\n"
         output_str += '        logging.debug("Post launch Fastapi app")\n'
         return output_str
@@ -179,7 +182,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"    {self.routes_callback_class_name}_instance: " \
                       f"Optional['{self.routes_callback_class_name_capital_camel_cased}'] = None\n\n"
         output_str += f"    def __init__(self):\n"
-        output_str += f"        pass\n\n"
+        output_str += f"        self.port: int | None = None    # must be set by overridden app_launch_pre\n\n"
 
         output_str += f"    @classmethod\n"
         output_str += f"    def get_instance(cls) -> '{self.routes_callback_class_name_capital_camel_cased}':\n"
@@ -397,6 +400,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
     def handle_callback_class_file_gen(self) -> str:
         output_str = "import threading\n"
         output_str += "import logging\n"
+        output_str += "from abc import abstractmethod\n"
         output_str += "from typing import Optional, TypeVar, List, Type\n"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f"from {model_file_path} import *\n"

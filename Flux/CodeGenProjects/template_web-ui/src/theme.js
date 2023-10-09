@@ -25,7 +25,9 @@ const lightThemeComponents = {
                 maxWidth: '600px !important',
                 maxHeight: "400px !important",
                 overflow: 'auto',
-                background: '#444'
+                background: cssVar('--light-primary-main'),
+                color: '#121212',
+                border: `1px solid ${cssVar('--light-primary-dark')}`
             },
         }
     },
@@ -107,7 +109,8 @@ const darkThemeComponents = {
                 maxWidth: '600px !important',
                 maxHeight: "400px !important",
                 overflow: 'auto',
-                background: '#444'
+                background: cssVar('--dark-primary-main'),
+                border: `1px solid ${cssVar('--dark-primary-dark')}`
             },
         }
     },

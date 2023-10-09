@@ -104,11 +104,6 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
     def handle_init_db(self) -> str:
         root_msg_list = [message.proto.name for message in self.root_message_list]
         output_str = "def get_mongo_server_uri():\n"
-        output_str += '    port = os.getenv("PORT")\n'
-        output_str += '    if port is None or len(port) == 0:\n'
-        output_str += '        err_str = "Can not find PORT env var for fastapi db init"\n'
-        output_str += '        logging.exception(err_str)\n'
-        output_str += '        raise Exception(err_str)\n\n'
         output_str += '    config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"config.yaml"\n'
         output_str += '    if os.path.exists(config_yaml_path):\n'
         output_str += '        config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n'
@@ -132,7 +127,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += f'        db = client.get_default_database()\n'
         output_str += f'    else:\n'
         output_str += f'        db = client.{self.proto_file_package}\n'
-        output_str += '    logging.debug(f"db_name: {db_name}")\n'
+        output_str += '    logging.debug(f"db_name: {db.name}")\n'
         output_str += f'    await init_beanie(\n'
         output_str += f'        database=db,\n'
         output_str += f'        document_models=document_models\n'
@@ -186,24 +181,31 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += (f'    os.environ[f"{self.proto_file_package}' + '_{port}"] = "1"  # indicator flag to tell '
                        'callback override that service is up\n')
         output_str += "\n\n"
-        output_str += "if os.getenv('DEBUG'):\n"
-        output_str += "    from fastapi.middleware.cors import CORSMiddleware\n\n"
-        output_str += "    origins = ['*']\n"
-        output_str += f"    {self.fastapi_app_name}.add_middleware(\n"
-        output_str += f"        CORSMiddleware,\n"
-        output_str += f"        allow_origins=origins,\n"
-        output_str += f"        allow_credentials=True,\n"
-        output_str += f"        allow_methods=['*'],\n"
-        output_str += f"        allow_headers=['*'],\n"
-        output_str += f"    )\n\n"
-        output_str += f'{self.fastapi_app_name}.include_router({self.api_router_app_name}, ' \
-                      f'prefix="/{self.proto_file_package}")\n'
-        output_str += f"from fastapi.staticfiles import StaticFiles\n\n"
         output_str += 'host = os.environ.get("HOST")\n'
         output_str += 'if host is None or len(host) == 0:\n'
         output_str += '    err_str = "Couldn\'t find \'HOST\' key in data/config.yaml of current project"\n'
         output_str += '    logging.error(err_str)\n'
-        output_str += '    raise Exception(err_str)\n'
+        output_str += '    raise Exception(err_str)\n\n'
+        output_str += "from fastapi.middleware.cors import CORSMiddleware\n"
+        output_str += f"from fastapi.staticfiles import StaticFiles\n\n"
+        output_str += "cors_dict: Dict[str, Any] = dict()\n"
+        output_str += 'cors_dict["allow_methods"] = ["*"]\n'
+        output_str += 'cors_dict["allow_headers"] = ["*"]\n'
+        output_str += "if os.getenv('DEBUG'):\n"
+        output_str += '    cors_dict["allow_origins"] = ["*"]\n'
+        output_str += '    cors_dict["allow_credentials"] = True\n'
+        output_str += "else:\n"
+        output_str += '    host_pattern = host.replace(".", "\\.")\n'
+        output_str += '    allow_origin_patten = rf"https?://{host_pattern}(:\d+)?"\n'
+        output_str += '    cors_dict["allow_origin_regex"] = allow_origin_patten\n'
+        output_str += f"{self.fastapi_app_name}.add_middleware(\n"
+        output_str += f"    CORSMiddleware,\n"
+        output_str += "     **cors_dict"
+        output_str += f")\n\n"
+        output_str += f'{self.fastapi_app_name}.include_router({self.api_router_app_name}, ' \
+                      f'prefix="/{self.proto_file_package}")\n'
+
+
         output_str += (f"{self.fastapi_app_name}.mount('/static', "
                        "StaticFiles(directory=f'{host}/static'), name='static')\n\n")
         return output_str

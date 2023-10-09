@@ -79,7 +79,7 @@ code {
 }
 
 .react-json-view {
-  background-color: var(--grey-200) !important;
+  /* background-color: var(--grey-200) !important; */
   padding: 5px;
   border-radius: 5px;
 }

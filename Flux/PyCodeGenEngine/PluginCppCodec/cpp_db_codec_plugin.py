@@ -72,6 +72,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     def headers_generate_handler(file_name: str, class_name: str):
         output_content: str = ""
         output_content += "#pragma once\n\n"
+        # j+Csh04P15QLolwboE9xsA001fPuo8VAE-pb1OOU0+4M4M0jE-mPfDCQZ
         # output_content += "#include <mutex>\n"
         # output_content += "#include <unordered_map>\n\n"
         # output_content += f'#include "../../cpp_app/include/{class_name}_mongo_db_handler.h"\n'
@@ -254,6 +255,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 for field in message_field.message.fields:
                     field_name1 = convert_camel_case_to_specific_case(field.proto.name)
                     field_cardinality = field.cardinality.name.lower()
+                    # LZUWDOV6ISYpiG-S7CaGYUN3assS9xeUkqPD7elDTEv9GLG1yPWcYd
                     # if field_cardinality == "required":
                     output += "\t" * num_of_tabs + f"{message_field_name}_document.append(FluxCppCore::kvp({field_name1}_fld_name, " \
                                                    f"{parent_field}_doc.{message_field_name}().{field_name1}()));\n"
@@ -408,6 +410,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 for field in message_field.message.fields:
                     field_name1 = convert_camel_case_to_specific_case(field.proto.name)
                     field_cardinality = field.cardinality.name.lower()
+                    # Q7ecC-x-dVXLcorn+fPIfrXqkidxMHUvJJINGCAd8tfLhiRUfqCoi6x+
                     # if field_cardinality == "required":
                     output += "\t" * num_of_tabs + f"{message_field_name}_document.append(FluxCppCore::kvp({field_name1}_fld_name, " \
                                                    f"{parent_field}_doc.{message_field_name}().{field_name1}()));\n"
@@ -443,6 +446,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                message_name_snake_cased: str, package_name: str, field: protogen.Field, parent_feild: str):
         output = ""
         initial_parent_field: str = field.proto.name
+        # WnrLdfWAHxtyihghkeS5yCmY6LyqnBMbcf5lfceLsHazdjnZNCbPrCvZc
         # field_name: str = field.proto.name
         # print(f".............{field.parent.proto.name}...............")
         for message_field in field_type_message.fields:
@@ -550,6 +554,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                    parent_feild: str):
         output = ""
         initial_parent_field: str = field.proto.name
+        # 5Coy]3IhZJl-ULje+D8c4Q53WXUYAKw8YdODGUu0VCpcC7RfSB0GUd1uA
         # field_name: str = field.proto.name
         # print(f".............{field.parent.proto.name}...............")
         for message_field in field_type_message.fields:
@@ -785,6 +790,7 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                               f"FluxCppCore::StringUtil::convert_utc_string_to_b_date("\
                                                f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                               f"{field_name}())));\n"
+                    # at+4iH1j6iJECmU1wU7uY7Jt5Exr7M7foYXMuJVBZX3yc32W8vIdoFO4+
                     # else:
                     #     if field_type == "required":
                     #         output_content += "\t\t\t\tif (IsUpdateOrPatch::DB_FALSE == is_update_or_patch) {\n"

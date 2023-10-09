@@ -3,8 +3,12 @@ import classes from './AbbreviatedJson.module.css';
 import { ClickAwayListener, Tooltip } from '@mui/material';
 import ReactJson from 'react-json-view'
 import PropTypes from 'prop-types';
+import { useTheme } from '@emotion/react';
 
 const AbbreviatedJson = (props) => {
+    const theme = useTheme();
+    const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
+ 
     return (
         <ClickAwayListener onClickAway={props.onClose}>
             <div className={classes.text}>
@@ -18,7 +22,7 @@ const AbbreviatedJson = (props) => {
                     onClose={props.onClose}
                     title={
                         <ReactJson
-                            theme='tube'
+                            theme={jsonViewTheme}
                             displayDataTypes={false}
                             displayObjectSize={false}
                             enableClipboard={true}

@@ -1,4 +1,6 @@
 # project imports
+import logging
+
 from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_routes_callback import LogAnalyzerServiceRoutesCallback
 from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import *
 from Flux.CodeGenProjects.log_analyzer.app.pair_strat_engine_log_analyzer import *
@@ -26,6 +28,7 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
 
     def __init__(self):
         super().__init__()
+        self.asyncio_loop = None
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         self.service_up: bool = False
         self.service_ready = False
@@ -45,7 +48,7 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            service_up_flag_env_var = os.environ.get(f"log_analyzer_{server_port}")
+            service_up_flag_env_var = os.environ.get(f"log_analyzer_{la_port}")
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
@@ -64,6 +67,18 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
                         if is_log_analyzer_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
                             self.service_up = True
                             should_sleep = False
+
+                            # creating portfolio_alerts model if not exist already
+                            run_coro = self.check_n_create_portfolio_alert()
+                            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+
+                            # block for task to finish
+                            try:
+                                future.result()
+                            except Exception as e:
+                                logging.exception(f"check_n_create_portfolio_alert "
+                                                  f"failed with exception: {e}")
+
                         else:
                             should_sleep = True
                             service_up_no_error_retry_count -= 1
@@ -80,7 +95,18 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
     def get_generic_read_route(self):
         pass
 
+    async def check_n_create_portfolio_alert(self):
+        from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_routes import (
+            underlying_read_portfolio_alert_http, underlying_create_portfolio_alert_http)
+
+        async with PortfolioAlert.reentrant_lock:
+            portfolio_alert_list: List[PortfolioAlert] = await underlying_read_portfolio_alert_http()
+            if len(portfolio_alert_list) == 0:
+                portfolio_alert = PortfolioAlert(_id=1, alerts=[], alert_update_seq_num=0)
+                await underlying_create_portfolio_alert_http(portfolio_alert)
+
     def app_launch_pre(self):
+        self.port = la_port
         app_launch_pre_thread = Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
         logging.debug("Triggered server launch pre override")
@@ -96,23 +122,12 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
         log_details: List[LogDetail] = [
             LogDetail(service="pair_strat_engine_beanie_fastapi",
                       log_file_path=str(
-                          pair_strat_engine_log_dir / f"pair_strat_engine_beanie_logs_*_{datetime_str}.log"),
-                      critical=True,
-                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
-                      log_file_path_is_regex=True),
-            LogDetail(service="pair_strat_engine_cache_fastapi",
-                      log_file_path=str(
-                          pair_strat_engine_log_dir / f"pair_strat_engine_cache_logs_*_{datetime_str}.log"),
-                      critical=True,
-                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
-                      log_file_path_is_regex=True),
-            LogDetail(service="market_data_beanie_fastapi",
-                      log_file_path=str(market_data_log_dir / f"market_data_beanie_logs_*_{datetime_str}.log"),
+                          pair_strat_engine_log_dir / f"pair_strat_engine_*_{datetime_str}.log"),
                       critical=True,
                       log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                       log_file_path_is_regex=True),
             LogDetail(service="strat_executor",
-                      log_file_path=str(strat_executor_log_dir / f"strat_executor_beanie_*_{datetime_str}.log"),
+                      log_file_path=str(strat_executor_log_dir / f"strat_executor_*_{datetime_str}.log"),
                       critical=True,
                       log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                       log_file_path_is_regex=True)
@@ -128,6 +143,21 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
         pair_strat_log_analyzer_thread.start()
         # PairStratEngineLogAnalyzer(regex_file=str(suppress_alert_regex_file), log_details=log_details,
         #                            simulation_mode=simulation_mode)
+
+    async def read_all_ui_layout_pre(self):
+        # Setting asyncio_loop in ui_layout_pre since it called to check current service up
+        attempt_counts = 3
+        for _ in range(attempt_counts):
+            if not self.asyncio_loop:
+                self.asyncio_loop = asyncio.get_running_loop()
+                time.sleep(1)
+            else:
+                break
+        else:
+            err_str_ = (f"self.asyncio_loop couldn't set as asyncio.get_running_loop() returned None for "
+                        f"{attempt_counts} attempts")
+            logging.critical(err_str_)
+            raise HTTPException(detail=err_str_, status_code=500)
 
     async def get_raw_performance_data_of_callable_query_pre(
             self, raw_performance_data_of_callable_class_type: Type[RawPerformanceDataOfCallable], callable_name: str):
@@ -166,7 +196,7 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
             raise HTTPException(status_code=503, detail=err_str_)
 
         if stored_portfolio_alert_obj.alert_update_seq_num is None:
-            updated_portfolio_alert_obj_json["alert_update_seq_num"] = 0
+            stored_portfolio_alert_obj.alert_update_seq_num = 0
         updated_portfolio_alert_obj_json["alert_update_seq_num"] = stored_portfolio_alert_obj.alert_update_seq_num + 1
         return updated_portfolio_alert_obj_json
 
@@ -199,6 +229,6 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
             raise HTTPException(status_code=503, detail=err_str_)
 
         if stored_strat_alert_obj.alert_update_seq_num is None:
-            updated_strat_alert_obj_json["alert_update_seq_num"] = 0
+            stored_strat_alert_obj.alert_update_seq_num = 0
         updated_strat_alert_obj_json["alert_update_seq_num"] = stored_strat_alert_obj.alert_update_seq_num + 1
         return updated_strat_alert_obj_json

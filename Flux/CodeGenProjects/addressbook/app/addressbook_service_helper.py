@@ -15,13 +15,6 @@ config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_
 ps_host, ps_port = (config_yaml_dict.get("server_host"),
                     parse_to_int(config_yaml_dict.get("main_server_beanie_port")))
 
-server_port = os.environ.get("PORT")
-if server_port is not None and parse_to_int(server_port) != ps_port:
-    err_str = (f"Env var 'PORT' can't be different from 'main_server_beanie_port' key present in data/config.yaml of "
-               f"this project, change config.yaml instead to use custom ports")
-    logging.exception(err_str)
-    raise Exception(err_str)
-
 strat_manager_service_http_client = \
     StratManagerServiceHttpClient.set_or_get_if_instance_exists(ps_host, ps_port)
 
@@ -32,6 +25,8 @@ STRAT_EXECUTOR_DATA_DIR = ROOT_DIR / 'strat_executor' / 'data'
 strat_executor_config_yaml_path: PurePath = STRAT_EXECUTOR_DATA_DIR / f"config.yaml"
 strat_executor_config_yaml_dict = (
     YAMLConfigurationManager.load_yaml_configurations(str(strat_executor_config_yaml_path)))
+
+
 
 # update_portfolio_status_lock: asyncio.Lock = asyncio.Lock()
 # def update_portfolio_status(overall_buy_notional: float | None, overall_sell_notional: float | None,
@@ -96,23 +91,14 @@ strat_executor_config_yaml_dict = (
 
 def is_service_up(ignore_error: bool = False):
     try:
-        portfolio_status_list: List[
-            PortfolioStatusBaseModel] = strat_manager_service_http_client.get_all_portfolio_status_client()
-        if 0 == len(portfolio_status_list):  # no portfolio status set yet, create one
-            portfolio_status: PortfolioStatusBaseModel = \
-                PortfolioStatusBaseModel(_id=1, kill_switch=False,
-                                         portfolio_alerts=[],
-                                         overall_buy_notional=0,
-                                         overall_sell_notional=0,
-                                         overall_buy_fill_notional=0,
-                                         overall_sell_fill_notional=0,
-                                         alert_update_seq_num=0)
-            strat_manager_service_http_client.create_portfolio_status_client(portfolio_status)
+        ui_layout_list: List[UILayoutBaseModel] = (
+            strat_manager_service_http_client.get_all_ui_layout_client())
+
         return True
     except Exception as e:
         if not ignore_error:
             logging.exception("service_up test failed - tried get_all_portfolio_status_client (and maybe create);;;"
-                          f"exception: {e}", exc_info=True)
+                              f"exception: {e}", exc_info=True)
         # else not required - silently ignore error is true
         return False
 
@@ -131,64 +117,6 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Po
                                                     rolling_max_reject_count=rolling_max_reject_count,
                                                     eligible_brokers=eligible_brokers)
     return portfolio_limits_obj
-
-
-@except_n_log_alert()
-def create_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> PortfolioLimitsBaseModel:
-    portfolio_limits_obj = get_new_portfolio_limits(eligible_brokers)
-    portfolio_limits: PortfolioLimitsBaseModel = \
-        strat_manager_service_http_client.create_portfolio_limits_client(portfolio_limits_obj)
-    logging.info(f"created portfolio_limits;;; {portfolio_limits_obj}")
-    return portfolio_limits
-
-
-@except_n_log_alert()
-def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
-    portfolio_limits_list: List[
-        PortfolioLimitsBaseModel] = strat_manager_service_http_client.get_all_portfolio_limits_client()
-    if portfolio_limits_list is None or len(portfolio_limits_list) <= 0:
-        return None
-    elif len(portfolio_limits_list) > 1:
-        # portfolio limits: PortfolioLimits = portfolio_limits_list[0]
-        # for portfolio limits entry in portfolio limits list:
-        #   if portfolio limits entry.id < portfolio_limits.id:
-        #          portfolio_limits = portfolio_limits_entry
-        # logging.debug(f"portfolio_limit_list: {portfolio_limits_list}, selected portfolio_limits: {portfolio_limits}")
-        # return portfolio limits
-        err_str_ = f"multiple: ({len(portfolio_limits_list)}) portfolio_limits entries not supported at this time!" \
-                   f" use swagger UI to delete redundant entries: {portfolio_limits_list} from DB and retry"
-        raise Exception(err_str_)
-    else:
-        return portfolio_limits_list[0]
-
-
-def get_new_order_limits():
-    ord_limit_obj = OrderLimitsBaseModel(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                                         max_order_qty=500, min_order_notional=100, max_order_notional=90_000)
-    return ord_limit_obj
-
-
-def get_order_limits() -> OrderLimitsBaseModel | None:
-    order_limits_list: List[
-        OrderLimitsBaseModel] = strat_manager_service_http_client.get_all_order_limits_client()
-    if order_limits_list is None or len(order_limits_list) <= 0:
-        return None
-    elif len(order_limits_list) > 1:
-        # order_limits: OrderLimits = order_limits_list[0]
-        # for order_limits_entry in order_limits_list:
-        #   if order_limits_entry.id < order_limits.id:
-        #          order_limits = order_limits_entry
-        # logging.debug(f"order_limits_list: {order_limits_list}, selected order_limits: {order_limits}")
-        # return order_limits
-        raise Exception(f"multiple: ({len(order_limits_list)}) order limits entries not supported at this time!"
-                        f" use swagger UI to delete redundant entries: {order_limits_list} from DB and retry")
-    else:
-        return order_limits_list[0]
-
-
-def create_order_limits():
-    ord_limit_obj = get_new_order_limits()
-    strat_manager_service_http_client.create_order_limits_client(ord_limit_obj)
 
 
 def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:

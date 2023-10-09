@@ -150,7 +150,6 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                 if self._top_of_books[0] is not None and self._top_of_books[1] is not None:
                     _top_of_books_update_date_time = copy.deepcopy(self._top_of_books_update_date_time)
                     _top_of_books = copy.deepcopy(self._top_of_books)
-                    logging.info(f"##### returning get tob, {_top_of_books, _top_of_books_update_date_time}")
                     return _top_of_books, _top_of_books_update_date_time
         # all else's return None
         return None
@@ -193,7 +192,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         # if no match - return None
         return None
 
-    def set_market_depth(self, market_depth: MarketDepthBaseModel) -> DateTime:
+    def set_market_depth(self, market_depth: MarketDepthBaseModel | MarketDepth) -> DateTime:
         if self._market_depths_conts is None:
             _market_depths_cont = MarketDepthsCont(market_depth.symbol)
             _market_depths_cont.set_market_depth(market_depth)

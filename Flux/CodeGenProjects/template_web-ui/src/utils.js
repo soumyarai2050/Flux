@@ -1005,9 +1005,11 @@ export function generateRowTrees(jsondata, collections, xpath) {
 
                 if (Object.keys(tree).length === 0) break;
 
-                if (!constainsArray(tree)) {
-                    tree['data-id'] = i;
-                }
+                // if (!constainsArray(tree)) {
+                //     tree['data-id'] = i;
+                // }
+                // array object should be of flat-type
+                tree['data-id'] = i;
 
                 if (trees.length > 0 && _.isEqual(trees[trees.length - 1], tree)) {
                     continue;

@@ -4,7 +4,7 @@ import classes from './Icon.module.css';
 
 export const Icon = (props) => {
     return (
-        <Tooltip title={props.title}>
+        <Tooltip title={props.title} disableInteractive>
             <IconButton
                 className={classes.icon}
                 disabled={props.disabled}
@@ -26,7 +26,7 @@ export const ToggleIcon = (props) => {
     }
 
     return (
-        <Tooltip title={props.title}>
+        <Tooltip title={props.title} disableInteractive>
             <ToggleButton
                 className={`${classes.toggle_icon} ${selectedIconClass}`}
                 size='small'
