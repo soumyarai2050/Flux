@@ -65,9 +65,6 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
                 if not self.service_up:
                     try:
                         if is_log_analyzer_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
-                            self.service_up = True
-                            should_sleep = False
-
                             # creating portfolio_alerts model if not exist already
                             run_coro = self.check_n_create_portfolio_alert()
                             future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
@@ -75,9 +72,12 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
                             # block for task to finish
                             try:
                                 future.result()
+                                self.service_up = True
+                                should_sleep = False
                             except Exception as e:
-                                logging.exception(f"check_n_create_portfolio_alert "
-                                                  f"failed with exception: {e}")
+                                err_str_ = f"check_n_create_portfolio_alert failed with exception: {e}"
+                                logging.exception(err_str_)
+                                raise Exception(err_str_)
 
                         else:
                             should_sleep = True

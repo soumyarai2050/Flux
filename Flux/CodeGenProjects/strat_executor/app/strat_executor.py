@@ -770,10 +770,9 @@ class StratExecutor:
                         logging.debug(err_str_)
                     return order_placed
                 else:
-                    logging.error(f"strats need both sides of TOB to be present, found  0 or 1 - triggering "
-                                  f"force update, strat_brief_key: {get_strat_brief_log_key(strat_brief)};;;"
+                    logging.error(f"strats need both sides of TOB to be present, found  0 or 1"
+                                  f", strat_brief_key: {get_strat_brief_log_key(strat_brief)};;;"
                                   f"tob found: {top_of_books[0]}, {top_of_books[1]}")
-                    self.update_tobs_from_http()
         return False
 
     def get_leg1_fx(self):
@@ -918,9 +917,8 @@ class StratExecutor:
                         if top_of_books[0] is not None and top_of_books[1] is not None:
                             pass
                         else:
-                            logging.warning(f"strats need both sides of TOB to be present, found  0 or 1 - triggering "
-                                            f"force update;;;tob found: {top_of_books[0]}, {top_of_books[1]}")
-                            self.update_tobs_from_http()
+                            logging.warning(f"strats need both sides of TOB to be present, found  0 or 1"
+                                            f";;;tob found: {top_of_books[0]}, {top_of_books[1]}")
                             continue
                     elif top_of_books is not None and len(top_of_books) == 1:
                         logging.error(f"Unexpected! found one tob, this should never happen - likely bug"

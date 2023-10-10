@@ -132,17 +132,18 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 if not self.service_up:
                     try:
                         if is_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
-                            self.service_up = True
-                            should_sleep = False
-
                             run_coro = self._check_and_create_portfolio_status_and_order_n_portfolio_limits()
                             future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-                            # block for task to finish
                             try:
+								# block for task to finish
                                 future.result()
+                                self.service_up = True
+                                should_sleep = False
                             except Exception as e:
-                                logging.exception(f"_check_and_create_portfolio_status_and_order_n_portfolio_limits "
-                                                  f"failed with exception: {e}")
+                                err_str_ = (f"_check_and_create_portfolio_status_and_order_n_portfolio_limits "
+                                            f"failed with exception: {e}")
+                                logging.exception(err_str_)
+                                raise Exception(err_str_)
 
                             self.run_existing_executors()
                         else:
@@ -437,8 +438,8 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     async def _start_executor_server(self, pair_strat: PairStrat) -> None:
         code_gen_projects_dir = PurePath(__file__).parent.parent.parent
-        path = code_gen_projects_dir / "strat_executor" / "scripts"
-        executor = subprocess.Popen(['python', 'launch_beanie_fastapi.py', f'{pair_strat.id}', '&'], cwd=path)
+        executor_path = code_gen_projects_dir / "strat_executor" / "scripts" / 'launch_beanie_fastapi.py'
+        executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', '&'])
         self.pair_strat_id_to_executor_process_dict[pair_strat.id] = executor
 
     def _close_executor_server(self, pair_strat_id: int) -> None:

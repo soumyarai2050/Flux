@@ -211,12 +211,12 @@ def test_patch_all(clean_and_set_limits, web_client):
 
 # sanity test to create and activate pair_strat
 def test_create_pair_strat(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
-                           expected_strat_limits_, expected_start_status_, symbol_overview_obj_list):
+                           expected_strat_limits_, expected_start_status_, symbol_overview_obj_list, top_of_book_list_):
     # creates and activates multiple pair_strats
     buy_sell_symbol_list = buy_sell_symbol_list[:1]
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                expected_start_status_, symbol_overview_obj_list)
+                                expected_start_status_, symbol_overview_obj_list, top_of_book_list_)
 
 
 # sanity test to create orders
@@ -234,9 +234,9 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -256,7 +256,7 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
         buy_ack_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(loop_count + 1, buy_symbol, sell_symbol, executor_web_client, top_of_book_list_)
+            run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                                 buy_symbol, executor_web_client,
@@ -267,7 +267,7 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
         sell_ack_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_sell_top_of_book(sell_symbol, executor_web_client)
+            run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                                 sell_symbol, executor_web_client,
@@ -549,7 +549,7 @@ def test_validate_kill_switch_systematic(static_data_, clean_and_set_limits, buy
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
-                                               market_depth_basemodel_list))
+                                               market_depth_basemodel_list, top_of_book_list_))
 
         portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
         updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
@@ -557,13 +557,13 @@ def test_validate_kill_switch_systematic(static_data_, clean_and_set_limits, buy
         assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
                                                      "expected to be True"
 
-        run_buy_top_of_book(1, buy_symbol, sell_symbol, executor_web_client, top_of_book_list_)
+        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
         # internally checking buy order
         order_journal = \
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                             buy_symbol, executor_web_client, expect_no_order=True)
 
-        run_sell_top_of_book(sell_symbol, executor_web_client)
+        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
         # internally checking sell order
         order_journal = \
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
@@ -582,7 +582,7 @@ def test_validate_kill_switch_non_systematic(static_data_, clean_and_set_limits,
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
-                                               market_depth_basemodel_list))
+                                               market_depth_basemodel_list, top_of_book_list_))
 
         portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
         updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
@@ -625,9 +625,9 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, buy_sell_sy
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
-                                               market_depth_basemodel_list))
+                                               market_depth_basemodel_list, top_of_book_list_))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -687,9 +687,9 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, buy_s
         created_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list))
+                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -744,9 +744,9 @@ def test_filled_status(static_data_, clean_and_set_limits, buy_sell_symbol_list,
         created_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                               market_depth_basemodel_list))
+                                               market_depth_basemodel_list, top_of_book_list_))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -763,7 +763,7 @@ def test_filled_status(static_data_, clean_and_set_limits, buy_sell_symbol_list,
             # buy fills check
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
             loop_count = 1
-            run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client, top_of_book_list_)
+            run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
             time.sleep(2)  # delay for order to get placed
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -820,9 +820,9 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_li
     created_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -839,7 +839,7 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_li
         # buy fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client, top_of_book_list_)
+        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(2)  # delay for order to get placed
 
         ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -911,9 +911,9 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, buy_sell_symbol_li
     created_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -930,7 +930,7 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, buy_sell_symbol_li
         # buy fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client, top_of_book_list_)
+        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(5)  # delay for order to get placed
 
         ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -1004,9 +1004,9 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol_l
         created_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list))
+                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1049,9 +1049,9 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol
         created_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list))
+                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1099,9 +1099,9 @@ def test_cxl_rej(static_data_, clean_and_set_limits, buy_sell_symbol_list,
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
-                                               market_depth_basemodel_list))
+                                               market_depth_basemodel_list, top_of_book_list_))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{created_pair_strat.port}_config.yaml"
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1126,10 +1126,9 @@ def test_cxl_rej(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
                     if check_symbol == buy_symbol:
-                        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol,
-                                            executor_http_client, top_of_book_list_)
+                        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
                     else:
-                        run_sell_top_of_book(sell_symbol, executor_http_client)
+                        run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
                     time.sleep(10)  # delay for order to get placed and trigger cxl
 
                     if order_count < continues_order_count:
@@ -1161,14 +1160,15 @@ def test_cxl_rej(static_data_, clean_and_set_limits, buy_sell_symbol_list,
 
 def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                        pair_strat_, expected_strat_limits_,
-                                       expected_start_status_, sample_alert, symbol_overview_obj_list):
+                                       expected_start_status_, sample_alert, symbol_overview_obj_list,
+                                       top_of_book_list_):
     # creating strat
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
     total_loop_count = 5
     active_pair_strat, executor_http_client = create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_,
                                                                       expected_strat_limits_, expected_start_status_,
-                                                                      symbol_overview_obj_list)
+                                                                      symbol_overview_obj_list, top_of_book_list_)
     alert_id_list = []
     broker_id_list = []
     for loop_count in range(total_loop_count):
@@ -1245,7 +1245,7 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
         active_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list))
+                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
         # buy handling
         buy_tob_last_update_date_time_tracker, buy_order_id = \
             create_fills_for_underlying_account_test(buy_symbol, sell_symbol, top_of_book_list_,
@@ -1301,9 +1301,9 @@ def test_last_n_sec_order_qty_sum_and_order_count(static_data_, clean_and_set_li
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1322,7 +1322,7 @@ def test_last_n_sec_order_qty_sum_and_order_count(static_data_, clean_and_set_li
         order_create_time_list = []
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            run_buy_top_of_book(loop_count + 1, buy_symbol, sell_symbol, executor_http_client, top_of_book_list_)
+            run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                 buy_symbol, executor_http_client,
@@ -1386,9 +1386,9 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_symb
         active_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                               market_depth_basemodel_list))
+                                               market_depth_basemodel_list, top_of_book_list_))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1431,9 +1431,9 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_sy
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
-                                               market_depth_basemodel_list))
+                                               market_depth_basemodel_list, top_of_book_list_))
 
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1464,7 +1464,7 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_sy
 def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                    pair_strat_, expected_strat_limits_, expected_start_status_,
                                                    symbol_overview_obj_list, last_trade_fixture_list,
-                                                   market_depth_basemodel_list):
+                                                   market_depth_basemodel_list, top_of_book_list_):
     activated_strats = []
 
     # creates and activates multiple pair_strats
@@ -1472,7 +1472,7 @@ def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_l
         activated_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list, market_depth_basemodel_list))
+                                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
         activated_strats.append((activated_strat, executor_http_client))
 
     for index, (activated_strat, executor_http_client) in enumerate(activated_strats):
@@ -1554,8 +1554,8 @@ def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, buy_
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
-                                               market_depth_basemodel_list))
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+                                               market_depth_basemodel_list, top_of_book_list_))
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1574,7 +1574,7 @@ def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, buy_
             cxl_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client, top_of_book_list_)
+                run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
                 time.sleep(2)  # delay for order to get placed
 
                 new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
@@ -1611,7 +1611,7 @@ def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, buy_
             cxl_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_sell_top_of_book(sell_symbol, executor_http_client)
+                run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
                 time.sleep(2)  # delay for order to get placed
 
                 new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
@@ -1667,8 +1667,8 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
-                                               market_depth_basemodel_list))
-        config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+                                               market_depth_basemodel_list, top_of_book_list_))
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
         config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1687,7 +1687,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             acked_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client, top_of_book_list_)
+                run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
                 time.sleep(2)  # delay for order to get placed
 
                 new_order_id, acked_order_id, partial_ack_qty = \
@@ -1705,7 +1705,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             acked_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_sell_top_of_book(sell_symbol, executor_http_client)
+                run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
                 time.sleep(2)
 
                 new_order_id, acked_order_id, partial_ack_qty = \
@@ -1738,13 +1738,12 @@ def test_update_residual_query(static_data_, clean_and_set_limits, buy_sell_symb
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
                                            last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
     total_loop_count = 5
     residual_qty = 5
 
     # creating tobs
-    run_buy_top_of_book(1, buy_symbol, sell_symbol, executor_http_client,
-                        top_of_book_list_, is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
 
     # Since both side have same last trade px in test cases
     last_trade_px = top_of_book_list_[0].get("last_trade").get("px")
@@ -1792,9 +1791,9 @@ def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, buy_sell_symbo
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1813,7 +1812,7 @@ def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, buy_sell_symbo
         # buy test
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client, top_of_book_list_)
+        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
 
         latest_unack_obj = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
                                                                            executor_http_client)
@@ -1867,7 +1866,7 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
                                                  last_trade_fixture_list, market_depth_basemodel_list,
                                                  top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1930,9 +1929,9 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, c
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -1976,9 +1975,9 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -2022,9 +2021,9 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clea
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -2066,9 +2065,9 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, cle
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -2245,7 +2244,8 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
 def test_update_agg_feature_in_post_put_patch_http_call(clean_and_set_limits, buy_sell_symbol_list,
                                                         pair_strat_, expected_strat_limits_,
                                                         expected_start_status_, symbol_overview_obj_list,
-                                                        last_trade_fixture_list, market_depth_basemodel_list):
+                                                        last_trade_fixture_list, market_depth_basemodel_list,
+                                                        top_of_book_list_):
     """
     This test case contains check of update aggregate feature available in beanie port, put and patch http calls.
     Note: since post, put and patch all uses same method call for this feature and currently only
@@ -2262,7 +2262,7 @@ def test_update_agg_feature_in_post_put_patch_http_call(clean_and_set_limits, bu
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
-                                               market_depth_basemodel_list))
+                                               market_depth_basemodel_list, top_of_book_list_))
 
         # First Cleaning market depth
         market_depth_list = executor_http_client.get_all_market_depth_client()

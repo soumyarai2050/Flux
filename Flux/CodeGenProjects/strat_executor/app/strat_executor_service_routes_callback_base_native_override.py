@@ -150,10 +150,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 if not self.all_services_up:
                     try:
                         if all_service_up_check(self.web_client, ignore_error=(service_up_no_error_retry_count > 0)):
-                            self.all_services_up = True
-                            logging.debug("Marked all_services_up True")
-                            should_sleep = False
-
                             # starting trading_data_manager and strat_executor
                             pair_strat = strat_manager_service_http_client.get_pair_strat_client(self.pair_strat_id)
                             self.strat_leg_1 = pair_strat.pair_strat_params.strat_leg1
@@ -186,6 +182,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                             # else not required: not updating if already is_executor_running
                             logging.debug("Marked pair_strat.is_partially_running True")
 
+                            self.all_services_up = True
+                            logging.debug("Marked all_services_up True")
+                            should_sleep = False
                         else:
                             should_sleep = True
                             service_up_no_error_retry_count -= 1

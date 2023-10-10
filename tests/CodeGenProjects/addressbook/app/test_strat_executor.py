@@ -143,7 +143,7 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
     # placing new non-systematic new_order
     px = 100
     qty = 90
-    check_str = "no ongoing pair strat matches this new_order_ key"
+    check_str = "blocked generated unsupported side order"
     assert_fail_msg = "Could not find any alert containing message to block orders due to unsupported side"
     handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.SIDE_UNSPECIFIED, px, qty,
                                                                   check_str, assert_fail_msg,
@@ -245,9 +245,9 @@ def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symb
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{active_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -519,7 +519,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
                                                  last_trade_fixture_list, market_depth_basemodel_list,
                                                  top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{activated_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activated_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -651,9 +651,9 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
     activate_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list))
+                                           market_depth_basemodel_list, top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{activate_pair_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
@@ -669,8 +669,7 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
 
         # buy test
         loop_count = 1
-        run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client,
-                            top_of_book_list_, is_non_systematic_run=True)
+        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
 
         # placing new non-systematic new_order
         px = 100
@@ -715,14 +714,13 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
     active_pair_strat, executor_http_client = (
         create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                 copy.deepcopy(expected_strat_limits_),
-                                copy.deepcopy(expected_start_status_), symbol_overview_obj_list))
+                                copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_list_))
     # creating market_depth
     create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_http_client)
 
     # buy test
     loop_count = 1
-    run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client,
-                        top_of_book_list_, is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
 
     # placing new non-systematic new_order
     px = 100
@@ -747,15 +745,14 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
     active_pair_strat, executor_http_client = (
         create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                 copy.deepcopy(expected_strat_limits_),
-                                copy.deepcopy(expected_start_status_), symbol_overview_obj_list))
+                                copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_list_))
     # creating market_depth
     create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_http_client)
 
     # buy test
     loop_count = 1
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client, create_counts_per_side=1)
-    run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, executor_http_client,
-                        top_of_book_list_, is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
 
     # placing new non-systematic new_order
     px = 100
@@ -781,7 +778,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
                                                  last_trade_fixture_list, market_depth_basemodel_list,
                                                  top_of_book_list_))
 
-    config_file_path = STRAT_EXECUTOR / "data" / f"strat_executor_{activated_strat.port}_config.yaml"
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activated_strat.id}_simulate_config.yaml"
     config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
