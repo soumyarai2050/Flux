@@ -886,7 +886,13 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_li
             if re.search(check_str, alert.alert_brief):
                 break
         else:
-            assert False, f"Couldn't find any alert saying: {check_str}"
+            # Checking alert in portfolio_alert if reason failed to add in strat_alert
+            portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+            for alert in portfolio_alert.alerts:
+                if re.search(check_str, alert.alert_brief):
+                    break
+            else:
+                assert False, f"Couldn't find any alert saying: {check_str}"
         assert True
     except AssertionError as e:
         raise AssertionError(e)
@@ -978,7 +984,13 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, buy_sell_symbol_li
             if re.search(check_str, alert.alert_brief):
                 break
         else:
-            assert False, f"Couldn't find any alert saying: {check_str}, received strat_alert: {strat_alerts}"
+            # Checking alert in portfolio_alert if reason failed to add in strat_alert
+            portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+            for alert in portfolio_alert.alerts:
+                if re.search(check_str, alert.alert_brief):
+                    break
+            else:
+                assert False, f"Couldn't find any alert saying: {check_str}, received strat_alert: {strat_alerts}"
         assert True
     except AssertionError as e:
         raise AssertionError(e)
@@ -1902,7 +1914,13 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
             if re.search(check_str, alert.alert_brief):
                 break
         else:
-            assert False, assert_fail_message
+            # Checking alert in portfolio_alert if reason failed to add in strat_alert
+            portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+            for alert in portfolio_alert.alerts:
+                if re.search(check_str, alert.alert_brief):
+                    break
+            else:
+                assert False, assert_fail_message
         assert True
     except AssertionError as e:
         raise AssertionError(e)

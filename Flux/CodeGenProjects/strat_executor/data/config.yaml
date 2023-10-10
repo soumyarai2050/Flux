@@ -14,6 +14,7 @@ custom_logger_lvls:
 
 log_mongo_uri: True
 mongo_server: "mongodb://localhost:27017"
+avoid_top_of_book_db_update: True  # to be used in routes to bypass db updates if True
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"

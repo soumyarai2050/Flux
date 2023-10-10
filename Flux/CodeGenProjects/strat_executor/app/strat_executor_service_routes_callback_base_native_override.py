@@ -9,7 +9,9 @@ import time
 import copy
 import shutil
 import sys
+import stat
 import datetime
+import subprocess
 
 # project imports
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_routes_callback import (
@@ -17,7 +19,7 @@ from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_servic
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import (
     get_order_journal_log_key, get_symbol_side_key, get_order_snapshot_log_key,
-    get_symbol_side_snapshot_log_key, all_service_up_check, host,
+    get_symbol_side_snapshot_log_key, all_service_up_check, host, create_start_md_shell_script,
     strat_manager_service_http_client, get_consumable_participation_qty,
     get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
     EXECUTOR_PROJECT_DATA_DIR, is_ongoing_strat, log_analyzer_service_http_client, main_config_yaml_dict)
@@ -182,6 +184,12 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                             # else not required: not updating if already is_executor_running
                             logging.debug("Marked pair_strat.is_partially_running True")
 
+                            # creating run_symbol_overview.sh file
+                            run_symbol_overview_file_path = EXECUTOR_PROJECT_DATA_DIR / f"ps_id_{pair_strat.id}_so.sh"
+                            create_start_md_shell_script(pair_strat, run_symbol_overview_file_path, "SO")
+                            os.chmod(run_symbol_overview_file_path, stat.S_IRWXU)
+                            subprocess.Popen([f"{run_symbol_overview_file_path}"])
+
                             self.all_services_up = True
                             logging.debug("Marked all_services_up True")
                             should_sleep = False
@@ -286,6 +294,16 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                               f"{self.pair_strat_id} while shutting executor server, symbol_side_key: "
                               f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
         logging.debug("Triggered server launch post override")
+
+        # removing md scripts
+        try:
+            os.remove(EXECUTOR_PROJECT_DATA_DIR / f"ps_id_{self.pair_strat_id}_so.sh")
+            os.remove(EXECUTOR_PROJECT_DATA_DIR / f"start_ps_id_{self.pair_strat_id}_md.sh")
+            os.remove(EXECUTOR_PROJECT_DATA_DIR / f"stop_ps_id_{self.pair_strat_id}_md.sh")
+        except Exception as e:
+            err_str_ = (f"Something went wrong while deleting md scripts, "
+                        f"exception: {e}")
+            logging.error(err_str_)
 
     def update_fx_symbol_overview_dict_from_http(self) -> bool:
         fx_symbol_overviews: List[FxSymbolOverviewBaseModel] = \

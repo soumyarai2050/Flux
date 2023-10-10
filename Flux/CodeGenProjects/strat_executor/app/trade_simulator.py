@@ -179,6 +179,7 @@ class TradeSimulator(TradingLinkBase):
                     cls.cxl_rej_symbol_to_bool_dict[order_journal_obj.order.security.sec_id] = True
                     await cls.place_cxl_order(order_journal_obj.order.order_id, order_journal_obj.order.side,
                                               order_journal_obj.order.security.sec_id,
+                                              order_journal_obj.order.security.sec_id,
                                               order_journal_obj.order.underlying_account)
 
     @classmethod

@@ -208,7 +208,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                 sec_id=symbol, side=side)
 
         if len(pair_strat_list) == 0:
-            raise None
+            return None
         elif len(pair_strat_list) == 1:
             pair_strat_obj: PairStratBaseModel = pair_strat_list[0]
             return pair_strat_obj

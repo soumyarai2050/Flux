@@ -8,9 +8,6 @@
 
 namespace market_data_handler {
 
-    const std::string host ="127.0.0.1";
-    const std::string port = "8040";
-
     class LastTradeHandler {
     public:
         explicit LastTradeHandler(std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_,

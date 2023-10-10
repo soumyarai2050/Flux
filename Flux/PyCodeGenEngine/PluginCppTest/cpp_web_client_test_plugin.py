@@ -95,8 +95,8 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
         output_content: str = ""
 
         output_content += self.header_generate_handler(file_name, class_name_snake_cased)
-        output_content += 'const std::string host = "127.0.0.1";\n'
-        output_content += 'const std::string port = "8040";\n'
+        # output_content += 'const std::string host = "127.0.0.1";\n'
+        # output_content += 'const std::string port = "8040";\n'
 
         output_content += f"using FluxCppCore::RootModelWebClient;\n"
         output_content += "using FluxCppCore::RootModelListWebClient;\n"
@@ -310,7 +310,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f'_list_for_patch;\n'
                                 output_content += f'\tRandomDataGen random_data_gen;\n'
                                 # output_content += (f'\t{package_name}_handler::{class_name}WebClient '
-                                #                    f'{class_name_snake_cased}_web_client(host, port);\n\n')
+                                #                    f'{class_name_snake_cased}_web_client({package_name}_handler::host, {package_name}_handler::port);\n\n')
                                 output_content += f"\tRootModelWebClient<{package_name}::{message_name}, " \
                                                   f"{package_name}_handler::create_{message_name_snake_cased}_client_url, " \
                                                   f"{package_name}_handler::get_{message_name_snake_cased}_client_url, " \
@@ -319,7 +319,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
                                                   f"{message_name_snake_cased}_client_url, {package_name}_handler::" \
                                                   f"delete_{message_name_snake_cased}_client_url> {class_name_snake_cased}" \
-                                                  f"_web_client(host, port);\n"
+                                                  f"_web_client({package_name}_handler::host, {package_name}_handler::port);\n"
 
                                 output_content += f"\tRootModelListWebClient<{package_name}::{message_name}List, " \
                                                   f"{package_name}_handler::create_all_{message_name_snake_cased}_client_url, " \
@@ -329,7 +329,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"all_{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
                                                   f"all_{message_name_snake_cased}_client_url, {package_name}_handler::" \
                                                   f"delete_{message_name_snake_cased}_client_url> " \
-                                                  f"web_client(host, port);\n\n"
+                                                  f"web_client({package_name}_handler::host, {package_name}_handler::port);\n\n"
 
                                 output_content += "\t// Test CREATE operation\n"
                                 output_content += f"\tGenerateRandom{message_name}({message_name_snake_cased});\n"
@@ -580,7 +580,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f'_list_for_patch;\n'
                                 output_content += f'\tRandomDataGen random_data_gen;\n'
                                 # output_content += (f'\t{package_name}_handler::{class_name}WebClient '
-                                #                    f'{class_name_snake_cased}_web_client(host, port);\n\n')
+                                #                    f'{class_name_snake_cased}_web_client({package_name}_handler::host, {package_name}_handler::port);\n\n')
                                 output_content += f"\tRootModelWebClient<{package_name}::{message_name}, " \
                                                   f"{package_name}_handler::create_{message_name_snake_cased}_client_url, " \
                                                   f"{package_name}_handler::get_{message_name_snake_cased}_client_url, " \
@@ -589,7 +589,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
                                                   f"{message_name_snake_cased}_client_url, {package_name}_handler::" \
                                                   f"delete_{message_name_snake_cased}_client_url> {class_name_snake_cased}" \
-                                                  f"_web_client(host, port);\n"
+                                                  f"_web_client({package_name}_handler::host, {package_name}_handler::port);\n"
 
                                 output_content += f"\tRootModelListWebClient<{package_name}::{message_name}List, " \
                                                   f"{package_name}_handler::create_all_{message_name_snake_cased}_client_url, " \
@@ -599,7 +599,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"all_{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
                                                   f"all_{message_name_snake_cased}_client_url, {package_name}_handler::" \
                                                   f"delete_{message_name_snake_cased}_client_url> " \
-                                                  f"web_client(host, port);\n\n"
+                                                  f"web_client({package_name}_handler::host, {package_name}_handler::port);\n\n"
 
                                 output_content += "\t// Test CREATE operation\n"
                                 output_content += f"\tGenerateRandom{message_name}({message_name_snake_cased});\n"
@@ -693,7 +693,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                 output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
                                 output_content += f'\tRandomDataGen random_data_gen;\n'
                                 # output_content += (f'\t{package_name}_handler::{class_name}WebClient {class_name_snake_cased}'
-                                #                    f'_web_client(host, port);\n\n')
+                                #                    f'_web_client({package_name}_handler::host, {package_name}_handler::port);\n\n')
                                 output_content += f"\tRootModelWebClient<{package_name}::{message_name}, " \
                                                   f"{package_name}_handler::create_{message_name_snake_cased}_client_url, " \
                                                   f"{package_name}_handler::get_{message_name_snake_cased}_client_url, " \
@@ -702,7 +702,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
                                                   f"{message_name_snake_cased}_client_url, {package_name}_handler::" \
                                                   f"delete_{message_name_snake_cased}_client_url> {class_name_snake_cased}" \
-                                                  f"_web_client(host, port);\n\n"
+                                                  f"_web_client({package_name}_handler::host, {package_name}_handler::port);\n\n"
                                 output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}' \
                                                   f'({message_name_snake_cased});\n'
                                 output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
@@ -814,7 +814,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                 output_content += f'\tstd::string {message_name_snake_cased}_json_from_server;\n'
                                 output_content += f'\tRandomDataGen random_data_gen;\n'
                                 # output_content += (f'\t{package_name}_handler::{class_name}WebClient '
-                                #                    f'{class_name_snake_cased}_web_client(host, port);\n\n')
+                                #                    f'{class_name_snake_cased}_web_client({package_name}_handler::host, {package_name}_handler::port);\n\n')
                                 output_content += f"\tRootModelWebClient<{package_name}::{message_name}, " \
                                                   f"{package_name}_handler::create_{message_name_snake_cased}_client_url, " \
                                                   f"{package_name}_handler::get_{message_name_snake_cased}_client_url, " \
@@ -823,7 +823,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                                   f"{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
                                                   f"{message_name_snake_cased}_client_url, {package_name}_handler::" \
                                                   f"delete_{message_name_snake_cased}_client_url> {class_name_snake_cased}" \
-                                                  f"_web_client(host, port);\n\n"
+                                                  f"_web_client({package_name}_handler::host, {package_name}_handler::port);\n\n"
                                 output_content += f'\t{package_name}_handler::{class_name}PopulateRandomValues::{message_name_snake_cased}' \
                                                   f'({message_name_snake_cased});\n'
                                 output_content += f'\t{message_name_snake_cased}_from_server.CopyFrom({message_name_snake_cased});\n'
@@ -930,7 +930,7 @@ class CppWebClientTestPlugin(BaseProtoPlugin):
                                           f"all_{message_name_snake_cased}_client_url, {package_name}_handler::patch_" \
                                           f"all_{message_name_snake_cased}_client_url, {package_name}_handler::" \
                                           f"delete_all_{message_name_snake_cased}_client_url> " \
-                                          f"web_client(host, port);\n\n"
+                                          f"web_client({package_name}_handler::host, {package_name}_handler::port);\n\n"
 
                         output_content += "\tfor (int i = 1; i < 1000; ++i) {\n"
                         output_content += f"\t\t{package_name}_handler::{class_name}PopulateRandomValues::" \

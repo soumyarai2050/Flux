@@ -2045,7 +2045,7 @@ def verify_cxl_rej(last_cxl_order_id: str | None, last_cxl_rej_order_id: str | N
                 "Unexpected order_snapshot.order_status: expected OrderStatusType.OE_FILLED, " \
                 f"received {order_snapshot.order_status}"
 
-    # internally checks order_journal is not None else raises assert exception internally
+    # checks order_journal is not None else raises assert exception internally
     latest_cxl_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, symbol,
                                                                                executor_web_client,
                                                                                last_order_id=last_cxl_order_id)
@@ -2320,7 +2320,13 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symb
         if re.search(check_str, alert.alert_brief):
             break
     else:
-        assert False, assert_fail_message
+        # Checking alert in portfolio_alert if reason failed to add in strat_alert
+        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+        for alert in portfolio_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                break
+        else:
+            assert False, assert_fail_message
     assert True
 
 
@@ -2354,7 +2360,13 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
         if re.search(check_str, alert.alert_brief):
             break
     else:
-        assert False, assert_fail_message
+        # Checking alert in portfolio_alert if reason failed to add in strat_alert
+        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+        for alert in portfolio_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                break
+        else:
+            assert False, assert_fail_message
     assert True
 
 

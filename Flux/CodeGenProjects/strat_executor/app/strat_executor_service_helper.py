@@ -207,3 +207,38 @@ def is_ongoing_strat(strat_status: StratStatus | StratStatusBaseModel) -> bool:
                                             StratState.StratState_READY,
                                             StratState.StratState_DONE,
                                             StratState.StratState_SNOOZED]
+
+
+def create_start_md_shell_script(pair_strat, generation_start_file_path: str, mode: str):
+    subscription_data = \
+        [
+            (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
+             str(pair_strat.pair_strat_params.strat_leg1.sec.sec_type)),
+            (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
+             str(pair_strat.pair_strat_params.strat_leg2.sec.sec_type))
+        ]
+    host = pair_strat.host
+    port = pair_strat.port
+    db_name = os.environ["DB_NAME"]
+
+    with open(generation_start_file_path, "w") as fl:
+        fl.write("#!/bin/bash\n")
+        fl.write(f'export SUBSCRIPTION_DATA="{jsonable_encoder(subscription_data)}"\n')
+        fl.write(f"export HOST='{str(host)}'\n")
+        fl.write(f"export PORT='{str(port)}'\n")
+        fl.write(f"export DB_NAME='{str(db_name)}'\n")
+        fl.write(f"export MODE='{str(mode)}'\n")
+        fl.write("./run.sh")
+
+
+def create_stop_md_script(running_process_name: str, generation_stop_file_path: str):
+    # stop file generator
+    with open(generation_stop_file_path, "w") as fl:
+        fl.write("#!/bin/bash\n")
+        fl.write(f"PROCESS_COUNT=`pgrep {running_process_name} | wc -l`\n")
+        fl.write('if [ "$PROCESS_COUNT" -eq 0 ]; then\n')
+        fl.write('  echo "nothing to kill"\n')
+        fl.write('else\n')
+        fl.write('  echo "PC: $PROCESS_COUNT"\n')
+        fl.write(f'  `pgrep {running_process_name} | xargs kill`"\n')
+        fl.write('fi\n')

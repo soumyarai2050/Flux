@@ -36,11 +36,11 @@ class CppBuildAndRunTestPlugin(BaseProtoPlugin):
 
         output_content += "# source directory where your CMakeLists.txt file is located\n"
         output_content += 'SOURCE_DIR="../../../../../tests/CodeGenProjects/market_data/cpp_app/"\n\n'
-        output_content += "# Change the file mode to executable mode\n"
-        output_content += "chmod +x build_and_run_test.sh\n\n"
-
-        output_content += "# Create a build directory\n"
-        output_content += f"chmod +x {class_name_snake_cased}_build_and_run_test.sh\n\n"
+        # output_content += "# Change the file mode to executable mode\n"
+        # output_content += "chmod +x build_and_run_test.sh\n\n"
+        #
+        # output_content += "# Create a build directory\n"
+        # output_content += f"chmod +x {class_name_snake_cased}_build_and_run_test.sh\n\n"
 
         output_content += "# Create a build directory\n"
         output_content += 'mkdir -p "${SOURCE_DIR}/build"\n\n'
@@ -62,7 +62,7 @@ class CppBuildAndRunTestPlugin(BaseProtoPlugin):
         output_content += 'cd ../..\n'
         output_content += 'rm -rf build'
 
-        output_file_name = f"{class_name_snake_cased}_build_and_run_test.sh"
+        output_file_name = f"run.sh"
         return {output_file_name: output_content}
 
 

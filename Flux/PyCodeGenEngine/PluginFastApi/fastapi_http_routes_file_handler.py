@@ -259,6 +259,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + f"    {message_name_snake_cased}_updated = " \
                                            f"await callback_class.update_{message_name_snake_cased}_pre(" \
                                            f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
+        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+        indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
                       f"        updated_{message_name_snake_cased}_obj = " \
@@ -306,6 +309,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post(" \
                                            f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
         output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj\n"
+        indent_count -= 4
+        output_str += " " * indent_count + f"    else:\n"
+        indent_count += 4
+        output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post(" \
+                                           f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
+        output_str += " " * indent_count + f"    return True\n"
         output_str += "\n"
         return output_str
 
@@ -349,6 +358,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + f"    {message_name_snake_cased}_updated_list = " \
                                            f"await callback_class.update_all_{message_name_snake_cased}_pre(" \
                                            f"stored_{message_name_snake_cased}_obj_list, {message_name_snake_cased}_updated_list)\n"
+        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+        indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
                       f"        updated_{message_name_snake_cased}_obj_list = " \
@@ -399,6 +411,13 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                            f"stored_{message_name_snake_cased}_obj_list, " \
                                            f"updated_{message_name_snake_cased}_obj_list)\n"
         output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj_list\n"
+        indent_count -= 4
+        output_str += " " * indent_count + f"    else:\n"
+        indent_count += 4
+        output_str += " " * indent_count + (f"    await callback_class.update_all_{message_name_snake_cased}_post("
+                                            f"stored_{message_name_snake_cased}_obj_list, "
+                                            f"{message_name_snake_cased}_updated_list)\n")
+        output_str += " " * indent_count + f"    return True\n"
         output_str += "\n"
         return output_str
 

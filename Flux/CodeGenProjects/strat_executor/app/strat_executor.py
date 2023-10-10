@@ -8,6 +8,7 @@ from threading import Thread
 import math
 import traceback
 import subprocess
+import stat
 
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 
@@ -19,10 +20,11 @@ from Flux.CodeGenProjects.strat_executor.app.trading_link import get_trading_lin
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import \
     get_consumable_participation_qty_http, get_symbol_side_key, \
-    get_strat_brief_log_key
+    get_strat_brief_log_key, create_start_md_shell_script, create_stop_md_script
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore
+
 
 class StratExecutor:
     trading_link: ClassVar[TradingLinkBase] = get_trading_link()
@@ -531,6 +533,24 @@ class StratExecutor:
         return checks_passed
 
     def run(self):
+        # running md file
+        pair_strat = self.strat_cache.get_pair_strat()[0]
+
+        data_dir = PurePath(__file__).parent.parent / "data"
+        # start file generator
+        generation_start_file_path = data_dir / f"start_ps_id_{pair_strat.id}_md.sh"
+        generation_stop_file_path = data_dir / f"stop_ps_id_{pair_strat.id}_md.sh"
+
+        create_stop_md_script(str(generation_start_file_path), str(generation_stop_file_path))
+        os.chmod(generation_stop_file_path, stat.S_IRWXU)
+
+        if os.path.exists(generation_start_file_path):
+            # first stopping script if already exists
+            subprocess.Popen([f"{generation_stop_file_path}"])
+        create_start_md_shell_script(pair_strat, str(generation_start_file_path), mode="MD")
+        os.chmod(generation_start_file_path, stat.S_IRWXU)
+        subprocess.Popen([f"{generation_start_file_path}"])
+
         ret_val: int = -5000
         while 1:
             try:
@@ -582,6 +602,10 @@ class StratExecutor:
                     else:
                         logging.error(f"strat_limits_tuple is None for: [ {self.strat_cache} ], "
                                       f"symbol_side_key: {get_pair_strat_log_key(pair_strat)}")
+
+        # running stopping md script
+        subprocess.Popen([f"{generation_stop_file_path}"])
+
         return ret_val
 
     def get_usd_px(self, px: float, system_symbol: str):
