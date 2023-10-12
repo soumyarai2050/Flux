@@ -2,6 +2,12 @@ syntax = "proto2";
 
 import "flux_options.proto";
 
+
+enum DummyEnumDMS{
+  DUMMY_DMS = 0;
+}
+
+
 message SymbolOverview{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,

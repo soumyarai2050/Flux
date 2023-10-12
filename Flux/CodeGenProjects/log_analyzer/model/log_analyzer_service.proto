@@ -137,3 +137,9 @@ message ProcessedPerformanceAnalysis{
   optional float per_80 = 14;
   optional float per_90 = 15;
 }
+
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+  optional ButtonType temp = 1;
+}

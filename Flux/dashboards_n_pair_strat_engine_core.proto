@@ -4,6 +4,11 @@ import "flux_options.proto";
 import "trade_core.proto";
 
 
+enum DummyEnumDP{
+  DUMMY_DP = 1;
+}
+
+
 message RollingMaxOrderCount{
   required int32 max_rolling_tx_count = 1 [(FluxFldHelp) = "max new orders count allowed per period defined below"];
   optional int32 rolling_tx_count_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above count enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];

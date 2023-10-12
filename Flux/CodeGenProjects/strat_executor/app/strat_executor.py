@@ -20,9 +20,11 @@ from Flux.CodeGenProjects.strat_executor.app.trading_link import get_trading_lin
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import \
     get_consumable_participation_qty_http, get_symbol_side_key, \
-    get_strat_brief_log_key, create_start_md_shell_script, create_stop_md_script
+    get_strat_brief_log_key, create_stop_md_script
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
+    create_md_shell_script, MDShellEnvData)
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore
 
 
@@ -328,10 +330,10 @@ class StratExecutor:
                               f"{self.strat_cache.get_key()}, strat_brief: {get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
             if order_usd_notional > strat_brief.pair_buy_side_trading_brief.consumable_notional:
-                logging.error(f"blocked generated BUY order, breaches available consumable notional, expected less "
-                              f"than: {strat_brief.pair_buy_side_trading_brief.consumable_notional}, order needs: "
-                              f"{order_usd_notional} for strat_cache: {self.strat_cache.get_key()}, strat_brief: "
-                              f"{get_strat_brief_log_key(strat_brief)}")
+                logging.error(f"blocked generated BUY order, breaches available consumable notional, available "
+                              f"consumable_notional: {strat_brief.pair_buy_side_trading_brief.consumable_notional}, "
+                              f"order needs: {order_usd_notional} for strat_cache: {self.strat_cache.get_key()}, "
+                              f"strat_brief: {get_strat_brief_log_key(strat_brief)}")
                 check_passed = False
             if strat_brief.pair_buy_side_trading_brief.consumable_concentration - qty < 0:
                 logging.error(f"blocked generated BUY order, not enough consumable_concentration: "
@@ -532,14 +534,22 @@ class StratExecutor:
 
         return checks_passed
 
-    def run(self):
-        # running md file
-        pair_strat = self.strat_cache.get_pair_strat()[0]
+    @staticmethod
+    def create_n_run_md_shell_script(pair_strat, generation_start_file_path, generation_stop_file_path):
+        subscription_data = \
+            [
+                (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
+                 pair_strat.pair_strat_params.strat_leg1.sec.sec_type.name),
+                (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
+                 pair_strat.pair_strat_params.strat_leg2.sec.sec_type.name)
+            ]
+        db_name = os.environ["DB_NAME"]
+        exch_code = pair_strat.pair_strat_params.strat_leg1.exch_id  # ideally get from pair_strat
 
-        data_dir = PurePath(__file__).parent.parent / "data"
-        # start file generator
-        generation_start_file_path = data_dir / f"start_ps_id_{pair_strat.id}_md.sh"
-        generation_stop_file_path = data_dir / f"stop_ps_id_{pair_strat.id}_md.sh"
+        md_shell_env_data: MDShellEnvData = (
+            MDShellEnvData(subscription_data=subscription_data, host=pair_strat.host,
+                           port=pair_strat.port, db_name=db_name, exch_code=exch_code,
+                           project_name="strat_executor"))
 
         create_stop_md_script(str(generation_start_file_path), str(generation_stop_file_path))
         os.chmod(generation_stop_file_path, stat.S_IRWXU)
@@ -547,64 +557,101 @@ class StratExecutor:
         if os.path.exists(generation_start_file_path):
             # first stopping script if already exists
             subprocess.Popen([f"{generation_stop_file_path}"])
-        create_start_md_shell_script(pair_strat, str(generation_start_file_path), mode="MD")
+        create_md_shell_script(md_shell_env_data, str(generation_start_file_path), mode="MD")
         os.chmod(generation_start_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{generation_start_file_path}"])
 
+    def run(self):
         ret_val: int = -5000
-        while 1:
-            try:
-                ret_val = self.internal_run()
-            except Exception as e:
-                logging.error(f"Run returned with exception - sending again, exception: {e}")
-            finally:
-                if ret_val == 1:
-                    logging.info(f"explicit strat shutdown requested for: {self.pair_strat_executor_id}, going down")
-                    break
-                elif ret_val != 0:
-                    logging.error(f"Error: Run returned, code: {ret_val} - sending again")
-                else:
-                    pair_strat, _ = self.strat_cache.get_pair_strat()
-                    strat_status_tuple = self.strat_cache.get_strat_status()
-                    if strat_status_tuple is not None:
-                        strat_status_, strat_status_update_date_time = strat_status_tuple
-                        if strat_status_.strat_state != StratState.StratState_DONE:
-                            strat_status_basemodel = StratStatusBaseModel(_id=pair_strat.id)
-                            strat_status_basemodel.strat_state = StratState.StratState_DONE
-                            alert_str: str = \
-                                (f"graceful shut down processing for strat: {self.pair_strat_executor_id} "
-                                 f"{get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
-                            logging.info(alert_str)
 
-                            from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
-                                underlying_partial_update_strat_status_http)
+        # getting pair_strat
+        pair_strat_tuple: Tuple[PairStratBaseModel, DateTime] = self.strat_cache.get_pair_strat()
+        if pair_strat_tuple is None:
+            logging.error("Can't find pair_strat_tuple even while entered executor's run method, likely bug "
+                          "in loading strat_cache with pair_strat")
+            return -3000
 
-                            # coro needs public method
-                            run_coro = underlying_partial_update_strat_status_http(
-                                jsonable_encoder(strat_status_basemodel, by_alias=True, exclude_none=True))
-                            future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
+        pair_strat, _ = pair_strat_tuple
+        if pair_strat is None:
+            logging.error("Can't find pair_strat from pair_strat_tuple even while entered "
+                          "executor's run method, likely bug in loading strat_cache with pair_strat")
+            return -3001
 
-                            # block for start_executor_server task to finish
-                            try:
-                                future.result()
-                            except Exception as e:
-                                logging.exception(f"underlying_partial_update_strat_status_http failed "
-                                                  f"with exception: {e}")
+        scripts_dir = PurePath(__file__).parent.parent / "scripts"
+        # start file generator
+        start_sh_file_path = scripts_dir / f"start_ps_id_{pair_strat.id}_md.sh"
+        stop_sh_file_path = scripts_dir / f"stop_ps_id_{pair_strat.id}_md.sh"
 
-                            logging.debug(f"StratStatus with id: {self.pair_strat_executor_id} Marked Done, "
-                                          f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
-                            ret_val = 0
-                        else:
-                            logging.error(f"unexpected, pair_strat: {self.pair_strat_executor_id} was already Marked Done, "
-                                          f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
-                            ret_val = -4000  # helps find the error location
+        try:
+            StratExecutor.create_n_run_md_shell_script(pair_strat, start_sh_file_path, stop_sh_file_path)
+
+            while 1:
+                try:
+                    ret_val = self.internal_run()
+                except Exception as e:
+                    logging.error(f"Run returned with exception - sending again, exception: {e}")
+                finally:
+                    if ret_val == 1:
+                        logging.info(f"explicit strat shutdown requested for: {self.pair_strat_executor_id}, going down")
                         break
+                    elif ret_val != 0:
+                        logging.error(f"Error: Run returned, code: {ret_val} - sending again")
                     else:
-                        logging.error(f"strat_limits_tuple is None for: [ {self.strat_cache} ], "
-                                      f"symbol_side_key: {get_pair_strat_log_key(pair_strat)}")
+                        pair_strat, _ = self.strat_cache.get_pair_strat()
+                        strat_status_tuple = self.strat_cache.get_strat_status()
+                        if strat_status_tuple is not None:
+                            strat_status_, strat_status_update_date_time = strat_status_tuple
+                            if strat_status_.strat_state != StratState.StratState_DONE:
+                                strat_status_basemodel = StratStatusBaseModel(_id=pair_strat.id)
+                                strat_status_basemodel.strat_state = StratState.StratState_DONE
+                                alert_str: str = \
+                                    (f"graceful shut down processing for strat: {self.pair_strat_executor_id} "
+                                     f"{get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
+                                logging.info(alert_str)
 
-        # running stopping md script
-        subprocess.Popen([f"{generation_stop_file_path}"])
+                                from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+                                    underlying_partial_update_strat_status_http)
+
+                                # coro needs public method
+                                run_coro = underlying_partial_update_strat_status_http(
+                                    jsonable_encoder(strat_status_basemodel, by_alias=True, exclude_none=True))
+                                future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
+
+                                # block for start_executor_server task to finish
+                                try:
+                                    future.result()
+                                except Exception as e:
+                                    logging.exception(f"underlying_partial_update_strat_status_http failed "
+                                                      f"with exception: {e}")
+
+                                logging.debug(f"StratStatus with id: {self.pair_strat_executor_id} Marked Done, "
+                                              f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
+                                ret_val = 0
+                            else:
+                                logging.error(f"unexpected, pair_strat: {self.pair_strat_executor_id} "
+                                              f"was already Marked Done, pair_strat_key: "
+                                              f"{get_pair_strat_log_key(pair_strat)}")
+                                ret_val = -4000  # helps find the error location
+                            break
+                        else:
+                            logging.error(f"strat_limits_tuple is None for: [ {self.strat_cache} ], "
+                                          f"symbol_side_key: {get_pair_strat_log_key(pair_strat)}")
+        except Exception as e:
+            logging.error(f"Some Error occurred in run method of executor, exception: {e}")
+        finally:
+            # running, stop md script
+            subprocess.Popen([f"{stop_sh_file_path}"])
+
+            # removing created scripts
+            try:
+                if os.path.exists(start_sh_file_path):
+                    os.remove(start_sh_file_path)
+                if os.path.exists(stop_sh_file_path):
+                    os.remove(stop_sh_file_path)
+            except Exception as e:
+                err_str_ = (f"Something went wrong while deleting md scripts, "
+                            f"exception: {e}")
+                logging.error(err_str_)
 
         return ret_val
 

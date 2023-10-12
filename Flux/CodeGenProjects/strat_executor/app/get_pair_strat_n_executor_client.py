@@ -12,6 +12,7 @@ from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, 
 
 EXECUTOR_PROJECT_DIR = PurePath(__file__).parent.parent
 EXECUTOR_PROJECT_DATA_DIR = EXECUTOR_PROJECT_DIR / 'data'
+EXECUTOR_PROJECT_SCRIPTS_DIR = EXECUTOR_PROJECT_DIR / 'scripts'
 main_config_yaml_path: PurePath = EXECUTOR_PROJECT_DATA_DIR / "config.yaml"
 try:
     main_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(main_config_yaml_path))

@@ -3,6 +3,12 @@ syntax = "proto2";
 import "flux_options.proto";
 import "trade_core.proto";
 
+
+enum DummyEnumMS{
+  DUMMY_MS = 0;
+}
+
+
 message TopOfBook {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,

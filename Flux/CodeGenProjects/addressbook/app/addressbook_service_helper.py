@@ -9,6 +9,7 @@ from FluxPythonUtils.scripts.utility_functions import (
 
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent
 CURRENT_PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
+CURRENT_PROJECT_SCRIPTS_DIR = PurePath(__file__).parent.parent / 'scripts'
 
 config_yaml_path: PurePath = CURRENT_PROJECT_DATA_DIR / f"config.yaml"
 config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
@@ -176,3 +177,35 @@ async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Sid
                     f"{get_symbol_side_key([(sec_id, side)])} found, one "
                     f"match expected, found: {len(match_level_2_pair_strats)}")
         return pair_strat
+
+
+class MDShellEnvData(BaseModel):
+    subscription_data: List[Tuple[str, str]] | None = None
+    host: str
+    port: int
+    db_name: str
+    project_name: str
+    exch_code: str | None
+
+
+def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_file_path: str, mode: str):
+    with open(generation_start_file_path, "w") as fl:
+        fl.write("#!/bin/bash\n")
+        fl.write("shopt -s expand_aliases\n")
+        fl.write("source ${HOME}/.bashrc\n")
+        fl.write("cdm\n")  # create this as alias in your bashrc to cd into market data run.sh script dir
+        fl.write("#export GDB_DEBUG=1  # uncomment if you want to run in debugger\n")
+        fl.write(f"export PROJECT_NAME='{str(md_shell_env_data.project_name)}'\n")
+        # for FX , exclude exch_code, SUBSCRIPTION_DATA instead export FX=1 with mode SO
+        if md_shell_env_data.exch_code is not None and md_shell_env_data.subscription_data is not None:
+            fl.write(f"export EXCHANGE_CODE={md_shell_env_data.exch_code}\n")
+            fl.write(f'export SUBSCRIPTION_DATA="{jsonable_encoder(md_shell_env_data.subscription_data)}"\n')
+        else:
+            fl.write(f"export FX='1'\n")
+            mode = "SO"     # overriding mode since fx is SO mode
+        fl.write(f"export HOST='{str(md_shell_env_data.host)}'\n")
+        fl.write(f"export PORT='{str(md_shell_env_data.port)}'\n")
+        fl.write(f"export DB_NAME='{str(md_shell_env_data.db_name)}'\n")
+        fl.write(f"export MODE='{str(mode)}'\n")
+        fl.write("./run.sh\n")
+

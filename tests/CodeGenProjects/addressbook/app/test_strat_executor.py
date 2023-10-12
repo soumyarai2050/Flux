@@ -829,6 +829,88 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+def test_strat_done_after_exhausted_consumable_notional(
+        static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
+        top_of_book_list_, buy_order_, sell_order_, expected_order_limits_):
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    # updating order_limits
+    expected_order_limits_.min_order_notional = 15000
+    expected_order_limits_.id = 1
+    strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+
+    # setting strat_limits for this test
+    expected_strat_limits_.max_cb_notional = 18000
+    created_pair_strat, executor_http_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 95
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.trade_simulator_reload_config_query_client()
+
+        # buy fills check
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        time.sleep(2)  # delay for order to get placed
+
+        ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
+                                                                            executor_http_client)
+        order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
+        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
+                                                                        f"OrderStatusType.OE_ACKED received " \
+                                                                        f"{order_snapshot.order_status}"
+
+        # Sell fills check
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[0])
+        time.sleep(2)  # delay for order to get placed
+
+        ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol,
+                                                                            executor_http_client)
+        order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
+        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
+                                                                        f"OrderStatusType.OE_ACKED received " \
+                                                                        f"{order_snapshot.order_status}"
+
+        # Next placed order must not get placed, instead it should find consumable_notional as exhausted for further
+        # orders and should come out of executor run and must set strat_state to StratState_DONE
+
+        # buy fills check
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        time.sleep(2)  # delay for order to get placed
+        # ack_order_journal = (
+        #     get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol, executor_http_client,
+        #                                                     last_order_id=ack_order_journal.order.order_id,
+        #                                                     expect_no_order=True))
+        strat_status = executor_http_client.get_strat_status_client(created_pair_strat.id)
+        assert strat_status.strat_state == StratState.StratState_DONE, (
+            f"Mismatched strat_state, expected {StratState.StratState_DONE}, received {strat_status.strat_state}")
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
 # tests for not implemented limits
 def test_strat_limits_with_high_consumable_open_notional(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                          pair_strat_, expected_strat_limits_,

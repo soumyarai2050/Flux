@@ -19,16 +19,19 @@ from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_servic
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import (
     get_order_journal_log_key, get_symbol_side_key, get_order_snapshot_log_key,
-    get_symbol_side_snapshot_log_key, all_service_up_check, host, create_start_md_shell_script,
+    get_symbol_side_snapshot_log_key, all_service_up_check, host,
     strat_manager_service_http_client, get_consumable_participation_qty,
     get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
-    EXECUTOR_PROJECT_DATA_DIR, is_ongoing_strat, log_analyzer_service_http_client, main_config_yaml_dict)
+    EXECUTOR_PROJECT_DATA_DIR, is_ongoing_strat, log_analyzer_service_http_client, main_config_yaml_dict,
+    EXECUTOR_PROJECT_SCRIPTS_DIR)
 from FluxPythonUtils.scripts.utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert)
 from Flux.CodeGenProjects.pair_strat_engine.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.pair_strat_engine.app.service_state import ServiceState
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import (
     PortfolioStatusOptional, PortfolioLimitsBaseModel, StratLeg, FxSymbolOverviewBaseModel)
+from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
+    create_md_shell_script, MDShellEnvData)
 from Flux.CodeGenProjects.strat_executor.app.strat_executor import StratExecutor, TradingDataManager
 from Flux.CodeGenProjects.strat_executor.app.trade_simulator import TradeSimulator, TradingLinkBase
 from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import StratAlertBaseModel
@@ -184,11 +187,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                             # else not required: not updating if already is_executor_running
                             logging.debug("Marked pair_strat.is_partially_running True")
 
-                            # creating run_symbol_overview.sh file
-                            run_symbol_overview_file_path = EXECUTOR_PROJECT_DATA_DIR / f"ps_id_{pair_strat.id}_so.sh"
-                            create_start_md_shell_script(pair_strat, run_symbol_overview_file_path, "SO")
-                            os.chmod(run_symbol_overview_file_path, stat.S_IRWXU)
-                            subprocess.Popen([f"{run_symbol_overview_file_path}"])
+                            # creating and running so_shell script
+                            self.create_n_run_so_shell_script(pair_strat)
 
                             self.all_services_up = True
                             logging.debug("Marked all_services_up True")
@@ -276,6 +276,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         logging.debug("Triggered server launch pre override")
 
     def app_launch_post(self):
+        logging.debug("Triggered server launch post override")
         # making pair_strat is_executor_running field to False
         try:
             pair_strat = strat_manager_service_http_client.get_pair_strat_client(self.pair_strat_id)
@@ -293,17 +294,40 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 logging.error(f"Some error occurred while updating is_running state of pair_strat of id: "
                               f"{self.pair_strat_id} while shutting executor server, symbol_side_key: "
                               f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
-        logging.debug("Triggered server launch post override")
+        finally:
+            # removing md scripts
+            try:
+                so_file_path = EXECUTOR_PROJECT_SCRIPTS_DIR / f"ps_id_{self.pair_strat_id}_so.sh"
+                if os.path.exists(so_file_path):
+                    os.remove(so_file_path)
+            except Exception as e:
+                err_str_ = (f"Something went wrong while deleting so shell script, "
+                            f"exception: {e}")
+                logging.error(err_str_)
 
-        # removing md scripts
-        try:
-            os.remove(EXECUTOR_PROJECT_DATA_DIR / f"ps_id_{self.pair_strat_id}_so.sh")
-            os.remove(EXECUTOR_PROJECT_DATA_DIR / f"start_ps_id_{self.pair_strat_id}_md.sh")
-            os.remove(EXECUTOR_PROJECT_DATA_DIR / f"stop_ps_id_{self.pair_strat_id}_md.sh")
-        except Exception as e:
-            err_str_ = (f"Something went wrong while deleting md scripts, "
-                        f"exception: {e}")
-            logging.error(err_str_)
+    @staticmethod
+    def create_n_run_so_shell_script(pair_strat):
+        # creating run_symbol_overview.sh file
+        run_symbol_overview_file_path = EXECUTOR_PROJECT_SCRIPTS_DIR / f"ps_id_{pair_strat.id}_so.sh"
+
+        subscription_data = \
+            [
+                (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
+                 pair_strat.pair_strat_params.strat_leg1.sec.sec_type.name),
+                (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
+                 pair_strat.pair_strat_params.strat_leg2.sec.sec_type.name)
+            ]
+        db_name = os.environ["DB_NAME"]
+        exch_code = pair_strat.pair_strat_params.strat_leg1.exch_id  # ideally get from pair_strat
+
+        md_shell_env_data: MDShellEnvData = (
+            MDShellEnvData(subscription_data=subscription_data, host=pair_strat.host,
+                           port=pair_strat.port, db_name=db_name, exch_code=exch_code,
+                           project_name="strat_executor"))
+
+        create_md_shell_script(md_shell_env_data, run_symbol_overview_file_path, "SO")
+        os.chmod(run_symbol_overview_file_path, stat.S_IRWXU)
+        subprocess.Popen([f"{run_symbol_overview_file_path}"])
 
     def update_fx_symbol_overview_dict_from_http(self) -> bool:
         fx_symbol_overviews: List[FxSymbolOverviewBaseModel] = \

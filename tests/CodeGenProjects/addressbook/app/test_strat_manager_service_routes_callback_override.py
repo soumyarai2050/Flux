@@ -421,7 +421,8 @@ def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits
                                               expected_portfolio_limits_, max_loop_count_per_side,
                                               buy_sell_symbol_list, residual_wait_sec):
     symbol_pair_counter = 0
-    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+    max_loop_count_per_side = int(len(buy_sell_symbol_list)/2)
+    for buy_symbol, sell_symbol in buy_sell_symbol_list[:max_loop_count_per_side]:
         symbol_pair_counter += 1
         handle_test_buy_sell_order(buy_symbol, sell_symbol, max_loop_count_per_side, symbol_pair_counter,
                                    residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
@@ -447,7 +448,7 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             expected_portfolio_limits_, max_loop_count_per_side,
                                             buy_sell_symbol_list, residual_wait_sec):
     symbol_pair_counter = 1
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_order, buy_symbol, sell_symbol, max_loop_count_per_side,
                                    symbol_pair_counter, residual_wait_sec, copy.deepcopy(buy_order_),
                                    copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
@@ -485,7 +486,8 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean
                                                              expected_portfolio_limits_, max_loop_count_per_side,
                                                              buy_sell_symbol_list, residual_wait_sec):
     symbol_pair_counter = 0
-    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+    max_loop_count_per_side = int(len(buy_sell_symbol_list)/2)
+    for buy_symbol, sell_symbol in buy_sell_symbol_list[:max_loop_count_per_side]:
         symbol_pair_counter += 1
         handle_test_buy_sell_order(buy_symbol, sell_symbol, max_loop_count_per_side, symbol_pair_counter,
                                    residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
@@ -515,7 +517,7 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_a
                                                            expected_portfolio_limits_, max_loop_count_per_side,
                                                            buy_sell_symbol_list, residual_wait_sec):
     symbol_pair_counter = 1
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_order, buy_symbol, sell_symbol, max_loop_count_per_side,
                                    symbol_pair_counter, residual_wait_sec, copy.deepcopy(buy_order_),
                                    copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),

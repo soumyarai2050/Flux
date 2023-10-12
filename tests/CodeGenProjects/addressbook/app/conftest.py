@@ -21,7 +21,7 @@ from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_v
 
 @pytest.fixture()
 def max_loop_count_per_side():
-    max_loop_count_per_side = 5
+    max_loop_count_per_side = 10
     return max_loop_count_per_side
 
 
@@ -32,7 +32,12 @@ def buy_sell_symbol_list():
         ("CB_Sec_2", "EQT_Sec_2"),
         ("CB_Sec_3", "EQT_Sec_3"),
         ("CB_Sec_4", "EQT_Sec_4"),
-        ("CB_Sec_5", "EQT_Sec_5")
+        ("CB_Sec_5", "EQT_Sec_5"),
+        ("CB_Sec_6", "EQT_Sec_6"),
+        ("CB_Sec_7", "EQT_Sec_7"),
+        ("CB_Sec_8", "EQT_Sec_8"),
+        ("CB_Sec_9", "EQT_Sec_9"),
+        ("CB_Sec_10", "EQT_Sec_10")
     ]
 
 
@@ -351,12 +356,12 @@ def pair_strat_(pair_securities_with_sides_):
         "frequency": 1,
         "pair_strat_params": {
         "strat_leg1": {
-          "exch_id": None,
+          "exch_id": "E1",
           "sec": pair_securities_with_sides_["security1"],
           "side": pair_securities_with_sides_["side1"]
         },
         "strat_leg2": {
-          "exch_id": None,
+          "exch_id": "E1",
           "sec": pair_securities_with_sides_["security2"],
           "side": pair_securities_with_sides_["side2"]
         },

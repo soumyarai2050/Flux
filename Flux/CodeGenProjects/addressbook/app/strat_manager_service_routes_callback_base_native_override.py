@@ -5,7 +5,7 @@ import logging
 import os
 import signal
 import subprocess
-
+import stat
 import time
 import sys
 from typing import Type, Set, Final
@@ -23,10 +23,11 @@ from pymongo import MongoClient
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_routes_callback import \
     StratManagerServiceRoutesCallback
-from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import is_service_up, \
-    get_single_exact_match_strat_from_symbol_n_side, except_n_log_alert, \
-    get_symbol_side_key, get_strats_from_symbol_n_side, config_yaml_dict, \
-    CURRENT_PROJECT_DIR, YAMLConfigurationManager, strat_executor_config_yaml_dict, ps_port
+from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import (
+    is_service_up, get_single_exact_match_strat_from_symbol_n_side, except_n_log_alert,
+    get_symbol_side_key, get_strats_from_symbol_n_side, config_yaml_dict,
+    CURRENT_PROJECT_DIR, YAMLConfigurationManager, strat_executor_config_yaml_dict, ps_port,
+    CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host)
 from Flux.CodeGenProjects.addressbook.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
@@ -36,15 +37,13 @@ from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_servi
 
 
 class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRoutesCallback):
+    Fx_SO_FilePath = CURRENT_PROJECT_SCRIPTS_DIR / f"fx_so.sh"
+
     def __init__(self):
         self.asyncio_loop = None
         self.service_up: bool = False
         self.service_ready: bool = False
         self.static_data: SecurityRecordManager | None = None
-        # restricted variable: don't overuse this will be extended to multi-currency support
-        self.usd_fx_symbol: Final[str] = "USD|SGD"
-        self.fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | None] = {"USD|SGD": None}
-        self.usd_fx = None
         self.pair_strat_id_to_executor_process_dict: Dict[int, subprocess.Popen] = {}
 
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
@@ -135,7 +134,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                             run_coro = self._check_and_create_portfolio_status_and_order_n_portfolio_limits()
                             future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
                             try:
-								# block for task to finish
+                                # block for task to finish
                                 future.result()
                                 self.service_up = True
                                 should_sleep = False
@@ -144,6 +143,9 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                                             f"failed with exception: {e}")
                                 logging.exception(err_str_)
                                 raise Exception(err_str_)
+
+                            # creating and running fx_so.sh
+                            self.create_n_run_fx_so_shell_script()
 
                             self.run_existing_executors()
                         else:
@@ -158,6 +160,22 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     # any periodic refresh code goes here
             else:
                 should_sleep = True
+
+    @staticmethod
+    def create_n_run_fx_so_shell_script():
+        # creating run_symbol_overview.sh file
+        run_fx_symbol_overview_file_path = StratManagerServiceRoutesCallbackBaseNativeOverride.Fx_SO_FilePath
+
+        db_name = os.environ.get("DB_NAME")
+        if db_name is None:
+            db_name = "addressbook"
+
+        md_shell_env_data: MDShellEnvData = (
+            MDShellEnvData(host=ps_host, port=ps_port, db_name=db_name, project_name="addressbook"))
+
+        create_md_shell_script(md_shell_env_data, run_fx_symbol_overview_file_path, "SO")
+        os.chmod(run_fx_symbol_overview_file_path, stat.S_IRWXU)
+        subprocess.Popen([f"{run_fx_symbol_overview_file_path}"])
 
     async def async_run_existing_executors(self) -> None:
         from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
@@ -225,16 +243,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             logging.critical(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
 
-    def get_usd_px(self, px: float, system_symbol: str):
-        """
-        assumes single currency strat for now - may extend to accept symbol and send revised px according to
-        underlying trading currency
-        """
-        return px / self.usd_fx
-
-    def get_local_px_or_notional(self, px_or_notional: float, system_symbol: str):
-        return px_or_notional * self.usd_fx
-
     def app_launch_pre(self):
         self.port = ps_port
         app_launch_pre_thread = threading.Thread(target=self._app_launch_pre_thread_func, daemon=True)
@@ -243,6 +251,15 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     def app_launch_post(self):
         logging.debug("Triggered server launch post override")
+
+        # removing md scripts
+        try:
+            if os.path.exists(StratManagerServiceRoutesCallbackBaseNativeOverride.Fx_SO_FilePath):
+                os.remove(StratManagerServiceRoutesCallbackBaseNativeOverride.Fx_SO_FilePath)
+        except Exception as e:
+            err_str_ = (f"Something went wrong while deleting fx_so shell script, "
+                        f"exception: {e}")
+            logging.error(err_str_)
 
     def get_generic_read_route(self):
         return None

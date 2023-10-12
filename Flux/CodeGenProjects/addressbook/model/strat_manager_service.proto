@@ -405,3 +405,12 @@ message House{
 message PairStratList {
   repeated PairStrat pair_strat = 1;
 }
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+  optional ButtonType temp = 1;
+  optional CommandType temp2 = 2;
+  optional DummyEnumDP temp3 = 3;
+  optional Severity temp4 = 4;
+  optional ReferencePxType temp5 = 5;
+}

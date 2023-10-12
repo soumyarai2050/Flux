@@ -625,3 +625,13 @@ message TradeSimulatorReloadConfig{
   };
   required bool resp = 1;
 }
+
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+  optional ButtonType temp = 1;
+  optional Severity temp2 = 2;
+  optional DummyEnumDMS temp3 = 3;
+  optional DummyEnumMS temp4 = 4;
+  optional CommandType temp5 = 5;
+}
