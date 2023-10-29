@@ -153,7 +153,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "import axios from 'axios';\n"
         output_str += "import _, { cloneDeep } from 'lodash';\n"
         output_str += "/* project constants */\n"
-        output_str += "import { DB_ID, API_ROOT_URL, API_ROOT_CACHE_URL, Modes } from '../constants';\n"
+        output_str += "import { DB_ID, API_ROOT_URL, API_ROOT_CACHE_URL, Modes, PROXY_SERVER } from '../constants';\n"
         output_str += "/* common util imports */\n"
         if not self.current_message_is_dependent:
             if message.proto.name not in self.dependent_to_abbreviated_relation_msg_name_dict.values():
@@ -199,7 +199,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             if (not self.current_message_is_dependent and
                     self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
                 output_str += "    const { url } = payload;\n"
-                output_str += "    return axios.get(`${url}/" + f"get-all-{message_name_snake_cased}`)\n"
+                output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                output_str += "    return axios.get(`${serverUrl}/" + f"get-all-{message_name_snake_cased}`)\n"
             else:
                 output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
             output_str += "        .then(res => res.data)\n"
@@ -235,8 +236,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     def handle_get_export_out_str(self, message_name: str, message_name_camel_cased: str) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"export const get{message_name} = createAsyncThunk('{message_name_camel_cased}/get', " \
-                     "async (id, { rejectWithValue }) => " + "{\n"
-        output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-{message_name_snake_cased}"+"/${id}`)\n"
+                     "async (payload, { rejectWithValue }) => " + "{\n"
+        output_str += "    const { url, id } = payload;\n"
+        output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+        output_str += "    return axios.get(`${serverUrl}/" + f"get-{message_name_snake_cased}"+"/${id}`)\n"
         output_str += "        .then(res => res.data)\n"
         output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
         output_str += "})\n\n"
@@ -250,7 +253,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                          "async (payload, { rejectWithValue }) => " + "{\n"
             if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
                 output_str += "    const { url, data } = payload;\n"
-                output_str += "    return axios.post(`${url}/create-" + f"{message_name_snake_cased}" + \
+                output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                output_str += "    return axios.post(`${serverUrl}/create-" + f"{message_name_snake_cased}" + \
                               "`, data)\n"
             else:
                 native_url = get_native_url_js_layout_var_name()
@@ -298,7 +302,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             if (not self.current_message_is_dependent and
                     self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
                 output_str += "    const { url, data } = payload;\n"
-                output_str += ("    return axios.patch(`${url}/patch-" +
+                output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                output_str += ("    return axios.patch(`${serverUrl}/patch-" +
                                f"{message_name_snake_cased}"+"`, data)\n")
             else:
                 native_url = get_native_url_js_layout_var_name()
@@ -426,7 +431,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     def handle_update_out_str(self, message: protogen.Message, message_name: str,
                               message_name_camel_cased: str) -> str:
         output_str = f"        [update{message_name}.pending]: (state) => " + "{\n"
-        output_str += f"            state.loading = true;\n"
+        # output_str += f"            state.loading = true;\n"
         output_str += f"            state.error = null;\n"
         output_str += "        },\n"
         output_str += f"        [update{message_name}.fulfilled]: (state, action) => " + "{\n"
@@ -574,7 +579,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "    openWsPopup: false,\n"
         output_str += "    forceUpdate: false,\n"
         if (message_name in self.repeated_layout_msg_name_list and
-                self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+                self._get_ui_msg_dependent_msg_name_from_another_proto(message)):
             output_str += "    url: null,\n"
         if self.current_message_is_dependent:
             output_str += "    mode: Modes.READ_MODE,\n"
@@ -769,7 +774,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                                "{\n")
                 output_str += (f"            state.{message_name_camel_cased} = "
                                f"initialState.{message_name_camel_cased};\n")
-                output_str += "            state.url = null;\n"
+                if self._get_ui_msg_dependent_msg_name_from_another_proto(message):
+                    output_str += "            state.url = null;\n"
                 output_str += "        },\n"
         output_str += "        resetError: (state) => {\n"
         output_str += "            state.error = initialState.error;\n"
@@ -790,7 +796,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "            state.forceUpdate = action.payload;\n"
         output_str += "        },\n"
         if (message_name in self.repeated_layout_msg_name_list and
-                self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+                self._get_ui_msg_dependent_msg_name_from_another_proto(message)):
             output_str += "        setUrl: (state, action) => {\n"
             output_str += "            state.url = action.payload;\n"
             output_str += "        }\n"
@@ -855,7 +861,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "export const { " + f"set{message_name}Ws, resetError" \
                           f", setUserChanges, setDiscardedChanges, setActiveChanges"
             if (message_name in self.repeated_layout_msg_name_list and
-                    self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+                    self._get_ui_msg_dependent_msg_name_from_another_proto(message)):
                 output_str += f", setUrl, reset{message_name}"
             output_str += " }" + f" = {message_name_camel_cased}Slice.actions;\n"
 
@@ -897,5 +903,3 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
 
 if __name__ == "__main__":
     main(JsSliceFileGenPlugin)
-#         if (message_name in self.repeated_layout_msg_name_list and
-#                 self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):

@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import os
-from typing import Dict
+from typing import Dict, ClassVar, Final
 import time
 from pathlib import PurePath
 import logging
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from FluxPythonUtils.scripts.utility_functions import parse_to_int, YAMLConfigurationManager
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
@@ -14,6 +14,10 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
+
+ui_proxy_project_dir = PurePath(__file__).parent.parent.parent / "CodeGenProjects" / "ui_proxy"
+ui_proxy_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(
+    str(ui_proxy_project_dir / "data" / "config.yaml"))
 
 
 class JsConstantsGenPlugin(BaseJSLayoutPlugin):
@@ -39,12 +43,22 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
 
     def handle_api_root_url(self, file: protogen.File) -> str:
         beanie_port = os.environ.get("BEANIE_PORT")
+        proxy_server = os.environ.get("PROXY_SERVER")
         if beanie_port is None or len(beanie_port) == 0:
             err_str = (f"Env var 'BEANIE_PORT' found as '{beanie_port}', "
                        f"likely bug in setting env var from launch of this plugin")
             logging.error(err_str)
             raise Exception(err_str)
-        output_str = f"export const API_ROOT_URL = 'http://{self.host}:{beanie_port}/{self.proto_package_name}';\n"
+        output_str = f"export const PROXY_SERVER = {proxy_server.lower()};\n"
+        ui_proxy_host: str = ui_proxy_config_yaml_dict.get("server_host")
+        ui_proxy_port: str = ui_proxy_config_yaml_dict.get("server_port")
+        if (ui_proxy_host is None or len(ui_proxy_host) == 0) or (ui_proxy_port is None or len(ui_proxy_port) == 0):
+            err_str = "Couldn't find host or port for ui_proxy project from ui_proxy/data/config.yaml file"
+            logging.error(err_str)
+            raise Exception(err_str)
+        output_str += f"export const PROXY_SERVER_URL = 'http://{ui_proxy_host}:{ui_proxy_port}/ui_proxy';\n"
+        output_str += (f"export const API_ROOT_URL = PROXY_SERVER ? PROXY_SERVER_URL : "
+                       f"'http://{self.host}:{beanie_port}/{self.proto_package_name}';\n")
 
         cache_port = os.environ.get("CACHE_PORT")
         if cache_port is None or len(cache_port) == 0:

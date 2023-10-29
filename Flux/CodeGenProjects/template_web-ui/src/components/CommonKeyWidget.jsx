@@ -1,5 +1,5 @@
 import React, { Fragment, useState } from 'react';
-import { Box, Tooltip, ClickAwayListener } from '@mui/material';
+import { Box, Tooltip, ClickAwayListener, IconButton } from '@mui/material';
 import PropTypes from 'prop-types';
 import {
     clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt, groupCommonKeys,
@@ -12,6 +12,8 @@ import classes from './CommonKeyWidget.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { useTheme } from '@emotion/react';
+import CopyToClipboard from './CopyToClipboard';
+import { ContentCopy } from '@mui/icons-material';
 dayjs.extend(utc);
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
@@ -20,7 +22,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
         if (commonKeyObj.value === undefined || commonKeyObj.value === null ||
             (Array.isArray(commonKeyObj.value) && commonKeyObj.value.length === 0) ||
             (_.isObject(commonKeyObj.value) && _.keys(commonKeyObj.value).length === 0)) {
-                return false;
+            return false;
         }
         return true;
     })
@@ -35,7 +37,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
     commonkeys = groupCommonKeys(commonkeys);
 
     return (
-        <Box ref={ref} className={classes.container} sx={{bgcolor: 'background.commonKey'}}>
+        <Box ref={ref} className={classes.container} sx={{ bgcolor: 'background.commonKey' }}>
             {commonkeys.map((collection, i) => {
                 return (
                     <Fragment key={i}>
@@ -55,6 +57,7 @@ CommonKeyWidget.propTypes = {
 
 const CommonKey = (props) => {
     const [open, setOpen] = useState(false);
+    const [clipboardText, setClipboardText] = useState(null);
     const { collection } = props;
 
     const theme = useTheme();
@@ -65,6 +68,10 @@ const CommonKey = (props) => {
 
     const onCloseAbbreviatedField = () => {
         setOpen(false);
+    }
+
+    const copyHandler = (text) => {
+        setClipboardText(text);
     }
 
     let abbreviatedJsonClass = '';
@@ -93,26 +100,36 @@ const CommonKey = (props) => {
                 tooltipText = (
                     <>
                         {lines.map((line, idx) => (
-                            <p key={idx}>{line}</p>
+                            <p key={idx}>
+                                {idx === 0 && (
+                                    <IconButton className={classes.icon} size='small' onClick={() => copyHandler(updatedData)}>
+                                        <ContentCopy fontSize='small' />
+                                    </IconButton>
+                                )}
+                                {line}
+                            </p>
                         ))}
                     </>
                 )
             }
             abbreviatedField = (
-                <ClickAwayListener onClickAway={onCloseAbbreviatedField}>
-                    <div className={classes.abbreviated_json}>
-                        <Tooltip
-                            title={tooltipText}
-                            placement="bottom-start"
-                            open={open}
-                            onClose={onCloseAbbreviatedField}
-                            disableFocusListener
-                            disableHoverListener
-                            disableTouchListener>
-                            <span>{updatedData}</span>
-                        </Tooltip >
-                    </div>
-                </ClickAwayListener>
+                <>
+                    <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
+                    <ClickAwayListener onClickAway={onCloseAbbreviatedField}>
+                        <div className={classes.abbreviated_json}>
+                            <Tooltip
+                                title={tooltipText}
+                                placement="bottom-start"
+                                open={open}
+                                onClose={onCloseAbbreviatedField}
+                                disableFocusListener
+                                disableHoverListener
+                                disableTouchListener>
+                                <span>{updatedData}</span>
+                            </Tooltip >
+                        </div>
+                    </ClickAwayListener>
+                </>
             )
         }
     }
@@ -150,8 +167,8 @@ const CommonKey = (props) => {
 
     return (
         <Box className={classes.item}>
-            {collection.groupStart && <span style={{color: `${groupIndicatorColor}`}} className={classes.group_indicator}>{collection.parentxpath}: [ </span>}
-            <span style={{color: `${commonkeyTitleColor}`}}>
+            {collection.groupStart && <span style={{ color: `${groupIndicatorColor}` }} className={classes.group_indicator}>{collection.parentxpath}: [ </span>}
+            <span style={{ color: `${commonkeyTitleColor}` }}>
                 {collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}:
             </span>
             {collection.abbreviated && collection.abbreviated === "JSON" ? (
@@ -159,11 +176,11 @@ const CommonKey = (props) => {
                     {abbreviatedField}
                 </span>
             ) : (
-                <span style={{color: `${commonkeyColor}`}}>
+                <span style={{ color: `${commonkeyColor}` }}>
                     {value}{numberSuffix}
                 </span>
             )}
-            {collection.groupEnd && <span style={{color: `${groupIndicatorColor}`}} className={classes.group_indicator}> ]</span>}
+            {collection.groupEnd && <span style={{ color: `${groupIndicatorColor}` }} className={classes.group_indicator}> ]</span>}
         </Box>
     )
 }

@@ -3,9 +3,9 @@ import { useSelector } from 'react-redux';
 import _, { cloneDeep, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener, InputAdornment } from '@mui/material';
+import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener, InputAdornment, IconButton } from '@mui/material';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
-import { Error } from '@mui/icons-material';
+import { ContentCopy, Error } from '@mui/icons-material';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
@@ -19,6 +19,7 @@ import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import classes from './Cell.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import CopyToClipboard from './CopyToClipboard';
 dayjs.extend(utc);
 
 const Cell = (props) => {
@@ -40,6 +41,7 @@ const Cell = (props) => {
     const [open, setOpen] = useState(false);
     const [oldValue, setOldValue] = useState(null);
     const [newUpdateClass, setNewUpdateClass] = useState("");
+    const [clipboardText, setClipboardText] = useState(null);
     const timeoutRef = useRef(null);
     const validationError = useRef(null);
     const [inputValue, setInputValue] = useState(currentValue);
@@ -116,6 +118,10 @@ const Cell = (props) => {
             onFocusOut();
         }
     }, [])
+
+    const copyHandler = (text) => {
+        setClipboardText(text);
+    }
 
     let type = DataTypes.STRING;
     let enumValues = [];
@@ -538,13 +544,21 @@ const Cell = (props) => {
                 tooltipText = (
                     <>
                         {lines.map((line, idx) => (
-                            <p key={idx}>{line}</p>
+                            <p key={idx}>
+                                {idx === 0 && (
+                                    <IconButton className={classes.icon} size='small' onClick={() => copyHandler(updatedData)}>
+                                        <ContentCopy fontSize='small' />
+                                    </IconButton>
+                                )}
+                                {line}
+                            </p>
                         ))}
                     </>
                 )
             }
             return (
                 <TableCell className={`${classes.cell} ${classes.abbreviated_json_cell} ${tableCellRemove}`} align='center' size='medium' onClick={onOpenTooltip}>
+                    <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
                     <ClickAwayListener onClickAway={onCloseTooltip}>
                         <div className={classes.abbreviated_json_cell}>
                             <Tooltip

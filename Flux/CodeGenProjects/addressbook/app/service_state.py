@@ -26,7 +26,7 @@ class ServiceState(BaseModel):
             return 0
 
     def handle_exception(self, e: Exception):
-        error_str: str = f"{self.error_prefix}{e}"
+        error_str: str = f"{self.error_prefix} failed;;;exception: {e}"
         logging.error(error_str, exc_info=True)
         if (last_error_interval_in_sec := self.record_error(e)) == 0:
             # raise alert

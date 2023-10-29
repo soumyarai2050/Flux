@@ -14,7 +14,8 @@ from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_v
     create_n_verify_portfolio_status, create_fx_symbol_overview, clean_all_collections_ignoring_ui_layout, \
     test_config_file_path, clean_today_activated_ticker_dict, clear_cache_in_model, \
     ps_config_yaml_dict, PAIR_STRAT_BEANIE_PORT, LOG_ANALYZER_BEANIE_PORT, log_analyzer_web_client, \
-    strat_manager_service_native_web_client, renew_portfolio_alert, clean_executors_and_today_activated_symbol_side_lock_file
+    strat_manager_service_native_web_client, renew_portfolio_alert, \
+    clean_executors_and_today_activated_symbol_side_lock_file
 # from CodeGenProjects.strat_executor.app.trading_link_base import TradingLinkBase, executor_config_yaml_path
 # from CodeGenProjects.strat_executor.app.trade_simulator import TradeSimulator
 
@@ -282,7 +283,7 @@ def expected_strat_limits_():
     yield StratLimitsBaseModel(**{
       "max_open_orders_per_side": 5,
       "max_cb_notional": 300000,
-      "max_open_cb_notional": 30000,
+      "max_open_cb_notional": 300000,
       "max_net_filled_notional": 160000,
       "max_concentration": 10,
       "limit_up_down_volume_participation_rate": 1,
@@ -338,10 +339,10 @@ def expected_brokers_(buy_sell_symbol_list) -> List[Broker]:
 
 @pytest.fixture()
 def expected_portfolio_limits_(expected_brokers_):
-    rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
-    rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
+    rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
+    rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=15, rolling_tx_count_period_seconds=2)
 
-    portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
+    portfolio_limits_obj = PortfolioLimitsBaseModel(_id=1, max_open_baskets=20, max_open_notional_per_side=2_000_000,
                                                     max_gross_n_open_notional=2_400_000,
                                                     rolling_max_order_count=rolling_max_order_count,
                                                     rolling_max_reject_count=rolling_max_reject_count,
@@ -404,7 +405,7 @@ def expected_strat_brief_(pair_securities_with_sides_):
                                                                      pair_securities_with_sides_["side2"])
     yield StratBriefBaseModel(pair_buy_side_trading_brief=pair_buy_side_trading_brief,
                               pair_sell_side_trading_brief=pair_sell_side_trading_brief,
-                              consumable_nett_filled_notional=0)
+                              consumable_nett_filled_notional=160_000)
 
 
 @pytest.fixture()
@@ -495,7 +496,8 @@ def expected_buy_order_snapshot_(pair_securities_with_sides_):
             "qty": 0,
             "order_notional": 0,
             "underlying_account": "trading_account",
-            "text": []
+            "text": [],
+            "exchange": "trading_exchange"
         },
         "filled_qty": 0,
         "avg_fill_px": 0,
@@ -568,7 +570,8 @@ def expected_sell_order_snapshot_(pair_securities_with_sides_):
             "qty": 0,
             "order_notional": 0,
             "underlying_account": "trading_account",
-            "text": []
+            "text": [],
+            "exchange": "trading_exchange"
         },
         "filled_qty": 0,
         "avg_fill_px": 0,

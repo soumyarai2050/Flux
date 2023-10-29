@@ -73,7 +73,6 @@ message WidgetUIDataElement {
                                           // on which current model is dependent
   optional bool depends_on_other_model_for_id = 18 [default=false];
   optional bool depends_on_other_model_for_dynamic_url = 19 [default=false];
-  repeated ColumnOrder column_orders = 20;
 }
 
 message ColumnOrder {
@@ -91,6 +90,7 @@ message WidgetUIData{
   optional bool truncate_date_time = 6 [default = false];
   // for UI to store the bounded id value
   optional string bind_id_val = 7;
+  repeated ColumnOrder column_orders = 8;
 }
 
 message UIButton{

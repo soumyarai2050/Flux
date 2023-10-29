@@ -27,7 +27,8 @@ from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import (
     is_service_up, get_single_exact_match_strat_from_symbol_n_side, except_n_log_alert,
     get_symbol_side_key, get_strats_from_symbol_n_side, config_yaml_dict,
     CURRENT_PROJECT_DIR, YAMLConfigurationManager, strat_executor_config_yaml_dict, ps_port,
-    CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host)
+    CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_portfolio_status,
+    get_new_portfolio_limits, get_new_order_limits, CURRENT_PROJECT_DATA_DIR)
 from Flux.CodeGenProjects.addressbook.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
@@ -60,13 +61,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         async with PortfolioStatus.reentrant_lock:
             portfolio_status_list: List[PortfolioStatus] = await underlying_read_portfolio_status_http()
             if 0 == len(portfolio_status_list):  # no portfolio status set yet, create one
-                portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, kill_switch=False,
-                                                                    portfolio_alerts=[],
-                                                                    overall_buy_notional=0,
-                                                                    overall_sell_notional=0,
-                                                                    overall_buy_fill_notional=0,
-                                                                    overall_sell_fill_notional=0,
-                                                                    alert_update_seq_num=0)
+                portfolio_status: PortfolioStatus = get_new_portfolio_status()
                 await underlying_create_portfolio_status_http(portfolio_status)
 
     @staticmethod
@@ -77,9 +72,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         async with OrderLimits.reentrant_lock:
             order_limits_list: List[OrderLimits] = await underlying_read_order_limits_http()
             if 0 == len(order_limits_list):  # no order_limits set yet, create one
-                order_limits: OrderLimits = OrderLimits(_id=1, max_basis_points=1500, max_px_deviation=20,
-                                                        max_px_levels=5, max_order_qty=500, min_order_notional=100,
-                                                        max_order_notional=90_000)
+                order_limits: OrderLimits = get_new_order_limits()
                 await underlying_create_order_limits_http(order_limits)
 
     @staticmethod
@@ -90,17 +83,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         async with PortfolioLimits.reentrant_lock:
             portfolio_limits_list: List[PortfolioLimits] = await underlying_read_portfolio_limits_http()
             if 0 == len(portfolio_limits_list):  # no portfolio_limits set yet, create one
-                rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5,
-                                                               rolling_tx_count_period_seconds=2)
-                rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5,
-                                                                rolling_tx_count_period_seconds=2)
-
-                portfolio_limits = PortfolioLimits(_id=1, max_open_baskets=20,
-                                                   max_open_notional_per_side=100_000,
-                                                   max_gross_n_open_notional=2_400_000,
-                                                   rolling_max_order_count=rolling_max_order_count,
-                                                   rolling_max_reject_count=rolling_max_reject_count,
-                                                   eligible_brokers=None)
+                portfolio_limits = get_new_portfolio_limits()
                 await underlying_create_portfolio_limits_http(portfolio_limits)
 
     @staticmethod
@@ -127,7 +110,11 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
                 if self.service_up:
-                    self.service_ready = True
+                    if not self.service_ready:
+                        # running all existing executor
+                        self.run_existing_executors()
+                        self.service_ready = True
+                        print(f"INFO: service is ready: {datetime.datetime.now().time()}")
                 if not self.service_up:
                     try:
                         if is_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
@@ -146,8 +133,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
                             # creating and running fx_so.sh
                             self.create_n_run_fx_so_shell_script()
-
-                            self.run_existing_executors()
                         else:
                             should_sleep = True
                             service_up_no_error_retry_count -= 1
@@ -249,6 +234,13 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         app_launch_pre_thread.start()
         logging.debug("Triggered server launch pre override")
 
+    async def _get_pair_strats(self):
+        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
+            underlying_read_pair_strat_http)
+
+        pair_strats = await underlying_read_pair_strat_http()
+        return pair_strats
+
     def app_launch_post(self):
         logging.debug("Triggered server launch post override")
 
@@ -257,8 +249,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             if os.path.exists(StratManagerServiceRoutesCallbackBaseNativeOverride.Fx_SO_FilePath):
                 os.remove(StratManagerServiceRoutesCallbackBaseNativeOverride.Fx_SO_FilePath)
         except Exception as e:
-            err_str_ = (f"Something went wrong while deleting fx_so shell script, "
-                        f"exception: {e}")
+            err_str_ = f"Something went wrong while deleting fx_so shell script, exception: {e}"
             logging.error(err_str_)
 
     def get_generic_read_route(self):
@@ -453,7 +444,29 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         updated_pair_strat_obj_dict["last_active_date_time"] = DateTime.utcnow()
         return updated_pair_strat_obj_dict
 
+    async def update_pair_strat_to_non_running_state_query_pre(self, pair_strat_class_type: Type[PairStrat],
+                                                               pair_strat_id: int):
+        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
+            underlying_partial_update_pair_strat_http)
+
+        pair_strat = PairStratOptional(_id=pair_strat_id)
+        pair_strat.port = None
+        pair_strat.is_partially_running = False
+        pair_strat.is_executor_running = False
+
+        update_pair_strat = await underlying_partial_update_pair_strat_http(jsonable_encoder(pair_strat, by_alias=True,
+                                                                                             exclude_none=True))
+        return [update_pair_strat]
+
     async def _start_executor_server(self, pair_strat: PairStrat) -> None:
+        if pair_strat.port is not None:
+            # If pair strat already exists and executor already have run before
+            from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
+                underlying_update_pair_strat_to_non_running_state_query_http)
+
+            await underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id)
+        # else not required: if it is newly created pair strat then already values are False
+
         code_gen_projects_dir = PurePath(__file__).parent.parent.parent
         executor_path = code_gen_projects_dir / "strat_executor" / "scripts" / 'launch_beanie_fastapi.py'
         executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', '&'])

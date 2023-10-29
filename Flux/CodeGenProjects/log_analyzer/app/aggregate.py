@@ -3,6 +3,7 @@ from typing import Dict, Tuple, Type
 import os
 
 os.environ["DBType"] = "beanie"
+# Below unused import is used by generated beanie file
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import (
     PortfolioAlertBaseModel, StratAlertBaseModel)

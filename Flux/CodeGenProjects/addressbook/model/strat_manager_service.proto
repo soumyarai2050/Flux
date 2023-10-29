@@ -172,6 +172,11 @@ message PairStrat{
       QueryParamsDataType: "List[str]",
       QueryType: WS
   };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "update_pair_strat_to_non_running_state",
+    QueryParams: "pair_strat_id",
+    QueryParamsDataType: "int"
+  };
   option (FluxMsgExecutorOptions) = {
       IsWebSocketModel: true,
       EnableNotifyAll: false,

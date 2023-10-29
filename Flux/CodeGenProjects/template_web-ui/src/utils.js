@@ -21,7 +21,7 @@ const primitiveDataTypes = [DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBE
 export const FLOAT_POINT_PRECISION = 2;
 export const Message = {
     REQUIRED_FIELD: 'required field cannot be null',
-    UNSPECIFIED_FIELD: 'enum field cannot be unset / UNSPECIFIED',
+    UNSPECIFIED_FIELD: 'required enum field cannot be unset / UNSPECIFIED',
     MAX: 'field value exceeds the max limit',
     MIN: 'field value exceeds the min limit'
 }
@@ -388,7 +388,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
         for (const key in additionalProps) {
             const prop = complexFieldProps.find(({ usageName }) => usageName === key);
             if (prop) {
-                currentSchema[prop.propertyName] = additionalProps[key]
+                currentSchema[prop.propertyName] = additionalProps[key];
             } else {
                 delete additionalProps[key];
             }
@@ -396,7 +396,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
     }
 
     let object = {};
-    Object.keys(currentSchema.properties).map((propname) => {
+    Object.keys(currentSchema.properties).map(propname => {
         let metadata = currentSchema.properties[propname];
         const xpath = objectxpath ? objectxpath + '.' + propname : propname;
 
@@ -1960,8 +1960,8 @@ export function excludeNullFromObject(obj) {
     */
     if (_.isObject(obj)) {
         for (const key in obj) {
-            if (obj[key] === null) {
-                // delete key with null values
+            if (obj[key] === null || (typeof obj[key] === DataTypes.STRING && obj[key].includes('_UNSPECIFIED'))) {
+                // delete key with null values or enum with UNSPECIFIED values
                 delete obj[key];
             } else if (_.isObject(obj[key])) {
                 excludeNullFromObject(obj[key]);
@@ -2129,7 +2129,7 @@ export function validateConstraints(metadata, value, min, max) {
         // else not required: value is set
     }
     // Check if enum field has "UNSPECIFIED" value
-    if (metadata.type === DataTypes.ENUM) {
+    if (metadata.type === DataTypes.ENUM && metadata.required) {
         if (value && value.includes('UNSPECIFIED')) {
             errors.push(Message.UNSPECIFIED_FIELD);
         }
@@ -2971,11 +2971,16 @@ export function getServerUrl(widgetSchema, linkedObj, runningField) {
     if (widgetSchema.connection_details) {
         const connectionDetails = widgetSchema.connection_details;
         const { host, port, project_name } = connectionDetails;
-        if (connectionDetails.dynamic_url) {
+        // set url only if linkedObj running field is set to true for dynamic as well as static
+        if (widgetSchema.widget_ui_data_element.depending_proto_model_name) {
             if (linkedObj && Object.keys(linkedObj).length > 0 && _.get(linkedObj, runningField)) {
-                const hostxpath = host.substring(host.indexOf('.') + 1);
-                const portxpath = port.substring(port.indexOf('.') + 1);
-                return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                if (connectionDetails.dynamic_url) {
+                    const hostxpath = host.substring(host.indexOf('.') + 1);
+                    const portxpath = port.substring(port.indexOf('.') + 1);
+                    return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                } else {
+                    return `http://${host}:${port}/${project_name}`;
+                }
             }
         } else {
             return `http://${host}:${port}/${project_name}`;

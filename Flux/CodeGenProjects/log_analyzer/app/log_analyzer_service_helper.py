@@ -37,7 +37,7 @@ def is_log_analyzer_service_up(ignore_error: bool = False) -> bool:
     except Exception as _e:
         if not ignore_error:
             logging.exception("is_executor_service_up test failed - tried "
-                              "is_strat_ongoing_query_client ;;;"
+                              "get_all_ui_layout_client ;;;"
                               f"exception: {_e}", exc_info=True)
         # else not required - silently ignore error is true
         return False

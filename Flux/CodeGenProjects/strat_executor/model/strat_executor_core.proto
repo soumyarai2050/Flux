@@ -5,46 +5,6 @@ import "flux_options.proto";
 
 package strat_executor;
 
-
-enum OrderEventType{
-  OE_UNSPECIFIED = 0;
-  OE_NEW = 1;
-  OE_ACK = 2;
-  OE_CXL = 3;
-  OE_CXL_ACK = 4;
-  OE_CXL_REJ = 5;
-  OE_REJ = 6;
-}
-
-enum OrderStatusType{
-  OE_UNACK = 0;
-  OE_ACKED = 1;
-  OE_CXL_UNACK = 2;
-  OE_DOD = 3;
-  OE_FILLED = 4;
-  OE_OVER_FILLED = 5;
-}
-
-message PairSideTradingBrief{
-  required Security security = 1;
-  required Side side = 2;
-  required string last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
-  optional float consumable_open_orders = 4 [(FluxFldHelp) = "max_open_orders_per_side - open_orders for this symbol side"];
-  optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_cb_notional - filled_notional - open_notional"];
-  optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_open_cb_notional - open_notional"];
-  optional int64 consumable_concentration = 7 [(FluxFldHelp) = "(total_trading_security_size/100*max_concentration) - (open_qty + filled_qty)"];
-  optional float participation_period_order_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all order qty in the MarketTradeVolumeParticipation.applicable_period_seconds irrespective of how the order fared in the market: open, filled , cancelled; if applicable_period_seconds is 0 , directly use SymbolSideSnapshot.total_qty"];
-  optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
-  //True hybrid field - depends on both market data and order / fill update (order trigger re-evaluates these in-process (no DB update) to avoid otherwise race condition between trading and market data updates trying to update same value in DB). This means the value in DB only accounts for Trading updates - market data updates are only applied at the time of trading updates - i.e. no RT market data based recompute and setting of value in DB
-  optional float indicative_consumable_participation_qty = 10 [(FluxFldHelp) = "((participation_period_last_trade_qty_sum / 100) * MarketTradeVolumeParticipation.max_participation_rate) - participation_period_order_qty_sum"];
-  optional int64 residual_qty = 15 [(FluxFldHelp) = "For DOD order: Any un-filled qty (which is order qty - fill qty)"];
-  // Another hybrid total_trading_security_size (refer total_trading_security_size description to understand handling of such hybrids)
-  optional float indicative_consumable_residual = 11 [(FluxFldHelp) = "max_residual - ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px))"];
-  optional float all_bkr_cxlled_qty = 12 [(FluxFldHelp) = "sum of all bkr cancels for this leg"];
-  optional float open_notional = 13 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "(symbol specific total qty * symbol_avg_px) - fill notional - (cxlled/rejected qty * symbol_avg_px)"];
-  optional float open_qty = 14 [(FluxFldHelp) = "sum of all open order qty for this leg: reduce if order is filled / rejected / cancelled (symbol side snapshot based compute)"];
-}
-
 message Residual{
   required Security security = 1 [(FluxFldHelp) = "security of leg with > residual_qty*last_px"];
   required float residual_notional = 2 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "absolute of ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px) only if the value remains non 0 post residual_mark_seconds interval else 0 (in non 0 case mark the remaining non zero as residual and pull that qty form the market)"];

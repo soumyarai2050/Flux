@@ -5,12 +5,16 @@ from pendulum import DateTime
 from Flux.CodeGenProjects.dashboards.generated.Pydentic.dashboards_service_model_imports import *
 from Flux.CodeGenProjects.dashboards.generated.FastApi.dashboards_service_routes_callback import \
     DashboardsServiceRoutesCallback
+from Flux.CodeGenProjects.dashboards.app.dashboards_service_helper import *
 
 
 class DashboardsServiceRoutesCallbackBaseNativeOverride(DashboardsServiceRoutesCallback):
     def __init__(self):
         super().__init__()
         pass
+
+    def app_launch_pre(self):
+        self.port = dsb_port
 
     async def search_n_update_dash_query_pre(self, dash_class_type: Type[Dash], payload_dict: Dict[str, Any]):
         # To be implemented in main callback override file

@@ -1,0 +1,36 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "projects_core.proto";
+import "strat_executor_n_post_trade_engine_core.proto";
+
+package post_trade_engine;
+
+message CheckPortfolioLimits{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "check_portfolio_limits",
+      QueryParams: "strat_id",
+      QueryParamsDataType: "int"
+      QueryParams: "order_journal",
+      QueryParamsDataType: "OrderJournalBaseModel",
+      QueryParams: "order_snapshot",
+      QueryParamsDataType: "OrderSnapshotBaseModel",
+      QueryParams: "strat_brief",
+      QueryParamsDataType: "StratBriefBaseModel",
+      QueryRouteType: PATCH
+  };
+  required bool check_result = 1;
+}
+
+message PauseAllStrats{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "pause_all_strats"
+  };
+  required bool result = 1;
+}
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+  optional DummyEnumSO temp1 = 1;
+  optional DummyEnumP temp2 = 2;
+}

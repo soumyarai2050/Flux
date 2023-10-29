@@ -59,6 +59,7 @@ def generic_http_get_client(url: str, query_param: Any, pydantic_type):
             url = f"{url}{query_param}"
         else:
             url = f"{url}/{query_param}"
+
     # else not required: When used for queries, like get last date query, there is no query_param in case of query
     response: requests.Response = requests.get(url)
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)

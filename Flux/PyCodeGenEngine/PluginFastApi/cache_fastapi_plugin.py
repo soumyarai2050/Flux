@@ -23,6 +23,11 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_routes_file_handler import Fa
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_file_handler import FastapiCallbackOverrideFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_callback_override_set_instance_handler import \
     FastapiCallbackOverrideSetInstanceHandler
+from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+
+
+flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
 
 
 class CacheFastApiPlugin(FastapiCallbackFileHandler,
@@ -40,7 +45,8 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
-    def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
+    def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message],
+                                                 avoid_non_roots: bool | None = None):
         for message in message_list:
             if ((is_json_root := self.is_option_enabled(message, CacheFastApiPlugin.flux_msg_json_root)) or
                     self.is_option_enabled(message, CacheFastApiPlugin.flux_msg_json_root_time_series)):
@@ -80,9 +86,10 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
                 else:
                     self.int_id_message_list.append(message)
             else:
-                if message not in self.non_root_message_list:
-                    self.non_root_message_list.append(message)
-                # else not required: avoiding repetition
+                if not avoid_non_roots:
+                    if message not in self.non_root_message_list:
+                        self.non_root_message_list.append(message)
+                    # else not required: avoiding repetition
 
             if self.is_option_enabled(message, CacheFastApiPlugin.flux_msg_json_query):
                 if message not in self.message_to_query_option_list_dict:
@@ -150,6 +157,16 @@ class CacheFastApiPlugin(FastapiCallbackFileHandler,
         # Pre-code generation initializations
         self.load_root_and_non_root_messages_in_dicts(file.messages)
         self.set_req_data_members(file)
+
+        # Adding messages from core proto files having json_root option
+        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        if core_or_util_files is not None:
+            for dependency_file in file.dependencies:
+                if dependency_file.proto.name in core_or_util_files:
+                    self.load_root_and_non_root_messages_in_dicts(dependency_file.messages, avoid_non_roots=True)
+                # else not required: if dependency file name not in core_or_util_files
+                # config list, avoid messages from it
+        # else not required: core_or_util_files key is not in yaml dict config
 
         output_dict: Dict[str, str] = {
             # Adding project´s main.py

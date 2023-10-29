@@ -587,14 +587,7 @@ class BaseProtoPlugin(ABC):
                     else:
                         field_name = f"{field.proto.name}"
                     projection_val_to_fields_dict[projection_key].append(field_name)
-
-        if not projection_val_to_fields_dict:
-            err_str = (f"Could not find option {BaseProtoPlugin.flux_fld_projections} set on any field "
-                       f"of message {message.proto.name}")
-            logging.exception(err_str)
-            raise Exception(err_str)
-        else:
-            return projection_val_to_fields_dict
+        return projection_val_to_fields_dict
 
     @staticmethod
     def get_projection_temp_query_name_to_generated_query_name_dict(message: protogen.Message) -> Dict[str, str]:

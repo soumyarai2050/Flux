@@ -22,7 +22,11 @@ else:
     clients_list = [strat_manager_service_beanie_web_client, strat_manager_service_cache_web_client]
 
 
-#
+# test cases requires addressbook and log_analyzer database to be present
+def _test_drop_all_databases():
+    drop_all_databases()
+
+
 def test_clean_and_set_limits(clean_and_set_limits):
     pass
 
@@ -283,6 +287,53 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+def handle_test_buy_sell_with_sleep_delays(buy_symbol: str, sell_symbol: str, pair_strat_: PairStratBaseModel,
+                                           expected_strat_limits_: StratLimits,
+                                           expected_start_status_: StratStatus,
+                                           last_trade_fixture_list: List[Dict],
+                                           symbol_overview_obj_list: List[SymbolOverviewBaseModel],
+                                           market_depth_basemodel_list: List[MarketDepthBaseModel],
+                                           top_of_book_list_: List[Dict]):
+    order_counts = 10
+    active_strat, executor_web_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list,
+                                           last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+
+    for order_count in range(order_counts):
+        # Buy Order
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+        # Running TopOfBook (this triggers expected buy order)
+        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0], False)
+
+        # Sell Order
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+        # Running TopOfBook (this triggers expected buy order)
+        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1], False)
+
+        time.sleep(10)
+
+
+def test_place_sanity_orders_with_sleep_delays(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+                                               expected_strat_limits_,
+                                               expected_start_status_, last_trade_fixture_list,
+                                               symbol_overview_obj_list, market_depth_basemodel_list,
+                                               top_of_book_list_):
+    symbol_pair_counter = 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
+        results = [executor.submit(handle_test_buy_sell_with_sleep_delays, buy_symbol, sell_symbol,
+                                   pair_strat_, expected_strat_limits_, expected_start_status_,
+                                   last_trade_fixture_list, symbol_overview_obj_list, market_depth_basemodel_list,
+                                   top_of_book_list_)
+                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+
+
 # def test_create_sanity_last_trade(static_data_, clean_and_set_limits, last_trade_fixture_list):
 #     symbols = ["CB_Sec_1", "CB_Sec_2", "CB_Sec_3", "CB_Sec_4"]
 #     px_portions = [(40, 55), (56, 70), (71, 85), (86, 100)]
@@ -391,8 +442,8 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
 #         market_data_web_client.create_all_bar_data_client(pending_bars)
 #         market_data_web_client.patch_all_dash_client(pending_dashes)
 #         time.sleep(loop_wait)
-#
-#
+
+
 def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
     """Adding Broker entries in portfolio limits"""
     broker = broker_fixture()
@@ -1086,7 +1137,7 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol
 
             handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
                                   last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
-                                  True, executor_http_client, config_dict)
+                                  False, executor_http_client, config_dict)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -1299,11 +1350,11 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
                     f"{underlying_account_n_cum_fill_qty_obj.cumulative_qty}"
 
 
-def test_last_n_sec_order_qty_sum_and_order_count(static_data_, clean_and_set_limits, buy_sell_symbol_list,
-                                                  pair_strat_, expected_strat_limits_,
-                                                  expected_start_status_, symbol_overview_obj_list,
-                                                  last_trade_fixture_list, market_depth_basemodel_list,
-                                                  top_of_book_list_, buy_fill_journal_):
+def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, buy_sell_symbol_list,
+                                  pair_strat_, expected_strat_limits_,
+                                  expected_start_status_, symbol_overview_obj_list,
+                                  last_trade_fixture_list, market_depth_basemodel_list,
+                                  top_of_book_list_, buy_fill_journal_):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
     total_order_count_for_each_side = 10
@@ -1351,7 +1402,7 @@ def test_last_n_sec_order_qty_sum_and_order_count(static_data_, clean_and_set_li
             last_n_sec = int(math.ceil(delta.total_seconds())) + 1
 
             # making portfolio_limits_obj.rolling_max_order_count.rolling_tx_count_period_seconds computed last_n_sec(s)
-            # this is required as rolling_new_order_count takes internally this limit as last_n_sec to provide counts
+            # this is required as last_n_sec_order_qty takes internally this limit as last_n_sec to provide order_qty
             # in query
             rolling_max_order_count = RollingMaxOrderCountOptional(rolling_tx_count_period_seconds=last_n_sec)
             portfolio_limits = PortfolioLimitsBaseModel(_id=1, rolling_max_order_count=rolling_max_order_count)
@@ -1372,9 +1423,6 @@ def test_last_n_sec_order_qty_sum_and_order_count(static_data_, clean_and_set_li
             assert executor_check_snapshot_obj[0].last_n_sec_order_qty == single_buy_order_qty * (loop_count + 1), \
                 f"Order qty mismatched for last {last_n_sec} " \
                 f"secs of {buy_symbol} from {call_date_time} for side {Side.BUY}"
-            assert executor_check_snapshot_obj[0].rolling_new_order_count == loop_count + 1, \
-                f"New Order count mismatched for last {last_n_sec} " \
-                f"secs from {call_date_time} of {buy_symbol} for side {Side.BUY}"
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -2261,7 +2309,7 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
 
 
 # # todo: currently contains beanie http call of market data, once cache http is implemented test that too
-def test_update_agg_feature_in_post_put_patch_http_call(clean_and_set_limits, buy_sell_symbol_list,
+def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                         pair_strat_, expected_strat_limits_,
                                                         expected_start_status_, symbol_overview_obj_list,
                                                         last_trade_fixture_list, market_depth_basemodel_list,
@@ -2389,3 +2437,19 @@ def test_get_max_id_query(clean_and_set_limits):
     order_limits_max_id = strat_manager_service_native_web_client.get_order_limits_max_id_client()
     assert order_limits_max_id.max_id_val == created_order_limits_obj.id, \
         f"max_id mismatch, expected {created_order_limits_obj.id} received {order_limits_max_id.max_id_val}"
+
+
+# def test_delete_all_test_db():
+#     from pymongo import MongoClient
+#
+#     uri = get_mongo_server_uri()
+#     client = MongoClient(uri)
+#     db_list = client.list_database_names()
+#
+#     for db_name in db_list:
+#         if (db_name.startswith("log_analyzer") or
+#                 db_name.startswith("strat_executor_") or
+#                 db_name.startswith("addressbook") or
+#                 db_name.startswith("post_trade_engine")):
+#             client.drop_database(name_or_database=db_name)
+

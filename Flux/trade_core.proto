@@ -175,7 +175,7 @@ message Position{
   optional float incurred_cost = 9;
   // T+1 and onwards recurring daily cost
   optional float carry_cost = 10;
-  optional int32 priority = 11 [default = 10, (FluxFldHelp) = "default priority: 10,  orders to respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional int32 priority = 11 [default = 10, (FluxFldHelp) = "default priority: 10, orders to respect specified priority (lower value is higher priority), duplicates allowed"];
   optional float premium_percentage = 12 [default = 2, (FluxFldNumberFormat) = "%"];
 }
 

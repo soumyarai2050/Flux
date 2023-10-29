@@ -48,13 +48,13 @@ function Layout(props) {
     const { uiLayoutArray, uiLayout, loading } = useSelector(state => state.uiLayout);
     /* local react states */
     const [updateCounter, setUpdateCounter] = useState(0); // to trigger ui render
-    const [layoutsById, setLayoutsById] = useState(defaultLayoutsById); // stores widget layout data
     const [draggable, setDraggable] = useState(false); // to enable/disable drag
     const [openSaveLayout, setOpenSaveLayout] = useState(false); // open close save layout popup
     const [openLoadLayout, setOpenLoadLayout] = useState(false); // open close load layout popup
     const [searchValue, setSearchValue] = useState(''); // load layout by profile search input
     const [profileId, setProfileId] = useState(''); // save layout by profile input
     const layoutsRef = useRef(defaultLayouts);
+    const layoutsById = useRef(defaultLayoutsById);
     const getAllWsDict = useRef({}); // stores get-all websocket updates
     const dispatch = useDispatch();
 
@@ -62,14 +62,12 @@ function Layout(props) {
         dispatch(getAllUILayout());
     }, [])
 
-    useEffect(() => {
-        /* update layoutsById dict when layoutRef value changes to trigger ui re-render */
-        const updatedLayoutsById = layoutsRef.current.reduce((dict, obj) => {
+    const setLayoutsById = () => {
+        layoutsById.current = layoutsRef.current.reduce((dict, obj) => {
             dict[obj.i] = obj;
             return dict;
         }, {});
-        setLayoutsById(updatedLayoutsById);
-    }, [updateCounter])
+    }
 
     const flushGetAllWs = useCallback(() => {
         /* apply get-all websocket changes */
@@ -131,6 +129,7 @@ function Layout(props) {
         /* set layouts, cookie and profile id of active layout if exists */
         if (uiLayout.widget_ui_data_elements) {
             layoutsRef.current = cloneDeep(uiLayout.widget_ui_data_elements);
+            setLayoutsById();
             setUpdateCounter(prevCounter => prevCounter + 1);
             setProfileId(uiLayout.profile_id);
             const cookie = sessionStorage.getItem(COOKIE_NAME);
@@ -199,6 +198,7 @@ function Layout(props) {
                 layoutsRef.current = [...layoutsRef.current, layout];
             }
         }
+        setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
     }
 
@@ -212,6 +212,7 @@ function Layout(props) {
                 }
             })
             layoutsRef.current = updatedLayouts;
+            setLayoutsById();
             setUpdateCounter(prevCounter => prevCounter + 1);
         }
     }
@@ -239,6 +240,7 @@ function Layout(props) {
     const onResetLayout = () => {
         sessionStorage.removeItem(COOKIE_NAME);
         layoutsRef.current = defaultLayouts;
+        setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
         setProfileId('');
         dispatch(setUILayout({}));
@@ -266,17 +268,30 @@ function Layout(props) {
             }
             return layout
         });
+        setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
-    const onColumnOrdersChange = useCallback((name, columnOrders) => {
+    const onColumnOrdersChange = useCallback((name, columnOrders, bindVal = null) => {
         layoutsRef.current = layoutsRef.current.map(layout => {
             if (layout.i === name) {
                 layout = cloneDeep(layout);
-                layout.column_orders = columnOrders;
+                if (bindVal || bindVal === 0) {
+                    bindVal = String(bindVal)
+                    const widgetUIData = layout.widget_ui_data.find(uiData => uiData.bind_id_val === bindVal);
+                    if (widgetUIData) {
+                        widgetUIData.column_orders = columnOrders;
+                        widgetUIData.bind_id_val = bindVal;
+                    } else {
+                        layout.widget_ui_data.push({ ...layout.widget_ui_data[0], column_orders: columnOrders, bind_id_val: bindVal });
+                    }
+                } else {
+                    layout.widget_ui_data[0].column_orders = columnOrders;
+                }
             }
             return layout
         });
+        setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
@@ -301,6 +316,7 @@ function Layout(props) {
             }
             return layout
         });
+        setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
@@ -323,6 +339,7 @@ function Layout(props) {
             }
             return layout
         });
+        setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
@@ -338,6 +355,7 @@ function Layout(props) {
             }
             return layout
         });
+        setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 
@@ -349,6 +367,7 @@ function Layout(props) {
             }
             return layout
         });
+        setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
 

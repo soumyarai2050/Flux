@@ -1,5 +1,6 @@
 import logging
 from threading import Thread
+from typing import Callable
 
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.strat_executor.app.trading_cache import *
@@ -7,7 +8,7 @@ from Flux.CodeGenProjects.strat_executor.app.strat_cache import StratCache
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import get_symbol_side_key, \
     get_strat_brief_log_key, get_fills_journal_log_key, get_order_journal_log_key, is_ongoing_strat
-from Flux.CodeGenProjects.strat_executor.app.trading_link import TradingLinkBase, get_trading_link
+from Flux.CodeGenProjects.strat_executor.app.trading_link import TradingLinkBase, get_trading_link, is_test_run
 from Flux.CodeGenProjects.pair_strat_engine.generated.StratExecutor.strat_manager_service_ws_data_manager import \
     StratManagerServiceDataManager
 from Flux.CodeGenProjects.strat_executor.generated.StratExecutor.strat_executor_service_ws_data_manager import (
@@ -40,6 +41,13 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
         self.strat_cache: StratCache = strat_cache
         self.strat_executor = None
         self.strat_executor_thread: Thread | None = None
+
+        if is_test_run:
+            err_str_: str = f"strat executor running in test mode, is_test_run: {is_test_run}"
+            print(f"CRITICAL: {err_str_}")
+            logging.critical(err_str_)
+        # else not required
+
 
         # TODO IMPORTANT Enable this when we add formal ws support for market depth
         # self.market_depth_ws_cont = WSReader(f"{market_data_base_url}/get-all-market_depth-ws", MarketDepthBaseModel,
@@ -108,9 +116,9 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
         if strat_brief_.pair_buy_side_trading_brief and strat_brief_.pair_sell_side_trading_brief:
             super().handle_strat_brief_get_all_ws(strat_brief_, **kwargs)
         else:
+            # don't log strat_brief_key here, it needs both legs (missing here): {get_strat_brief_log_key(strat_brief_)}
             logging.error(f"ignoring strat brief update - missing required pair_buy_side_trading_brief or pair_sell_"
-                          f"side_trading_brief, strat_brief_key: "
-                          f"{get_strat_brief_log_key(strat_brief_)};;;strat_brief: {strat_brief_}")
+                          f"side_trading_brief;;;strat_brief: {strat_brief_}")
 
     def underlying_handle_fills_journal_ws(self, **kwargs):
         fills_journal_ = kwargs.get("fills_journal_")

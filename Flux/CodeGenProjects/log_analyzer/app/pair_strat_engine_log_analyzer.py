@@ -157,20 +157,26 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                 if alert_details is not None:
                     cleaned_alert_details = self.clean_alert_str(alert_str=cleaned_alert_details)
 
-                if cleaned_alert_brief == stored_alert_brief and \
-                        cleaned_alert_details == stored_alert_details and \
-                        severity == alert.severity:
-                    updated_alert_count: int = alert.alert_count + 1
-                    updated_last_update_date_time: DateTime = DateTime.utcnow()
-                    alert_obj = Alert(_id=alert.id, dismiss=False, alert_count=updated_alert_count,
-                                      alert_brief=alert_brief, severity=alert.severity,
-                                      last_update_date_time=updated_last_update_date_time)
-                    # update the alert in cache
-                    alert.dismiss = False
-                    alert.alert_brief = alert_brief
-                    alert.alert_count = updated_alert_count
-                    alert.last_update_date_time = updated_last_update_date_time
-                    break
+                if cleaned_alert_brief == stored_alert_brief and severity == alert.severity:
+                    # handling truncated mismatch
+                    if cleaned_alert_details is not None and stored_alert_details is not None:
+                        if len(cleaned_alert_details) > len(stored_alert_details):
+                            cleaned_alert_details = cleaned_alert_details[:len(stored_alert_details)]
+                        else:
+                            stored_alert_details = stored_alert_details[:len(cleaned_alert_details)]
+                    if cleaned_alert_details == stored_alert_details:
+                        updated_alert_count: int = alert.alert_count + 1
+                        updated_last_update_date_time: DateTime = DateTime.utcnow()
+                        alert_obj = Alert(_id=alert.id, dismiss=False, alert_count=updated_alert_count,
+                                          alert_brief=alert_brief, severity=alert.severity,
+                                          last_update_date_time=updated_last_update_date_time)
+                        # update the alert in cache
+                        alert.dismiss = False
+                        alert.alert_brief = alert_brief
+                        alert.alert_count = updated_alert_count
+                        alert.last_update_date_time = updated_last_update_date_time
+                        break
+                    # else not required: alert details not matched
                 # else not required: alert not matched with existing alerts
         if alert_obj is None:
             # create a new alert
@@ -187,6 +193,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         cleaned_alert_str: str = re.sub(r"0x[a-f0-9]*", "", alert_str)
         # remove all numeric digits
         cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)
+        cleaned_alert_str = cleaned_alert_str.split("...check the file:")[0]
         return cleaned_alert_str
 
     def _create_alert(self, error_dict: Dict) -> List[str]:
@@ -242,7 +249,6 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
 
             callback_method: Callable = getattr(executor_web_client, method_name)
             callback_method(**kwargs)
-            logging.info(f"@@@@@@@ calling cxl_order_id: {kwargs.get('order_id')} Datetime: {DateTime.utcnow()}")
 
         except Exception as e:
             alert_brief: str = f"_process_trade_simulator_message failed in log analyzer"

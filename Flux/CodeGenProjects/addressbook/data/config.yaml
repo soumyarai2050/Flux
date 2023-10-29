@@ -2,6 +2,7 @@
   # ui_port needs code regeneration if changed and it should ideally be symmetric with server port like
   # if server port is 8020 then ui_port should be 3020
 ui_port: "3020"
+is_proxy_server: False
 
 # server specific configs
 server_host: "127.0.0.1"
@@ -35,6 +36,7 @@ raw_perf_data_config:
 raw_performance_data_processor_loop_wait: 2  # sec
 
 is_test_run: True
+is_sanity_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
 
 # to be used by plugins to take proto files form these projects to generated combined output

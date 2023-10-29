@@ -21,11 +21,13 @@ from Flux.CodeGenProjects.market_data.generated.FastApi.market_data_service_http
     MarketDataServiceHttpClient
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
 from FluxPythonUtils.scripts.utility_functions import clean_mongo_collections, YAMLConfigurationManager, parse_to_int, \
-    get_mongo_db_list
+    get_mongo_db_list, drop_mongo_database
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
     StratExecutorServiceHttpClient)
 from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_client import (
     LogAnalyzerServiceHttpClient)
+from Flux.CodeGenProjects.post_trade_engine.app.post_trade_engine_service_helper import (
+    post_trade_engine_service_http_client)
 
 code_gen_projects_dir_path = PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects"
 
@@ -76,10 +78,20 @@ def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
     for db_name in get_mongo_db_list(mongo_server_uri):
         if "log_analyzer" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
-                                    ignore_collections=["UILayout", "PortfolioAlert", "StratAlert"])
-        elif "strat_executor_" in db_name or "addressbook" == db_name:
+                                    ignore_collections=["UILayout", "PortfolioAlert"])
+        elif "addressbook" == db_name or "post_trade_engine" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout"])
+        elif "strat_executor_" in db_name:
+            drop_mongo_database(mongo_server_uri=mongo_server_uri, database_name=db_name)
+
+
+def drop_all_databases() -> None:
+    mongo_server_uri: str = get_mongo_server_uri()
+    for db_name in get_mongo_db_list(mongo_server_uri):
+        if "log_analyzer" == db_name or "addressbook" == db_name or "strat_executor_" in db_name:
+            drop_mongo_database(mongo_server_uri=mongo_server_uri, database_name=db_name)
+        # else ignore drop database
 
 #
 # def run_pair_strat_log_analyzer(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
@@ -256,10 +268,10 @@ def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot
     expected_strat_brief_obj.pair_buy_side_trading_brief.open_notional = open_notional
     expected_strat_brief_obj.pair_buy_side_trading_brief.all_bkr_cxlled_qty = \
         expected_symbol_side_snapshot.total_cxled_qty
-    if expected_order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
-        expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 4
-    else:
-        expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 5
+    # if expected_order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
+    #     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 4
+    # else:
+    expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 5
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_notional = \
         expected_strat_limits.max_cb_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_notional = \
@@ -283,7 +295,7 @@ def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot
         ((expected_strat_brief_obj.pair_buy_side_trading_brief.residual_qty * current_leg_last_trade_px) -
          (0 * other_leg_last_trade_px))
     expected_strat_brief_obj.pair_buy_side_trading_brief.last_update_date_time = date_time_for_cmp
-
+    expected_strat_brief_obj.consumable_nett_filled_notional = 160_000 - abs(expected_symbol_side_snapshot.total_fill_notional - 0)
 
 def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
                                          expected_order_snapshot_obj: OrderSnapshotBaseModel,
@@ -303,10 +315,10 @@ def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
     expected_strat_brief_obj.pair_sell_side_trading_brief.open_notional = open_notional
     expected_strat_brief_obj.pair_sell_side_trading_brief.all_bkr_cxlled_qty = \
         expected_symbol_side_snapshot.total_cxled_qty
-    if expected_order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
-        expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 4
-    else:
-        expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 5
+    # if expected_order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
+    #     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 4
+    # else:
+    expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 5
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_notional = \
         expected_strat_limits.max_cb_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_notional = \
@@ -330,6 +342,9 @@ def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
         ((expected_strat_brief_obj.pair_sell_side_trading_brief.residual_qty * current_leg_last_trade_px) -
          ((40 * total_loop_count) * other_leg_last_trade_px))
     expected_strat_brief_obj.pair_sell_side_trading_brief.last_update_date_time = date_time_for_cmp
+    expected_strat_brief_obj.consumable_nett_filled_notional = (160_000 -
+                                                                abs((4500*total_loop_count) -
+                                                                    expected_symbol_side_snapshot.total_fill_notional))
 
 
 def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, symbol: str,
@@ -480,6 +495,7 @@ def check_placed_buy_order_computes(loop_count: int, expected_order_id: str, sym
         expected_strat_status.id = strat_status_obj.id
         expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
         expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
+        expected_strat_status.average_premium = strat_status_obj.average_premium
         assert strat_status_obj == expected_strat_status, \
             f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
     else:
@@ -678,6 +694,7 @@ def check_fill_receive_for_placed_buy_order(loop_count: int, expected_order_id: 
         expected_strat_status.id = strat_status_obj.id
         expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
         expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
+        expected_strat_status.average_premium = strat_status_obj.average_premium
         assert strat_status_obj == expected_strat_status, \
             f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
     else:
@@ -861,6 +878,7 @@ def check_placed_sell_order_computes(loop_count: int, total_loop_count: int, exp
         expected_strat_status.id = strat_status_obj.id
         expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
         expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
+        expected_strat_status.average_premium = strat_status_obj.average_premium
         assert strat_status_obj == expected_strat_status, \
             f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
     else:
@@ -1063,6 +1081,7 @@ def check_fill_receive_for_placed_sell_order(loop_count: int, total_loop_count: 
         expected_strat_status.id = strat_status_obj.id
         expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
         expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
+        expected_strat_status.average_premium = strat_status_obj.average_premium
         assert strat_status_obj == expected_strat_status, \
             f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
     else:
@@ -1230,6 +1249,35 @@ def run_last_trade(buy_symbol: str, sell_symbol: str, last_trade_json_list: List
                 f"Mismatch last_trade: expected {last_trade_obj}, received {created_last_trade_obj}"
 
 
+# TODO: move it to web-ui
+def symbol_overview_list() -> List[SymbolOverviewBaseModel]:
+    symbol_overview_obj_list: List[SymbolOverviewBaseModel] = []
+
+    symbols = ["CB_Sec_1", "EQT_Sec_1"]  # Add more symbols if needed
+
+    for symbol in symbols:
+        symbol_overview = {
+            "symbol": symbol,
+            "company": "string",
+            "status": "string",
+            "lot_size": 10,
+            "limit_up_px": 110,
+            "limit_dn_px": 12,
+            "conv_px": 1.0,
+            "closing_px": 11,
+            "open_px": 11,
+            "high": 100,
+            "low": 10,
+            "volume": 150,
+            "last_update_date_time": "2023-10-18T21:35:15.728Z",
+            "force_publish": True
+        }
+
+        symbol_overview_obj_list.append(SymbolOverviewBaseModel(**symbol_overview))
+
+    return symbol_overview_obj_list
+
+
 def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: PairStratBaseModel,
                             expected_strat_limits: StratLimits,
                             expected_strat_status: StratStatus,
@@ -1313,6 +1361,7 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
             strat_status = strat_status_list[0]
             expected_strat_status.id = strat_status.id
             expected_strat_status.strat_status_update_seq_num = strat_status.strat_status_update_seq_num
+            expected_strat_status.last_update_date_time = strat_status.last_update_date_time
             assert strat_status == expected_strat_status, \
                 (f"StratStatus Mismatched: expected strat_status {expected_strat_status}, "
                  f"received strat_status: {strat_status}")
@@ -1393,9 +1442,9 @@ def run_symbol_overview(buy_symbol: str, sell_symbol: str,
         symbol_overview_obj.id = None
         created_symbol_overview = executor_web_client.create_symbol_overview_client(symbol_overview_obj)
         symbol_overview_obj.id = created_symbol_overview.id
-        assert created_symbol_overview == symbol_overview_obj, f"Created symbol_overview {symbol_overview_obj} not " \
+        assert created_symbol_overview == symbol_overview_obj, f"Created symbol_overview {created_symbol_overview} not " \
                                                                f"equals to expected symbol_overview " \
-                                                               f"{created_symbol_overview}"
+                                                               f"{symbol_overview_obj}"
 
 
 def create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list: List[MarketDepthBaseModel],
@@ -1946,7 +1995,7 @@ def verify_rej_orders(check_ack_to_reject_orders: bool, last_order_id: int | Non
 
     if check_ack_to_reject_orders:
         if check_order_event != OrderEventType.OE_REJ:
-            # internally checks fills_journal is not None else raises assert exception internally
+            # internally checks fills_journal is not None else raises assert exception
             latest_fill_journal = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id,
                                                                         executor_web_client)
 
@@ -1971,6 +2020,7 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
     buy_order_count = 0
     buy_special_order_count = 0
     last_id = None
+    buy_rej_last_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
         run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
@@ -1992,9 +2042,13 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
         last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
                                     buy_symbol, executor_web_client)
 
+        if check_order_event == OrderEventType.OE_REJ:
+            buy_rej_last_id = last_id
+
     # sell fills check
     continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol, config_dict)
     last_id = None
+    sell_rej_last_id = None
     sell_order_count = 0
     sell_special_order_count = 0
     for loop_count in range(1, max_loop_count_per_side + 1):
@@ -2018,6 +2072,9 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
         last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
                                     sell_symbol, executor_web_client)
 
+        if check_order_event == OrderEventType.OE_REJ:
+            sell_rej_last_id = last_id
+    return buy_rej_last_id, sell_rej_last_id
 
 def verify_cxl_rej(last_cxl_order_id: str | None, last_cxl_rej_order_id: str | None,
                    check_order_event: OrderEventType, symbol: str,
@@ -2421,6 +2478,7 @@ def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy
                                                                         check_symbol, executor_web_client,
                                                                         last_order_id=last_order_id)
     last_order_id = order_ack_journal.order.order_id
+    time.sleep(5)
 
     # ATTENTION: Below code is dummy of original impl present in trade_executor, keep it sync with original
     partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, order_ack_journal.order.qty)

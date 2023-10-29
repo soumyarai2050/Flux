@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import logging
 import os
-from typing import List, Callable, Dict, ClassVar, Tuple
+from typing import List, Callable, Dict, ClassVar, Tuple, Final
 import time
 from abc import abstractmethod
 
@@ -56,6 +56,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.ws_routes_file_name: str = ""
         self.client_file_name: str = ""
         self.ws_client_file_name: str = ""
+        self.ws_ui_proxy_config_file_name: Final[str] = "ui_uri_to_server_uri_config.yaml"
         self.launch_file_name: str = ""
         self.routes_callback_class_name: str = ""
         self.base_native_override_routes_callback_class_name: str = ""

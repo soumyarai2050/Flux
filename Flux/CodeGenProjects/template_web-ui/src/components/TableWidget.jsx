@@ -5,7 +5,7 @@ import {
     DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination,
     Snackbar, Alert, TextField, Popover, Box
 } from '@mui/material';
-import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp } from '@mui/icons-material';
+import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp, Help } from '@mui/icons-material';
 import { utils, writeFileXLSX } from 'xlsx';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, stableSort, getComparator, getTableRowsFromData, sortColumns } from '../utils';
@@ -40,6 +40,7 @@ const TableWidget = (props) => {
     const [selectAll, setSelectAll] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
     const [clipboardText, setClipboardText] = useState(null);
+    const [userChanges, setUserChanges] = useState({});
 
     useEffect(() => {
         setData(props.data);
@@ -194,9 +195,16 @@ const TableWidget = (props) => {
         if (type === 'add' || type === 'remove') {
             setOpen(false);
             props.onUpdate(updatedData);
+            props.onUserChange(null, null, userChanges);
         } else {
             setData(updatedData);
         }
+    }
+
+    const onUserChange = (xpath, value) => {
+        let updatedData = cloneDeep(userChanges);
+        updatedData = { ...updatedData, [xpath]: value };
+        setUserChanges(updatedData);
     }
 
     const onSettingsItemChange = (e, key) => {
@@ -344,7 +352,7 @@ const TableWidget = (props) => {
         } else {
             columnOrders = [{ column_name: xpath, sequence: value }]
         }
-        props.onColumnOrdersChange(props.name, columnOrders);
+        props.onColumnOrdersChange(columnOrders);
     }
 
     const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
@@ -379,7 +387,7 @@ const TableWidget = (props) => {
                         }
                     />
                     <Icon title='show/hide all fields'>
-                        <LiveHelp color='primary' />
+                        <Help />
                     </Icon>
                 </MenuItem>
                 {headCells.map((cell, index) => {
@@ -415,7 +423,7 @@ const TableWidget = (props) => {
                             <Box sx={{ minWidth: '30px' }}>
                                 {cell.help &&
                                     <Icon title={cell.help}>
-                                        <LiveHelp color='primary' />
+                                        <Help />
                                     </Icon>
                                 }
                             </Box>
@@ -546,7 +554,7 @@ const TableWidget = (props) => {
                     onUpdate={onUpdate}
                     xpath={props.xpath}
                     subtree={rowTrees[selectedRow]}
-                    onUserChange={props.onUserChange}
+                    onUserChange={onUserChange}
                 />
                 <Dialog
                     open={openModalPopup}
@@ -556,8 +564,8 @@ const TableWidget = (props) => {
                         <DialogContentText>Do you want to save changes?</DialogContentText>
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={onConfirmClose} autoFocus>Discard</Button>
-                        <Button onClick={onSave} autoFocus>Save</Button>
+                        <Button variant='contained' color='error' onClick={onConfirmClose} autoFocus>Discard</Button>
+                        <Button variant='contained' color='success' onClick={onSave} autoFocus>Save</Button>
                     </DialogActions>
                 </Dialog>
             </FullScreenModal>

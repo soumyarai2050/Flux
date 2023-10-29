@@ -113,7 +113,7 @@ class TradeSimulator(TradingLinkBase):
         security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
 
         order_brief = OrderBrief(order_id=order_id, security=security, side=side, px=px, qty=qty,
-                                 underlying_account=account)
+                                 underlying_account=account, exchange=exchange)
         msg = f"SIM: Ordering {trading_sec_id}/{system_sec_id}, qty {qty} and px {px}"
         add_to_texts(order_brief, msg)
 

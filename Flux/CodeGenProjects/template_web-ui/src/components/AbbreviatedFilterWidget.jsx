@@ -254,7 +254,7 @@ function AbbreviatedFilterWidget(props) {
         } else {
             columnOrders = [{ column_name: xpath, sequence: value }]
         }
-        props.onColumnOrdersChange(props.name, columnOrders);
+        props.onColumnOrdersChange(columnOrders);
     }
 
     const filteredHeadCells = sortColumns(headCells.filter(cell => commonKeys.filter(c => c.key === cell.key).length === 0), props.columnOrders, true);

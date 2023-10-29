@@ -64,7 +64,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += f"    set{message_name}Ws, resetError"
             widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                 message, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
-            if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field):
+            if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field):
                 output_str += ", setUrl"
             output_str += "\n"
         elif layout_type == JsxFileGenPlugin.root_type:
@@ -105,7 +105,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += (f"    setMode, setCreateMode, setOpenConfirmSavePopup, set{dependent_message_name}, "
                            f"reset{dependent_message_name}, resetSelected{dependent_message_name}Id, "
                            f"setFormValidation, setOpenFormValidationPopup")
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+            if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
                 output_str += f", getAll{dependent_message_name}Background"
             output_str += "\n"
             output_str += "}" + f" from '../features/{dependent_message_name_camel_cased}Slice';\n"
@@ -349,8 +349,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onFormUpdate={onFormUpdate}\n"
         output_str += "                    formValidation={formValidation}\n"
         output_str += "                    truncateDateTime={truncateDateTime}\n"
-        output_str += "                    columnOrders={props.columnOrders}\n"
-        output_str += "                    onColumnOrdersChange={props.onColumnOrdersChange}\n"
+        output_str += "                    columnOrders={columnOrders}\n"
+        output_str += "                    onColumnOrdersChange={onColumnOrdersChange}\n"
         if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                    forceUpdate={forceUpdate}\n"
         output_str += "                />\n"
@@ -450,7 +450,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                               " loading, error"
                 widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                     message, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
-                if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field):
+                if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field):
                     output_str += ", url"
                 output_str += "\n"
                 output_str += "    } = useSelector(state => " + f"state.{message_name_camel_cased});\n"
@@ -470,6 +470,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
                 output_str += "    const [openFormValidationPopup, setOpenFormValidationPopup] = useState(false);\n"
                 output_str += "    const [disableWs, setDisableWs] = useState(false);\n"
+                option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                    message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+                other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
+                other_proto_mode_name = option_dict.get(
+                    JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
+                if other_proto_file is not None and other_proto_mode_name is None:
+                    output_str += "    const [url, setUrl] = useState();\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
             case JsxFileGenPlugin.root_type:
                 output_str += "    /* states from redux store */\n"
@@ -505,8 +512,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
                 other_proto_file = option_dict.get(JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field)
-                is_id_based = option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field)
-                if other_proto_file is not None and not is_id_based:
+                # is_id_based = option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field)
+                other_proto_mode_name = option_dict.get(
+                    JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field)
+                if other_proto_file is not None and other_proto_mode_name is None:
                     output_str += "    const [url, setUrl] = useState();\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
                 output_str += "    const getWsDict = useRef({});\n"
@@ -695,8 +704,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    filters={props.filters}\n"
         output_str += "                    onFiltersChange={props.onFiltersChange}\n"
         output_str += "                    dependentLoading={dependentLoading}\n"
-        output_str += "                    columnOrders={props.columnOrders}\n"
-        output_str += "                    onColumnOrdersChange={props.onColumnOrdersChange}\n"
+        output_str += "                    columnOrders={columnOrders}\n"
+        output_str += "                    onColumnOrdersChange={onColumnOrdersChange}\n"
         output_str += "                />\n"
         output_str += "            )}\n"
         output_str += "            <FormValidation\n"
@@ -930,6 +939,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "    const itemCollections = useMemo(() => {\n"
                 output_str += "        return getAbbreviatedCollections(dependentWidgetCollectionsDict, abbreviated);\n"
                 output_str += "    }, [dependentWidgetCollectionsDict])\n"
+        output_str += "    const columnOrders = widgetOption.column_orders;\n"
         output_str += "    const truncateDateTime = widgetOption.hasOwnProperty('truncate_date_time') ? " \
                       "widgetOption.truncate_date_time : false;\n\n"
         if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
@@ -944,9 +954,11 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         # taking all repeated root types
                         widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                             msg, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
-                        if (widget_ui_option_value.get(
-                                JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field) ==
-                                self.current_proto_file_name):
+                        if widget_ui_option_value.get(
+                                JsxFileGenPlugin.widget_ui_option_depending_proto_file_name_field) == \
+                                self.current_proto_file_name and \
+                                widget_ui_option_value.get(
+                                    JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field) is not None:
                             output_str += f"        dispatch(reset{msg.proto.name}());\n"
                 output_str += "    }, " + f"[selected{dependent_message}Id])\n\n"
 
@@ -1595,6 +1607,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "        }\n"
         output_str += "    }\n\n"
 
+        output_str += "    const onColumnOrdersChange = (orders) => {\n"
+        output_str += "        if (currentSchema.widget_ui_data_element.hasOwnProperty('bind_id_fld')) {\n"
+        output_str += "            props.onColumnOrdersChange(props.name, orders, "
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "null);\n"
+        elif layout_type == JsxFileGenPlugin.non_root_type:
+            output_str += f"selected{root_message_name}Id);\n"
+        else:
+            output_str += f"selected{message_name}Id);\n"
+        output_str += "        } else {\n"
+        output_str += "            props.onColumnOrdersChange(props.name, orders);\n"
+        output_str += "        }\n"
+        output_str += "    }\n\n"
 
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "    /* required fields (loaded & buffered) not found. render error view */\n"
@@ -1806,7 +1831,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onUpdate = () => { }\n\n"
             output_str += "    const onButtonToggle = () => { }\n\n"
             output_str += "    const onReload = () => {\n"
-            if self._get_ui_msg_dependent_msg_name_from_another_proto(message):
+            if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
                 output_str += f"        dispatch(getAll{message_name}("+"{ url }));\n"
             else:
                 output_str += f"        dispatch(getAll{message_name}());\n"
@@ -2008,7 +2033,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        }\n"
             output_str += "    }\n\n"
             output_str += "    const onRefreshItems = () => {\n"
-            output_str += f"        dispatch(getAll{dependent_message}());\n"
+            output_str += f"        dispatch(getAll{dependent_message}Background());\n"
             output_str += "    }\n\n"
             if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                 output_str += "    const onCloseCollectionSwitchPopup = (e, reason) => {\n"
@@ -2022,17 +2047,25 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
         if layout_type == JsxFileGenPlugin.root_type or layout_type == JsxFileGenPlugin.non_root_type or \
                 layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-            output_str += "    const onUserChange = (xpath, value) => {\n"
+            output_str += "    const onUserChange = (xpath, value, dict = null) => {\n"
             output_str += "        let updatedData = cloneDeep(userChanges);\n"
+            output_str += "        if (dict) {\n"
+            if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
+                output_str += f"            dict[DB_ID] = selected{message_name}Id;\n"
+            elif layout_type == JsxFileGenPlugin.non_root_type:
+                output_str += f"            dict[DB_ID] = selected{root_message_name}Id;\n"
+            output_str += "            updatedData = { ...updatedData, ...dict };\n"
+            output_str += "        } else {\n"
             if layout_type == self.root_type:
-                output_str += "        updatedData = { ...updatedData, [xpath]: value };\n"
+                output_str += "            updatedData = { ...updatedData, [xpath]: value };\n"
             else:
                 if layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-                    output_str += "        updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
+                    output_str += "            updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
                                   f"selected{message_name}Id " + "};\n"
                 else:
-                    output_str += "        updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
+                    output_str += "            updatedData = { ...updatedData, [xpath]: value, [DB_ID]: " \
                                   f"selected{root_message_name}Id " + "};\n"
+            output_str += "        }\n"
             output_str += "        dispatch(setUserChanges(updatedData));\n"
             output_str += "    }\n\n"
             output_str += "    const onFormUpdate = (xpath, value) => {\n"

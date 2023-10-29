@@ -104,7 +104,7 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             message_name_space_sep = convert_camel_case_to_specific_case(message_name, " ", False)
             message_name_case_styled = self.case_style_convert_method(message_name)
             output_str += f"<ToggleIcon title='{message_name_space_sep}' name='{message_name_case_styled}' selected=" + \
-                          "{layoutsById.hasOwnProperty('"+f"{message_name_case_styled}"+"')} onClick={onToggleWidget}>\n"
+                          "{layoutsById.current.hasOwnProperty('"+f"{message_name_case_styled}"+"')} onClick={onToggleWidget}>\n"
             output_str += "    {getIconText('"+f"{message_name_case_styled}"+"')}\n"
             output_str += "</ToggleIcon>\n"
         return output_str
@@ -114,16 +114,15 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
         for index, message in enumerate(self.layout_msg_list):
             message_name = message.proto.name
             message_name_case_styled = self.case_style_convert_method(message_name)
-            output_str += "{"+f"layoutsById.{message_name_case_styled} &&\n"
+            output_str += "{"+f"layoutsById.current.hasOwnProperty('{message_name_case_styled}') &&\n"
             output_str += "    <Paper key='"+f"{message_name_case_styled}' id='{message_name_case_styled}'" + \
-                          " className={classes.widget} data-grid={layoutsById." + \
+                          " className={classes.widget} data-grid={layoutsById.current." + \
                           f"{message_name_case_styled}" + "}>\n"
             output_str += f'        <{message.proto.name}\n'
             output_str += f'            name="{message_name_case_styled}"\n'
-            output_str += "            options={"+f"layoutsById.{message_name_case_styled}.widget_ui_data"+"}\n"
-            output_str += "            chartData={"+ f"layoutsById.{message_name_case_styled}.chart_data"+"}\n"
-            output_str += "            filters={" + f"layoutsById.{message_name_case_styled}.filters" + "}\n"
-            output_str += "            columnOrders={" + f"layoutsById.{message_name_case_styled}.column_orders" + "}\n"
+            output_str += "            options={"+f"layoutsById.current.{message_name_case_styled}.widget_ui_data"+"}\n"
+            output_str += "            chartData={"+ f"layoutsById.current.{message_name_case_styled}.chart_data"+"}\n"
+            output_str += "            filters={" + f"layoutsById.current.{message_name_case_styled}.filters" + "}\n"
             output_str += "            onChartDataChange={onChartDataChange}\n"
             output_str += "            onChartDelete={onChartDelete}\n"
             output_str += "            onChangeLayout={onLayoutTypeChange}\n"

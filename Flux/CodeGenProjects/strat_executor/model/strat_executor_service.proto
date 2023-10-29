@@ -8,126 +8,9 @@ import "dashboards_n_market_data_n_strat_executor_core.proto";
 import "strat_executor_core.proto";
 import "pair_strat_engine_n_strat_executor_core.proto";
 import "market_data_n_strat_executor_core.proto";
+import "strat_executor_n_post_trade_engine_core.proto";
 
 package strat_executor;
-
-message OrderJournal{
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_FilterAggregate,
-    ReadOp: AggregateType_FilterAggregate,
-    PatchOp: AggregateType_FilterAggregate,
-    DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_FilterAggregate
-  };
-  option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
-    y: 91,
-    w: 18,
-    h: 17,
-    is_repeated: True,
-    widget_ui_data: {
-      view_layout: UI_TABLE
-    },
-    depending_proto_file_name: "strat_manager_service.proto",
-    depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true
-  };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "get_last_n_sec_orders_by_event",
-      AggregateVarName: "get_last_n_sec_orders_by_event",
-      QueryParams: "symbol",
-      QueryParams: "last_n_sec",
-      QueryParams: "order_event",
-      QueryParamsDataType: "str | None",
-      QueryParamsDataType: "int",
-      QueryParamsDataType: "str"
-  };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_notify_order_journal_update",
-      QueryParams: "symbols",
-      QueryParamsDataType: "List[str]",
-      QueryType: WS
-  };
-  option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-100";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
-  option (FluxMsgExecutorOptions) = {
-    IsWebSocketModel: true,
-    EnableNotifyAll: false,
-    IsTopLvlModel: false,
-    ExecutorKeyCounts: 1,
-    ExecutorKeySequence: "order.security.sec_id-order.side",
-    LogKeySequence: "order.order_id",
-    IsRepeated: true
-  };
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional OrderBrief order = 2;
-  optional string order_event_date_time = 3 [(FluxFldIndex) = true, (FluxFldValIsDateTime) = true];
-  optional OrderEventType order_event = 4;
-  optional int32 current_period_order_count = 8 [ (FluxFldHelp) = "total new order count within order_rate(s) applicable_period_seconds"];
-}
-
-message OrderSnapshot{
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_FilterAggregate,
-    ReadOp: AggregateType_FilterAggregate,
-    UpdateOp: AggregateType_FilterAggregate,
-    PatchOp: AggregateType_FilterAggregate,
-    DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_FilterAggregate
-  };
-  option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
-    y: 74,
-    w: 18,
-    h: 17,
-    is_repeated: True,
-    widget_ui_data: {
-      view_layout: UI_TABLE
-    },
-    depending_proto_file_name: "strat_manager_service.proto",
-    depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true
-  };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "trigger_residual_check",
-      QueryParams: "order_status_list",
-      QueryParamsDataType: "List[str]"
-  };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_notify_order_snapshot_update",
-      QueryParams: "symbols",
-      QueryParamsDataType: "List[str]",
-      QueryType: WS
-  };
-  option (FluxMsgExecutorOptions) = {
-    IsWebSocketModel: true,
-    EnableNotifyAll: false,
-    IsTopLvlModel: false,
-    ExecutorKeyCounts: 1,
-    ExecutorKeySequence: "order_brief.security.sec_id-order_brief.side",
-    LogKeySequence: "order_brief.order_id-order_status",
-    IsRepeated: true
-  };
-  option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-100";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
-
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional OrderStatusType order_status = 2 [(FluxFldNoCommonKey) = true];
-  optional OrderBrief order_brief = 3;
-  optional int64 filled_qty = 4;
-  optional float avg_fill_px = 5;
-  optional float fill_notional = 6 [(FluxFldDisplayType) = "int"];
-  optional int64 last_update_fill_qty = 7;
-  optional float last_update_fill_px = 8;
-  optional int64 cxled_qty = 9;
-  optional float avg_cxled_px = 10;
-  optional float cxled_notional = 11 [(FluxFldDisplayType) = "int"];
-  optional string create_date_time = 12 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
-  optional string last_update_date_time = 13 [(FluxFldValIsDateTime) = true];
-  optional int64 last_n_sec_total_qty = 14 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec order qty
-}
 
 message SymbolSideSnapshot{
   option (FluxMsgJsonRoot) = {
@@ -247,58 +130,6 @@ message FillsJournal{
   optional int64 underlying_account_cumulative_fill_qty = 11[(FluxFldHide) = "True"]; // used by executor query at strat start
 }
 
-message StratBrief{
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_UNSPECIFIED,
-    ReadOp: AggregateType_UNSPECIFIED,
-    UpdateOp: AggregateType_UNSPECIFIED,
-    PatchOp: AggregateType_UNSPECIFIED,
-    DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
-  };
-  option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
-    y: 50,
-    w: 8,
-    h: 8,
-    widget_ui_data: {
-      view_layout: UI_TABLE
-    },
-    is_repeated: true,
-    depending_proto_file_name: "strat_manager_service.proto",
-    depending_proto_model_name: "PairStrat",
-    depends_on_other_model_for_dynamic_url: true
-  };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "get_strat_brief_from_symbol",
-      AggregateVarName: "get_strat_brief_from_symbol",
-      QueryParams: "security_id",
-      QueryParamsDataType: "str"
-  };
-  option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_notify_strat_brief_update",
-      QueryParams: "symbols",
-      QueryParamsDataType: "List[str]",
-      QueryType: WS
-  };
-  option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
-  option (FluxMsgExecutorOptions) = {
-    IsWebSocketModel: true,
-    EnableNotifyAll: false,
-    IsTopLvlModel: false,
-    ExecutorKeyCounts: 2,
-    ExecutorKeySequence: "pair_buy_side_trading_brief.security.sec_id-pair_buy_side_trading_brief.side",
-    ExecutorKeySequence: "pair_sell_side_trading_brief.security.sec_id-pair_sell_side_trading_brief.side",
-    LogKeySequence: "id"
-    IsRepeated: false
-  };
-
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional PairSideTradingBrief pair_buy_side_trading_brief = 2;
-  optional PairSideTradingBrief pair_sell_side_trading_brief = 3;
-  optional float consumable_nett_filled_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_net_filled_notional - Absolute (filled_cb_notional - filled_egt_notional)"];
-}
-
 message StratStatus{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
@@ -356,15 +187,15 @@ message StratStatus{
   }];
 
   optional int64 total_buy_qty = 3 [(FluxFldHelp) = "sum of all buy order qty in order brief of strat order snapshot"];
-  optional int64 total_sell_qty = 4 [(FluxFldHelp) = "sum of all  sell order qty in order brief of strat order snapshot"];
-  optional int64 total_order_qty = 5 [(FluxFldHide) = "True", (FluxFldHelp) = "sum of above total_buy_qty + total_sell_qty "];
+  optional int64 total_sell_qty = 4 [(FluxFldHelp) = "sum of all sell order qty in order brief of strat order snapshot"];
+  optional int64 total_order_qty = 5 [(FluxFldHide) = "True", (FluxFldHelp) = "sum of above total_buy_qty + total_sell_qty"];
 
   optional int64 total_open_buy_qty = 6 [(FluxFldHelp) = "sum of all open buy order qty: StratOrderSnapshot-s order_brief.qty minus its filled_qty provided its state is ack or unack"];
   optional int64 total_open_sell_qty = 7 [(FluxFldHelp) = "sum of all open sell order qty: StratOrderSnapshot-s order_brief.qty minus its filled_qty provided its state is ack or unack"];
   optional float avg_open_buy_px = 8 [(FluxFldHelp) = "total_open_buy_notional / total_open_buy_qty"];
   optional float avg_open_sell_px = 9 [(FluxFldHelp) = "total_open_sell_notional / total_open_sell_qty"];
-  optional float total_open_buy_notional = 10 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all StratOrderSnapshot-s [open_buy_qty X price] "];
-  optional float total_open_sell_notional = 11 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all StratOrderSnapshot-s [open_sell_qty X price] "];
+  optional float total_open_buy_notional = 10 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all StratOrderSnapshot-s [open_buy_qty X price]"];
+  optional float total_open_sell_notional = 11 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all StratOrderSnapshot-s [open_sell_qty X price]"];
   optional float total_open_exposure = 12 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_open_buy_notional - total_open_sell_notional"];
 
   optional int64 total_fill_buy_qty = 13 [(FluxFldHelp) = "sum of all fill buy order qty from StratOrderSnapshot"];
@@ -491,15 +322,6 @@ message CancelOrder{
   optional bool cxl_confirmed = 5 [(FluxFldHide) = "True"];
 }
 
-message OpenOrderCount{
-  option (FluxMsgJsonQuery) = {
-      QueryName: "get_open_order_count"
-      QueryParams: "symbol",
-      QueryParamsDataType: "str"
-  };
-  required int32 open_order_count = 1;
-}
-
 message UnderlyingAccountNCumFillQty{
   required string underlying_account = 1;
   required int64 cumulative_qty = 2;
@@ -528,7 +350,6 @@ message ExecutorCheckSnapshot{
   };
   optional int32 last_n_sec_trade_qty = 1;
   optional int32 last_n_sec_order_qty = 2;
-  optional int32 rolling_new_order_count = 3;
 }
 
 message LastNSecMarketTradeVol{
@@ -634,4 +455,5 @@ message ImportWarningAvoidDummyMessage{
   optional DummyEnumDMS temp3 = 3;
   optional DummyEnumMS temp4 = 4;
   optional CommandType temp5 = 5;
+  optional DummyEnumSO temp6 = 6;
 }

@@ -79,753 +79,6 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             raise Exception(err_str)
         return message, aggregation_type, shared_lock_list
 
-    def handle_underlying_POST_one_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
-        output_str += (f"async def underlying_create_{message_name_snake_cased}_http({message_name_snake_cased}: "
-                       f"{message.proto.name}, filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                       f") -> {message.proto.name} | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Create route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_post_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + \
-                      f"    await callback_class.create_{message_name_snake_cased}_pre({message_name_snake_cased})\n"
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
-                      f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                      f"{message_name_snake_cased}, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter:
-                output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
-                               f"{self._get_filter_configs_var_name(message)}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case FastapiWsRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, {message_name_snake_cased}, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case FastapiWsRoutesFileHandler.aggregation_type_both:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}, {self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_POST_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_POST_one_gen(**kwargs)
-        output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + \
-                      f'", response_model={message.proto.name} | bool, status_code=201)\n'
-        output_str += (f"async def create_{message_name_snake_cased}_http({message_name_snake_cased}: "
-                       f"{message.proto.name}, return_obj_copy: bool | None = True) -> "
-                       f"{message.proto.name} | bool:\n")
-        output_str += (f"    return await underlying_create_{message_name_snake_cased}_http("
-                       f"{message_name_snake_cased}, return_obj_copy=return_obj_copy)\n")
-        return output_str
-
-    def handle_underlying_POST_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
-        output_str += (
-            f"async def underlying_create_all_{message_name_snake_cased}_http({message_name_snake_cased}_list: "
-            f"List[{message.proto.name}], filter_agg_pipeline: Any = None, generic_callable: "
-            f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True) -> "
-            f"List[{message.proto.name}] | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Create All route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_post_all_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + \
-                      f"    await callback_class.create_all_{message_name_snake_cased}_pre(" \
-                      f"{message_name_snake_cased}_list)\n"
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        {message_name_snake_cased}_obj_list = await generic_callable({message.proto.name}, " \
-                      f"{FastapiWsRoutesFileHandler.proto_package_var_name}," \
-                      f"{message_name_snake_cased}_list, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter:
-                output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj_list = "
-                               f"await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}_list, "
-                               f"{self._get_filter_configs_var_name(message)}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case FastapiWsRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj_list = "
-                               f"await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}_list, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
-            case FastapiWsRoutesFileHandler.aggregation_type_both:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj_list = "
-                               f"await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}_list, {self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              (f"        {message_name_snake_cased}_obj_list = "
-                               f"await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"{message_name_snake_cased}_list, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_obj_list)\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj_list\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_POST_all_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_POST_all_gen(**kwargs)
-        output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.post("/create_all-{message_name_snake_cased}' + \
-                      f'", response_model=List[{message.proto.name}] | bool, status_code=201)\n'
-        output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_list: "
-                       f"List[{message.proto.name}], return_obj_copy: bool | None = True) -> "
-                       f"List[{message.proto.name}] | bool:\n")
-        output_str += f"    return await underlying_create_all_{message_name_snake_cased}_http(" \
-                      f"{message_name_snake_cased}_list, return_obj_copy=return_obj_copy)\n"
-        return output_str
-
-    def handle_underlying_PUT_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
-        output_str += (f"async def underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                       f"updated: {message.proto.name}, filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                       f") -> {message.proto.name} | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Update route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_put_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
-                                           f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                                           f"{message_name_snake_cased}_updated.id, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + f"    {message_name_snake_cased}_updated = " \
-                                           f"await callback_class.update_{message_name_snake_cased}_pre(" \
-                                           f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        updated_{message_name_snake_cased}_obj = " \
-                      f"await generic_callable({message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj), {message_name_snake_cased}_updated, " \
-                      f"filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter:
-                output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj = await generic_callable(" \
-                              f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
-                              f"{message_name_snake_cased}_updated, {self._get_filter_configs_var_name(message)}, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-            case FastapiWsRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_updated, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
-            case FastapiWsRoutesFileHandler.aggregation_type_both:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_updated, {self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_updated, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.update_{message_name_snake_cased}_post(" \
-                                           f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_PUT_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_PUT_gen(**kwargs)
-        output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
-                      f'", response_model={message.proto.name} | bool, status_code=200)\n'
-        output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}_updated: " \
-                      f"{message.proto.name}, return_obj_copy: bool | None = True) -> {message.proto.name} | bool:\n"
-        output_str += f"    return await underlying_update_{message_name_snake_cased}_http(" \
-                      f"{message_name_snake_cased}_updated, return_obj_copy=return_obj_copy)\n"
-        return output_str
-
-    def handle_underlying_PUT_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
-        output_str += (f"async def underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                       f"updated_list: List[{message.proto.name}], filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True) -> "
-                       f"List[{message.proto.name}] | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Update All route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_put_all_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    obj_id_list = [pydantic_obj.id for pydantic_obj in " \
-                                           f"{message_name_snake_cased}_updated_list]\n"
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj_list = await " \
-                                           f"generic_read_http({message.proto.name}, " \
-                                           f"{FastapiWsRoutesFileHandler.proto_package_var_name}, has_links={msg_has_links}, " \
-                                           f"read_ids_list=obj_id_list)\n"
-        output_str += " " * indent_count + f"    {message_name_snake_cased}_updated_list = " \
-                                           f"await callback_class.update_all_{message_name_snake_cased}_pre(" \
-                                           f"stored_{message_name_snake_cased}_obj_list, {message_name_snake_cased}_updated_list)\n"
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        updated_{message_name_snake_cased}_obj_list = " \
-                      f"await generic_callable({message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), {message_name_snake_cased}_updated_list, " \
-                      f"obj_id_list, filter_agg_pipeline, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter:
-                output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj_list = await generic_callable(" \
-                              f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                              f"{message_name_snake_cased}_updated_list, obj_id_list, " \
-                              f"{self._get_filter_configs_var_name(message)}, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-            case FastapiWsRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_updated_list, obj_id_list, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
-            case FastapiWsRoutesFileHandler.aggregation_type_both:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_updated_list, obj_id_list, "
-                               f"{self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_updated_list, obj_id_list, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.update_all_{message_name_snake_cased}_post(" \
-                                           f"stored_{message_name_snake_cased}_obj_list, " \
-                                           f"updated_{message_name_snake_cased}_obj_list)\n"
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj_list\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_PUT_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_PUT_all_gen(**kwargs)
-        output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.put("/put_all-{message_name_snake_cased}' + \
-                      f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
-        output_str += (f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_updated_list: "
-                       f"List[{message.proto.name}], return_obj_copy: bool | None = True"
-                       f") -> List[{message.proto.name}] | bool:\n")
-        output_str += f"    return await underlying_update_all_{message_name_snake_cased}_http(" \
-                      f"{message_name_snake_cased}_updated_list, return_obj_copy=return_obj_copy)\n"
-        return output_str
-
-    def handle_underlying_PATCH_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self._handle_str_int_val_callable_generation(message)
-        output_str += "\n"
-        output_str += "@perf_benchmark\n"
-        output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http("
-                       f"{message_name_snake_cased}_update_req_json: Dict, filter_agg_pipeline: Any = None, "
-                       f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                       f") -> {message.proto.name} | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Partial Update route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_patch_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + (f"    handle_str_formatted_int_fields_in_{message_name_snake_cased}_"
-                                            f"json({message_name_snake_cased}_update_req_json)\n")
-        output_str += " " * indent_count + f"    obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
-        output_str += " " * indent_count + f"    if obj_id is None:\n"
-        output_str += " " * indent_count + f'        err_str_ = f"Can not find _id key in received response body for ' \
-                                           f'patch operation of {message.proto.name}, response body: ' + \
-                      '{' + f'{message_name_snake_cased}_update_req_json' + '}"\n'
-        output_str += " " * indent_count + f"        raise HTTPException(status_code=503, detail=err_str_)\n"
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
-                                           f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                                           f"obj_id, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + f"    {message_name_snake_cased}_update_req_json = " \
-                                           f"await callback_class.partial_update_{message_name_snake_cased}_pre(" \
-                                           f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_update_req_json)\n"
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                       f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                       f"{message_name_snake_cased}_update_req_json, filter_agg_pipeline, "
-                       f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter:
-                output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj =  await generic_callable(" \
-                              f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj), " \
-                              f"{message_name_snake_cased}_update_req_json, {self._get_filter_configs_var_name(message)}, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-            case FastapiWsRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_update_req_json, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case FastapiWsRoutesFileHandler.aggregation_type_both:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_update_req_json, {self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
-                               f"{message_name_snake_cased}_update_req_json, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-        output_str += " " * indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_post(" \
-                                           f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_PATCH_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_PATCH_gen(**kwargs)
-        output_str += f"\n"
-        output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
-                      f'", response_model={message.proto.name} | bool, status_code=200)\n'
-        output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req_body: " \
-                      f"Request, return_obj_copy: bool | None = True) -> {message.proto.name} | bool:\n"
-        output_str += f"    json_body = await {message_name_snake_cased}_update_req_body.json()\n"
-        output_str += (f'    return await underlying_partial_update_{message_name_snake_cased}_http(json_body, '
-                       f'return_obj_copy=return_obj_copy)\n')
-        return output_str
-
-    def _get_int_field_list(self, message: protogen.Message, parent_field_names: str | None = None) -> List[str]:
-        int_field_list = []
-        for field in message.fields:
-            if field.message is not None:
-                if parent_field_names is not None:
-                    if field.cardinality.name.lower() == "repeated":
-                        parent_field_names_str = f"{parent_field_names}.[{field.proto.name}]"
-                    else:
-                        parent_field_names_str = f"{parent_field_names}.{field.proto.name}"
-                else:
-                    if field.cardinality.name.lower() == "repeated":
-                        parent_field_names_str = f"[{field.proto.name}]"
-                    else:
-                        parent_field_names_str = field.proto.name
-                int_field_list.extend(self._get_int_field_list(field.message, parent_field_names_str))
-            elif (field.kind.name.lower() in ["int32", "int64"] and
-                  not self.is_bool_option_enabled(field, FastapiWsRoutesFileHandler.flux_fld_val_is_datetime)):
-                if parent_field_names is not None:
-                    if field.cardinality.name.lower() == "repeated":
-                        int_field_list.append(f"{parent_field_names}.[{field.proto.name}]")
-                    else:
-                        int_field_list.append(f"{parent_field_names}.{field.proto.name}")
-                else:
-                    if field.cardinality.name.lower() == "repeated":
-                        int_field_list.append(f"[{field.proto.name}]")
-                    else:
-                        int_field_list.append(field.proto.name)
-        return int_field_list
-
-    def _handle_str_int_val_callable_generation(self, message: protogen.Message) -> str:
-        message_name = message.proto.name
-        message_name_camel_cased = convert_camel_case_to_specific_case(message_name)
-        int_field_list: List[str] = self._get_int_field_list(message)
-
-        output_str = ""
-        if int_field_list:
-            output_str += (f"def handle_str_formatted_int_fields_in_{message_name_camel_cased}_"
-                           f"json({message_name_camel_cased}_update_req_json: Dict) -> None:\n")
-            for int_field in int_field_list:
-                int_fields_dot_sep_list: List[str] = int_field.split(".")
-                indent_count = 1
-                last_field_name = f"{message_name_camel_cased}_update_req_json"
-                for index, field in enumerate(int_fields_dot_sep_list):
-                    if field == int_fields_dot_sep_list[-1]:
-                        output_str += " " * (
-                                indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
-                        output_str += (" " * (indent_count * 4) +
-                                       f"if {field} is not None and isinstance({field}, str):\n")
-                        indent_count += 1
-                        output_str += (" " * (indent_count * 4) +
-                                       f'{last_field_name}["{field}"] = parse_to_int({field})\n')
-                        output_str += "\n"
-                    else:
-                        if field[0] == "[" and field[-1] == "]":
-                            field = field[1:-1]  # removing [] from field name added to identify as list type
-                            output_str += " " * (
-                                    indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
-                            output_str += " " * (indent_count * 4) + f"if {field}:\n"
-                            indent_count += 1
-                            output_str += " " * (indent_count * 4) + f"for {field}_ in {field}:\n"
-                            indent_count += 1
-                            last_field_name = f"{field}_"
-                        else:
-                            output_str += " " * (
-                                    indent_count * 4) + f'{field} = {last_field_name}.get("{field}")\n'
-                            output_str += " " * (indent_count * 4) + f"if {field} is not None:\n"
-                            indent_count += 1
-                            last_field_name = field
-        return output_str
-
-    def handle_underlying_PATCH_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self._handle_str_int_val_callable_generation(message)
-        output_str += "\n"
-        output_str += "@perf_benchmark\n"
-        output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http("
-                       f"{message_name_snake_cased}_update_req_json_list: List[Dict], "
-                       f"filter_agg_pipeline: Any = None, "
-                       f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                       f") -> List[{message.proto.name}] | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Partial Update route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_patch_all_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    obj_id_list = []\n"
-        output_str += " " * indent_count + f"    for {message_name_snake_cased}_update_req_json in " \
-                                           f"{message_name_snake_cased}_update_req_json_list:\n"
-        output_str += " " * indent_count + (f"        handle_str_formatted_int_fields_in_{message_name_snake_cased}_"
-                                            f"json({message_name_snake_cased}_update_req_json)\n")
-        output_str += " " * indent_count + f"        obj_id = {message_name_snake_cased}_update_req_json.get('_id')\n"
-        output_str += " " * indent_count + f"        if obj_id is None:\n"
-        output_str += " " * indent_count + f'            err_str_ = f"Can not find _id key in received response ' \
-                                           f'body for patch all operation of {message.proto.name}, response body: ' + \
-                      '{' + f'{message_name_snake_cased}_update_req_json_list' + '}"\n'
-        output_str += " " * indent_count + f"            raise HTTPException(status_code=503, detail=err_str_)\n"
-        output_str += " " * indent_count + f"        obj_id_list.append(obj_id)\n"
-        output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_obj_list = await "
-                                            f"generic_read_http({message.proto.name}, "
-                                            f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                                            f"has_links={msg_has_links}, read_ids_list=obj_id_list)\n")
-        output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_req_json_list = "
-                                            f"await callback_class.partial_update_all_{message_name_snake_cased}_pre("
-                                            f"stored_{message_name_snake_cased}_obj_list, "
-                                            f"{message_name_snake_cased}_update_req_json_list)\n")
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        updated_{message_name_snake_cased}_obj = await generic_callable(" \
-                      f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                      f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                      f"{message_name_snake_cased}_update_req_json_list, obj_id_list, filter_agg_pipeline, " \
-                      f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter:
-                output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj =  await generic_callable(" \
-                              f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                              f"{message_name_snake_cased}_update_req_json_list, " \
-                              f"{self._get_filter_configs_var_name(message)}, obj_id_list, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-            case FastapiWsRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
-                               f"update_agg_pipeline={update_agg_pipeline_var_name[1:-1]}, "
-                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n")
-            case FastapiWsRoutesFileHandler.aggregation_type_both:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
-                               f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
-                               f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
-                               f"{self._get_filter_configs_var_name(message)}, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj = await generic_callable(" \
-                              f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
-                              f"{message_name_snake_cased}_update_req_json_list, obj_id_list, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + (f"    await callback_class.partial_update_all_"
-                                            f"{message_name_snake_cased}_post("
-                                            f"stored_{message_name_snake_cased}_obj_list, "
-                                            f"updated_{message_name_snake_cased}_obj)\n")
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_PATCH_all_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
-
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_PATCH_all_gen(**kwargs)
-        output_str += f"\n"
-        output_str += f'@{self.api_router_app_name}.patch("/patch_all-{message_name_snake_cased}' + \
-                      f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
-        output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                       f"update_req_body: Request, return_obj_copy: bool | None = True"
-                       f") -> List[{message.proto.name}] | bool:\n")
-        output_str += f"    json_body = await {message_name_snake_cased}_update_req_body.json()\n"
-        output_str += (f'    return await underlying_partial_update_all_{message_name_snake_cased}_http(json_body, '
-                       f'return_obj_copy=return_obj_copy)\n')
-        return output_str
-
-    def handle_underlying_DELETE_gen(self, **kwargs) -> str:
-        message, aggregation_type, id_field_type, shared_lock_list = self._unpack_kwargs_with_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
-        if id_field_type is not None:
-            output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id: {id_field_type}, "
-                           f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
-        else:
-            output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name}, "
-                           f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Delete route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_delete_http\n'
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
-                                           f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                                           f"{message_name_snake_cased}_id, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + f"    await callback_class.delete_{message_name_snake_cased}_pre(" \
-                                           f"stored_{message_name_snake_cased}_obj)\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter | FastapiWsRoutesFileHandler.aggregation_type_both:
-                err_str = "Filter Aggregation type is not supported in Delete operations, " \
-                          f"but aggregation type {aggregation_type} received in message {message.proto.name}"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            case FastapiWsRoutesFileHandler.aggregation_type_update:
-                update_agg_pipeline_var_name = \
-                    self.get_simple_option_value_from_proto(message,
-                                                            FastapiWsRoutesFileHandler.flux_msg_aggregate_query_var_name)
-                output_str += " " * indent_count + \
-                              (f"    delete_web_resp = await generic_callable({message.proto.name}, "
-                               f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
-                               f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj, "
-                               f"{update_agg_pipeline_var_name[1:-1]}, has_links={msg_has_links}, "
-                               f"return_obj_copy=return_obj_copy)\n")
-            case other:
-                output_str += " " * indent_count + \
-                              f"    delete_web_resp = await generic_callable({message.proto.name}, " \
-                              f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"{message.proto.name}BaseModel, stored_{message_name_snake_cased}_obj, " \
-                              f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + f"    await callback_class.delete_{message_name_snake_cased}_post(" \
-                                           f"delete_web_resp)\n"
-        output_str += " " * indent_count + f"    return delete_web_resp\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_DELETE_gen(self, **kwargs) -> str:
-        message, _, id_field_type, _ = self._unpack_kwargs_with_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_DELETE_gen(**kwargs)
-        output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + \
-                      '{' + f'{message_name_snake_cased}_id' + '}' + \
-                      f'", response_model=DefaultWebResponse | bool, status_code=200)\n'
-        if id_field_type is not None:
-            output_str += (f"async def delete_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id: {id_field_type}, "
-                           f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
-        else:
-            output_str += (f"async def delete_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name}, "
-                           f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
-        output_str += f"    return await underlying_delete_{message_name_snake_cased}_http(" \
-                      f"{message_name_snake_cased}_id, return_obj_copy=return_obj_copy)\n"
-        return output_str
-
-    def handle_underlying_DELETE_all_gen(self, **kwargs) -> str:
-        message, aggregation_type, shared_lock_list = self._unpack_kwargs_without_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
-        output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http("
-                       f"generic_callable: Callable[[...], Any] | None = None, "
-                       f"return_obj_copy: bool | None = True) -> DefaultWebResponse | bool:\n")
-        output_str += f'    """\n'
-        output_str += f'    Delete All route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_delete_all_http\n'
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    await callback_class.delete_all_{message_name_snake_cased}_pre()\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter | (
-            FastapiWsRoutesFileHandler.aggregation_type_both) | FastapiWsRoutesFileHandler.aggregation_type_update:
-                err_str = "Filter Aggregation type is not supported in Delete All operations, " \
-                          f"but aggregation type {aggregation_type} received in message {message.proto.name}"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            case other:
-                output_str += " " * indent_count + \
-                              f"    delete_web_resp = await generic_callable({message.proto.name}, " \
-                              f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"{message.proto.name}BaseModel, return_obj_copy=return_obj_copy)\n"
-        output_str += " " * indent_count + f"    await callback_class.delete_all_{message_name_snake_cased}_post(" \
-                                           f"delete_web_resp)\n"
-        output_str += " " * indent_count + f"    return delete_web_resp\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_DELETE_all_gen(self, **kwargs) -> str:
-        message, _, _ = self._unpack_kwargs_without_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_DELETE_all_gen(**kwargs)
-        output_str += "\n"
-        output_str += (f'@{self.api_router_app_name}.delete("/delete_all-{message_name_snake_cased}/", '
-                       f'response_model=DefaultWebResponse | bool, status_code=200)\n')
-        output_str += (f"async def delete_{message_name_snake_cased}_all_http(return_obj_copy: bool | None = True"
-                       f") -> DefaultWebResponse | bool:\n")
-        output_str += (f"    return await underlying_delete_all_{message_name_snake_cased}_http("
-                       f"return_obj_copy=return_obj_copy)\n")
-        return output_str
-
     def _get_filter_tuple_str(self, index_fields: List[protogen.Field]) -> str:
         filter_tuples_str = ""
         for field in index_fields:
@@ -833,67 +86,6 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if field != index_fields[-1]:
                 filter_tuples_str += ", "
         return filter_tuples_str
-
-    def handle_underlying_index_req_gen(self, message: protogen.Message,
-                                        shared_lock_list: List[str] | None = None) -> str:
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        index_fields: List[protogen.Field] = [field for field in message.fields
-                                              if self.is_bool_option_enabled(field, FastapiWsRoutesFileHandler.flux_fld_index)]
-
-        field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
-        output_str = "@perf_benchmark\n"
-        output_str += f"async def underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params}, " \
-                      f"filter_agg_pipeline: Any = None, generic_callable: " \
-                      f"Callable[[...], Any] | None = None) -> List[{message.proto.name}]:\n"
-        output_str += f'    """ Index route of {message.proto.name} """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_read_http\n'
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_pre()\n"
-        filter_configs_var_name = self._get_filter_configs_var_name(message)
-        if filter_configs_var_name:
-            output_str += " " * indent_count + f"    indexed_filter = copy.deepcopy({filter_configs_var_name})\n"
-            output_str += " " * indent_count + \
-                          f"    indexed_filter['match'] = [{self._get_filter_tuple_str(index_fields)}]\n"
-        else:
-            output_str += " " * indent_count + "    indexed_filter = {'match': " + \
-                          f"[{self._get_filter_tuple_str(index_fields)}]" + "}\n"
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
-                      f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                      f"filter_agg_pipeline, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + "    else:\n"
-        output_str += " " * indent_count + \
-                      f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
-                      f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                      f"indexed_filter, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_post(" \
-                                           f"{message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj\n\n"
-        return output_str
-
-    def handle_index_req_gen(self, message: protogen.Message, shared_lock_list: List[str] | None = None) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_index_req_gen(message, shared_lock_list)
-        output_str += "\n"
-        index_fields: List[protogen.Field] = [field for field in message.fields
-                                              if self.is_bool_option_enabled(field, FastapiWsRoutesFileHandler.flux_fld_index)]
-
-        field_query = "/".join(["{" + f"{field.proto.name}" + "}" for field in index_fields])
-        field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
-
-        output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-index-fields/' + \
-                      f'{field_query}' + f'", response_model=List[{message.proto.name}], status_code=200)\n'
-        output_str += f"async def get_{message_name_snake_cased}_from_index_fields_http({field_params}) " \
-                      f"-> List[{message.proto.name}]:\n"
-        field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
-        output_str += \
-            f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params})\n\n\n"
-        return output_str
 
     def handle_underlying_index_ws_req_gen(self, message: protogen.Message,
                                            shared_lock_list: List[str] | None = None) -> str:
@@ -941,78 +133,6 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             f"    await underlying_get_{message_name_snake_cased}_from_index_fields_ws(websocket, {field_params})\n\n\n"
         return output_str
 
-    def handle_underlying_GET_gen(self, **kwargs) -> str:
-        message, aggregation_type, id_field_type, shared_lock_list = self._unpack_kwargs_with_id_field_type(**kwargs)
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
-        if id_field_type is not None:
-            output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
-                          f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
-                          f"generic_callable: Callable[[...], Any] | None = None) -> {message.proto.name}:\n"
-        else:
-            output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
-                          f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name}, " \
-                          f"filter_agg_pipeline: Any = None, generic_callable: " \
-                          f"Callable[[...], Any] | None = None) -> {message.proto.name}:\n"
-        output_str += f'    """\n'
-        output_str += f'    Read by id route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_read_by_id_http\n'
-        # else not required: avoiding if method desc not provided
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + \
-                      f"    await callback_class.read_by_id_{message_name_snake_cased}_pre({message_name_snake_cased}_id)\n"
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
-                      f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                      f"{message_name_snake_cased}_id, filter_agg_pipeline, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter:
-                output_str += " " * indent_count + \
-                              f"        {message_name_snake_cased}_obj = await generic_callable(" \
-                              f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"{message_name_snake_cased}_id, " \
-                              f"{self._get_filter_configs_var_name(message)}, has_links={msg_has_links})\n"
-            case FastapiWsRoutesFileHandler.aggregation_type_update | FastapiWsRoutesFileHandler.aggregation_type_both:
-                err_str = "Update Aggregation type is not supported in read by id operations, " \
-                          f"but aggregation type {aggregation_type} received in message {message.proto.name}"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            case other:
-                output_str += " " * indent_count + \
-                              f"        {message_name_snake_cased}_obj = await generic_callable(" \
-                              f"{message.proto.name}, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"{message_name_snake_cased}_id, has_links={msg_has_links})\n"
-
-        output_str += " " * indent_count + f"    await callback_class.read_by_id_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
-        output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj\n"
-        output_str += "\n"
-        return output_str
-
-    def handle_GET_gen(self, **kwargs) -> str:
-        message, _, id_field_type, _ = self._unpack_kwargs_with_id_field_type(**kwargs)
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_GET_gen(**kwargs)
-        output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}/' + '{' + \
-                      f'{message_name_snake_cased}_id' + '}' + \
-                      f'", response_model={message.proto.name}, status_code=200)\n'
-        if id_field_type is not None:
-            output_str += f"async def read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id: " \
-                          f"{id_field_type}) -> {message.proto.name}:\n"
-        else:
-            output_str += f"async def read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id: " \
-                          f"{FastapiWsRoutesFileHandler.default_id_type_var_name}) -> {message.proto.name}:\n"
-        output_str += \
-            f"    return await underlying_read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id)\n"
-        return output_str
-
     def handle_underlying_GET_ws_gen(self, **kwargs):
         message, aggregation_type, id_field_type, shared_lock_list = self._unpack_kwargs_with_id_field_type(**kwargs)
         msg_has_links: bool = message in self.message_to_link_messages_dict
@@ -1021,7 +141,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         if id_field_type is not None:
             output_str = f"async def underlying_read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, " \
                          f"{message_name_snake_cased}_id: {id_field_type}, " \
-                         f"filter_agg_pipeline: Any = None) -> None:\n"
+                         f"filter_agg_pipeline: Any = None, need_initial_snapshot: bool | None = True) -> None:\n"
         else:
             output_str = f"async def underlying_read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, " \
                          f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name}, " \
@@ -1036,15 +156,16 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"        await generic_read_by_id_ws(websocket, " \
                       f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
                       f"{message_name}, {message_name_snake_cased}_id, filter_agg_pipeline, " \
-                      f"has_links={msg_has_links})\n"
+                      f"has_links={msg_has_links}, need_initial_snapshot=need_initial_snapshot)\n"
         output_str += "    else:\n"
         match aggregation_type:
             case FastapiWsRoutesFileHandler.aggregation_type_filter:
                 output_str += \
-                    f"        await generic_read_by_id_ws(websocket, " \
-                    f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                    f"{message_name}, {message_name_snake_cased}_id, " \
-                    f"{self._get_filter_configs_var_name(message)}, has_links={msg_has_links})\n"
+                    (f"        await generic_read_by_id_ws(websocket, "
+                     f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                     f"{message_name}, {message_name_snake_cased}_id, "
+                     f"{self._get_filter_configs_var_name(message)}, has_links={msg_has_links}, "
+                     f"need_initial_snapshot=need_initial_snapshot)\n")
             case FastapiWsRoutesFileHandler.aggregation_type_update | FastapiWsRoutesFileHandler.aggregation_type_both:
                 err_str = "Update Aggregation type is not supported in read by id operations, " \
                           f"but aggregation type {aggregation_type} received in message {message.proto.name}"
@@ -1052,9 +173,10 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 raise Exception(err_str)
             case other:
                 output_str += \
-                    f"        await generic_read_by_id_ws(websocket, " \
-                    f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                    f"{message_name}, {message_name_snake_cased}_id, has_links={msg_has_links})\n"
+                    (f"        await generic_read_by_id_ws(websocket, "
+                     f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                     f"{message_name}, {message_name_snake_cased}_id, has_links={msg_has_links}, "
+                     f"need_initial_snapshot=need_initial_snapshot)\n")
         output_str += f"    await callback_class.read_by_id_ws_{message_name_snake_cased}_post()\n"
         output_str += "\n"
         return output_str
@@ -1068,68 +190,15 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f'@{self.api_router_app_name}.websocket("/get-{message_name_snake_cased}-ws/' + \
                       '{' + f'{message_name_snake_cased}_id' + '}")\n'
         if id_field_type is not None:
-            output_str += f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, " \
-                          f"{message_name_snake_cased}_id: {id_field_type}) -> None:\n"
+            output_str += (f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, "
+                           f"{message_name_snake_cased}_id: {id_field_type}, "
+                           f"need_initial_snapshot: bool | None = True) -> None:\n")
         else:
-            output_str += f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, " \
-                          f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name}) -> None:\n"
+            output_str += (f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, "
+                           f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name},"
+                           f"need_initial_snapshot: bool | None = True) -> None:\n")
         output_str += f"    await underlying_read_{message_name_snake_cased}_by_id_ws(websocket, " \
-                      f"{message_name_snake_cased}_id)\n"
-        return output_str
-
-    def handle_underlying_GET_ALL_gen(self, message: protogen.Message, aggregation_type: str,
-                                      shared_lock_list: List[str] | None = None) -> str:
-        msg_has_links: bool = message in self.message_to_link_messages_dict
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = "@perf_benchmark\n"
-        output_str += (f"async def underlying_read_{message_name_snake_cased}_http("
-                       f"filter_agg_pipeline: Any = None, generic_callable: "
-                       f"Callable[[...], Any] | None = None, projection_model=None, "
-                       f"projection_filter: Dict | None = None) -> List[{message.proto.name}]:\n")
-        output_str += f'    """\n'
-        output_str += f'    Get All route for {message.proto.name}\n'
-        output_str += f'    """\n'
-        output_str += f'    if generic_callable is None:\n'
-        output_str += f'        generic_callable = generic_read_http\n'
-        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-
-        output_str += mutex_handling_str
-        output_str += " " * indent_count + f"    await callback_class.read_all_{message_name_snake_cased}_pre()\n"
-        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-        output_str += " " * indent_count + \
-                      f"        obj_list = await generic_callable({message.proto.name}, " \
-                      f"{FastapiWsRoutesFileHandler.proto_package_var_name}, filter_agg_pipeline, " \
-                      f"has_links={msg_has_links}, projection_model=projection_model)\n"
-        output_str += " " * indent_count + "    else:\n"
-        match aggregation_type:
-            case FastapiWsRoutesFileHandler.aggregation_type_filter:
-                output_str += " " * indent_count + \
-                              f"        obj_list = await generic_callable({message.proto.name}, " \
-                              f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"{self._get_filter_configs_var_name(message)}, has_links={msg_has_links})\n"
-            case FastapiWsRoutesFileHandler.aggregation_type_update | FastapiWsRoutesFileHandler.aggregation_type_both:
-                err_str = "Update Aggregation type is not supported in real all operations, " \
-                          f"but aggregation type {aggregation_type} received in message {message.proto.name}"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            case other:
-                output_str += " " * indent_count + \
-                              f"        obj_list = await generic_callable({message.proto.name}, " \
-                              f"{FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                              f"has_links={msg_has_links})\n"
-        output_str += " " * indent_count + f"    await callback_class.read_all_{message_name_snake_cased}_post(obj_list)\n"
-        output_str += " " * indent_count + f"    return obj_list\n\n"
-        return output_str
-
-    def handle_GET_ALL_gen(self, message: protogen.Message, aggregation_type: str,
-                           shared_lock_list: List[str] | None = None) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        output_str = self.handle_underlying_GET_ALL_gen(message, aggregation_type, shared_lock_list)
-        output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}' + \
-                      f'", response_model=List[{message.proto.name}], status_code=200)\n'
-        output_str += f"async def read_{message_name_snake_cased}_http() -> List[{message.proto.name}]:\n"
-        output_str += f"    return await underlying_read_{message_name_snake_cased}_http()\n\n\n"
+                      f"{message_name_snake_cased}_id, need_initial_snapshot=need_initial_snapshot)\n"
         return output_str
 
     def handle_underlying_GET_ALL_ws_gen(self, message: protogen.Message, aggregation_type: str,
@@ -1138,19 +207,22 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = f"async def underlying_read_{message_name_snake_cased}_ws(websocket: WebSocket, " \
-                     f"filter_agg_pipeline: Any = None) -> None:\n"
+                     f"filter_agg_pipeline: Any = None, need_initial_snapshot: bool | None = True) -> None:\n"
         output_str += f'    """ Get All {message_name} using websocket """\n'
 
         output_str += f"    await callback_class.read_all_ws_{message_name_snake_cased}_pre()\n"
         output_str += f"    if filter_agg_pipeline is not None:\n"
-        output_str += f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                      f"{message_name}, filter_agg_pipeline, has_links={msg_has_links})\n"
+        output_str += (f"        await generic_read_ws(websocket, "
+                       f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                       f"{message_name}, filter_agg_pipeline, has_links={msg_has_links}, "
+                       f"need_initial_snapshot=need_initial_snapshot)\n")
         output_str += "    else:\n"
         match aggregation_type:
             case FastapiWsRoutesFileHandler.aggregation_type_filter:
                 output_str += \
-                    f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                    f"{message_name}, {self._get_filter_configs_var_name(message)}, has_links={msg_has_links})\n"
+                    (f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                     f"{message_name}, {self._get_filter_configs_var_name(message)}, has_links={msg_has_links}, "
+                     f"need_initial_snapshot=need_initial_snapshot)\n")
             case FastapiWsRoutesFileHandler.aggregation_type_update | FastapiWsRoutesFileHandler.aggregation_type_both:
                 err_str = "Update Aggregation type is not supported in real all websocket operations, " \
                           f"but aggregation type {aggregation_type} received in message {message.proto.name}"
@@ -1159,7 +231,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             case other:
                 output_str += \
                     f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                    f"{message_name}, has_links={msg_has_links})\n"
+                    f"{message_name}, has_links={msg_has_links}, need_initial_snapshot=need_initial_snapshot)\n"
         output_str += f"    await callback_class.read_all_ws_{message_name_snake_cased}_post()\n\n"
         return output_str
 
@@ -1169,9 +241,11 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = self.handle_underlying_GET_ALL_ws_gen(message, aggregation_type, shared_lock_list)
         output_str += f"\n"
-        output_str += f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws")\n'
-        output_str += f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket) -> None:\n"
-        output_str += f"    await underlying_read_{message_name_snake_cased}_ws(websocket)\n\n\n"
+        output_str += (f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws")\n')
+        output_str += (f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket, "
+                       f"need_initial_snapshot: bool | None = True) -> None:\n")
+        output_str += (f"    await underlying_read_{message_name_snake_cased}_ws(websocket, "
+                       f"need_initial_snapshot=need_initial_snapshot)\n\n\n")
         return output_str
 
     def handle_field_web_socket_gen(self, message: protogen.Message, field: protogen.Field):
@@ -1278,72 +352,12 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
-    def _handle_http_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
-                               query_params_with_type_str: str, route_type: str | None = None,
-                               return_type_str: str | None = None) -> str:
-        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-        if return_type_str is None:
-            return_type_str = message.proto.name
-        if route_type is None or route_type == FastapiWsRoutesFileHandler.flux_json_query_route_get_type_field_val:
-            output_str = "@perf_benchmark\n"
-            output_str += f"async def underlying_{query_name}_query_http({query_params_with_type_str}) -> " \
-                          f"List[{return_type_str}]:\n"
-            if query_params_str:
-                output_str += f"    {message_name_snake_cased}_obj = await " \
-                              f"callback_class.{query_name}_query_pre({message.proto.name}, {query_params_str})\n"
-                output_str += f"    {message_name_snake_cased}_obj = await " \
-                              f"callback_class.{query_name}_query_post({message_name_snake_cased}_obj)\n"
-            else:
-                output_str += f"    {message_name_snake_cased}_obj = await callback_class.{query_name}_" \
-                              f"query_pre({message.proto.name})\n"
-                output_str += f"    await callback_class.{query_name}_query_post(" \
-                              f"{message_name_snake_cased}_obj)\n"
-            output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
-            output_str += f'@{self.api_router_app_name}.get("/query-{query_name}' + \
-                          f'", response_model=List[{return_type_str}], status_code=200)\n'
-            output_str += f"async def {query_name}_query_http({query_params_with_type_str}) -> " \
-                          f"List[{return_type_str}]:\n"
-            output_str += f'    """\n'
-            output_str += f'    Get Query of {message.proto.name} with aggregate - {query_name}\n'
-            output_str += f'    """\n'
-            output_str += f"    return await underlying_{query_name}_query_http({query_params_str})"
-            output_str += "\n\n\n"
-        elif route_type == FastapiWsRoutesFileHandler.flux_json_query_route_patch_type_field_val:
-            output_str = "@perf_benchmark\n"
-            output_str += f"async def underlying_{query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
-                          f"List[{return_type_str}]:\n"
-            if query_params_str:
-                output_str += f"    {message_name_snake_cased}_obj = await " \
-                              f"callback_class.{query_name}_query_pre({message.proto.name}, payload_dict)\n"
-                output_str += f"    {message_name_snake_cased}_obj = await " \
-                              f"callback_class.{query_name}_query_post({message_name_snake_cased}_obj)\n"
-            else:
-                err_str = f"patch query can't be generated without payload query_param, query {query_name} in " \
-                          f"message {message.proto.name} found without query params"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
-            output_str += f'@{self.api_router_app_name}.patch("/query-{query_name}' + \
-                          f'", response_model=List[{return_type_str}], status_code=201)\n'
-            output_str += f"async def {query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
-                          f"List[{return_type_str}]:\n"
-            output_str += f'    """\n'
-            output_str += f'    Patch Query of {message.proto.name} with aggregate - {query_name}\n'
-            output_str += f'    """\n'
-            output_str += f"    return await underlying_{query_name}_query_http(payload_dict)"
-            output_str += "\n\n\n"
-        else:
-            err_str = f"Unexpected routes_type: {route_type}, str: {route_type}, type {type(route_type)}"
-            logging.exception(err_str)
-            raise Exception(err_str)
-        return output_str
-
     def _handle_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
                              query_params_with_type_str: str, query_args_dict_str: str,
                              projection_model_name: str | None = None) -> str:
         output_str = "@perf_benchmark\n"
         output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
-                       f"{query_params_with_type_str}):\n")
+                       f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
         if projection_model_name:
             output_str += (f"    filter_callable, projection_agg_pipeline_callable = "
                            f"await callback_class.{query_name}_query_ws_pre()\n")
@@ -1351,21 +365,24 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f"    await generic_query_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
                           f"{message.proto.name}, filter_callable, agg_params"
             output_str += (f", projection_agg_pipeline_callable=projection_agg_pipeline_callable, "
-                           f"projection_model={projection_model_name})\n")
+                           f"projection_model={projection_model_name}, need_initial_snapshot=need_initial_snapshot)\n")
         else:
             output_str += f"    filter_callable = await callback_class.{query_name}_query_ws_pre()\n"
             output_str += f'    params_json = {query_args_dict_str}\n'
-            output_str += f"    await generic_query_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, " \
-                          f"{message.proto.name}, filter_callable, params_json"
-            output_str += ")\n"
+            output_str += (f"    await generic_query_ws(websocket, "
+                           f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                           f"{message.proto.name}, filter_callable, params_json")
+            output_str += ", need_initial_snapshot=need_initial_snapshot)\n"
         output_str += f"    await callback_class.{query_name}_query_ws_post()\n"
         output_str += f"\n\n"
         output_str += f'@{self.api_router_app_name}.websocket("/ws-query-{query_name}")\n'
-        output_str += f"async def {query_name}_query_ws(websocket: WebSocket, {query_params_with_type_str}):\n"
+        output_str += (f"async def {query_name}_query_ws(websocket: WebSocket, {query_params_with_type_str}, "
+                       f"need_initial_snapshot: bool | None = True):\n")
         output_str += f'    """\n'
         output_str += f'    WS Query of {message.proto.name} with aggregate - {query_name}\n'
         output_str += f'    """\n'
-        output_str += f"    await underlying_{query_name}_query_ws(websocket, {query_params_str})"
+        output_str += (f"    await underlying_{query_name}_query_ws(websocket, {query_params_str}, "
+                       f"need_initial_snapshot)")
         output_str += "\n\n\n"
         return output_str
 
@@ -1490,7 +507,8 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += self._handle_ws_query_methods(message)
 
         for message in self.root_message_list:
-            if FastapiWsRoutesFileHandler.is_option_enabled(message, FastapiWsRoutesFileHandler.flux_msg_json_root_time_series):
+            if FastapiWsRoutesFileHandler.is_option_enabled(message,
+                                                            FastapiWsRoutesFileHandler.flux_msg_json_root_time_series):
                 output_str += self._handle_projection_ws_query_methods(message)
 
         return output_str

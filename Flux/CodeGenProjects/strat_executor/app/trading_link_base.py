@@ -1,13 +1,14 @@
+import asyncio
 import logging
 from abc import abstractmethod, ABC
-from typing import List, ClassVar, final, Dict
+from typing import List, ClassVar, final, Dict, Callable
 from pendulum import DateTime
 import os
 
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
     Security, Side
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import \
-    OrderBrief, OrderJournal, OrderEventType
+    OrderBrief, OrderJournal, OrderJournalBaseModel, OrderEventType, FillsJournalBaseModel
 from Flux.CodeGenProjects.strat_executor.app.get_pair_strat_n_executor_client import *
 
 def add_to_texts(order_brief: OrderBrief, msg: str):
@@ -22,12 +23,17 @@ def load_configs(config_path):
 
 
 class TradingLinkBase(ABC):
+    asyncio_loop: asyncio.AbstractEventLoop | None = None
     simulate_config_yaml_path: str | None = None    # must be set before StratExecutor is provided to TradingDataManager
     simulate_config_dict: Dict | None = None    # must be set before StratExecutor is provided to TradingDataManager
     executor_port: int | None = None    # must be set before StratExecutor is provided to TradingDataManager
     executor_host = host
     pair_strat_config_dict = pair_strat_config_yaml_dict
     pair_strat_web_client: ClassVar[StratManagerServiceHttpClient] = strat_manager_service_http_client
+
+    def subscribe(self, listener_id: str, asyncio_loop: asyncio.AbstractEventLoop,
+                  ric_filters: List[str] | None, sedol_filters: List[str] | None):
+        logging.warning("Warning: TradingLinkBase subscribe invoked - subscribe call has no effect")
 
     @classmethod
     @final
@@ -53,19 +59,17 @@ class TradingLinkBase(ABC):
     @classmethod
     @abstractmethod
     async def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
-                              account: str, exchange: str | None = None, text: List[str] | None = None) -> bool:
+                              account: str, exchange: str | None = None, text: List[str] | None = None) -> OrderJournal | None:
         """
         derived to implement connector to underlying link provider
-        return false for any synchronous error (including if send to underlying provider fails)
         """
 
     @classmethod
     @abstractmethod
     async def place_cxl_order(cls, order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
-                              system_sec_id: str | None = None, underlying_account: str | None = None) -> bool:
+                              system_sec_id: str | None = None, underlying_account: str | None = None) -> OrderJournal | None:
         """
         derived to implement connector to underlying link provider
-        return false for any synchronous error (including if send to underlying provider fails)
         """
 
     @classmethod

@@ -47,6 +47,8 @@ if __name__ == "__main__":
     env_var_dict["PLUGIN_FILE_NAME"] = "js_constants_gen_plugin.py"
     env_var_dict["TEMPLATE_FILE_NAME"] = "constants_js_temp.txt"
     env_var_dict["UI_PORT"] = config_dict.get("ui_port")
+    env_var_dict["PROXY_SERVER"] = "False" \
+        if (proxy_server := config_dict.get("is_proxy_server")) is None else str(proxy_server)
     env_var_dict["HOST"] = config_dict.get("server_host")
     env_var_dict["BEANIE_PORT"] = config_dict.get("main_server_beanie_port")
     env_var_dict["CACHE_PORT"] = config_dict.get("main_server_cache_port")

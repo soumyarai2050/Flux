@@ -3,6 +3,10 @@ import 'flux_options.proto';
 import 'ui_option_utils.proto';
 
 
+enum DummyEnumP{
+  DUMMY_P = 0;
+}
+
 // , ERROR, WARNING, INFO, DEBUG, UNSPECIFIED
 enum Severity{
   Severity_UNSPECIFIED = 0;  // GRAY

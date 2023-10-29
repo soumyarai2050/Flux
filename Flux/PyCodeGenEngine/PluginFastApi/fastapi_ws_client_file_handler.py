@@ -136,8 +136,11 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
                         query_params_str += f"{meta_field_name}: {self.proto_to_py_datatype(meta_field_value)}, "
                 query_params_dict += '"start_date_time": start_date_time, "end_date_time": end_date_time}'
                 query_params_str += "start_date_time: DateTime | None = None, end_date_time: DateTime | None = None"
-                output_str += (f'\tdef {query_name}_ws_client(self, notify: bool, {query_params_str}) -> WSReader:\n')
+                output_str += (f'\tdef {query_name}_ws_client(self, notify: bool, {query_params_str}, '
+                               f'need_initial_snapshot: bool | None = True) -> WSReader:\n')
                 output_str += f"\t\tquery_kwargs = {query_params_dict}\n"
+                output_str += f'\t\tif need_initial_snapshot is not None:\n'
+                output_str += f'\t\t\tquery_kwargs["need_initial_snapshot"] = str(need_initial_snapshot).lower()\n'
                 output_str += ("\t\tquery_kwargs = jsonable_encoder(query_kwargs, exclude_none=True)   "
                                "# removes none values from dict\n")
                 output_str += (f'\t\tws_reader_obj = WSReader(self.{query_name}_ws_query_url, {container_model_name}, '
@@ -197,10 +200,13 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
                                     for aggregate_param, aggregate_params_type in zip(query_params,
                                                                                       query_params_types)])
             if query_type == "ws" or query_type == "both":
-                output_str += (f'\tdef query_{query_name}_ws_client(self, notify: bool, {params_str}) -> WSReader:\n')
+                output_str += (f'\tdef query_{query_name}_ws_client(self, notify: bool, {params_str}, '
+                               f'need_initial_snapshot: bool | None = True) -> WSReader:\n')
                 params_dict_str = \
                     ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
                 output_str += "\t\tquery_kwargs = {" + f"{params_dict_str}" + "}\n"
+                output_str += f'\t\tif need_initial_snapshot is not None:\n'
+                output_str += f'\t\t\tquery_kwargs["need_initial_snapshot"] = str(need_initial_snapshot).lower()\n'
                 output_str += ("\t\tquery_kwargs = jsonable_encoder(query_kwargs, exclude_none=True)   "
                                "# removes none values from dict\n")
                 output_str += (f'\t\tws_reader_obj = WSReader(self.ws_query_{query_name}_url, '
@@ -213,7 +219,11 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
         output_str = ""
         for message in self.root_message_list:
             message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-            output_str += f'\tdef {message_name_snake_cased}_ws_get_all_client(self, notify: bool) -> WSReader:\n'
+            output_str += (f'\tdef {message_name_snake_cased}_ws_get_all_client(self, notify: bool, '
+                           f'need_initial_snapshot: bool | None = True) -> WSReader:\n')
+            output_str += f'\t\tif need_initial_snapshot is not None:\n'
+            output_str += (f'\t\t\tself.{message_name_snake_cased}_ws_get_all_uri += '
+                           f'"?need_initial_snapshot=" + str(need_initial_snapshot).lower()\n')
             output_str += (f'\t\tws_reader_obj = WSReader(self.{message_name_snake_cased}_ws_get_all_uri, '
                            f'{message.proto.name}BaseModel, {message.proto.name}BaseModelList, '
                            f'self.handle_{message_name_snake_cased}_get_all_ws, notify=notify)\n')
@@ -229,13 +239,17 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
 
             if BaseFastapiPlugin.flux_json_root_read_by_id_websocket_field in option_value_dict:
                 output_str += (f'\tdef {message_name_snake_cased}_ws_get_by_id_client(self, notify: bool, '
-                               f'{message_name_snake_cased}_id: Any) -> WSReader:\n')
+                               f'{message_name_snake_cased}_id: Any, need_initial_snapshot: bool | None = True'
+                               f') -> WSReader:\n')
                 output_str += f'\t\tif self.{message_name_snake_cased}_ws_get_by_id_uri.endswith("/"):\n'
                 output_str += (f'\t\t\tself.{message_name_snake_cased}_ws_get_by_id_uri += '
                                f'str({message_name_snake_cased}_id)\n')
                 output_str += f'\t\telse:\n'
                 output_str += (f'\t\t\tself.{message_name_snake_cased}_ws_get_by_id_uri += '
                                f'"/" + str({message_name_snake_cased}_id)\n')
+                output_str += f'\t\tif need_initial_snapshot is not None:\n'
+                output_str += (f'\t\t\tself.{message_name_snake_cased}_ws_get_by_id_uri += '
+                               f'"?need_initial_snapshot=" + str(need_initial_snapshot).lower()\n')
                 output_str += (f'\t\tws_reader_obj = WSReader(self.{message_name_snake_cased}_ws_get_by_id_uri, '
                                f'{message.proto.name}BaseModel, {message.proto.name}BaseModelList, '
                                f'self.handle_{message_name_snake_cased}_get_by_id_ws, notify=notify)\n')

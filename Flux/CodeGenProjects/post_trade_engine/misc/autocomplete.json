@@ -1,0 +1,58 @@
+{
+  "autocomplete": {
+    "CB_List": [
+      "CB_Sec_1",
+      "CB_Sec_2",
+      "CB_Sec_3",
+      "CB_Sec_4",
+      "CB_Sec_5",
+      "CB_Sec_6",
+      "CB_Sec_7",
+      "CB_Sec_8",
+      "CB_Sec_9",
+      "CB_Sec_10"
+    ],
+    "EQT_List": [
+      "EQT_Sec_1",
+      "EQT_Sec_2",
+      "EQT_Sec_3",
+      "EQT_Sec_4",
+      "EQT_Sec_5",
+      "EQT_Sec_6",
+      "EQT_Sec_7",
+      "EQT_Sec_8",
+      "EQT_Sec_9",
+      "EQT_Sec_10",
+      "EQT_Sec_11",
+      "EQT_Sec_12",
+      "EQT_Sec_13",
+      "EQT_Sec_14"
+    ],
+    "DashFld_List": [
+      "cb_leg.sec.sec_id",
+      "cb_leg.company",
+      "cb_leg.last_px",
+      "cb_leg.last_px_change",
+      "cb_leg.market_notional",
+      "cb_leg.consumed_notional",
+      "eqt_leg.sec.sec_id",
+      "eqt_leg.company",
+      "eqt_leg.last_px",
+      "eqt_leg.last_px_change",
+      "eqt_leg.market_notional",
+      "eqt_leg.consumed_notional",
+      "max_buy_notional",
+      "max_sell_notional",
+      "mkt_premium",
+      "mkt_premium_change",
+      "borrow_summary.qty",
+      "borrow_summary.avg_rate",
+      "pth_summary.qty",
+      "pth_summary.avg_rate",
+      "locate_summary.qty",
+      "locate_summary.avg_rate",
+      "sod_summary.qty",
+      "sod_summary.avg_rate"
+    ]
+  }
+}

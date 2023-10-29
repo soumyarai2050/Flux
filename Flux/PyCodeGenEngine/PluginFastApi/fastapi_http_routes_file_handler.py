@@ -1308,9 +1308,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             elif self.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):
                 output_str += self._handle_routes_methods(message)
 
-        for message in self.root_message_list + self.non_root_message_list:
-            if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_query):
-                output_str += self._handle_query_methods(message)
+        for message in self.message_to_query_option_list_dict:
+            # if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_query):
+            output_str += self._handle_query_methods(message)
 
         for message in self.root_message_list:
             if FastapiHttpRoutesFileHandler.is_option_enabled(message, FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series):

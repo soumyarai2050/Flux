@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Any
 from enum import auto, Enum
 from fastapi_utils.enums import StrEnum
 from pydantic import BaseModel
@@ -8,8 +8,10 @@ class FieldQuery(BaseModel):
     field_name: str
     properties: Dict[str, str | Dict[str, str]]
 
+
 class WidgetQuery(BaseModel):
     widget_name: str
+    widget_data: Dict[str, Any] | None
     fields: List[FieldQuery]
 
 
@@ -65,9 +67,8 @@ class Delay(Enum):
     DEFAULT = 5
     LONG = 20
 
+
 class ColorType(StrEnum):
     # ERROR = (156, 0, 6)
     WARNING = auto()
     CRITICAL = auto()
-
-

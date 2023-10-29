@@ -6,7 +6,7 @@ from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_m
 from Flux.CodeGenProjects.log_analyzer.app.pair_strat_engine_log_analyzer import *
 from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import *
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
-
+from Flux.PyCodeGenEngine.FluxCodeGenCore.aggregate_core import get_raw_performance_data_from_callable_name_agg_pipeline
 # standard imports
 from datetime import datetime
 
@@ -16,15 +16,24 @@ LOG_ANALYZER_DATA_DIR = (
 pair_strat_engine_log_dir: PurePath = code_gen_projects_path / "pair_strat_engine" / "log"
 market_data_log_dir: PurePath = code_gen_projects_path / "market_data" / "log"
 strat_executor_log_dir: PurePath = code_gen_projects_path / "strat_executor" / "log"
+portfolio_monitor_log_dir: PurePath = code_gen_projects_path / "post_trade_engine" / "log"
 
 
 class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoutesCallback):
     pair_strat_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
                                                r"DEBUG|INFO|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*] : "
+    background_log_prefix_regex_pattern: str = r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : )?(" \
+                                               r"DEBUG|INFO|WARNING|ERROR|CRITICAL):"
     log_prefix_regex_pattern_to_callable_name_dict = {
         pair_strat_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
     }
+    background_log_prefix_regex_pattern_to_callable_name_dict = {
+        background_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
+    }
     datetime_str: str = datetime.now().strftime("%Y%m%d")
+    underlying_read_portfolio_alert_http: Callable[[Any], Any] | None = None
+    underlying_create_portfolio_alert_http: Callable[[Any], Any] | None = None
+    underlying_read_raw_performance_data_http: Callable[[Any], Any] | None = None
 
     def __init__(self):
         super().__init__()
@@ -34,6 +43,17 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
         self.service_ready = False
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
+
+    def initialize_underlying_http_callables(self):
+        from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_routes import (
+            underlying_read_portfolio_alert_http, underlying_create_portfolio_alert_http,
+            underlying_read_raw_performance_data_http)
+        LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_alert_http = (
+            underlying_read_portfolio_alert_http)
+        LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_alert_http = (
+            underlying_create_portfolio_alert_http)
+        LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_read_raw_performance_data_http = (
+            underlying_read_raw_performance_data_http)
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -54,13 +74,13 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
                 # validate essential services are up, if so, set service ready state to true
                 if self.service_up:
                     if not self.service_ready:
-                        self.service_ready = True
-
                         # starting log_analyzer script once log analyzer service is up
                         thread = (
                             Thread(target=LogAnalyzerServiceRoutesCallbackBaseNativeOverride.start_log_analyzer_script,
                                    daemon=True))
                         thread.start()
+                        self.service_ready = True
+                        print(f"INFO: service is ready: {datetime.now().time()}")
 
                 if not self.service_up:
                     try:
@@ -78,7 +98,6 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
                                 err_str_ = f"check_n_create_portfolio_alert failed with exception: {e}"
                                 logging.exception(err_str_)
                                 raise Exception(err_str_)
-
                         else:
                             should_sleep = True
                             service_up_no_error_retry_count -= 1
@@ -96,19 +115,21 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
         pass
 
     async def check_n_create_portfolio_alert(self):
-        from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_routes import (
-            underlying_read_portfolio_alert_http, underlying_create_portfolio_alert_http)
-
         async with PortfolioAlert.reentrant_lock:
-            portfolio_alert_list: List[PortfolioAlert] = await underlying_read_portfolio_alert_http()
+            portfolio_alert_list: List[PortfolioAlert] = (
+                await LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_alert_http())
             if len(portfolio_alert_list) == 0:
                 portfolio_alert = PortfolioAlert(_id=1, alerts=[], alert_update_seq_num=0)
-                await underlying_create_portfolio_alert_http(portfolio_alert)
+                await LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_alert_http(
+                    portfolio_alert)
 
     def app_launch_pre(self):
+        self.initialize_underlying_http_callables()
+
         self.port = la_port
         app_launch_pre_thread = Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
+
         logging.debug("Triggered server launch pre override")
 
     def app_launch_post(self):
@@ -119,15 +140,34 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
         datetime_str = LogAnalyzerServiceRoutesCallbackBaseNativeOverride.datetime_str
         log_prefix_regex_pattern_to_callable_name_dict = (
             LogAnalyzerServiceRoutesCallbackBaseNativeOverride.log_prefix_regex_pattern_to_callable_name_dict)
+        background_log_prefix_regex_pattern_to_callable_name_dict = (
+            LogAnalyzerServiceRoutesCallbackBaseNativeOverride.background_log_prefix_regex_pattern_to_callable_name_dict)
         log_details: List[LogDetail] = [
             LogDetail(service="pair_strat_engine_beanie_fastapi",
                       log_file_path=str(
-                          pair_strat_engine_log_dir / f"pair_strat_engine_*_{datetime_str}.log"),
+                          pair_strat_engine_log_dir / f"pair_strat_engine_logs_{datetime_str}.log"),
+                      critical=True,
+                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                      log_file_path_is_regex=False),
+            LogDetail(service="pair_strat_engine_background_debug",
+                      log_file_path=str(
+                          pair_strat_engine_log_dir / f"pair_strat_engine_background_logs.log"),
+                      critical=True,
+                      log_prefix_regex_pattern_to_callable_name_dict=background_log_prefix_regex_pattern_to_callable_name_dict,
+                      log_file_path_is_regex=False),
+            LogDetail(service="pair_strat_engine_background",
+                      log_file_path=str(
+                          pair_strat_engine_log_dir / f"pair_strat_engine_background_logs_{datetime_str}.log"),
+                      critical=True,
+                      log_prefix_regex_pattern_to_callable_name_dict=background_log_prefix_regex_pattern_to_callable_name_dict,
+                      log_file_path_is_regex=False),
+            LogDetail(service="strat_executor",
+                      log_file_path=str(strat_executor_log_dir / f"strat_executor_*_logs_{datetime_str}.log"),
                       critical=True,
                       log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                       log_file_path_is_regex=True),
-            LogDetail(service="strat_executor",
-                      log_file_path=str(strat_executor_log_dir / f"strat_executor_*_{datetime_str}.log"),
+            LogDetail(service="post_trade_engine",
+                      log_file_path=str(portfolio_monitor_log_dir / f"post_trade_engine_*_{datetime_str}.log"),
                       critical=True,
                       log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                       log_file_path_is_regex=True)
@@ -161,13 +201,9 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
 
     async def get_raw_performance_data_of_callable_query_pre(
             self, raw_performance_data_of_callable_class_type: Type[RawPerformanceDataOfCallable], callable_name: str):
-        from Flux.PyCodeGenEngine.FluxCodeGenCore.aggregate_core import \
-            get_raw_performance_data_from_callable_name_agg_pipeline
-        from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_routes import \
-            underlying_read_raw_performance_data_http
 
         raw_performance_data_list = \
-            await underlying_read_raw_performance_data_http(
+            await LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_read_raw_performance_data_http(
                 get_raw_performance_data_from_callable_name_agg_pipeline(callable_name), self.get_generic_read_route())
 
         raw_performance_data_of_callable = RawPerformanceDataOfCallable(raw_performance_data=raw_performance_data_list)

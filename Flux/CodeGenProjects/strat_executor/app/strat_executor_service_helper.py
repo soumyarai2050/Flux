@@ -24,6 +24,9 @@ def all_service_up_check(executor_client: StratExecutorServiceHttpClient, ignore
             strat_manager_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
+            post_trade_engine_service_http_client.get_all_ui_layout_client())
+
+        ui_layout_list: List[UILayoutBaseModel] = (
             log_analyzer_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
@@ -138,7 +141,8 @@ def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_pe
 
     # block for task to finish
     try:
-        return future.result()
+        result = future.result()
+        return result
     except Exception as e_:
         logging.exception(f"get_consumable_participation_qty_underlying_http failed with exception: {e_}")
 
@@ -156,7 +160,8 @@ async def get_consumable_participation_qty_underlying_http(symbol: str, side: Si
     else:
         logging.error("Received unexpected length of executor_check_snapshot_list from query "
                       f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
-                      f"{get_symbol_side_key([(symbol, side)])}, likely bug in "
+                      f"{get_symbol_side_key([(symbol, side)])}, applicable_period_seconds: {applicable_period_seconds}"
+                      f", max_participation_rate: {max_participation_rate}, likely bug in "
                       f"get_executor_check_snapshot_query pre implementation")
         return
 
@@ -169,7 +174,7 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
     market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=10, depth_levels=3)
     residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=30_000, residual_mark_seconds=4)
     strat_limits: StratLimits = StratLimits(max_open_orders_per_side=5,
-                                            max_cb_notional=300_000,
+                                            max_cb_notional=get_default_max_notional(),
                                             max_open_cb_notional=30_000,
                                             max_net_filled_notional=160_000,
                                             max_concentration=10,
@@ -220,3 +225,7 @@ def create_stop_md_script(running_process_name: str, generation_stop_file_path: 
         fl.write('  echo "PC: $PROCESS_COUNT"\n')
         fl.write(f'  `pgrep {running_process_name} | xargs kill`"\n')
         fl.write('fi\n')
+
+
+def get_default_max_notional() -> int:
+    return 300_000

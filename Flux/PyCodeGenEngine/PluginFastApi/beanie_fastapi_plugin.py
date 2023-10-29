@@ -22,6 +22,7 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_routes_file_handler import Fa
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_launcher_file_handler import FastapiLauncherFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_client_file_handler import FastapiHttpClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_client_file_handler import FastapiWSClientFileHandler
+from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ui_proxy_config_handler import FastapiUIProxyConfigHandler
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
@@ -37,7 +38,8 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
                           FastapiHttpRoutesFileHandler,
                           FastapiWsRoutesFileHandler,
                           FastapiLauncherFileHandler,
-                          FastapiCallbackOverrideFileHandler):
+                          FastapiCallbackOverrideFileHandler,
+                          FastapiUIProxyConfigHandler):
     """
     Plugin script to generate Beanie enabled fastapi app
     """
@@ -196,11 +198,11 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += '    cors_dict["allow_credentials"] = True\n'
         output_str += "else:\n"
         output_str += '    host_pattern = host.replace(".", "\\.")\n'
-        output_str += '    allow_origin_patten = rf"https?://{host_pattern}(:\d+)?"\n'
-        output_str += '    cors_dict["allow_origin_regex"] = allow_origin_patten\n'
+        output_str += '    allow_origin_pattern = rf"https?://{host_pattern}(:\d+)?"\n'
+        output_str += '    cors_dict["allow_origin_regex"] = allow_origin_pattern\n'
         output_str += f"{self.fastapi_app_name}.add_middleware(\n"
         output_str += f"    CORSMiddleware,\n"
-        output_str += "     **cors_dict"
+        output_str += f"    **cors_dict\n"
         output_str += f")\n\n"
         output_str += f'{self.fastapi_app_name}.include_router({self.api_router_app_name}, ' \
                       f'prefix="/{self.proto_file_package}")\n'
@@ -265,7 +267,9 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
             self.client_file_name + ".py": self.handle_client_file_gen(file),
 
             # Adding WS client file
-            self.ws_client_file_name + ".py": self.handle_ws_client_file_gen(file)
+            self.ws_client_file_name + ".py": self.handle_ws_client_file_gen(file),
+
+            self.ws_ui_proxy_config_file_name: self.handle_ui_proxy_config_file_gen(file)
         }
 
         return output_dict

@@ -9,6 +9,11 @@ from Flux.CodeGenProjects.pair_strat_engine.generated.FastApi.strat_manager_serv
 from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_client import (
     LogAnalyzerServiceHttpClient)
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, parse_to_int
+from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import log_analyzer_service_http_client
+from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
+    strat_manager_service_http_client, config_yaml_dict as pair_strat_config_yaml_dict, ps_host, ps_port)
+from Flux.CodeGenProjects.post_trade_engine.app.post_trade_engine_service_helper import (
+    post_trade_engine_service_http_client)
 
 EXECUTOR_PROJECT_DIR = PurePath(__file__).parent.parent
 EXECUTOR_PROJECT_DATA_DIR = EXECUTOR_PROJECT_DIR / 'data'
@@ -23,19 +28,3 @@ except FileNotFoundError as e:
 
 host = main_config_yaml_dict.get("server_host")
 
-# pair_strat_engine client handling
-pair_strat_config_yaml_path = PurePath(__file__).parent.parent.parent / "pair_strat_engine" / "data" / "config.yaml"
-pair_strat_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(pair_strat_config_yaml_path))
-pair_strat_port = pair_strat_config_yaml_dict.get("main_server_beanie_port")
-ps_host, ps_port = pair_strat_config_yaml_dict.get("server_host"), parse_to_int(pair_strat_port)
-strat_manager_service_http_client = \
-    StratManagerServiceHttpClient.set_or_get_if_instance_exists(ps_host, ps_port)
-
-# log_analyzer client handling
-log_analyzer_config_yaml_path = PurePath(__file__).parent.parent.parent / "log_analyzer" / "data" / "config.yaml"
-log_analyzer_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(log_analyzer_config_yaml_path))
-log_analyzer_port = log_analyzer_config_yaml_dict.get("main_server_beanie_port")
-
-la_host, la_port = log_analyzer_config_yaml_dict.get("server_host"), parse_to_int(log_analyzer_port)
-log_analyzer_service_http_client = \
-    LogAnalyzerServiceHttpClient.set_or_get_if_instance_exists(la_host, la_port)

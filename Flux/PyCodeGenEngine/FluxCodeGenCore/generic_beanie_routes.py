@@ -30,7 +30,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.ws_connection_manager import WSData
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, compare_n_patch_dict, \
     parse_to_int, YAMLConfigurationManager, compare_n_patch_list, execute_tasks_list_with_all_completed, \
-    get_time_it_log_pattern, parse_to_float
+    get_time_it_log_pattern, parse_to_float, handle_ws
 
 """
 1. FilterAggregate [only filters the returned value]
@@ -622,22 +622,6 @@ async def generic_read_http(pydantic_class_type: Type[DocType], proto_package_na
     return pydantic_list
 
 
-async def handle_ws(ws: WebSocket, is_new_ws: bool):
-    need_disconnect = False
-    if is_new_ws:
-        while True:
-            json_data = await ws.receive()  # {"type": "websocket.disconnect", "code": exc.code}
-            if json_data["type"] == "websocket.disconnect":
-                need_disconnect = True
-                break
-            else:
-                logging.error(
-                    f"Unexpected! WS client send data to server (ignoring) where none is expected, data: {json_data}")
-                continue
-    # else not required - some other path has invoked the websocket.receive(), we can ignore
-    return need_disconnect
-
-
 def get_all_ws_url(host: str, port: int, proto_package_name: str, pydantic_class_type) -> str:
     return f"http://{host}:{port}/{proto_package_name}/" \
            f"get-all-{convert_camel_case_to_specific_case(pydantic_class_type.__name__)}-ws/"
@@ -651,7 +635,7 @@ def get_by_id_ws_url(host: str, port: int, proto_package_name: str, pydantic_cla
 
 @http_except_n_log_error(status_code=500)
 async def generic_read_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocType],
-                          filter_agg_pipeline: Any = None, has_links: bool = False):
+                          filter_agg_pipeline: Any = None, has_links: bool = False, need_initial_snapshot: bool = True):
     is_new_ws: bool = await pydantic_class_type.read_ws_path_ws_connection_manager.connect(ws)
     logging.debug(f"websocket client requested to connect: {ws.client}")
     host, port = get_beanie_host_n_port(project_name)
@@ -659,13 +643,16 @@ async def generic_read_ws(ws: WebSocket, project_name: str, pydantic_class_type:
                   f"{get_all_ws_url(host, port, project_name, pydantic_class_type)}")
     need_disconnect = False
     try:
-        pydantic_list = \
-            await get_obj_list(pydantic_class_type, filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
-        fetched_pydantic_list_json = jsonable_encoder(pydantic_list, by_alias=True)
-        fetched_pydantic_list_json_str = json.dumps(fetched_pydantic_list_json)
-        await pydantic_class_type.read_ws_path_ws_connection_manager. \
-            send_json_to_websocket(fetched_pydantic_list_json_str, ws)
-        need_disconnect = await handle_ws(ws, is_new_ws)
+        if need_initial_snapshot is None or need_initial_snapshot:
+            pydantic_list = \
+                await get_obj_list(pydantic_class_type, filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
+            fetched_pydantic_list_json = jsonable_encoder(pydantic_list, by_alias=True)
+            fetched_pydantic_list_json_str = json.dumps(fetched_pydantic_list_json)
+            await pydantic_class_type.read_ws_path_ws_connection_manager. \
+                send_json_to_websocket(fetched_pydantic_list_json_str, ws)
+        # else not required: no initial snapshot is provided on this connection
+
+        need_disconnect = await handle_ws(ws, is_new_ws)    # Blocking call
     except WebSocketException as e:
         need_disconnect = True
         logging.info(f"WebSocketException in url "
@@ -711,7 +698,8 @@ async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type
                            filter_callable: Callable[..., Any] | None = None,
                            filter_callable_kwargs: Dict[Any, Any] | None = None,
                            projection_agg_pipeline_callable: Callable[..., Any] | None = None,
-                           projection_model: ModelMetaclass | None = None):
+                           projection_model: ModelMetaclass | None = None,
+                           need_initial_snapshot: bool = True):
     if filter_callable_kwargs is None:
         filter_callable_kwargs = {}
 
@@ -726,17 +714,19 @@ async def generic_query_ws(ws: WebSocket, project_name: str, pydantic_class_type
                   f"{get_all_ws_url(host, port, project_name, pydantic_class_type)}")
     need_disconnect = False
     try:
-        projection_agg_pipeline = None
-        if projection_agg_pipeline_callable:
-            projection_agg_pipeline = projection_agg_pipeline_callable(**filter_callable_kwargs)
+        if need_initial_snapshot is None or need_initial_snapshot:
+            projection_agg_pipeline = None
+            if projection_agg_pipeline_callable:
+                projection_agg_pipeline = projection_agg_pipeline_callable(**filter_callable_kwargs)
 
-        pydantic_obj_list = await get_obj_list(pydantic_class_type,
-                                               filter_agg_pipeline=projection_agg_pipeline,
-                                               projection_model=projection_model)
-        json_data = jsonable_encoder(pydantic_obj_list, by_alias=True)
-        json_str = json.dumps(json_data)
-        await pydantic_class_type.read_ws_path_ws_connection_manager. \
-            send_json_to_websocket(json_str, ws)
+            pydantic_obj_list = await get_obj_list(pydantic_class_type,
+                                                   filter_agg_pipeline=projection_agg_pipeline,
+                                                   projection_model=projection_model)
+            json_data = jsonable_encoder(pydantic_obj_list, by_alias=True)
+            json_str = json.dumps(json_data)
+            await pydantic_class_type.read_ws_path_ws_connection_manager. \
+                send_json_to_websocket(json_str, ws)
+        # else not required: no initial snapshot is provided on this connection
         need_disconnect = await handle_ws(ws, is_new_ws)
     except WebSocketException as e:
         need_disconnect = True
@@ -793,7 +783,8 @@ async def generic_read_by_id_http(pydantic_class_type: Type[DocType], proto_pack
 
 @http_except_n_log_error(status_code=500)
 async def generic_read_by_id_ws(ws: WebSocket, project_name: str, pydantic_class_type: Type[DocType],
-                                pydantic_obj_id: Any, filter_agg_pipeline: Any = None, has_links: bool = False):
+                                pydantic_obj_id: Any, filter_agg_pipeline: Any = None, has_links: bool = False,
+                                need_initial_snapshot: bool | None = True):
     # prevent duplicate addition
     is_new_ws: bool = await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.connect(ws, pydantic_obj_id)
 
@@ -803,16 +794,18 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, pydantic_class
                   f"{get_by_id_ws_url(host, port, project_name, pydantic_class_type, pydantic_obj_id)}")
     need_disconnect: bool = False
     try:
-        fetched_pydantic_obj: pydantic_class_type = await get_obj(pydantic_class_type, pydantic_obj_id,
-                                                                  filter_agg_pipeline, has_links)
-        if fetched_pydantic_obj is None:
-            raise HTTPException(status_code=404, detail=id_not_found.format_msg(pydantic_class_type.__name__,
-                                                                                pydantic_obj_id))
-        else:
-            fetched_pydantic_obj_json = jsonable_encoder(fetched_pydantic_obj, by_alias=True)
-            fetched_pydantic_obj_json_str = json.dumps(fetched_pydantic_obj_json)
-            await pydantic_class_type.read_ws_path_with_id_ws_connection_manager. \
-                send_json_to_websocket(fetched_pydantic_obj_json_str, ws)
+        if need_initial_snapshot is None or need_initial_snapshot:
+            fetched_pydantic_obj: pydantic_class_type = await get_obj(pydantic_class_type, pydantic_obj_id,
+                                                                      filter_agg_pipeline, has_links)
+            if fetched_pydantic_obj is None:
+                raise HTTPException(status_code=404, detail=id_not_found.format_msg(pydantic_class_type.__name__,
+                                                                                    pydantic_obj_id))
+            else:
+                fetched_pydantic_obj_json = jsonable_encoder(fetched_pydantic_obj, by_alias=True)
+                fetched_pydantic_obj_json_str = json.dumps(fetched_pydantic_obj_json)
+                await pydantic_class_type.read_ws_path_with_id_ws_connection_manager.send_json_to_websocket(
+                    fetched_pydantic_obj_json_str, ws)
+        # else not required: no initial snapshot is provided on this connection
         need_disconnect = await handle_ws(ws, is_new_ws)
     except WebSocketException as e:
         need_disconnect = True
