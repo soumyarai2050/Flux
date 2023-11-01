@@ -298,8 +298,8 @@ def buy_sell_symbol_list():
 def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_,
                          db_names_list):
 
-    # deleting existing data available in existing executor client
-    delete_tob_md_ld_fj_os_oj()
+    # # deleting existing data available in existing executor client
+    # delete_tob_md_ld_fj_os_oj()
 
     # deleting existing executors
     clean_executors_and_today_activated_symbol_side_lock_file()

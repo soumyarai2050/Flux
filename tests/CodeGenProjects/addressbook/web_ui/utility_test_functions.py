@@ -544,7 +544,8 @@ def get_xpath_from_field_name(schema_dict: Dict[str, any], widget_type: WidgetTy
 
 def override_default_limits(order_limits: OrderLimitsBaseModel, portfolio_limits: PortfolioLimitsBaseModel):
     updated_order_limits: OrderLimitsBaseModel = OrderLimitsBaseModel(_id=order_limits.id, max_basis_points=150,
-                                                                      max_px_deviation=2, min_order_notional=1_000)
+                                                                      max_px_deviation=2, min_order_notional=1_000,
+                                                                      max_order_notional=400000)
     strat_manager_service_native_web_client.patch_order_limits_client(jsonable_encoder(
         updated_order_limits, by_alias=True, exclude_none=True))
 
@@ -609,9 +610,7 @@ def activate_strat(widget: WebElement, driver: WebDriver) -> None:
         time.sleep(Delay.SHORT.value)
 
         # Verify if the strat is in active state
-        pause_strat = widget.find_element(By.XPATH,
-                                          "//div[@id='strat_collection']//h6//div//div//button[@name="
-                                          "'strat_state'][normalize-space()='Pause']")
+        pause_strat = widget.find_element(By.XPATH, '//*[@id="strat_collection"]/h6/div/div/button[1]')
 
         btn_text = pause_strat.text
         assert btn_text == "PAUSE", "Failed to activate strat."
@@ -784,9 +783,9 @@ def get_table_layout_field_name(widget: WebElement):
 
 def validate_comma_separated_values(widget: WebElement, xpath: str, value: str):
     entered_value = get_value_from_input_field(widget=widget, xpath=xpath, layout=Layout.TREE)
-    entered_value = entered_value.replace("55", "")
+    entered_value = entered_value.split(".")[0]
     entered_value = entered_value.replace(",", "")
-    value = value.replace(".55", "")
+    value = value.split(".")[0]
     assert entered_value == value
 
 
@@ -877,6 +876,18 @@ def get_common_keys(widget: WebElement) -> List[str]:
         span_element = key_element.find_element(By.TAG_NAME, "span")
         common_keys_text.append(span_element.text)
     return common_keys_text
+
+
+def get_all_keys_from_table(table: WebElement) -> List[str]:
+    # Assuming the heading cells are in the first row of the table
+    heading_row: WebElement = table.find_element(By.TAG_NAME, "tr")
+
+    # Assuming the heading values are present in the cells of the heading row
+    heading_cells: List[WebElement] = heading_row.find_elements(By.TAG_NAME, "th")
+
+    headings = [cell.text.replace(" ", "_") for cell in heading_cells]
+
+    return headings
 
 
 def get_replaced_common_keys(common_keys_list: List) -> List[str]:
@@ -1069,3 +1080,85 @@ def delete_tob_md_ld_fj_os_oj() -> None:
 
         for _ in range(1, 11):
             assert executor_web_client.delete_order_journal_client(order_journal_id=_, return_obj_copy=False)
+
+
+def scroll_into_view(driver: WebDriver, element: WebElement):
+    driver.execute_script('arguments[0].scrollIntoView(true)', element)
+    time.sleep(Delay.SHORT.value)
+
+
+def click_button_with_name(widget: WebElement, button_name: str):
+    widget.find_element(By.NAME, button_name).click()
+    time.sleep(Delay.SHORT.value)
+
+
+def flux_fld_default_widget(schema_dict: Dict, widget: WebElement, widget_type: WidgetType, widget_name: str, layout: Layout,
+                            field_query):
+    field_name: str = field_query.field_name
+    default_value: str = field_query.properties['default']
+    if (field_name != "bkr_disable" and field_name != "pos_disable" and field_name != "sec_type" and
+            field_name != "dismiss" and field_name != "kill_switch" and field_name != "strat_state" and
+            field_name != "exch_response_max_seconds"):
+        xpath: str = get_xpath_from_field_name(schema_dict, widget_type=widget_type,
+                                               widget_name=widget_name, field_name=field_name)
+
+        field_value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
+        assert field_value == default_value
+
+
+def get_select_box_value(select_box: WebElement) -> str:
+    try:
+        # Find the div element containing the selected value
+        value_div = select_box.find_element(By.CLASS_NAME, "MuiInputBase-input")
+
+        # Get the text content of the div element
+        selected_value = value_div.text
+
+        return selected_value
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return ""
+
+
+def get_placeholder_from_element(widget: WebElement, id: str):
+    input_element = widget.find_element(By.ID, id)
+    return input_element.get_attribute('placeholder')
+
+
+def flux_fld_sequence_number_in_widget(result, driver: WebDriver, widget_type: WidgetType):
+    for widget_query in result:
+        driver.refresh()
+        time.sleep(Delay.SHORT.value)
+        i: int = 1
+        sequence_number: int = 0
+        previous_field_sequence_value: int = 0
+        widget_name: str = widget_query.widget_name
+        widget: WebElement = driver.find_element(By.ID, widget_name)
+
+        scroll_into_view(driver=driver, element=widget)
+        time.sleep(Delay.SHORT.value)
+        switch_layout(widget=widget, layout=Layout.TABLE)
+        time.sleep(Delay.SHORT.value)
+        click_button_with_name(widget=widget, button_name="Settings")
+
+        for field_query in widget_query.fields:
+            field_name = field_query.field_name
+            if field_name == "kill_switch" or field_name == "strat_state":
+                continue
+            i += 1
+            sequence_number += 1
+            if widget_type == WidgetType.INDEPENDENT or widget_type == WidgetType.REPEATED_INDEPENDENT:
+                field_sequence_value_element: WebElement = widget.find_element(
+                    By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]/li[{i}]/div[1]')
+            else:
+                if widget_name == "pair_strat_params":
+                    widget_name = "pair_strat"
+                field_sequence_value_element: WebElement = widget.find_element(
+                    By.XPATH, f'//*[@id="definitions.{widget_name}_table_settings"]/div[3]/li[{i}]/div[1]')
+            field_sequence_value: int = int(get_select_box_value(field_sequence_value_element))
+            if (field_sequence_value - previous_field_sequence_value) > 1:
+                sequence_number += ((field_sequence_value - previous_field_sequence_value) - 1)
+            previous_field_sequence_value = field_sequence_value
+
+            assert sequence_number == field_sequence_value

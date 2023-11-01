@@ -333,11 +333,11 @@ class StratExecutorPlugin(BaseProtoPlugin):
         if is_repeated:
             extra_str = "s"
             output_str = f"\tdef get_{message_name_snake_cased}(self, date_time: DateTime | None = None) -> " \
-                         f"Tuple[List[{message_name}BaseModel], DateTime] | None:\n"
+                         f"Tuple[List[{message_name}BaseModel | {message_name}], DateTime] | None:\n"
         else:
             extra_str = ""
             output_str = f"\tdef get_{message_name_snake_cased}(self, date_time: DateTime | None = None) -> " \
-                         f"Tuple[{message_name}BaseModel, DateTime] | None:\n"
+                         f"Tuple[{message_name}BaseModel | {message_name}, DateTime] | None:\n"
         output_str += f"\t\tif date_time is None or date_time < " \
                       f"self._{message_name_snake_cased}{extra_str}_update_date_time:\n"
         output_str += f"\t\t\tif self._{message_name_snake_cased}{extra_str} is not None:\n"
@@ -359,7 +359,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
             extra_str = ""
 
         output_str = f"\tdef set_{message_name_snake_cased}(self, " \
-                     f"{message_name_snake_cased}: {message_name}BaseModel) -> DateTime:\n"
+                     f"{message_name_snake_cased}: {message_name}BaseModel | {message_name}) -> DateTime:\n"
         if is_repeated:
             output_str += f"\t\tif self._{message_name_snake_cased}{extra_str} is None:\n"
             output_str += f"\t\t\tself._{message_name_snake_cased}{extra_str} = list()\n"
@@ -399,11 +399,13 @@ class StratExecutorPlugin(BaseProtoPlugin):
 
                 if is_repeated:
                     output_str += \
-                        f"\t\tself._{message_name_snake_cased}s: List[{message_name}BaseModel] | None = None\n"
+                        (f"\t\tself._{message_name_snake_cased}s: "
+                         f"List[{message_name}BaseModel | {message_name}] | None = None\n")
                     output_str += \
                         f"\t\tself._{message_name_snake_cased}s_update_date_time: DateTime = DateTime.utcnow()\n\n"
                 else:
-                    output_str += f"\t\tself._{message_name_snake_cased}: {message_name}BaseModel | None = None\n"
+                    output_str += (f"\t\tself._{message_name_snake_cased}: "
+                                   f"{message_name}BaseModel | {message_name} | None = None\n")
                     output_str += \
                         f"\t\tself._{message_name_snake_cased}_update_date_time: DateTime = DateTime.utcnow()\n\n"
 
@@ -469,34 +471,6 @@ class StratExecutorPlugin(BaseProtoPlugin):
                 output_str += self._strat_cache_set_model_interface_content(message, is_repeated)
 
         return output_str
-
-    # def _trading_cache_set_model_interface_content(self, message: protogen.Message, is_repeated: bool) -> str:
-    #     message_name = message.proto.name
-    #     message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-    #     output_str = f"\tdef set_{message_name_snake_cased}(self, " \
-    #                   f"{message_name_snake_cased}: {message_name}BaseModel) -> DateTime:\n"
-    #
-    #     output_str += f"\t\tself._{message_name_snake_cased} = {message_name_snake_cased}\n"
-    #     output_str += f"\t\tself._{message_name_snake_cased}_update_date_time = DateTime.utcnow()\n"
-    #     output_str += f"\t\treturn self._{message_name_snake_cased}_update_date_time\n\n"
-    #     # return output_str
-    #
-    #     if is_repeated:
-    #         extra_str = "s"
-    #     else:
-    #         extra_str = ""
-    #
-    #     output_str = f"\tdef set_{message_name_snake_cased}(self, " \
-    #                  f"{message_name_snake_cased}: {message_name}BaseModel) -> DateTime:\n"
-    #     if is_repeated:
-    #         output_str += f"\t\tif self._{message_name_snake_cased}{extra_str} is None:\n"
-    #         output_str += f"\t\t\tself._{message_name_snake_cased}{extra_str} = list()\n"
-    #         output_str += f"\t\tself._{message_name_snake_cased}{extra_str}.append({message_name_snake_cased})\n"
-    #     else:
-    #         output_str += f"\t\t\tself._{message_name_snake_cased} = {message_name_snake_cased}\n"
-    #     output_str += f"\t\tself._{message_name_snake_cased}{extra_str}_update_date_time = DateTime.utcnow()\n"
-    #     output_str += f"\t\treturn self._{message_name_snake_cased}{extra_str}_update_date_time\n\n"
-    #     return output_str
 
     def base_trading_cache_file_content(self, file: protogen.File):
         output_str = "# primary imports\n"

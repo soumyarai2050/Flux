@@ -31,6 +31,7 @@ from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import (
     get_new_portfolio_limits, get_new_order_limits, CURRENT_PROJECT_DATA_DIR)
 from Flux.CodeGenProjects.addressbook.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.addressbook.app.aggregate import get_pair_strat_filter
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
     StratExecutorServiceHttpClient)
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import (
@@ -38,6 +39,22 @@ from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_servi
 
 
 class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRoutesCallback):
+    underlying_read_portfolio_status_http: Callable[..., Any] | None = None
+    underlying_create_portfolio_status_http: Callable[..., Any] | None = None
+    underlying_read_order_limits_http: Callable[..., Any] | None = None
+    underlying_create_order_limits_http: Callable[..., Any] | None = None
+    underlying_read_portfolio_limits_http: Callable[..., Any] | None = None
+    underlying_create_portfolio_limits_http: Callable[..., Any] | None = None
+    underlying_read_pair_strat_http: Callable[..., Any] | None = None
+    underlying_read_portfolio_status_by_id_http: Callable[..., Any] | None = None
+    underlying_partial_update_portfolio_status_http: Callable[..., Any] | None = None
+    underlying_read_strat_collection_http: Callable[..., Any] | None = None
+    underlying_create_strat_collection_http: Callable[..., Any] | None = None
+    underlying_update_strat_collection_http: Callable[..., Any] | None = None
+    underlying_partial_update_pair_strat_http: Callable[..., Any] | None = None
+    underlying_update_pair_strat_to_non_running_state_query_http: Callable[..., Any] | None = None
+    underlying_read_pair_strat_by_id_http: Callable[..., Any] | None = None
+
     Fx_SO_FilePath = CURRENT_PROJECT_SCRIPTS_DIR / f"fx_so.sh"
 
     def __init__(self):
@@ -55,36 +72,33 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     @staticmethod
     async def _check_n_create_portfolio_status():
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-            underlying_read_portfolio_status_http, underlying_create_portfolio_status_http)
-
         async with PortfolioStatus.reentrant_lock:
-            portfolio_status_list: List[PortfolioStatus] = await underlying_read_portfolio_status_http()
+            portfolio_status_list: List[PortfolioStatus] = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_status_http())
             if 0 == len(portfolio_status_list):  # no portfolio status set yet, create one
                 portfolio_status: PortfolioStatus = get_new_portfolio_status()
-                await underlying_create_portfolio_status_http(portfolio_status)
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_status_http(
+                    portfolio_status)
 
     @staticmethod
     async def _check_n_create_order_limits():
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-            underlying_read_order_limits_http, underlying_create_order_limits_http)
-
         async with OrderLimits.reentrant_lock:
-            order_limits_list: List[OrderLimits] = await underlying_read_order_limits_http()
+            order_limits_list: List[OrderLimits] = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_order_limits_http())
             if 0 == len(order_limits_list):  # no order_limits set yet, create one
                 order_limits: OrderLimits = get_new_order_limits()
-                await underlying_create_order_limits_http(order_limits)
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_create_order_limits_http(
+                    order_limits)
 
     @staticmethod
     async def _check_n_create_portfolio_limits():
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-            underlying_read_portfolio_limits_http, underlying_create_portfolio_limits_http)
-
         async with PortfolioLimits.reentrant_lock:
-            portfolio_limits_list: List[PortfolioLimits] = await underlying_read_portfolio_limits_http()
+            portfolio_limits_list: List[PortfolioLimits] = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_limits_http())
             if 0 == len(portfolio_limits_list):  # no portfolio_limits set yet, create one
                 portfolio_limits = get_new_portfolio_limits()
-                await underlying_create_portfolio_limits_http(portfolio_limits)
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_limits_http(
+                    portfolio_limits)
 
     @staticmethod
     async def _check_and_create_portfolio_status_and_order_n_portfolio_limits() -> None:
@@ -163,9 +177,8 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         subprocess.Popen([f"{run_fx_symbol_overview_file_path}"])
 
     async def async_run_existing_executors(self) -> None:
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
-            underlying_read_pair_strat_http
-        existing_pair_strats = await underlying_read_pair_strat_http()
+        existing_pair_strats = \
+            await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http()
         pending_strats = []
         for pair_strat in existing_pair_strats:
             pending_strats.append(pair_strat)
@@ -228,17 +241,44 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             logging.critical(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
 
+    @classmethod
+    def initialize_underlying_http_routes(cls):
+        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
+            underlying_read_portfolio_status_http, underlying_create_portfolio_status_http,
+            underlying_read_order_limits_http, underlying_create_order_limits_http,
+            underlying_read_portfolio_limits_http, underlying_create_portfolio_limits_http,
+            underlying_read_pair_strat_http, underlying_read_portfolio_status_by_id_http,
+            underlying_partial_update_portfolio_status_http, underlying_read_strat_collection_http,
+            underlying_create_strat_collection_http, underlying_update_strat_collection_http,
+            underlying_partial_update_pair_strat_http, underlying_update_pair_strat_to_non_running_state_query_http,
+            underlying_read_pair_strat_by_id_http)
+        cls.underlying_read_portfolio_status_http = underlying_read_portfolio_status_http
+        cls.underlying_create_portfolio_status_http = underlying_create_portfolio_status_http
+        cls.underlying_read_order_limits_http = underlying_read_order_limits_http
+        cls.underlying_create_order_limits_http = underlying_create_order_limits_http
+        cls.underlying_read_portfolio_limits_http = underlying_read_portfolio_limits_http
+        cls.underlying_create_portfolio_limits_http = underlying_create_portfolio_limits_http
+        cls.underlying_read_pair_strat_http = underlying_read_pair_strat_http
+        cls.underlying_read_portfolio_status_by_id_http = underlying_read_portfolio_status_by_id_http
+        cls.underlying_partial_update_portfolio_status_http = underlying_partial_update_portfolio_status_http
+        cls.underlying_read_strat_collection_http = underlying_read_strat_collection_http
+        cls.underlying_create_strat_collection_http = underlying_create_strat_collection_http
+        cls.underlying_update_strat_collection_http = underlying_update_strat_collection_http
+        cls.underlying_partial_update_pair_strat_http = underlying_partial_update_pair_strat_http
+        cls.underlying_update_pair_strat_to_non_running_state_query_http = (
+            underlying_update_pair_strat_to_non_running_state_query_http)
+        cls.underlying_read_pair_strat_by_id_http = underlying_read_pair_strat_by_id_http
+
     def app_launch_pre(self):
+        StratManagerServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
+
         self.port = ps_port
         app_launch_pre_thread = threading.Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
         logging.debug("Triggered server launch pre override")
 
     async def _get_pair_strats(self):
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-            underlying_read_pair_strat_http)
-
-        pair_strats = await underlying_read_pair_strat_http()
+        pair_strats = await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http()
         return pair_strats
 
     def app_launch_post(self):
@@ -261,12 +301,10 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             self, portfolio_status_class_type: Type[PortfolioStatus], overall_buy_notional: float | None = None,
             overall_sell_notional: float | None = None, overall_buy_fill_notional: float | None = None,
             overall_sell_fill_notional: float | None = None):
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-            underlying_partial_update_portfolio_status_http, underlying_read_portfolio_status_by_id_http)
-
         async with PortfolioStatus.reentrant_lock:
             updated_portfolio_status = PortfolioStatusOptional()
-            portfolio_status: PortfolioStatus = await underlying_read_portfolio_status_by_id_http(1)
+            portfolio_status: PortfolioStatus = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_status_by_id_http(1))
 
             updated_portfolio_status.id = portfolio_status.id
             if overall_buy_notional is not None:
@@ -289,17 +327,14 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     portfolio_status.overall_sell_fill_notional = 0
                 updated_portfolio_status.overall_sell_fill_notional = (portfolio_status.overall_sell_fill_notional +
                                                                        overall_sell_fill_notional)
-            await underlying_partial_update_portfolio_status_http(
+            await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_portfolio_status_http(
                 json.loads(updated_portfolio_status.json(by_alias=True, exclude_none=True)))
         return []
 
     # Code-generated
     async def get_pair_strat_sec_filter_json_query_pre(self, pair_strat_class_type: Type[PairStrat], security_id: str):
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
-            underlying_read_pair_strat_http
-        from Flux.CodeGenProjects.addressbook.app.aggregate import get_pair_strat_filter
-        return await underlying_read_pair_strat_http(get_pair_strat_filter(security_id),
-                                                     self.get_generic_read_route())
+        return await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http(
+            get_pair_strat_filter(security_id), self.get_generic_read_route())
 
     def _set_derived_side(self, pair_strat_obj: PairStrat):
         raise_error = False
@@ -329,16 +364,14 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     async def get_dismiss_filter_portfolio_limit_brokers_query_pre(
             self, dismiss_filter_portfolio_limit_broker_class_type: Type[DismissFilterPortfolioLimitBroker],
             security_id1: str, security_id2: str):
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-            underlying_read_portfolio_limits_http)
-
         # get security name from : pair_strat_params.strat_legs and then redact pattern
         # security.sec_id (a pattern in positions) where there is a value match
         dismiss_filter_agg_pipeline = {'redact': [("security.sec_id",
                                                    security_id1,
                                                    security_id2)]}
-        filtered_portfolio_limits: List[PortfolioLimits] = await underlying_read_portfolio_limits_http(
-            dismiss_filter_agg_pipeline, self.get_generic_read_route())
+        filtered_portfolio_limits: List[PortfolioLimits] = \
+            await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_limits_http(
+                dismiss_filter_agg_pipeline, self.get_generic_read_route())
         if len(filtered_portfolio_limits) == 1:
             if filtered_portfolio_limits[0].eligible_brokers is not None:
                 eligible_brokers = [eligible_broker for eligible_broker in
@@ -382,12 +415,9 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     @except_n_log_alert()
     async def create_pair_strat_post(self, pair_strat_obj: PairStrat):
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-            underlying_read_strat_collection_http, underlying_create_strat_collection_http,
-            underlying_update_strat_collection_http)
-
         async with StratCollection.reentrant_lock:
-            strat_collection_obj_list = await underlying_read_strat_collection_http()
+            strat_collection_obj_list = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_collection_http())
 
             strat_key = f"{pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id}-" \
                         f"{pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id}-" \
@@ -400,11 +430,14 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     ],
                     "buffered_strat_keys": []
                 })
-                created_strat_collection = await underlying_create_strat_collection_http(created_strat_collection)
+                created_strat_collection = (
+                    await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_collection_http(
+                        created_strat_collection))
             else:
                 strat_collection_obj = strat_collection_obj_list[0]
                 strat_collection_obj.loaded_strat_keys.append(strat_key)
-                await underlying_update_strat_collection_http(strat_collection_obj)
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
+                    strat_collection_obj)
 
     async def update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
         if not self.service_ready:
@@ -446,25 +479,22 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     async def update_pair_strat_to_non_running_state_query_pre(self, pair_strat_class_type: Type[PairStrat],
                                                                pair_strat_id: int):
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-            underlying_partial_update_pair_strat_http)
-
         pair_strat = PairStratOptional(_id=pair_strat_id)
         pair_strat.port = None
         pair_strat.is_partially_running = False
         pair_strat.is_executor_running = False
 
-        update_pair_strat = await underlying_partial_update_pair_strat_http(jsonable_encoder(pair_strat, by_alias=True,
-                                                                                             exclude_none=True))
+        update_pair_strat = \
+            await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_pair_strat_http(
+                jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
         return [update_pair_strat]
 
     async def _start_executor_server(self, pair_strat: PairStrat) -> None:
         if pair_strat.port is not None:
             # If pair strat already exists and executor already have run before
-            from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-                underlying_update_pair_strat_to_non_running_state_query_http)
 
-            await underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id)
+            await (StratManagerServiceRoutesCallbackBaseNativeOverride.
+                   underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id))
         # else not required: if it is newly created pair strat then already values are False
 
         code_gen_projects_dir = PurePath(__file__).parent.parent.parent
@@ -479,12 +509,10 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     async def get_ongoing_strats_symbol_n_exch_query_pre(self,
                                                          ongoing_strat_symbols_class_type: Type[
                                                              OngoingStratsSymbolNExchange]):
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
-            underlying_read_pair_strat_http
-        from Flux.CodeGenProjects.addressbook.app.aggregate import get_pair_strat_filter
 
-        pair_strat_list: List[PairStrat] = await underlying_read_pair_strat_http(get_pair_strat_filter(),
-                                                                                 self.get_generic_read_route())
+        pair_strat_list: List[PairStrat] = \
+            await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http(
+                get_pair_strat_filter(), self.get_generic_read_route())
         ongoing_symbol_n_exch_set: Set[str] = set()
         ongoing_strat_symbols_n_exchange = OngoingStratsSymbolNExchange(symbol_n_exchange=[])
 
@@ -549,15 +577,23 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
 
-            strat_details_list: List[StratDetails] = strat_web_client.is_strat_ongoing_query_client()
-            if strat_details_list:
-                strat_details = strat_details_list[0]
+            try:
+                strat_details_list: List[StratDetails] = strat_web_client.is_strat_ongoing_query_client()
+            except Exception as e:
+                err_str_ = ("Something went wrong in is_strat_ongoing_query_client call - ignoring this delete, "
+                            f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])}, exception: {e}")
+                raise HTTPException(detail=err_str_, status_code=500)
             else:
-                err_str_ = ("Received empty strat_details list from is_strat_ongoing_query_client call "
-                            f"of strat_executor for port {port}, ignoring this strat delete, symbol_side_key: "
-                            f"{get_symbol_side_key([(sec_id, side)])};;; pair_strat: {pydantic_obj_to_be_deleted}")
-                logging.error(err_str_)
-                raise HTTPException(status_code=500, detail=err_str_)
+                if len(strat_details_list) == 1:
+                    strat_details = strat_details_list[0]
+                else:
+                    err_str_ = (
+                        "Received unexpected length of strat_details list from "
+                        "is_strat_ongoing_query_client call of strat_executor for port "
+                        f"{port}, expected 1, likely bug in query implementation, symbol_side_key: "
+                        f"{get_symbol_side_key([(sec_id, side)])};;; pair_strat: {pydantic_obj_to_be_deleted}")
+                    logging.error(err_str_)
+                    raise HTTPException(status_code=500, detail=err_str_)
 
             if strat_details.is_ongoing:
                 err_str_ = ("This strat is ongoing: Deletion of ongoing strat is no supported, "
@@ -611,8 +647,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     async def unload_pair_strats(self, stored_strat_collection_obj: StratCollection,
                                  updated_strat_collection_obj: StratCollection) -> None:
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
-            underlying_read_pair_strat_by_id_http
         updated_strat_collection_loaded_strat_keys_frozenset = frozenset(updated_strat_collection_obj.loaded_strat_keys)
         stored_strat_collection_loaded_strat_keys_frozenset = frozenset(stored_strat_collection_obj.loaded_strat_keys)
         # existing items in stored loaded frozenset but not in the updated stored frozen set need to move to done state
@@ -623,7 +657,9 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             for unloaded_strat_key in unloaded_strat_keys_frozenset:
                 if unloaded_strat_key in updated_strat_collection_obj.buffered_strat_keys:  # unloaded not deleted
                     pair_strat_id: int = self.get_id_from_strat_key(unloaded_strat_key)
-                    pair_strat = await underlying_read_pair_strat_by_id_http(pair_strat_id)
+                    pair_strat = \
+                        await (StratManagerServiceRoutesCallbackBaseNativeOverride.
+                               underlying_read_pair_strat_by_id_http(pair_strat_id))
                     if pair_strat.port is not None:
                         strat_web_client: StratExecutorServiceHttpClient = (
                             StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
@@ -640,17 +676,26 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                         logging.error(err_str_)
                         raise HTTPException(status_code=500, detail=err_str_)
 
-                    strat_details_list: List[StratDetails] = strat_web_client.is_strat_ongoing_query_client()
-                    if strat_details_list:
-                        strat_details = strat_details_list[0]
-                    else:
-                        err_str_ = ("Received empty strat_details list from is_strat_ongoing_query_client call "
-                                    f"of strat_executor for port {pair_strat.port};;; "
+                    try:
+                        strat_details_list: List[StratDetails] = strat_web_client.is_strat_ongoing_query_client()
+                    except Exception as e:
+                        err_str_ = ("Something went wrong in is_strat_ongoing_query_client call "
+                                    f"of strat_executor for port {pair_strat.port}, exception: {e};;; "
                                     f"pair_strat: {pair_strat}")
-                        logging.error(err_str_)
                         raise HTTPException(status_code=500, detail=err_str_)
+                    else:
+                        if len(strat_details_list) == 1:
+                            strat_details = strat_details_list[0]
+                        else:
+                            err_str_ = (
+                                "Received unexpected length of strat_details list from "
+                                f"is_strat_ongoing_query_client call of strat_executor for port {pair_strat.port}"
+                                f"{pair_strat.port}, expected 1, likely bug in query implementation;;; "
+                                f"pair_strat: {pair_strat}")
+                            logging.error(err_str_)
+                            raise HTTPException(status_code=500, detail=err_str_)
+
                     if strat_details.is_ongoing:
-                        # is_strat_ongoing_query_client returns strat_status if is ongoing else returns empty list
                         error_str = f"unloading and ongoing pair strat key: {unloaded_strat_key} is not supported, " \
                                     f"current strat state: {strat_details.current_state}, " \
                                     f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}"
@@ -683,8 +728,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     async def reload_pair_strats(self, stored_strat_collection_obj: StratCollection,
                                  updated_strat_collection_obj: StratCollection) -> None:
-        from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
-            underlying_read_pair_strat_by_id_http
         updated_strat_collection_buffered_strat_keys_frozenset = frozenset(
             updated_strat_collection_obj.buffered_strat_keys)
         stored_strat_collection_buffered_strat_keys_frozenset = frozenset(
@@ -698,7 +741,9 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             for reloaded_strat_key in reloaded_strat_keys_frozenset:
                 if reloaded_strat_key in updated_strat_collection_obj.loaded_strat_keys:  # loaded not deleted
                     pair_strat_id: int = self.get_id_from_strat_key(reloaded_strat_key)
-                    pair_strat = await underlying_read_pair_strat_by_id_http(pair_strat_id)
+                    pair_strat = \
+                        await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_by_id_http(
+                            pair_strat_id)
 
                     # starting snoozed server
                     await self._start_executor_server(pair_strat)

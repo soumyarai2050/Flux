@@ -78,7 +78,8 @@ def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
     for db_name in get_mongo_db_list(mongo_server_uri):
         if "log_analyzer" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
-                                    ignore_collections=["UILayout", "PortfolioAlert"])
+                                    ignore_collections=["UILayout", "PortfolioAlert",
+                                                        "RawPerformanceData", "ProcessedPerformanceAnalysis"])
         elif "addressbook" == db_name or "post_trade_engine" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout"])

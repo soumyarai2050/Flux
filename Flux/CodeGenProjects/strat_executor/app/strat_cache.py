@@ -18,8 +18,8 @@ from Flux.CodeGenProjects.strat_executor.generated.StratExecutor.strat_executor_
 class MarketDepthsCont:
     def __init__(self, symbol: str):
         self.symbol: str = symbol
-        self.bid_market_depths: List[MarketDepthBaseModel] = []
-        self.ask_market_depths: List[MarketDepthBaseModel] = []
+        self.bid_market_depths: List[MarketDepthBaseModel | MarketDepth] = []
+        self.ask_market_depths: List[MarketDepthBaseModel | MarketDepth] = []
 
     def __str__(self):
         return f"{self.symbol} " \
@@ -35,7 +35,7 @@ class MarketDepthsCont:
             logging.error(f"get_market_depths: Unsupported Side requested: {side}, returning empty list")
             return []
 
-    def set_market_depth(self, market_depth: MarketDepthBaseModel):
+    def set_market_depth(self, market_depth: MarketDepthBaseModel | MarketDepth):
         if market_depth.side == TickType.BID:
             for bid_market_depth in self.bid_market_depths:
                 if bid_market_depth.position == market_depth.position:
@@ -55,7 +55,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
     add_to_strat_cache_rlock: RLock = RLock()
     order_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
     # fx_symbol_overview_dict must be preloaded with supported fx pairs for system to work
-    fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | None] = {"USD|SGD": None}
+    fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | FxSymbolOverview | None] = {"USD|SGD": None}
 
     def __init__(self):
         StratManagerServiceBaseStratCache.__init__(self)
@@ -70,24 +70,37 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
 
         # all fx always against usd - these are reused across strats
         self.leg1_fx_symbol: str = "USD|SGD"  # get this from static data based on leg1 symbol
-        self.leg1_fx_tob: TopOfBookBaseModel | None = None
-        self.leg1_fx_symbol_overview: FxSymbolOverviewBaseModel | None = None
+        self.leg1_fx_tob: TopOfBookBaseModel | TopOfBook | None = None
+        self.leg1_fx_symbol_overview: FxSymbolOverviewBaseModel | FxSymbolOverview | None = None
 
-        self._symbol_overviews: List[SymbolOverviewBaseModel | None] = [None, None]  # pre-create space for 2 legs
+        self._symbol_side_snapshots: List[SymbolSideSnapshotBaseModel |
+                                          SymbolSideSnapshot | None] = [None, None]  # pre-create space for 2 legs
+        self._symbol_side_snapshots_update_date_time: DateTime = DateTime.utcnow()
+
+        self._symbol_overviews: List[SymbolOverviewBaseModel |
+                                     SymbolOverview | None] = [None, None]  # pre-create space for 2 legs
         self._symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
 
-        self._top_of_books: List[TopOfBookBaseModel | None] = [None, None]  # pre-create space for 2 legs
+        self._top_of_books: List[TopOfBookBaseModel | TopOfBook | None] = [None, None]  # pre-create space for 2 legs
         self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
 
         self._market_depths_conts: List[MarketDepthsCont] | None = None
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
+        self.order_id_to_order_snapshot_dict: Dict[str, OrderSnapshot | OrderSnapshotBaseModel] = {}
+        self.order_id_to_cxl_order_dict: Dict[str, CancelOrder | CancelOrderBaseModel] = {}
+
     @property
-    def get_symbol_overviews(self) -> List[SymbolOverviewBaseModel | None]:
+    def get_symbol_side_snapshots(self) -> List[SymbolOverviewBaseModel | SymbolOverview | None]:
+        return self._symbol_side_snapshots
+
+    @property
+    def get_symbol_overviews(self) -> List[SymbolOverviewBaseModel | SymbolOverview | None]:
         return self._symbol_overviews
 
     @staticmethod
-    def get_key_n_symbol_from_fills_journal(fills_journal: FillsJournalBaseModel) -> Tuple[str | None, str | None]:
+    def get_key_n_symbol_from_fills_journal(
+            fills_journal: FillsJournalBaseModel | FillsJournal) -> Tuple[str | None, str | None]:
         symbol: str
         symbol_side_tuple = StratCache.order_id_to_symbol_side_tuple_dict.get(fills_journal.order_id)
         if not symbol_side_tuple:
@@ -111,7 +124,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         return primary_ticker, secondary_ticker
 
     # pass None to remove pair strat
-    def set_pair_strat(self, pair_strat: PairStratBaseModel | None) -> DateTime:
+    def set_pair_strat(self, pair_strat: PairStratBaseModel | PairStrat | None) -> DateTime:
         self._pair_strat = pair_strat
         self._pair_strat_update_date_time = DateTime.utcnow()
         if self._pair_strat is not None:
@@ -119,16 +132,66 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         # else not required: passing None to clear pair_strat form cache is valid
         return self._pair_strat_update_date_time
 
-    def get_symbol_overview(self, symbol, date_time: DateTime | None = None) -> Tuple[SymbolOverviewBaseModel, DateTime] | None:
-        if date_time is None or date_time < self._symbol_overviews_update_date_time:
-            for symbol_overview in self._symbol_overviews:
+    def get_order_snapshot_from_order_id(self, order_id: str) -> OrderSnapshot | None:
+        return self.order_id_to_order_snapshot_dict.get(order_id)
+
+    def set_order_snapshot(self, order_snapshot: OrderSnapshotBaseModel | OrderSnapshot) -> DateTime:
+        self.order_id_to_order_snapshot_dict[order_snapshot.order_brief.order_id] = order_snapshot
+        return super().set_order_snapshot(order_snapshot)
+
+    def get_cancel_order_from_order_id(self, order_id: str) -> CancelOrder | None:
+        return self.order_id_to_cxl_order_dict.get(order_id)
+
+    def set_cancel_order(self, cancel_order: CancelOrderBaseModel | CancelOrder) -> DateTime:
+        self.order_id_to_cxl_order_dict[cancel_order.order_id] = cancel_order
+        return super().set_cancel_order(cancel_order)
+
+    def get_symbol_side_snapshot_from_symbol(
+            self, symbol: str, date_time: DateTime | None = None) -> Tuple[SymbolSideSnapshot, DateTime] | None:
+        symbol_side_snapshot_tuple = self.get_symbol_side_snapshot(date_time)
+        if symbol_side_snapshot_tuple is not None:
+            symbol_side_snapshot_list, _ = symbol_side_snapshot_tuple
+            for symbol_side_snapshot in symbol_side_snapshot_list:
+                if symbol_side_snapshot is not None and symbol_side_snapshot.security.sec_id == symbol:
+                    if date_time is None or date_time < symbol_side_snapshot.last_update_date_time:
+                        return symbol_side_snapshot, symbol_side_snapshot.last_update_date_time
+        return None
+
+    def set_symbol_side_snapshot(self, symbol_side_snapshot: SymbolSideSnapshotBaseModel | SymbolSideSnapshot
+                                 ) -> DateTime | None:
+        if self._pair_strat is not None:
+            if (symbol_side_snapshot.security.sec_id == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id and
+                    symbol_side_snapshot.side == self._pair_strat.pair_strat_params.strat_leg1.side):
+                self._symbol_side_snapshots[0] = symbol_side_snapshot
+                self._symbol_side_snapshots_update_date_time = symbol_side_snapshot.last_update_date_time
+                return symbol_side_snapshot.last_update_date_time
+            elif (symbol_side_snapshot.security.sec_id == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id and
+                  symbol_side_snapshot.side == self._pair_strat.pair_strat_params.strat_leg2.side):
+                self._symbol_side_snapshots[1] = symbol_side_snapshot
+                self._symbol_side_snapshots_update_date_time = symbol_side_snapshot.last_update_date_time
+                return symbol_side_snapshot.last_update_date_time
+            else:
+                logging.error(f"set_symbol_side_snapshot called with non matching symbol: "
+                              f"{symbol_side_snapshot.security.sec_id}, supported symbols: "
+                              f"{self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
+                              f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+        return None
+
+    def get_symbol_overview_from_symbol(
+            self, symbol: str, date_time: DateTime | None = None) -> Tuple[SymbolOverviewBaseModel | SymbolOverview,
+                                                                           DateTime] | None:
+        symbol_overview_tuple = self.get_symbol_overview(date_time)
+
+        if symbol_overview_tuple is not None:
+            symbol_overview_list, _ = symbol_overview_tuple
+            for symbol_overview in symbol_overview_list:
                 if symbol_overview is not None and symbol_overview.symbol == symbol:
                     if date_time is None or date_time < symbol_overview.last_update_date_time:
                         return symbol_overview, symbol_overview.last_update_date_time
         # if no match - return None
         return None
 
-    def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel):
+    def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel | SymbolOverview):
         if self._pair_strat is not None:
             if symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
                 self._symbol_overviews[0] = symbol_overview_
@@ -144,7 +207,8 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                               f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
         return None
 
-    def get_top_of_book(self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel], DateTime] | None:
+    def get_top_of_book(
+            self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel| TopOfBook], DateTime] | None:
         if date_time is None or date_time < self._top_of_books_update_date_time:
             with self.re_ent_lock:
                 if self._top_of_books[0] is not None and self._top_of_books[1] is not None:
@@ -154,7 +218,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         # all else's return None
         return None
 
-    def set_top_of_book(self, top_of_book: TopOfBookBaseModel) -> DateTime | None:
+    def set_top_of_book(self, top_of_book: TopOfBookBaseModel | TopOfBook) -> DateTime | None:
         if top_of_book.last_update_date_time > self._top_of_books_update_date_time:
             if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
                 self._top_of_books[0] = top_of_book
@@ -175,8 +239,9 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                           f"update received TOB: {top_of_book}")
             return None
 
-    def get_market_depth(self, symbol: str, side: Side, sorted_reverse: bool = False,
-                         date_time: DateTime | None = None) -> Tuple[List[MarketDepthBaseModel], DateTime] | None:
+    def get_market_depth(
+            self, symbol: str, side: Side, sorted_reverse: bool = False, date_time: DateTime | None = None
+    ) -> Tuple[List[MarketDepthBaseModel | MarketDepth], DateTime] | None:
         if date_time is None or date_time < self._market_depths_update_date_time:
             with self.re_ent_lock:
                 if self._market_depths_conts is not None:
@@ -184,7 +249,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                     for stored_symbol, _market_depths_by_symbol in self._market_depths_conts:
                         if stored_symbol == symbol:
                             _market_depths_update_date_time = copy.deepcopy(self._market_depths_update_date_time)
-                            filtered_market_depths: List[MarketDepthBaseModel] = copy.deepcopy(
+                            filtered_market_depths: List[MarketDepthBaseModel | MarketDepth] = copy.deepcopy(
                                 _market_depths_by_symbol.get_market_depths(side))
                             if sorted_reverse:
                                 filtered_market_depths.sort(reverse=True, key=lambda x: x.position)

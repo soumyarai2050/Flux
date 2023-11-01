@@ -71,8 +71,7 @@ message RawPerformanceData{
     ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
-    Granularity: Sec,
-    ExpireAfterSeconds: 5
+    Granularity: Sec
   };
 //  option (FluxMsgWidgetUIDataElement) = {
 //    x: 0,

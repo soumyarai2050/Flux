@@ -36,6 +36,10 @@ message SymbolSideSnapshot{
       QueryType: WS
   };
   option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
     LogKeySequence: "id",
     IsRepeated: true
   };

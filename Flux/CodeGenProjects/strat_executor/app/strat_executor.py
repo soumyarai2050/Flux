@@ -31,8 +31,19 @@ from FluxPythonUtils.scripts.utility_functions import clear_semaphore
 
 
 class StratExecutor:
+    # Query Callables
+    underlying_get_market_depth_from_index_fields_http: Callable[..., Any] | None = None
+    underlying_partial_update_strat_status_http: Callable[..., Any] | None = None
+
     trading_link: ClassVar[TradingLinkBase] = get_trading_link()
     asyncio_loop: asyncio.AbstractEventLoop
+
+    @classmethod
+    def initialize_underlying_http_routes(cls):
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_get_market_depth_from_index_fields_http, underlying_partial_update_strat_status_http)
+        cls.underlying_get_market_depth_from_index_fields_http = underlying_get_market_depth_from_index_fields_http
+        cls.underlying_partial_update_strat_status_http = underlying_partial_update_strat_status_http
 
     @staticmethod
     def executor_trigger(trading_data_manager_: TradingDataManager, strat_cache: StratCache):
@@ -43,14 +54,6 @@ class StratExecutor:
     """ 1 instance = 1 thread = 1 pair strat"""
 
     def __init__(self, trading_data_manager_: TradingDataManager, strat_cache: StratCache):
-        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import \
-            underlying_partial_update_strat_status_http
-        self.underlying_partial_update_strat_status_http: Callable = underlying_partial_update_strat_status_http
-
-        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import \
-            underlying_update_residuals_query_http
-        self.underlying_update_residuals_query_http: Callable = underlying_update_residuals_query_http
-
         self.pair_strat_executor_id: str | None = None
         self.is_test_run: bool = is_test_run
         self.is_sanity_test_run: bool = config_dict.get("is_sanity_test_run")
@@ -80,6 +83,7 @@ class StratExecutor:
         self.order_pase_seconds = 0
         # internal rejects to use:  -ive internal_reject_count + current date time as order id
         self.internal_reject_count = 0
+        StratExecutor.initialize_underlying_http_routes()    # Calling underlying instances init
 
     def check_order_eligibility(self, side: Side, check_notional: float) -> bool:
         strat_brief, self._strat_brief_update_date_time = \
@@ -98,11 +102,8 @@ class StratExecutor:
                 return False
 
     def get_aggressive_market_depths(self, symbol: str, side: Side) -> List[MarketDepth]:
-        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
-            underlying_get_market_depth_from_index_fields_http)
-
         # coro needs public method
-        run_coro = underlying_get_market_depth_from_index_fields_http(symbol)
+        run_coro = StratExecutor.underlying_get_market_depth_from_index_fields_http(symbol)
         future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
 
         # block for task to finish
@@ -291,7 +292,8 @@ class StratExecutor:
         symbol_overview: SymbolOverviewBaseModel | None = None
         if side == Side.SELL:
             symbol_overview_tuple = \
-                self.strat_cache.get_symbol_overview(strat_brief.pair_sell_side_trading_brief.security.sec_id)
+                self.strat_cache.get_symbol_overview_from_symbol(
+                    strat_brief.pair_sell_side_trading_brief.security.sec_id)
             if symbol_overview_tuple:
                 symbol_overview, _ = symbol_overview_tuple
                 if not symbol_overview:
@@ -346,7 +348,8 @@ class StratExecutor:
 
         elif side == Side.BUY:
             symbol_overview_tuple = \
-                self.strat_cache.get_symbol_overview(strat_brief.pair_buy_side_trading_brief.security.sec_id)
+                self.strat_cache.get_symbol_overview_from_symbol(
+                    strat_brief.pair_buy_side_trading_brief.security.sec_id)
             if symbol_overview_tuple:
                 symbol_overview, _ = symbol_overview_tuple
                 if not symbol_overview:
@@ -435,20 +438,6 @@ class StratExecutor:
             check_passed = False
 
         return check_passed
-
-    def get_executor_check_snapshot_query_client(self, symbol: str, side: Side, applicable_period_seconds: int):
-        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
-            underlying_get_executor_check_snapshot_query_http)
-
-        # coro needs public method
-        run_coro = underlying_get_executor_check_snapshot_query_http(symbol, side, applicable_period_seconds)
-        future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
-
-        # block for task to finish
-        try:
-            return future.result()
-        except Exception as e:
-            logging.exception(f"underlying_get_executor_check_snapshot_query_http failed with exception: {e}")
 
     def get_breach_threshold_px(self, top_of_book: TopOfBookBaseModel, order_limits: OrderLimitsBaseModel,
                                 side: Side, system_symbol: str) -> float | None:
@@ -603,11 +592,8 @@ class StratExecutor:
         subprocess.Popen([f"{generation_start_file_path}"])
 
     def _update_strat_state(self, strat_status_basemodel: StratStatusBaseModel):
-        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
-            underlying_partial_update_strat_status_http)
-
         # coro needs public method
-        run_coro = underlying_partial_update_strat_status_http(
+        run_coro = StratExecutor.underlying_partial_update_strat_status_http(
             jsonable_encoder(strat_status_basemodel, by_alias=True, exclude_none=True))
         future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
 

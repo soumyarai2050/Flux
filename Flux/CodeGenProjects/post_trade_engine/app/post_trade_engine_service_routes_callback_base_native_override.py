@@ -20,7 +20,9 @@ from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_servic
     StratExecutorServiceHttpClient)
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import (
     StratState, StratStatusBaseModel)
-from FluxPythonUtils.scripts.async_rlock import AsyncRLock
+from Flux.CodeGenProjects.strat_executor.app.aggregate import (get_last_n_sec_orders_by_event,
+                                                               get_order_snapshot_order_id_filter_json)
+from Flux.CodeGenProjects.post_trade_engine.app.aggregate import get_open_order_counts
 
 
 class ContainerObject(BaseModel):
@@ -30,7 +32,33 @@ class ContainerObject(BaseModel):
 
 
 class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServiceRoutesCallback):
-    portfolio_limit_check_r_lock: AsyncRLock = AsyncRLock()
+    underlying_read_order_journal_http: Callable[..., Any] | None = None
+    underlying_read_order_snapshot_http: Callable[..., Any] | None = None
+    underlying_create_all_order_snapshot_http: Callable[..., Any] | None = None
+    underlying_update_all_order_snapshot_http: Callable[..., Any] | None = None
+    underlying_create_all_order_journal_http: Callable[..., Any] | None = None
+    underlying_read_strat_brief_by_id_http: Callable[..., Any] | None = None
+    underlying_create_strat_brief_http: Callable[..., Any] | None = None
+    underlying_update_strat_brief_http: Callable[..., Any] | None = None
+    underlying_get_last_n_sec_orders_by_event_query_http: Callable[..., Any] | None = None
+
+    @classmethod
+    def initialize_underlying_http_routes(cls):
+        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
+            underlying_read_order_journal_http, underlying_read_order_snapshot_http,
+            underlying_create_all_order_snapshot_http, underlying_update_all_order_snapshot_http,
+            underlying_create_all_order_journal_http, underlying_read_strat_brief_by_id_http,
+            underlying_create_strat_brief_http, underlying_update_strat_brief_http,
+            underlying_get_last_n_sec_orders_by_event_query_http)
+        cls.underlying_read_order_journal_http = underlying_read_order_journal_http
+        cls.underlying_read_order_snapshot_http = underlying_read_order_snapshot_http
+        cls.underlying_create_all_order_snapshot_http = underlying_create_all_order_snapshot_http
+        cls.underlying_update_all_order_snapshot_http = underlying_update_all_order_snapshot_http
+        cls.underlying_create_all_order_journal_http = underlying_create_all_order_journal_http
+        cls.underlying_read_strat_brief_by_id_http = underlying_read_strat_brief_by_id_http
+        cls.underlying_create_strat_brief_http = underlying_create_strat_brief_http
+        cls.underlying_update_strat_brief_http = underlying_update_strat_brief_http
+        cls.underlying_get_last_n_sec_orders_by_event_query_http = underlying_get_last_n_sec_orders_by_event_query_http
 
     def __init__(self):
         super().__init__()
@@ -84,6 +112,8 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 should_sleep = True
 
     def app_launch_pre(self):
+        PostTradeEngineServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
+
         logging.debug("Triggered server launch pre override")
         self.port = pm_port
         app_launch_pre_thread = Thread(target=self._app_launch_pre_thread_func, daemon=True)
@@ -109,17 +139,12 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
 
     async def get_last_n_sec_orders_by_event_query_pre(self, order_journal_class_type: Type[OrderJournal],
                                                        last_n_sec: int, order_event: str):
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
-            underlying_read_order_journal_http)
-        from Flux.CodeGenProjects.strat_executor.app.aggregate import get_last_n_sec_orders_by_event
-        return await underlying_read_order_journal_http(get_last_n_sec_orders_by_event(last_n_sec, order_event))
+        return await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_journal_http(
+            get_last_n_sec_orders_by_event(last_n_sec, order_event))
 
     async def get_open_order_count_query_pre(self, open_order_count_class_type: Type[OpenOrderCount], symbol: str):
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import \
-            underlying_read_order_snapshot_http
-        from Flux.CodeGenProjects.post_trade_engine.app.aggregate import get_open_order_counts
-
-        open_orders = await underlying_read_order_snapshot_http(get_open_order_counts())
+        open_orders = await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
+            get_open_order_counts())
 
         open_order_count = OpenOrderCount(open_order_count=len(open_orders))
         return [open_order_count]
@@ -148,11 +173,6 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         return []
 
     async def create_or_update_order_snapshot(self, order_snapshot_list: List[OrderSnapshot]):
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
-            underlying_create_all_order_snapshot_http, underlying_read_order_snapshot_http,
-            underlying_update_all_order_snapshot_http)
-        from Flux.CodeGenProjects.strat_executor.app.aggregate import get_order_snapshot_order_id_filter_json
-
         order_id_to_latest_order_snapshot_dict = {}
         # Taking latest order_snapshots based on order_id
         for order_snapshot in order_snapshot_list:
@@ -162,8 +182,9 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             create_order_snapshots: List[OrderSnapshot] = []
             update_order_snapshots: List[OrderSnapshot] = []
             for order_id, order_snapshot in order_id_to_latest_order_snapshot_dict.items():
-                filtered_order_snapshot_list: List[OrderSnapshot] = await underlying_read_order_snapshot_http(
-                    get_order_snapshot_order_id_filter_json(order_id))
+                filtered_order_snapshot_list: List[OrderSnapshot] = (
+                    await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
+                        get_order_snapshot_order_id_filter_json(order_id)))
 
                 if len(filtered_order_snapshot_list) == 0:
                     order_snapshot.id = OrderSnapshot.next_id()    # overriding id to make it unique for this server db
@@ -181,9 +202,11 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                     update_order_snapshots.append(order_snapshot)
 
             if create_order_snapshots:
-                await underlying_create_all_order_snapshot_http(create_order_snapshots)
+                await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_create_all_order_snapshot_http(
+                    create_order_snapshots)
             if update_order_snapshots:
-                await underlying_update_all_order_snapshot_http(update_order_snapshots)
+                await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_update_all_order_snapshot_http(
+                    update_order_snapshots)
 
     def _get_order_journal_from_payload(self, payload_dict: Dict[str, Any]):
         order_journal: OrderJournal | None = None
@@ -254,10 +277,8 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             strat_id_to_container_obj_dict[strat_id] = container_obj
 
     def add_order_journals(self, order_journal_list: List[OrderJournal]):
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
-            underlying_create_all_order_journal_http)
-
-        run_coro = underlying_create_all_order_journal_http(order_journal_list)
+        run_coro = PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_create_all_order_journal_http(
+            order_journal_list)
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
         # block for task to finish
@@ -268,17 +289,15 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                               f"with exception: {e}")
 
     async def create_or_update_strat_brief(self, strat_brief: StratBrief):
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
-            underlying_create_strat_brief_http, underlying_read_strat_brief_by_id_http,
-            underlying_update_strat_brief_http)
-
         async with StratBrief.reentrant_lock:
             try:
-                await underlying_read_strat_brief_by_id_http(strat_brief.id)
+                await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_by_id_http(
+                    strat_brief.id)
             except HTTPException as http_e:
                 # creating if no object exists with id
                 if "Id not Found:" in http_e.detail:
-                    await underlying_create_strat_brief_http(strat_brief)
+                    await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_brief_http(
+                        strat_brief)
                 else:
                     logging.exception(f"underlying_read_strat_brief_by_id_http failed "
                                       f"with http_exception: {http_e.detail}")
@@ -286,7 +305,8 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 logging.exception(f"underlying_read_strat_brief_by_id_http failed "
                                   f"with exception: {e}")
             else:
-                await underlying_update_strat_brief_http(strat_brief)
+                await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_brief_http(
+                    strat_brief)
 
     def update_db(self, order_journal_list: List[OrderJournal],
                   order_snapshot_list: List[OrderSnapshot],
@@ -320,12 +340,9 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                                   f"with exception: {e}")
 
     def check_max_open_baskets(self, max_open_baskets: int) -> bool:
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
-            underlying_read_order_snapshot_http)
-        from Flux.CodeGenProjects.post_trade_engine.app.aggregate import get_open_order_counts
-
         pause_all_strats = False
-        run_coro = underlying_read_order_snapshot_http(get_open_order_counts())
+        run_coro = PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
+            get_open_order_counts())
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
         # block for task to finish
@@ -344,12 +361,10 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         return pause_all_strats
 
     def check_rolling_max_order_count(self, rolling_order_count_period_seconds: int, max_rolling_tx_count: int):
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
-            underlying_get_last_n_sec_orders_by_event_query_http)
-
         pause_all_strats = False
-        run_coro = underlying_get_last_n_sec_orders_by_event_query_http(rolling_order_count_period_seconds,
-                                                                        OrderEventType.OE_NEW)
+        run_coro = (PostTradeEngineServiceRoutesCallbackBaseNativeOverride.
+                    underlying_get_last_n_sec_orders_by_event_query_http(rolling_order_count_period_seconds,
+                                                                         OrderEventType.OE_NEW))
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
         # block for task to finish
@@ -379,9 +394,8 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         return pause_all_strats
 
     def check_rolling_max_rej_count(self, rolling_rej_count_period_seconds: int, max_rolling_tx_count: int):
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
-            underlying_get_last_n_sec_orders_by_event_query_http)
-        run_coro = underlying_get_last_n_sec_orders_by_event_query_http(rolling_rej_count_period_seconds, "OE_REJ")
+        run_coro = (PostTradeEngineServiceRoutesCallbackBaseNativeOverride.
+                    underlying_get_last_n_sec_orders_by_event_query_http(rolling_rej_count_period_seconds, "OE_REJ"))
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
         pause_all_strats = False
@@ -438,7 +452,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             logging.exception(f"underlying_get_open_order_count_query_http failed "
                               f"with exception: {e}")
         else:
-            # FixME: Add aggregation for total_open_notional
+            # Todo LAZY: Add aggregation for total_open_notional
             # Buy side check
             for strat_brief in strat_brief_list:
                 total_buy_open_notional += strat_brief.pair_buy_side_trading_brief.open_notional
@@ -525,7 +539,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
                                                                                                      pair_strat.port)
                 strat_status = strat_executor_client.get_strat_status_client(pair_strat.id)
-                # Fixme: race condition
+                # TODO: make query instead of get and patch calls
                 if strat_status.strat_state == StratState.StratState_ACTIVE:
                     update_strat_status_obj = StratStatusBaseModel(_id=pair_strat.id,
                                                                    strat_state=StratState.StratState_PAUSED)
