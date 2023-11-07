@@ -105,8 +105,8 @@ class RawPerformanceDataProcessor:
                 )
                 task_list.append(task)
 
-                await execute_tasks_list_with_all_completed(task_list, self.processed_performance_analysis_model_type)
-                task_list.clear()
+            await execute_tasks_list_with_all_completed(task_list, self.processed_performance_analysis_model_type)
+            task_list.clear()
 
             time.sleep(self.wait_time)
 

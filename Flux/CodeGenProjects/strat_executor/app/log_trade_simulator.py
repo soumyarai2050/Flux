@@ -4,6 +4,9 @@ from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_ser
 from Flux.CodeGenProjects.strat_executor.app.trading_link_base import TradingLinkBase
 
 
+log_simulate_logger = logging.getLogger("log_simulator")
+
+
 class LogTradeSimulator(TradingLinkBase):
     fld_sep: str = "~~"
     val_sep: str = "^^"
@@ -13,12 +16,12 @@ class LogTradeSimulator(TradingLinkBase):
     """
     @classmethod
     def trigger_kill_switch(cls) -> bool:
-        logging.info("$$$trigger_kill_switch")
+        log_simulate_logger.info("$$$trigger_kill_switch")
         return True
 
     @classmethod
     def revoke_kill_switch_n_resume_trading(cls) -> bool:
-        logging.info("$$$revoke_kill_switch_n_resume_trading")
+        log_simulate_logger.info("$$$revoke_kill_switch_n_resume_trading")
         return True
 
     @classmethod
@@ -30,7 +33,7 @@ class LogTradeSimulator(TradingLinkBase):
                           f"px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}{cls.fld_sep}side{cls.val_sep}{side}"
                           f"{cls.fld_sep}trading_sec_id{cls.val_sep}{trading_sec_id}{cls.fld_sep}system_sec_id: "
                           f"{system_sec_id}{cls.fld_sep}account{cls.val_sep}{account}{exchange_str}")
-        logging.info(f"$$$trade_simulator_place_new_order_query_client{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
+        log_simulate_logger.info(f"$$$trade_simulator_place_new_order_query_client{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
                      f"{cls.executor_port}{cls.fld_sep}px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}"
                      f"{cls.fld_sep}side{cls.val_sep}{side}{cls.fld_sep}trading_sec_id{cls.val_sep}{trading_sec_id}"
                      f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}{cls.fld_sep}underlying_account"
@@ -45,7 +48,7 @@ class LogTradeSimulator(TradingLinkBase):
         system_sec_id_str: str = f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}" if system_sec_id else ""
         underlying_account_str: str = \
             f"{cls.fld_sep}underlying_account{cls.val_sep}{underlying_account}" if underlying_account else ""
-        logging.info(f"$$$trade_simulator_place_cxl_order_query_client{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
+        log_simulate_logger.info(f"$$$trade_simulator_place_cxl_order_query_client{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
                      f"{cls.executor_port}{cls.fld_sep}order_id{cls.val_sep}{order_id}{side_str}{trading_sec_id_str}"
                      f"{system_sec_id_str}"
                      f"{underlying_account_str}")

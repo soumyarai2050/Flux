@@ -141,6 +141,7 @@ class BaseProtoPlugin(ABC):
     executor_option_executor_key_sequence_field: ClassVar[str] = "ExecutorKeySequence"
     executor_option_log_key_sequence_field: ClassVar[str] = "LogKeySequence"
     executor_option_is_repeated_field: ClassVar[str] = "IsRepeated"
+    executor_option_cache_as_dict_with_key_field: ClassVar[str] = "CacheAsDictWithKeyField"
     flux_msg_small_sized_collection: ClassVar[str] = "FluxMsgSmallSizedCollection"
     flux_fld_PK: ClassVar[str] = "FluxFldPk"
     default_id_field_name: ClassVar[str] = "id"

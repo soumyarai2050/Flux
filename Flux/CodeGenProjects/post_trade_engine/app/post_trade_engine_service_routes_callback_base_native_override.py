@@ -37,7 +37,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
     underlying_create_all_order_snapshot_http: Callable[..., Any] | None = None
     underlying_update_all_order_snapshot_http: Callable[..., Any] | None = None
     underlying_create_all_order_journal_http: Callable[..., Any] | None = None
-    underlying_read_strat_brief_by_id_http: Callable[..., Any] | None = None
+    underlying_read_strat_brief_http: Callable[..., Any] | None = None
     underlying_create_strat_brief_http: Callable[..., Any] | None = None
     underlying_update_strat_brief_http: Callable[..., Any] | None = None
     underlying_get_last_n_sec_orders_by_event_query_http: Callable[..., Any] | None = None
@@ -47,7 +47,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
             underlying_read_order_journal_http, underlying_read_order_snapshot_http,
             underlying_create_all_order_snapshot_http, underlying_update_all_order_snapshot_http,
-            underlying_create_all_order_journal_http, underlying_read_strat_brief_by_id_http,
+            underlying_create_all_order_journal_http, underlying_read_strat_brief_http,
             underlying_create_strat_brief_http, underlying_update_strat_brief_http,
             underlying_get_last_n_sec_orders_by_event_query_http)
         cls.underlying_read_order_journal_http = underlying_read_order_journal_http
@@ -55,7 +55,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         cls.underlying_create_all_order_snapshot_http = underlying_create_all_order_snapshot_http
         cls.underlying_update_all_order_snapshot_http = underlying_update_all_order_snapshot_http
         cls.underlying_create_all_order_journal_http = underlying_create_all_order_journal_http
-        cls.underlying_read_strat_brief_by_id_http = underlying_read_strat_brief_by_id_http
+        cls.underlying_read_strat_brief_http = underlying_read_strat_brief_http
         cls.underlying_create_strat_brief_http = underlying_create_strat_brief_http
         cls.underlying_update_strat_brief_http = underlying_update_strat_brief_http
         cls.underlying_get_last_n_sec_orders_by_event_query_http = underlying_get_last_n_sec_orders_by_event_query_http
@@ -71,6 +71,8 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             self.min_refresh_interval = 30
         self.portfolio_limit_check_queue: Queue = Queue()
         self.container_model: Type = ContainerObject
+        self.order_id_to_order_snapshot_cache_dict: Dict[str, OrderSnapshot] = {}
+        self.strat_id_to_strat_brief_cache_dict: Dict[int, StratBrief] = {}
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -95,6 +97,10 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
 
                         # Running portfolio_limit_check_queue_handler
                         Thread(target=self.portfolio_limit_check_queue_handler, daemon=True).start()
+
+                        # Updating order_snapshot cache and strat_brief cache
+                        self.load_existing_order_snapshot()
+                        self.load_existing_strat_brief()
 
                 if not self.service_up:
                     try:
@@ -154,52 +160,77 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             # raise service unavailable 503 exception, let the caller retry
             err_str_ = "create_order_journal_pre not ready - service is not initialized yet"
             logging.error(err_str_)
+            raise HTTPException(detail=err_str_, status_code=503)
 
     async def create_order_snapshot_pre(self, order_snapshot_obj: OrderSnapshot):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             err_str_ = "create_order_snapshot_pre not ready - service is not initialized yet"
             logging.error(err_str_)
+            raise HTTPException(detail=err_str_, status_code=503)
 
     async def create_strat_brief_pre(self, strat_brief_obj: StratBrief):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             err_str_ = "create_strat_brief_pre not ready - service is not initialized yet"
             logging.error(err_str_)
+            raise HTTPException(detail=err_str_, status_code=503)
 
     async def check_portfolio_limits_query_pre(self, check_portfolio_limits_class_type: Type[CheckPortfolioLimits],
                                                payload_dict: Dict[str, Any]):
         self.portfolio_limit_check_queue.put(payload_dict)
         return []
 
-    async def create_or_update_order_snapshot(self, order_snapshot_list: List[OrderSnapshot]):
-        order_id_to_latest_order_snapshot_dict = {}
-        # Taking latest order_snapshots based on order_id
-        for order_snapshot in order_snapshot_list:
-            order_id_to_latest_order_snapshot_dict[order_snapshot.order_brief.order_id] = order_snapshot
+    def load_existing_order_snapshot(self):
+        run_coro = (
+            PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http())
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
+        # block for task to finish
+        try:
+            order_snapshot_list: List[OrderSnapshot] = future.result()
+        except Exception as e:
+            logging.exception(f"underlying_read_order_snapshot_http failed - ignoring cache load of order_snapshot "
+                              f"from db, exception: {e}")
+            return None
+
+        self._load_existing_order_snapshot(order_snapshot_list)
+
+    def _load_existing_order_snapshot(self, order_snapshot_list: List[OrderSnapshot]):
+        # Setting cache data member
+        for order_snapshot in order_snapshot_list:
+            self.order_id_to_order_snapshot_cache_dict[order_snapshot.order_brief.order_id] = order_snapshot
+
+    def load_existing_strat_brief(self):
+        run_coro = (
+            PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http())
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+
+        # block for task to finish
+        try:
+            strat_brief_list: List[StratBrief] = future.result()
+        except Exception as e:
+            logging.exception(f"underlying_read_strat_brief_http failed - ignoring cache load of strat_brief "
+                              f"from db, exception: {e}")
+            return None
+
+        # Setting cache data member
+        self._load_existing_strat_brief(strat_brief_list)
+
+    def _load_existing_strat_brief(self, strat_brief_list: List[StratBrief]):
+        for strat_brief in strat_brief_list:
+            self.strat_id_to_strat_brief_cache_dict[strat_brief.id] = strat_brief
+
+    async def create_or_update_order_snapshot(self, order_snapshot_list: List[OrderSnapshot]):
         async with OrderSnapshot.reentrant_lock:
             create_order_snapshots: List[OrderSnapshot] = []
             update_order_snapshots: List[OrderSnapshot] = []
-            for order_id, order_snapshot in order_id_to_latest_order_snapshot_dict.items():
-                filtered_order_snapshot_list: List[OrderSnapshot] = (
-                    await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
-                        get_order_snapshot_order_id_filter_json(order_id)))
-
-                if len(filtered_order_snapshot_list) == 0:
-                    order_snapshot.id = OrderSnapshot.next_id()    # overriding id to make it unique for this server db
-                    create_order_snapshots.append(order_snapshot)
-                elif len(filtered_order_snapshot_list) > 1:
-                    err_str = (f"Unexpected: There must only max one order_snapshot with order_id: "
-                               f"{order_snapshot.order_brief.order_id} but found {len(filtered_order_snapshot_list)}, "
-                               f"avoiding this order_snapshot create/update, "
-                               f"found order_snapshot list: {filtered_order_snapshot_list}")
-                    logging.error(err_str)
-                    return False
-                else:
-                    stored_order_snapshot = filtered_order_snapshot_list[0]
-                    order_snapshot.id = stored_order_snapshot.id    # updating id to stored id for patch
+            for order_snapshot in order_snapshot_list:
+                if order_snapshot.order_brief.order_id in self.order_id_to_order_snapshot_cache_dict:
                     update_order_snapshots.append(order_snapshot)
+                else:
+                    create_order_snapshots.append(order_snapshot)
+                self.order_id_to_order_snapshot_cache_dict[order_snapshot.order_brief.order_id] = order_snapshot
 
             if create_order_snapshots:
                 await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_create_all_order_snapshot_http(
@@ -208,7 +239,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_update_all_order_snapshot_http(
                     update_order_snapshots)
 
-    def _get_order_journal_from_payload(self, payload_dict: Dict[str, Any]):
+    def _get_order_journal_from_payload(self, payload_dict: Dict[str, Any]) -> OrderJournal | None:
         order_journal: OrderJournal | None = None
         if (order_journal_dict := payload_dict.get("order_journal")) is not None:
             order_journal_dict["_id"] = OrderJournal.next_id()  # overriding id for this server db if exists
@@ -216,11 +247,22 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         # else not required: Fills update doesn't contain order_journal
         return order_journal
 
-    def _get_order_snapshot_from_payload(self, payload_dict: Dict[str, Any]):
+    def _get_order_snapshot_from_payload(self, payload_dict: Dict[str, Any]) -> OrderSnapshot | None:
         order_snapshot: OrderSnapshot | None = None
         if (order_snapshot_dict := payload_dict.get("order_snapshot")) is not None:
-            # _id override for order_snapshot is done in create/update time since more cleanup is done
-            # before create/update call, to know about extra cleanup check function to create/update order_snapshot
+            order_brief = order_snapshot_dict.get("order_brief")
+            if order_brief is None:
+                logging.error("order_snapshot_dict doesn't have 'order_brief' key - "
+                              f"ignoring this order_snapshot create/update, order_snapshot_dict: {order_snapshot_dict}")
+                return None
+            else:
+                order_id = order_brief.get("order_id")
+            cached_order_snapshot = self.order_id_to_order_snapshot_cache_dict.get(order_id)
+            if cached_order_snapshot is None:
+                order_snapshot_dict["_id"] = OrderSnapshot.next_id()    # overriding id for this server db if exists
+            else:
+                order_snapshot_dict["_id"] = cached_order_snapshot.id   # updating _id from existing cache object
+            # order_id_to_order_snapshot_cache_dict will be updated later while db operation for order_snapshot
             order_snapshot = OrderSnapshot(**order_snapshot_dict)
         return order_snapshot
 
@@ -290,23 +332,13 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
 
     async def create_or_update_strat_brief(self, strat_brief: StratBrief):
         async with StratBrief.reentrant_lock:
-            try:
-                await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_by_id_http(
-                    strat_brief.id)
-            except HTTPException as http_e:
-                # creating if no object exists with id
-                if "Id not Found:" in http_e.detail:
-                    await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_brief_http(
-                        strat_brief)
-                else:
-                    logging.exception(f"underlying_read_strat_brief_by_id_http failed "
-                                      f"with http_exception: {http_e.detail}")
-            except Exception as e:
-                logging.exception(f"underlying_read_strat_brief_by_id_http failed "
-                                  f"with exception: {e}")
+            if strat_brief.id not in self.strat_id_to_strat_brief_cache_dict:
+                await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_brief_http(
+                    strat_brief)
             else:
                 await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_brief_http(
                     strat_brief)
+            self.strat_id_to_strat_brief_cache_dict[strat_brief.id] = strat_brief
 
     def update_db(self, order_journal_list: List[OrderJournal],
                   order_snapshot_list: List[OrderSnapshot],
@@ -323,6 +355,9 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             # block for task to finish
             try:
                 future.result()
+            except HTTPException as http_e:
+                logging.exception(f"underlying_create_order_journal_http failed "
+                                  f"with http_exception: {http_e.detail}")
             except Exception as e:
                 logging.exception(f"underlying_create_order_journal_http failed "
                                   f"with exception: {e}")
@@ -428,9 +463,6 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         return pause_all_strats
 
     def check_all_portfolio_limits(self) -> bool:
-        from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_http_routes import (
-            underlying_read_strat_brief_http)
-
         portfolio_limits = strat_manager_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
 
         pause_all_strats = False
@@ -439,41 +471,28 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         if self.check_max_open_baskets(portfolio_limits.max_open_baskets):
             pause_all_strats = True
 
-        # Checking portfolio_limits.max_open_notional_per_side for both sides
-        run_coro = underlying_read_strat_brief_http()
-        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-
         # block for task to finish
         total_buy_open_notional = 0
         total_sell_open_notional = 0
-        try:
-            strat_brief_list: List[StratBrief] = future.result()
-        except Exception as e:
-            logging.exception(f"underlying_get_open_order_count_query_http failed "
-                              f"with exception: {e}")
-        else:
-            # Todo LAZY: Add aggregation for total_open_notional
+        for strat_brief in self.strat_id_to_strat_brief_cache_dict.values():
             # Buy side check
-            for strat_brief in strat_brief_list:
-                total_buy_open_notional += strat_brief.pair_buy_side_trading_brief.open_notional
-
-            if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
-                logging.error(f"max_open_notional_per_side breached for BUY side, "
-                              f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                              f"current total_buy_open_notional {total_buy_open_notional}"
-                              f" - initiating all strat pause")
-                pause_all_strats = True
-
+            total_buy_open_notional += strat_brief.pair_buy_side_trading_brief.open_notional
             # Sell side check
-            for strat_brief in strat_brief_list:
-                total_sell_open_notional += strat_brief.pair_sell_side_trading_brief.open_notional
+            total_sell_open_notional += strat_brief.pair_sell_side_trading_brief.open_notional
 
-            if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
-                logging.error(f"max_open_notional_per_side breached for SELL side, "
-                              f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                              f"current total_sell_open_notional {total_sell_open_notional}"
-                              f" - initiating all strat pause")
-                pause_all_strats = True
+        if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
+            logging.error(f"max_open_notional_per_side breached for BUY side, "
+                          f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                          f"current total_buy_open_notional {total_buy_open_notional}"
+                          f" - initiating all strat pause")
+            pause_all_strats = True
+
+        if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
+            logging.error(f"max_open_notional_per_side breached for SELL side, "
+                          f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                          f"current total_sell_open_notional {total_sell_open_notional}"
+                          f" - initiating all strat pause")
+            pause_all_strats = True
 
         # Checking portfolio_limits.max_gross_n_open_notional
         portfolio_status = strat_manager_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
@@ -525,7 +544,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                                                           strat_id_to_container_obj_dict, payload_dict)
 
             while not self.portfolio_limit_check_queue.empty():
-                payload_dict: Dict[str, Any] = self.portfolio_limit_check_queue.get()  # blocking call
+                payload_dict: Dict[str, Any] = self.portfolio_limit_check_queue.get()
                 self.update_strat_id_list_n_dict_from_payload(strat_id_list, strat_id_to_container_obj_dict,
                                                               payload_dict)
             # Does db operations and checks portfolio_limits and raises all-strat pause if any limit breaches
@@ -538,15 +557,22 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             if pair_strat.is_executor_running and pair_strat.port is not None and pair_strat.host is not None:
                 strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
                                                                                                      pair_strat.port)
-                strat_status = strat_executor_client.get_strat_status_client(pair_strat.id)
-                # TODO: make query instead of get and patch calls
-                if strat_status.strat_state == StratState.StratState_ACTIVE:
-                    update_strat_status_obj = StratStatusBaseModel(_id=pair_strat.id,
-                                                                   strat_state=StratState.StratState_PAUSED)
-                    strat_executor_client.patch_strat_status_client(jsonable_encoder(update_strat_status_obj,
-                                                                                     by_alias=True, exclude_none=True))
-            # else not required: pair_strat which are still not running or still not activated
+                strat_executor_client.put_strat_to_pause_if_active_query_client()
 
     async def pause_all_strats_query_pre(self, pause_all_strats_class_type: Type[PauseAllStrats]):
         self.pause_all_strats()
+        return []
+
+    async def reload_cache_query_pre(self, reload_cache_class_type: Type[ReloadCache]):
+        # clearing cache dict
+        self.order_id_to_order_snapshot_cache_dict.clear()
+        self.strat_id_to_strat_brief_cache_dict.clear()
+
+        order_snapshot_list: List[OrderSnapshot] = \
+            await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http()
+        self._load_existing_order_snapshot(order_snapshot_list)
+
+        strat_brief_list: List[StratBrief] = \
+            await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http()
+        self._load_existing_strat_brief(strat_brief_list)
         return []

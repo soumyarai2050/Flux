@@ -479,8 +479,13 @@ async def generic_patch_http(pydantic_class_type: Type[DocType], proto_package_n
                              has_links: bool = False, return_obj_copy: bool | None = True
                              ) -> DocType | bool:
     assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json)
-    updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(by_alias=True),
-                                                     pydantic_obj_update_json)
+    try:
+        updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(by_alias=True),
+                                                         pydantic_obj_update_json)
+    except Exception as e:
+        err_str = f"compare_n_patch_dict failed: exception: {e}"
+        logging.exception(err_str)
+        raise HTTPException(detail=err_str, status_code=400)
     return await _underlying_patch_n_put(pydantic_class_type, proto_package_name, stored_pydantic_obj,
                                          updated_pydantic_obj_dict,
                                          filter_agg_pipeline, update_agg_pipeline, has_links, return_obj_copy)

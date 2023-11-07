@@ -1499,16 +1499,12 @@ def renew_portfolio_alert():
         logging.error(err_str_)
         raise Exception(err_str_)
 
+    retaining_alerts = []
     for alert in portfolio_alert.alerts:
         if "Log analyzer running in simulation mode" in alert.alert_brief:
-            break
-    else:
-        err_str_ = (f"Can't find alert saying 'Log analyzer running in simulation mode', "
-                    f"portfolio_alert: {portfolio_alert}")
-        logging.error(err_str_)
-        raise Exception(err_str_)
+            retaining_alerts.append(alert)
     portfolio_alert_obj = PortfolioAlertBaseModel(_id=portfolio_alert.id,
-                                                  alerts=[alert],
+                                                  alerts=retaining_alerts,
                                                   alert_update_seq_num=0)
     log_analyzer_web_client.put_portfolio_alert_client(portfolio_alert_obj)
 
@@ -2547,6 +2543,7 @@ def clear_cache_in_model():
     command_n_control_obj: CommandNControlBaseModel = CommandNControlBaseModel(command_type=CommandType.RESET_STATE,
                                                                                datetime=DateTime.utcnow())
     strat_manager_service_native_web_client.create_command_n_control_client(command_n_control_obj)
+    post_trade_engine_service_http_client.reload_cache_query_client()
 
 
 def append_csv_file(file_name: str, records: List[List[any]]):

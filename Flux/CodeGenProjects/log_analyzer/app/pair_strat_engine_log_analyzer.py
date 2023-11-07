@@ -9,37 +9,24 @@ os.environ["DBType"] = "beanie"
 from FluxPythonUtils.scripts.utility_functions import configure_logger, get_symbol_side_key
 from FluxPythonUtils.log_analyzer.log_analyzer import LogDetail, get_transaction_counts_n_timeout_from_config
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_analyzer import AppLogAnalyzer
-from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_client import \
-    LogAnalyzerServiceHttpClient
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
     StratExecutorServiceHttpClient)
-from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import *
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
     PairStratBaseModel
 from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import *
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
     strat_manager_service_http_client)
+from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
+    performance_benchmark_service_http_client, RawPerformanceDataBaseModel)
 
 LOG_ANALYZER_DATA_DIR = (
     PurePath(__file__).parent.parent / "data"
 )
 
-# PAIR_STRAT_ENGINE_DATA_DIR = code_gen_projects_path / "pair_strat_engine" / "data"
-#
-# config_yaml_path = LOG_ANALYZER_DATA_DIR / "config.yaml"
-# config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
-# # host, port = get_primary_native_host_n_port_from_config_dict(config_yaml_dict, LOG_ANALYZER_DATA_DIR)
+
 debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
                              len(debug_env) == 0 or debug_env == "0") else True
-# host, port = config_yaml_dict.get("main_server_beanie_host"), config_yaml_dict.get("main_server_beanie_port")
-# log_analyzer_service_http_client = LogAnalyzerServiceHttpClient.set_or_get_if_instance_exists(host, port)
-
-# pair_strat_engine_config_yaml_path = PAIR_STRAT_ENGINE_DATA_DIR / "config.yaml"
-# pair_strat_engine_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(
-#     str(pair_strat_engine_config_yaml_path))
-# pair_strat_engine_host, pair_strat_engine_port = \
-#     get_primary_native_host_n_port_from_config_dict(pair_strat_engine_config_yaml_dict, PAIR_STRAT_ENGINE_DATA_DIR)
 
 portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs")))
@@ -48,14 +35,32 @@ strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
 
 
 class PairStratEngineLogAnalyzer(AppLogAnalyzer):
+    underlying_partial_update_all_portfolio_alert_http: Callable[..., Any] | None = None
+    underlying_partial_update_all_strat_alert_http: Callable[..., Any] | None = None
+    underlying_read_portfolio_alert_by_id_http: Callable[..., Any] | None = None
+    underlying_read_strat_alert_by_id_http: Callable[..., Any] | None = None
+
+    asyncio_loop: ClassVar[asyncio.AbstractEventLoop | None] = None
+
+    @classmethod
+    def initialize_underlying_http_callables(cls):
+        from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_routes import (
+            underlying_partial_update_all_portfolio_alert_http, underlying_partial_update_all_strat_alert_http,
+            underlying_read_portfolio_alert_by_id_http, underlying_read_strat_alert_by_id_http)
+        cls.underlying_partial_update_all_portfolio_alert_http = underlying_partial_update_all_portfolio_alert_http
+        cls.underlying_partial_update_all_strat_alert_http = underlying_partial_update_all_strat_alert_http
+        cls.underlying_read_portfolio_alert_by_id_http = underlying_read_portfolio_alert_by_id_http
+        cls.underlying_read_strat_alert_by_id_http = underlying_read_strat_alert_by_id_http
+
     def __init__(self, regex_file: str, log_details: List[LogDetail] | None = None,
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
                  simulation_mode: bool = False):
-        super().__init__(regex_file, config_yaml_dict, log_analyzer_service_http_client,
+        super().__init__(regex_file, config_yaml_dict, performance_benchmark_service_http_client,
                          RawPerformanceDataBaseModel, log_details=log_details,
                          log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                          debug_mode=debug_mode)
         logging.info(f"starting pair_strat log analyzer. monitoring logs: {log_details}")
+        PairStratEngineLogAnalyzer.initialize_underlying_http_callables()
         self.simulation_mode = simulation_mode
         self.portfolio_alerts_model_exist: bool = False
         self.portfolio_alerts_cache: List[Alert] = list()
@@ -66,9 +71,15 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         self.strat_alert_queue: Queue = Queue()
         self.port_to_executor_web_client: Dict[int, StratExecutorServiceHttpClient] = {}
         if self.simulation_mode:
-            print("CRITICAL: log analyzer running in simulation mode...")
-            alert_brief: str = "Log analyzer running in simulation mode"
+            print("CRITICAL: PairStrat log analyzer running in simulation mode...")
+            alert_brief: str = "PairStrat Log analyzer running in simulation mode"
             self._send_alerts(severity=self._get_severity("critical"), alert_brief=alert_brief, alert_details="")
+
+        if PairStratEngineLogAnalyzer.asyncio_loop is None:
+            err_str_ = ("Couldn't find asyncio_loop class data member in PairStratEngineLogAnalyzer, "
+                        "exiting PairStratEngineLogAnalyzer run.")
+            logging.error(err_str_)
+            raise Exception(err_str_)
 
         self.run_queue_handler()
         self.run()
@@ -89,13 +100,45 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         PairStratEngineLogAnalyzer.queue_handler(
             self.portfolio_alert_queue, portfolio_alert_bulk_update_counts_per_call,
             portfolio_alert_bulk_update_timeout,
-            self.webclient_object.patch_all_portfolio_alert_client, self._handle_portfolio_alert_queue_err_handler)
+            self.patch_all_portfolio_alert_client_with_asyncio_loop,
+            self._handle_portfolio_alert_queue_err_handler)
 
     def _handle_strat_alert_queue(self):
         PairStratEngineLogAnalyzer.queue_handler(
             self.strat_alert_queue, strat_alert_bulk_update_counts_per_call,
             strat_alert_bulk_update_timeout,
-            self.webclient_object.patch_all_strat_alert_client, self._handle_strat_alert_queue_err_handler)
+            self.patch_all_strat_alert_client_with_asyncio_loop,
+            self._handle_strat_alert_queue_err_handler)
+
+    def patch_all_portfolio_alert_client_with_asyncio_loop(self, pydantic_obj_json_list: Dict):
+        run_coro = PairStratEngineLogAnalyzer.underlying_partial_update_all_portfolio_alert_http(pydantic_obj_json_list)
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        try:
+            # block for task to finish
+            return future.result()
+        except HTTPException as http_e:
+            err_str_ = f"underlying_partial_update_all_portfolio_alert_http failed with http_exception: {http_e}"
+            logging.error(err_str_)
+            raise Exception(err_str_)
+        except Exception as e:
+            err_str_ = f"underlying_partial_update_all_portfolio_alert_http failed with exception: {e}"
+            logging.error(err_str_)
+            raise Exception(err_str_)
+
+    def patch_all_strat_alert_client_with_asyncio_loop(self, pydantic_obj_json_list: Dict):
+        run_coro = PairStratEngineLogAnalyzer.underlying_partial_update_all_strat_alert_http(pydantic_obj_json_list)
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        try:
+            # block for task to finish
+            return future.result()
+        except HTTPException as http_e:
+            err_str_ = f"underlying_partial_update_all_strat_alert_http failed with http_exception: {http_e}"
+            logging.error(err_str_)
+            raise Exception(err_str_)
+        except Exception as e:
+            err_str_ = f"underlying_partial_update_all_strat_alert_http failed with exception: {e}"
+            logging.error(err_str_)
+            raise Exception(err_str_)
 
     def run_queue_handler(self):
         portfolio_alert_handler_thread = Thread(target=self._handle_portfolio_alert_queue, daemon=True)
@@ -130,8 +173,20 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         else:
             self.service_up = is_log_analyzer_service_up(ignore_error=True)
             if self.service_up:
-                portfolio_alert: PortfolioAlertBaseModel = \
-                    self.webclient_object.get_portfolio_alert_client(1)
+                run_coro = PairStratEngineLogAnalyzer.underlying_read_portfolio_alert_by_id_http(1)
+                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                try:
+                    # block for task to finish
+                    portfolio_alert: PortfolioAlert = future.result()
+                except HTTPException as http_e:
+                    err_str_ = f"underlying_read_portfolio_alert_by_id_http failed with http_exception: {http_e}"
+                    logging.error(err_str_)
+                    raise Exception(err_str_)
+                except Exception as e:
+                    err_str_ = f"underlying_read_portfolio_alert_by_id_http failed with exception: {e}"
+                    logging.error(err_str_)
+                    raise Exception(err_str_)
+
                 if portfolio_alert.alerts is not None:
                     self.portfolio_alerts_cache = portfolio_alert.alerts
                 else:
@@ -229,35 +284,6 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
             self.port_to_executor_web_client[port_] = executor_web_client
         return executor_web_client
 
-    def _process_trade_simulator_message(self, message: str) -> None:
-        try:
-            if not self.simulation_mode:
-                raise Exception("Received trade simulator message but log analyzer not running in simulation mode")
-            # remove $$$ from beginning of message
-            message: str = message[3:]
-            args: List[str] = message.split("~~")
-            method_name: str = args.pop(0)
-            host: str = args.pop(0)
-            port: int = parse_to_int(args.pop(0))
-
-            kwargs: Dict[str, str] = dict()
-            # get method kwargs separated by "^^" if any
-            for arg in args:
-                key, value = arg.split("^^")
-                kwargs[key] = value
-
-            executor_web_client = self._get_executor_http_client_from_pair_strat(port, host)
-
-            callback_method: Callable = getattr(executor_web_client, method_name)
-            callback_method(**kwargs)
-
-        except Exception as e:
-            alert_brief: str = f"_process_trade_simulator_message failed in log analyzer"
-            alert_details: str = f"message: {message}, exception: {e}"
-            logging.exception(f"{alert_brief};;; {alert_details}")
-            self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
-                              alert_details=alert_details)
-
     def _process_strat_alert_message(self, prefix: str, message: str) -> None:
         try:
             pattern: re.Pattern = re.compile("%%.*%%")
@@ -324,10 +350,22 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                             raise Exception(f"StartExecutor Server not running for pair_strat: {pair_strat_obj}")
 
                         strat_id = pair_strat_obj.id
-                        strat_alert: StratAlertBaseModel = self.webclient_object.get_strat_alert_client(strat_id)
+                        run_coro = PairStratEngineLogAnalyzer.underlying_read_strat_alert_by_id_http(strat_id)
+                        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                        try:
+                            # block for task to finish
+                            strat_alert: StratAlert = future.result()
+                        except HTTPException as http_e:
+                            err_str_ = f"underlying_read_strat_alert_by_id_http failed with http_exception: {http_e}"
+                            logging.error(err_str_)
+                            raise Exception(err_str_)
+                        except Exception as e:
+                            err_str_ = f"underlying_read_strat_alert_by_id_http failed with exception: {e}"
+                            logging.error(err_str_)
+                            raise Exception(err_str_)
+
                         if strat_alert.alerts is not None:
-                            self.strat_alert_cache_by_strat_id_dict[strat_id] = \
-                                strat_alert.alerts
+                            self.strat_alert_cache_by_strat_id_dict[strat_id] = strat_alert.alerts
                         else:
                             self.strat_alert_cache_by_strat_id_dict[strat_id] = list()
                         self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
@@ -422,12 +460,6 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
 
     def handle_pair_strat_matched_log_message(self, log_prefix: str, log_message: str):
         # put in method
-        if log_message.startswith("$$$"):
-            # handle trade simulator message
-            logging.info(f"Trade simulator message: {log_message}")
-            self._process_trade_simulator_message(log_message)
-            return
-
         if re.compile(r"%%.*%%").search(log_message):
             # handle strat alert message
             logging.info(f"Strat alert message: {log_message}")

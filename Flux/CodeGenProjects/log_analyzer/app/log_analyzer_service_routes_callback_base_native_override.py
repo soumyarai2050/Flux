@@ -1,12 +1,12 @@
-# project imports
-import logging
+# standard imports
+import subprocess
 
+# project imports
 from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_routes_callback import LogAnalyzerServiceRoutesCallback
 from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import *
 from Flux.CodeGenProjects.log_analyzer.app.pair_strat_engine_log_analyzer import *
 from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import *
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
-from Flux.PyCodeGenEngine.FluxCodeGenCore.aggregate_core import get_raw_performance_data_from_callable_name_agg_pipeline
 # standard imports
 from datetime import datetime
 
@@ -33,7 +33,6 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
     datetime_str: str = datetime.now().strftime("%Y%m%d")
     underlying_read_portfolio_alert_http: Callable[[Any], Any] | None = None
     underlying_create_portfolio_alert_http: Callable[[Any], Any] | None = None
-    underlying_read_raw_performance_data_http: Callable[[Any], Any] | None = None
 
     def __init__(self):
         super().__init__()
@@ -46,14 +45,11 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
 
     def initialize_underlying_http_callables(self):
         from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_routes import (
-            underlying_read_portfolio_alert_http, underlying_create_portfolio_alert_http,
-            underlying_read_raw_performance_data_http)
+            underlying_read_portfolio_alert_http, underlying_create_portfolio_alert_http)
         LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_alert_http = (
             underlying_read_portfolio_alert_http)
         LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_alert_http = (
             underlying_create_portfolio_alert_http)
-        LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_read_raw_performance_data_http = (
-            underlying_read_raw_performance_data_http)
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -75,10 +71,16 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
                 if self.service_up:
                     if not self.service_ready:
                         # starting log_analyzer script once log analyzer service is up
+                        PairStratEngineLogAnalyzer.asyncio_loop = self.asyncio_loop
                         thread = (
                             Thread(target=LogAnalyzerServiceRoutesCallbackBaseNativeOverride.start_log_analyzer_script,
                                    daemon=True))
                         thread.start()
+
+                        app_dir = PurePath(__file__).parent.parent / "app"
+                        script_path = app_dir / 'log_simulator_log_analyzer.py'
+                        subprocess.Popen(['python', str(script_path), '&'])
+
                         self.service_ready = True
                         print(f"INFO: service is ready: {datetime.now().time()}")
 
@@ -198,17 +200,6 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
                         f"{attempt_counts} attempts")
             logging.critical(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
-
-    async def get_raw_performance_data_of_callable_query_pre(
-            self, raw_performance_data_of_callable_class_type: Type[RawPerformanceDataOfCallable], callable_name: str):
-
-        raw_performance_data_list = \
-            await LogAnalyzerServiceRoutesCallbackBaseNativeOverride.underlying_read_raw_performance_data_http(
-                get_raw_performance_data_from_callable_name_agg_pipeline(callable_name), self.get_generic_read_route())
-
-        raw_performance_data_of_callable = RawPerformanceDataOfCallable(raw_performance_data=raw_performance_data_list)
-
-        return [raw_performance_data_of_callable]
 
     async def update_portfolio_alert_pre(self, stored_portfolio_alert_obj: PortfolioAlert,
                                          updated_portfolio_alert_obj: PortfolioAlert):

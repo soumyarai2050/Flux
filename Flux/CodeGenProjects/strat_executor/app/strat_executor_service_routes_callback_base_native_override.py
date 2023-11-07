@@ -25,7 +25,7 @@ from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper impor
     EXECUTOR_PROJECT_DATA_DIR, is_ongoing_strat, log_analyzer_service_http_client, main_config_yaml_dict,
     EXECUTOR_PROJECT_SCRIPTS_DIR, get_default_max_notional, post_trade_engine_service_http_client)
 from FluxPythonUtils.scripts.utility_functions import (
-    avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert)
+    avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger)
 from Flux.CodeGenProjects.pair_strat_engine.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.pair_strat_engine.app.service_state import ServiceState
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import (
@@ -45,7 +45,8 @@ from Flux.CodeGenProjects.strat_executor.app.aggregate import (
     get_symbol_side_snapshot_from_symbol_side, get_order_by_order_id_filter, get_strat_brief_from_symbol,
     get_order_snapshot_order_id_filter_json, get_open_order_snapshots_for_symbol,
     get_symbol_side_underlying_account_cumulative_fill_qty, get_order_by_order_id_filter,
-    get_symbol_overview_from_symbol, get_last_n_sec_total_qty, get_open_order_snapshots_by_order_status)
+    get_symbol_overview_from_symbol, get_last_n_sec_total_trade_qty, get_open_order_snapshots_by_order_status,
+    get_aggressive_market_depths)
 
 
 def get_pair_strat_id_from_cmd_argv():
@@ -87,7 +88,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     underlying_get_top_of_book_from_symbol_query_http: Callable[..., Any] | None = None
     underlying_read_order_snapshot_http: Callable[..., Any] | None = None
     underlying_read_order_journal_http: Callable[..., Any] | None = None
-    underlying_get_last_n_sec_total_qty_query_http: Callable[..., Any] | None = None
+    underlying_get_last_n_sec_total_trade_qty_query_http: Callable[..., Any] | None = None
     get_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
     underlying_create_order_snapshot_http: Callable[..., Any] | None = None
     underlying_partial_update_order_snapshot_http: Callable[..., Any] | None = None
@@ -104,6 +105,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     underlying_is_strat_ongoing_query_http: Callable[..., Any] | None = None
     underlying_delete_strat_brief_http: Callable[..., Any] | None = None
     underlying_create_cancel_order_http: Callable[..., Any] | None = None
+    underlying_read_market_depth_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_routes(cls):
@@ -118,14 +120,15 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             underlying_read_symbol_overview_http, underlying_create_cancel_order_http,
             underlying_read_top_of_book_http, underlying_get_top_of_book_from_symbol_query_http,
             underlying_read_order_snapshot_http, underlying_read_order_journal_http,
-            underlying_get_last_n_sec_total_qty_query_http, underlying_partial_update_cancel_order_http,
+            underlying_get_last_n_sec_total_trade_qty_query_http, underlying_partial_update_cancel_order_http,
             get_underlying_account_cumulative_fill_qty_query_http, underlying_create_order_snapshot_http,
             underlying_partial_update_order_snapshot_http, underlying_partial_update_symbol_side_snapshot_http,
             underlying_partial_update_strat_status_http, underlying_get_open_order_count_query_http,
             underlying_partial_update_strat_brief_http, underlying_delete_symbol_side_snapshot_http,
             get_symbol_side_underlying_account_cumulative_fill_qty_query_http, underlying_read_fills_journal_http,
             underlying_read_last_trade_http, get_open_order_snapshots_by_order_status,
-            underlying_is_strat_ongoing_query_http, underlying_delete_strat_brief_http)
+            underlying_is_strat_ongoing_query_http, underlying_delete_strat_brief_http,
+            underlying_read_market_depth_http)
 
         cls.residual_compute_shared_lock = residual_compute_shared_lock
         cls.journal_shared_lock = journal_shared_lock
@@ -148,7 +151,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         cls.underlying_get_top_of_book_from_symbol_query_http = underlying_get_top_of_book_from_symbol_query_http
         cls.underlying_read_order_snapshot_http = underlying_read_order_snapshot_http
         cls.underlying_read_order_journal_http = underlying_read_order_journal_http
-        cls.underlying_get_last_n_sec_total_qty_query_http = underlying_get_last_n_sec_total_qty_query_http
+        cls.underlying_get_last_n_sec_total_trade_qty_query_http = underlying_get_last_n_sec_total_trade_qty_query_http
         cls.get_underlying_account_cumulative_fill_qty_query_http = (
             get_underlying_account_cumulative_fill_qty_query_http)
         cls.underlying_create_order_snapshot_http = underlying_create_order_snapshot_http
@@ -171,6 +174,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             underlying_get_symbol_overview_from_symbol_query_http)
         cls.underlying_delete_strat_brief_http = underlying_delete_strat_brief_http
         cls.underlying_create_cancel_order_http = underlying_create_cancel_order_http
+        cls.underlying_read_market_depth_http = underlying_read_market_depth_http
 
     def __init__(self):
         super().__init__()
@@ -199,6 +203,11 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         self.trading_data_manager: TradingDataManager | None = None
         self.simulate_config_yaml_file_path = (
                 EXECUTOR_PROJECT_DATA_DIR / f"executor_{self.pair_strat_id}_simulate_config.yaml")
+
+        create_logger(
+            "log_simulator", logging.DEBUG,
+            str(PurePath(__file__).parent.parent / "log" /
+                f"log_simulator_{self.pair_strat_id}_logs_{datetime_str}.log"))
 
     def get_generic_read_route(self):
         return None
@@ -396,7 +405,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             else:
                 logging.error(f"Some error occurred while updating is_running state of pair_strat of id: "
                               f"{self.pair_strat_id} while shutting executor server, symbol_side_key: "
-                              f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+                              f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}, "
+                              f"exception: {e}")
         finally:
             # removing md scripts
             try:
@@ -990,13 +1000,13 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 applicable_period_seconds = strat_limits.market_trade_volume_participation.applicable_period_seconds
                 last_n_sec_market_trade_vol_obj_list = \
                     await (StratExecutorServiceRoutesCallbackBaseNativeOverride.
-                           underlying_get_last_n_sec_total_qty_query_http(symbol, applicable_period_seconds))
+                           underlying_get_last_n_sec_total_trade_qty_query_http(symbol, applicable_period_seconds))
                 if last_n_sec_market_trade_vol_obj_list:
                     last_n_sec_trade_qty = last_n_sec_market_trade_vol_obj_list[0].last_n_sec_trade_vol
                 else:
                     logging.error(f"could not receive any last_n_sec_market_trade_vol_obj to get last_n_sec_trade_qty "
                                   f"for symbol_side_key: {get_symbol_side_key([(symbol, side)])}, likely bug in "
-                                  f"get_last_n_sec_total_qty_query pre impl")
+                                  f"get_last_n_sec_total_trade_qty_query pre impl")
         else:
             err_str_ = (
                 "Can't find any strat_limits in cache to get last_n_sec trade qty, "
@@ -2138,51 +2148,72 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
             if strat_limits_tuple is not None and strat_status_tuple is not None:
                 strat_limits, _ = strat_limits_tuple
-                update_strat_status_obj, _ = strat_status_tuple
+                fetched_strat_status_obj, _ = strat_status_tuple
+
+                update_strat_status_obj = StratStatusOptional(_id=fetched_strat_status_obj.id)
                 match order_snapshot_obj.order_brief.side:
                     case Side.BUY:
-                        update_strat_status_obj.total_open_buy_qty -= order_snapshot_obj.last_update_fill_qty
-                        update_strat_status_obj.total_open_buy_notional -= \
-                            order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                                                      order_snapshot_obj.order_brief.security.sec_id)
-                        if update_strat_status_obj.total_open_buy_qty == 0:
+                        update_strat_status_obj.total_open_buy_qty = (fetched_strat_status_obj.total_open_buy_qty -
+                                                                      order_snapshot_obj.last_update_fill_qty)
+                        update_strat_status_obj.total_open_buy_notional = (
+                                fetched_strat_status_obj.total_open_buy_notional -
+                                (order_snapshot_obj.last_update_fill_qty *
+                                 self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                                 order_snapshot_obj.order_brief.security.sec_id)))
+                        if fetched_strat_status_obj.total_open_buy_qty == 0:
                             update_strat_status_obj.avg_open_buy_px = 0
                         else:
                             update_strat_status_obj.avg_open_buy_px = \
-                                self.get_local_px_or_notional(update_strat_status_obj.total_open_buy_notional,
+                                self.get_local_px_or_notional(fetched_strat_status_obj.total_open_buy_notional,
                                                               order_snapshot_obj.order_brief.security.sec_id) / \
-                                update_strat_status_obj.total_open_buy_qty
-                        update_strat_status_obj.total_fill_buy_qty += order_snapshot_obj.last_update_fill_qty
-                        update_strat_status_obj.total_fill_buy_notional += \
-                            order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                                order_snapshot_obj.last_update_fill_px,
-                                order_snapshot_obj.order_brief.security.sec_id)
+                                fetched_strat_status_obj.total_open_buy_qty
+                        update_strat_status_obj.total_fill_buy_qty = (
+                                fetched_strat_status_obj.total_fill_buy_qty + order_snapshot_obj.last_update_fill_qty)
+                        update_strat_status_obj.total_fill_buy_notional = (
+                                fetched_strat_status_obj.total_fill_buy_notional +
+                                order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
+                                    order_snapshot_obj.last_update_fill_px,
+                                    order_snapshot_obj.order_brief.security.sec_id))
                         update_strat_status_obj.avg_fill_buy_px = \
                             self.get_local_px_or_notional(update_strat_status_obj.total_fill_buy_notional,
                                                           order_snapshot_obj.order_brief.security.sec_id) / \
                             update_strat_status_obj.total_fill_buy_qty
+                        update_strat_status_obj.total_open_sell_notional = (
+                            fetched_strat_status_obj.total_open_sell_notional)
+                        update_strat_status_obj.total_fill_sell_notional = (
+                            fetched_strat_status_obj.total_fill_sell_notional)
+
                     case Side.SELL:
-                        update_strat_status_obj.total_open_sell_qty -= order_snapshot_obj.last_update_fill_qty
-                        update_strat_status_obj.total_open_sell_notional -= \
-                            (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                                order_snapshot_obj.order_brief.px,
-                                order_snapshot_obj.order_brief.security.sec_id))
+                        update_strat_status_obj.total_open_sell_qty = (
+                                fetched_strat_status_obj.total_open_sell_qty - order_snapshot_obj.last_update_fill_qty)
+                        update_strat_status_obj.total_open_sell_notional = (
+                                fetched_strat_status_obj.total_open_sell_notional -
+                                (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
+                                    order_snapshot_obj.order_brief.px,
+                                    order_snapshot_obj.order_brief.security.sec_id)))
                         if update_strat_status_obj.total_open_sell_qty == 0:
                             update_strat_status_obj.avg_open_sell_px = 0
                         else:
                             update_strat_status_obj.avg_open_sell_px = \
-                                self.get_local_px_or_notional(update_strat_status_obj.total_open_sell_notional,
+                                self.get_local_px_or_notional(fetched_strat_status_obj.total_open_sell_notional,
                                                               order_snapshot_obj.order_brief.security.sec_id) / \
-                                update_strat_status_obj.total_open_sell_qty
-                        update_strat_status_obj.total_fill_sell_qty += order_snapshot_obj.last_update_fill_qty
-                        update_strat_status_obj.total_fill_sell_notional += \
-                            order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                                order_snapshot_obj.last_update_fill_px,
-                                order_snapshot_obj.order_brief.security.sec_id)
+                                fetched_strat_status_obj.total_open_sell_qty
+                        update_strat_status_obj.total_fill_sell_qty = (
+                                fetched_strat_status_obj.total_fill_sell_qty + order_snapshot_obj.last_update_fill_qty)
+                        update_strat_status_obj.total_fill_sell_notional = (
+                                fetched_strat_status_obj.total_fill_sell_notional +
+                                order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
+                                    order_snapshot_obj.last_update_fill_px,
+                                    order_snapshot_obj.order_brief.security.sec_id))
                         update_strat_status_obj.avg_fill_sell_px = \
                             self.get_local_px_or_notional(update_strat_status_obj.total_fill_sell_notional,
                                                           order_snapshot_obj.order_brief.security.sec_id) / \
                             update_strat_status_obj.total_fill_sell_qty
+                        update_strat_status_obj.total_open_buy_notional = (
+                            fetched_strat_status_obj.total_open_buy_notional)
+                        update_strat_status_obj.total_fill_buy_notional = (
+                            fetched_strat_status_obj.total_fill_buy_notional)
+
                     case other_:
                         err_str_ = f"Unsupported Side Type {other_} received for order_snapshot_key: " \
                                    f"{get_order_snapshot_log_key(order_snapshot_obj)} while updating strat_status;;; " \
@@ -2557,6 +2588,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     if cxl_order is None:
                         await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_create_cancel_order_http(
                             cancel_order)
+                        logging.debug(f"Created CancelOrder for order_id: {cancel_order.order_id}, {DateTime.utcnow()}")
                     else:
                         if not cxl_order.cxl_confirmed:
                             logging.error(f"cxl_expired_open_orders failed: Prior cxl request found in DB for this "
@@ -2616,12 +2648,12 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         return await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_top_of_book_http(
             get_objs_from_symbol(symbol))
 
-    async def get_last_n_sec_total_qty_query_pre(self,
-                                                 last_sec_market_trade_vol_class_type: Type[LastNSecMarketTradeVol],
-                                                 symbol: str, last_n_sec: int) -> List[LastNSecMarketTradeVol]:
+    async def get_last_n_sec_total_trade_qty_query_pre(
+            self, last_sec_market_trade_vol_class_type: Type[LastNSecMarketTradeVol],
+            symbol: str, last_n_sec: int) -> List[LastNSecMarketTradeVol]:
         last_trade_obj_list = \
             await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_last_trade_http(
-                get_last_n_sec_total_qty(symbol, last_n_sec))
+                get_last_n_sec_total_trade_qty(symbol, last_n_sec))
         last_n_sec_trade_vol = 0
         if last_trade_obj_list:
             last_n_sec_trade_vol = \
@@ -2713,6 +2745,37 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             logging.error(err_str_)
 
         return []
+
+    async def put_strat_to_pause_if_active_query_pre(self, strat_status_class_type: Type[StratStatus]):
+        async with StratStatus.reentrant_lock:
+            strat_status_tuple = self.strat_cache.get_strat_status()
+            if strat_status_tuple is not None:
+                strat_status, _ = strat_status_tuple
+                if strat_status.strat_state == StratState.StratState_ACTIVE:
+                    update_strat_status = StratStatus(_id=strat_status.id, strat_state=StratState.StratState_PAUSED)
+                    (await StratExecutorServiceRoutesCallbackBaseNativeOverride.
+                     underlying_partial_update_strat_status_http(
+                        jsonable_encoder(update_strat_status, by_alias=True, exclude_none=True)))
+                # else not required: ignore pause if not active
+            else:
+                err_str_ = ("Received strat_status_tuple as None from strat_cache - ignoring strat_status update "
+                            "pause if active")
+                logging.exception(err_str_)
+                raise HTTPException(status_code=500, detail=err_str_)
+        return []
+
+    async def get_aggressive_market_depths_query_pre(self, market_depth_class_type: Type[MarketDepth],
+                                                     payload_dict: Dict[str, Any]):
+        symbol_side_tuple_list = payload_dict.get("symbol_side_tuple_list")
+        if symbol_side_tuple_list is None:
+            err_str_ = "Can't find symbol_side_tuple_list in payload from query"
+            logging.error(err_str_)
+            raise HTTPException(detail=err_str_, status_code=503)
+
+        market_depth_list: List[MarketDepth] = \
+            await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_market_depth_http(
+            get_aggressive_market_depths(symbol_side_tuple_list))
+        return market_depth_list
 
     #########################
     # Trade Simulator Queries

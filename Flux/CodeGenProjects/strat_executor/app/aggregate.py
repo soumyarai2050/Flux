@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 from pendulum import DateTime
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
@@ -149,7 +149,7 @@ def get_max_market_depth_obj(symbol: str, side: str):
     ]}
 
 
-def get_last_n_sec_total_qty(symbol: str, last_n_sec: float):
+def get_last_n_sec_total_trade_qty(symbol: str, last_n_sec: float):
     # Model - LastTrade
     return {"aggregate": [
         {
@@ -419,6 +419,53 @@ def get_open_order_snapshots_for_symbol(symbol: str):
                 ]
             },
         }]}
+
+
+def get_aggressive_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
+    agg_pipeline = {
+        "aggregate": [
+            {
+                '$match': {
+                    '$or': [
+                        # To be updated based on provided symbol_side_tuple_list
+                    ]
+                }
+            },
+            {
+                '$match': {
+                    '$or': [
+                        # To be updated based on provided symbol_side_tuple_list
+                    ]
+                }
+            },
+            {
+                '$sort': {
+                    'px': -1
+                }
+            }
+        ]
+    }
+
+    for symbol_side_tuple in symbol_side_tuple_list:
+        symbol, side = symbol_side_tuple
+
+        # Adding first match by symbol
+        agg_pipeline["aggregate"][0]["$match"]["$or"].append({
+            "symbol": symbol
+        })
+
+        # Adding second match with symbol n side
+        agg_pipeline["aggregate"][1]["$match"]["$or"].append({
+            '$and': [
+                {
+                    'symbol': symbol
+                }, {
+                    'side': side
+                }
+            ]
+        })
+
+    return agg_pipeline
 
 
 # Market Depth cumulative average

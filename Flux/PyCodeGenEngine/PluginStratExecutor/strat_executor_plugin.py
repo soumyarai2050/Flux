@@ -326,7 +326,8 @@ class StratExecutorPlugin(BaseProtoPlugin):
         return output_str
 
     def _strat_cache_get_model_interface_content(self, message: protogen.Message,
-                                                 is_repeated: bool) -> str:
+                                                 is_repeated: bool,
+                                                 cache_as_dict_with_key_field: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
@@ -340,16 +341,32 @@ class StratExecutorPlugin(BaseProtoPlugin):
                          f"Tuple[{message_name}BaseModel | {message_name}, DateTime] | None:\n"
         output_str += f"\t\tif date_time is None or date_time < " \
                       f"self._{message_name_snake_cased}{extra_str}_update_date_time:\n"
-        output_str += f"\t\t\tif self._{message_name_snake_cased}{extra_str} is not None:\n"
-        output_str += f"\t\t\t\treturn self._{message_name_snake_cased}{extra_str}, " \
-                      f"self._{message_name_snake_cased}{extra_str}_update_date_time\n"
+        if cache_as_dict_with_key_field is None:
+            output_str += f"\t\t\tif self._{message_name_snake_cased}{extra_str} is not None:\n"
+            output_str += f"\t\t\t\treturn self._{message_name_snake_cased}{extra_str}, " \
+                          f"self._{message_name_snake_cased}{extra_str}_update_date_time\n"
+        else:
+            key_field_name = cache_as_dict_with_key_field.split(".")[-1]
+            output_str += f"\t\t\tif self._{key_field_name}_to_{message_name_snake_cased}_dict is not None:\n"
+            output_str += (f"\t\t\t\treturn list(self._{key_field_name}_to_{message_name_snake_cased}_dict.values()), "
+                           f"self._{message_name_snake_cased}{extra_str}_update_date_time\n")
         output_str += f"\t\t\telse:\n"
         output_str += f"\t\t\t\treturn None\n"
         output_str += f"\t\telse:\n"
         output_str += f"\t\t\treturn None\n\n"
+
+        if cache_as_dict_with_key_field:
+            key_field_name = cache_as_dict_with_key_field.split(".")[-1]
+            output_str += (f"\tdef get_{message_name_snake_cased}_from_{key_field_name}(self, {key_field_name}) -> "
+                           f"{message_name} | None:\n")
+            output_str += f"\t\tif self._{key_field_name}_to_{message_name_snake_cased}_dict is None:\n"
+            output_str += f"\t\t\treturn None\n"
+            output_str += (f"\t\treturn self._{key_field_name}_to_{message_name_snake_cased}_dict.get("
+                           f"{key_field_name})\n\n")
         return output_str
 
-    def _strat_cache_set_model_interface_content(self, message: protogen.Message, is_repeated: bool) -> str:
+    def _strat_cache_set_model_interface_content(self, message: protogen.Message, is_repeated: bool,
+                                                 cache_as_dict_with_key_field: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
@@ -361,9 +378,17 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str = f"\tdef set_{message_name_snake_cased}(self, " \
                      f"{message_name_snake_cased}: {message_name}BaseModel | {message_name}) -> DateTime:\n"
         if is_repeated:
-            output_str += f"\t\tif self._{message_name_snake_cased}{extra_str} is None:\n"
-            output_str += f"\t\t\tself._{message_name_snake_cased}{extra_str} = list()\n"
-            output_str += f"\t\tself._{message_name_snake_cased}{extra_str}.append({message_name_snake_cased})\n"
+            if cache_as_dict_with_key_field is None:
+                output_str += f"\t\tif self._{message_name_snake_cased}{extra_str} is None:\n"
+                output_str += f"\t\t\tself._{message_name_snake_cased}{extra_str} = list()\n"
+                output_str += f"\t\tself._{message_name_snake_cased}{extra_str}.append({message_name_snake_cased})\n"
+            else:
+                key_field_name = cache_as_dict_with_key_field.split(".")[-1]
+                output_str += f"\t\tif self._{key_field_name}_to_{message_name_snake_cased}_dict is None:\n"
+                output_str += f"\t\t\tself._{key_field_name}_to_{message_name_snake_cased}_dict = dict()\n"
+                output_str += (f"\t\tself._{key_field_name}_to_{message_name_snake_cased}_dict["
+                               f"{message_name_snake_cased}.{cache_as_dict_with_key_field}] = "
+                               f"{message_name_snake_cased}\n")
         else:
             output_str += f"\t\tself._{message_name_snake_cased} = {message_name_snake_cased}\n"
         output_str += f"\t\tself._{message_name_snake_cased}{extra_str}_update_date_time = DateTime.utcnow()\n"
@@ -395,12 +420,20 @@ class StratExecutorPlugin(BaseProtoPlugin):
                 option_value_dict = \
                     StratExecutorPlugin.get_complex_option_value_from_proto(
                         message, StratExecutorPlugin.flux_msg_executor_options)
-                is_repeated = option_value_dict.get(StratExecutorPlugin.executor_option_is_repeated_field)
+                is_repeated: bool = option_value_dict.get(StratExecutorPlugin.executor_option_is_repeated_field)
+                cache_as_dict_with_key_field: str = (
+                    option_value_dict.get(StratExecutorPlugin.executor_option_cache_as_dict_with_key_field))
 
                 if is_repeated:
-                    output_str += \
-                        (f"\t\tself._{message_name_snake_cased}s: "
-                         f"List[{message_name}BaseModel | {message_name}] | None = None\n")
+                    if cache_as_dict_with_key_field is None:
+                        output_str += \
+                            (f"\t\tself._{message_name_snake_cased}s: "
+                             f"List[{message_name}BaseModel | {message_name}] | None = None\n")
+                    else:
+                        key_field_name = cache_as_dict_with_key_field.split(".")[-1]
+                        output_str += \
+                            (f"\t\tself._{key_field_name}_to_{message_name_snake_cased}_dict: "
+                             f"Dict[Any, {message_name}BaseModel | {message_name}] | None = None\n")
                     output_str += \
                         f"\t\tself._{message_name_snake_cased}s_update_date_time: DateTime = DateTime.utcnow()\n\n"
                 else:
@@ -465,10 +498,14 @@ class StratExecutorPlugin(BaseProtoPlugin):
                 StratExecutorPlugin.get_complex_option_value_from_proto(
                     message, StratExecutorPlugin.flux_msg_executor_options)
             is_repeated = option_value_dict.get(StratExecutorPlugin.executor_option_is_repeated_field)
+            cache_as_dict_with_key_field: str = (
+                option_value_dict.get(StratExecutorPlugin.executor_option_cache_as_dict_with_key_field))
 
             if message not in self.ws_manager_required_top_lvl_messages:
-                output_str += self._strat_cache_get_model_interface_content(message, is_repeated)
-                output_str += self._strat_cache_set_model_interface_content(message, is_repeated)
+                output_str += self._strat_cache_get_model_interface_content(message, is_repeated,
+                                                                            cache_as_dict_with_key_field)
+                output_str += self._strat_cache_set_model_interface_content(message, is_repeated,
+                                                                            cache_as_dict_with_key_field)
 
         return output_str
 

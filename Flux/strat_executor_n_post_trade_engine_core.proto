@@ -123,7 +123,8 @@ message OrderSnapshot{
     ExecutorKeyCounts: 1,
     ExecutorKeySequence: "order_brief.security.sec_id-order_brief.side",
     LogKeySequence: "order_brief.order_id-order_status",
-    IsRepeated: true
+    IsRepeated: true,
+    CacheAsDictWithKeyField: "order_brief.order_id"
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";

@@ -177,6 +177,9 @@ message StratStatus{
   option (FluxMsgJsonQuery) = {
     QueryName: "put_strat_to_snooze",
   };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "put_strat_to_pause_if_active",
+  };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
   required StratState strat_state = 2 [default = StratState_UNSPECIFIED, (FluxFldButton) = {
@@ -316,8 +319,9 @@ message CancelOrder{
     IsWebSocketModel: true,
     EnableNotifyAll: true,
     IsTopLvlModel: false,
-    ExecutorKeySequence: "security.sec_id-side"
-    IsRepeated: true
+    ExecutorKeySequence: "security.sec_id-side",
+    IsRepeated: true,
+    CacheAsDictWithKeyField: "order_id"
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string order_id = 2;
@@ -358,8 +362,8 @@ message ExecutorCheckSnapshot{
 
 message LastNSecMarketTradeVol{
   option (FluxMsgJsonQuery) = {
-    QueryName: "get_last_n_sec_total_qty",
-    AggregateVarName: "get_last_n_sec_total_qty",
+    QueryName: "get_last_n_sec_total_trade_qty",
+    AggregateVarName: "get_last_n_sec_total_trade_qty",
     QueryParams: "symbol",
     QueryParams: "last_n_sec",
     QueryParamsDataType: "str",

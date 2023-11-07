@@ -1566,7 +1566,6 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-# tests for not implemented limits
 def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                       pair_strat_, expected_strat_limits_,
                                                       expected_start_status_, symbol_overview_obj_list,
@@ -1693,6 +1692,7 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
                                                                                 sell_symbol, executor_http_client,
                                                                                 last_order_id=last_sell_order_id)
             last_sell_order_id = new_order_journal.order.order_id
+
         return executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id
     except AssertionError as e:
         raise AssertionError(e)
@@ -1745,6 +1745,11 @@ def handle_place_single_side_orders_for_portfolio_limits_test(buy_symbol: str, s
                                                                                     buy_symbol, executor_http_client,
                                                                                     last_order_id=last_order_id)
                 last_order_id = new_order_journal.order.order_id
+
+                # Checking if fills found
+                time.sleep(10)
+                get_latest_fill_journal_from_order_id(last_order_id, executor_http_client)
+
         else:
             # Placing sell orders
             last_order_id = None
@@ -1756,6 +1761,8 @@ def handle_place_single_side_orders_for_portfolio_limits_test(buy_symbol: str, s
                                                                                     sell_symbol, executor_http_client,
                                                                                     last_order_id=last_order_id)
                 last_order_id = new_order_journal.order.order_id
+                time.sleep(10)
+                get_latest_fill_journal_from_order_id(last_order_id, executor_http_client)
 
         if order_side == Side.BUY:
             return executor_http_client, buy_symbol, sell_symbol, last_order_id
@@ -1863,9 +1870,9 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
                                             max_loop_count_per_side, expected_portfolio_limits_):
     # INFO:
     # Test sets max_open_notional_per_side = 45_000, first triggers 2 strat_executors and places 2 orders BUY side
-    # from each executor, these 4 must pass for positive check, then one more BUY order is placed side in
-    # any executor and post this new order journal limit must get breached and pause-all strats must
-    # get called + alert must be created in portfolio_alerts
+    # from each executor, these 4 must pass for positive check and fourth order must breach limit and as a result
+    # all-strat pause also should get triggered, then one more BUY order place is tried but that should get ignored
+    # due to all strat pause + alert must be created in portfolio_alerts
 
     # Updating portfolio limits
     expected_portfolio_limits_.max_open_notional_per_side = 45_000
@@ -1890,8 +1897,8 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
             executor_http_clients_n_last_order_id_tuple_list.append(
                 (executor_http_client, buy_symbol, sell_symbol, last_buy_order_id))
 
-    # Till this point since max_open_notional_per_side limits is not breached all orders must have been
-    # placed but next new order must trigger all strat-pause, checking that now...
+    # Till this point, since last order must have breached max_open_notional_per_side limits, all strat-pause must
+    # have been triggered and next order must get ignored, checking that now...
 
     for executor_http_client, buy_symbol, sell_symbol, last_buy_order_id in (
             executor_http_clients_n_last_order_id_tuple_list):
@@ -1939,10 +1946,10 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
                                              top_of_book_list_, buy_order_, sell_order_,
                                              max_loop_count_per_side, expected_portfolio_limits_):
     # INFO:
-    # Test sets max_open_notional_per_side = 54_000, first triggers 2 strat_executors and places 2 orders BUY side
-    # from each executor, these 4 must pass for positive check, then one more order is placed per side in
-    # each executor and post this new order journal limit must get breached and pause-all strats must
-    # get called + alert must be created in portfolio_alerts
+    # Test sets max_open_notional_per_side = 38_500, first triggers 2 strat_executors and places 2 orders BUY side
+    # from each executor, these 4 must pass for positive check and fourth order must breach limit and as a result
+    # all-strat pause also should get triggered, then one more BUY order place is tried but that should get ignored
+    # due to all strat pause + alert must be created in portfolio_alerts
 
     # Updating portfolio limits
     expected_portfolio_limits_.max_open_notional_per_side = 38_500
@@ -1967,8 +1974,8 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
             executor_http_clients_n_last_order_id_tuple_list.append(
                 (executor_http_client, buy_symbol, sell_symbol, last_sell_order_id))
 
-    # Till this point since max_open_notional_per_side limits is not breached all orders must have been
-    # placed but next new order must trigger all strat-pause, checking that now...
+    # Till this point, since last order must have breached max_open_notional_per_side limits, all strat-pause must
+    # have been triggered and next order must get ignored, checking that now...
 
     for executor_http_client, buy_symbol, sell_symbol, last_sell_order_id in (
             executor_http_clients_n_last_order_id_tuple_list):
@@ -1979,6 +1986,7 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
         # will raise assertion internally if new order found
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol,
                                                                             executor_http_client,
+                                                                            expect_no_order=True,
                                                                             last_order_id=last_sell_order_id)
         break
 
@@ -2195,7 +2203,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
     # Test has rolling_max_order_count.max_rolling_tx_count = 8 and
     # rolling_max_order_count.rolling_tx_count_period_seconds = 10000 that means within 10000 secs 9th rej
     # will trigger all strat-pause. Test will create 2 strats and will place 2 order each side to equal threshold of
-    # 8 rej orders after which one more order will be placed per side from any executor so one must trigger
+    # 8 rej orders after which one more order will be placed per side from any executor so, one must trigger
     # all strat-pause and other must get ignored since strats got paused + alert must be present in portfolio alerts
 
     # Updating portfolio limits
@@ -2308,7 +2316,7 @@ def test_all_strat_pause_for_max_reject_limit_breach(
                 (executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id))
 
     # Placing on more rej order that must trigger auto-kill_switch
-    # (Placed order will be rej by simulator because of continues_special_order_count)
+    # (Placed order will be rej type by simulator because of continues_special_order_count)
     executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id = (
         executor_http_clients_n_last_order_id_tuple_list)[0]
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
@@ -2318,7 +2326,7 @@ def test_all_strat_pause_for_max_reject_limit_breach(
                                                                            executor_http_client,
                                                                            last_order_id=last_buy_rej_id)
 
-    time.sleep(5)
+    time.sleep(10)
     # Checking alert in portfolio_alert
     check_str: str = "max_allowed_rejection_within_period breached"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"

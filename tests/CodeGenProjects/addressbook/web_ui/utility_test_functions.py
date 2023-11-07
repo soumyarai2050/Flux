@@ -3,7 +3,7 @@ from typing import Optional
 from selenium import webdriver
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support.wait import WebDriverWait
-from selenium.common import NoSuchElementException
+from selenium.common import NoSuchElementException, ElementNotInteractableException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
@@ -49,7 +49,7 @@ def get_web_project_url():
 
 def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
-    driver.execute_script('arguments[0].scrollIntoView(true)', strat_collection_widget)
+    scroll_into_view(driver=driver, element=strat_collection_widget)
     time.sleep(Delay.SHORT.value)
     strat_collection_widget.find_element(By.NAME, "Create").click()
     time.sleep(Delay.SHORT.value)
@@ -485,6 +485,24 @@ def get_widgets_by_flux_property(schema_dict: Dict[str, any], widget_type: Widge
                 ref_list: List[str] = ref_path.split("/")[1:]
                 child_schema: Dict[str, any] = schema_dict[ref_list[0]][ref_list[1]] if len(ref_list) == 2 \
                     else schema_dict[ref_list[0]]
+
+                # Check if flux_property is enabled in the complex type
+                if flux_property in field_properties:
+                    # If enabled, apply it to all fields within the complex type
+                    for child_field, child_field_properties in child_schema["properties"].items():
+                        parent_title: str | None = field_properties.get("parent_title")
+                        if (flux_property not in child_field_properties or
+                                parent_title != field_properties["title"].replace(" ", "_")):
+                            if parent_title is None:
+                                child_field_properties["parent_title"] = field_properties["title"].replace(" ", "_")
+                            else:
+                                parent_title = parent_title.replace(" ", "_")
+                                child_parent_title: str = field_properties["title"]
+                                child_parent_title = child_parent_title.replace(" ", "_")
+                                child_field_properties["parent_title"] = parent_title + "." + child_parent_title
+                            child_field_properties[flux_property] = field_properties[flux_property]
+
+                # Recursively search the child schema
                 search_schema_for_flux_property(child_schema)
 
     widget_queries: List[WidgetQuery] = []
@@ -581,11 +599,6 @@ def switch_layout(widget: WebElement, layout: Layout) -> None:
         time.sleep(Delay.SHORT.value)
         btn_name_element = widget.find_element(By.NAME, btn_name)
         btn_name_element.click()
-        # wait = WebDriverWait(widget, 15)
-        # if layout == Layout.TREE:
-        #     wait.until(EC.text_to_be_present_in_element((By.NAME, "Layout"), "Layout: UI_TREE"))
-        # elif layout == Layout.TABLE:
-        #     wait.until(EC.text_to_be_present_in_element((By.NAME, "Layout"), "Layout: UI_TABLE"))
     except NoSuchElementException as e:
         raise Exception(f"failed to switch to layout: {layout};;; exception: {e}")
 
@@ -638,18 +651,11 @@ def select_n_unselect_checkbox(driver: WebDriver, inner_text: str) -> None:
             time.sleep(Delay.DEFAULT.value)
             break
 
-# def select_n_unselect_checkbox(widget: WebElement, driver: WebDriver, inner_text: str):
-#     settings_dropdown = driver.find_element(By.CLASS_NAME, "")
-#
-#     pass
-
-
 def get_default_field_value(widget: WebElement, layout: Layout, xpath: str) -> str:
     if layout == Layout.TABLE:
         input_td_xpath: str = get_table_input_field_xpath(xpath=xpath)
         input_td_element = widget.find_element(By.XPATH, input_td_xpath)
         input_td_element.click()
-        time.sleep(2)
         input_element = input_td_element.find_element(By.TAG_NAME, "input")
         get_field_value = input_element.get_attribute('value')
         input_element.send_keys(Keys.ENTER)
@@ -704,15 +710,16 @@ def validate_property_that_it_contain_val_min_val_max_or_none(schema_dict, widge
             else:
                 return str(1000.5)
 
-
 def validate_table_cell_enabled_or_not(widget: WebElement, xpath: str) -> bool:
     try:
         input_td_xpath: str = get_table_input_field_xpath(xpath=xpath)
         input_td_element = widget.find_element(By.XPATH, input_td_xpath)
-        input_td_element.click()
-        widget.click()
+        # input_td_element.click()
+        # input_td_element.send_keys(Keys.ENTER)
         return True
     except NoSuchElementException:
+        return False
+    except ElementNotInteractableException:
         return False
 
 
@@ -724,7 +731,8 @@ def count_fields_in_tree(widget: WebElement) -> List[str]:
     return field_names
 
 
-def get_commonkey_items(widget: WebElement) -> dict:
+def get_commonkey_items(widget: WebElement) -> Dict[str, any]:
+
     common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
     common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__ny8Fj")
     common_key_items: Dict[str] = {}
@@ -734,17 +742,6 @@ def get_commonkey_items(widget: WebElement) -> dict:
         value = common_key_item_txt[1]
         common_key_items[key] = value
     return common_key_items
-
-
-# def get_flux_fld_number_format_in_tree_layout(widget: WebElement, xpath: str) -> str:
-#     xpath: str = f"//div['@data-xpath'='{xpath}']"
-#     div_element = widget.find_element(By.XPATH, xpath)
-#     div_element.click()
-#     time.sleep(2)
-#     mui_element = div_element.find_element(By.CLASS_NAME, "MuiInputAdornment-root")
-#     number_format = mui_element.find_element(By.TAG_NAME, "p")
-#     number_format_txt = number_format.text
-#     return number_format_txt
 
 
 def get_flux_fld_number_format(widget: WebElement, xpath: str, layout: Layout) -> str:
@@ -867,6 +864,7 @@ def click_on_continue_editing_btn(widget: WebElement) -> None:
 
 
 def get_common_keys(widget: WebElement) -> List[str]:
+
     common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
     name: str = "CommonKeyWidget_item__ny8Fj"
     common_key_elements: List[WebElement] = common_key_widget.find_elements(By.CLASS_NAME, name)
@@ -874,7 +872,7 @@ def get_common_keys(widget: WebElement) -> List[str]:
     common_keys_text = []
     for key_element in common_key_elements:
         span_element = key_element.find_element(By.TAG_NAME, "span")
-        common_keys_text.append(span_element.text)
+        common_keys_text.append(span_element.text.split(":")[0])
     return common_keys_text
 
 
@@ -1092,8 +1090,8 @@ def click_button_with_name(widget: WebElement, button_name: str):
     time.sleep(Delay.SHORT.value)
 
 
-def flux_fld_default_widget(schema_dict: Dict, widget: WebElement, widget_type: WidgetType, widget_name: str, layout: Layout,
-                            field_query):
+def flux_fld_default_widget(schema_dict: Dict, widget: WebElement, widget_type: WidgetType, widget_name: str,
+                            layout: Layout, field_query):
     field_name: str = field_query.field_name
     default_value: str = field_query.properties['default']
     if (field_name != "bkr_disable" and field_name != "pos_disable" and field_name != "sec_type" and
@@ -1126,7 +1124,7 @@ def get_placeholder_from_element(widget: WebElement, id: str):
     return input_element.get_attribute('placeholder')
 
 
-def flux_fld_sequence_number_in_widget(result, driver: WebDriver, widget_type: WidgetType):
+def flux_fld_sequence_number_in_widget(result: List[WidgetQuery], driver: WebDriver, widget_type: WidgetType):
     for widget_query in result:
         driver.refresh()
         time.sleep(Delay.SHORT.value)
@@ -1162,3 +1160,52 @@ def flux_fld_sequence_number_in_widget(result, driver: WebDriver, widget_type: W
             previous_field_sequence_value = field_sequence_value
 
             assert sequence_number == field_sequence_value
+
+
+def flux_fld_ui_place_holder_in_widget(result: List[WidgetQuery], driver: WebDriver):
+    for widget_query in result:
+        driver.refresh()
+        time.sleep(Delay.SHORT.value)
+        widget_name: str = widget_query.widget_name
+        widget: WebElement = driver.find_element(By.ID, widget_name)
+
+        if widget_name == "strat_status":
+            scroll_into_view(driver=driver, element=widget)
+            click_button_with_name(widget=widget, button_name="Create")
+            switch_layout(widget=widget, layout=Layout.TREE)
+            time.sleep(Delay.SHORT.value)
+            widget.find_element(By.XPATH, '//*[@id="strat_status"]/div/div/div/ul/div[27]/div[2]/button').click()
+            widget.find_element(By.XPATH, '//*[@id="strat_status"]/div/div/div/ul/div[27]/div[2]').click()
+        elif widget_name == "pair_strat_params":
+
+            strat_collection_widget = driver.find_element(By.ID, "strat_collection")
+            click_button_with_name(widget=strat_collection_widget, button_name="Create")
+            scroll_into_view(driver=driver, element=widget)
+            switch_layout(widget=widget, layout=Layout.TREE)
+            time.sleep(Delay.SHORT.value)
+            widget.find_element(By.XPATH, '//*[@id="pair_strat_params"]/div/div/div/ul/ul/div[2]/div[2]/button').click()
+            widget.find_element(By.XPATH, '//*[@id="pair_strat_params"]/div/div/div/ul/ul/div[2]/div[2]').click()
+        else:
+            scroll_into_view(driver=driver, element=widget)
+            click_button_with_name(widget=widget, button_name="Create")
+            switch_layout(widget=widget, layout=Layout.TREE)
+            time.sleep(Delay.SHORT.value)
+
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            placeholder: str = get_placeholder_from_element(widget=widget, id=field_name)
+            default_placeholder: str = field_query.properties['ui_placeholder']
+
+            assert default_placeholder == placeholder
+
+
+def get_element_text_list_from_filter_popup(driver: WebDriver) -> List[str]:
+    container: WebElement = driver.find_element(By.CLASS_NAME, "MuiDialogContent-root")
+
+    # Find all <span> elements within the container
+    elements = container.find_elements(By.CLASS_NAME, "DynamicMenu_filter_name__OdQVe")
+
+    # Get the text of each element and store in a list
+    element_texts: List[str] = [element.text.replace(" ", "_") for element in elements]
+
+    return element_texts

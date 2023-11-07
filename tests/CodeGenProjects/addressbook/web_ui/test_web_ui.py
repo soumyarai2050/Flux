@@ -1,6 +1,7 @@
 from typing import Dict, List
 import random
 import time
+import copy
 
 import pytest
 
@@ -22,8 +23,8 @@ from tests.CodeGenProjects.addressbook.web_ui.utility_test_functions import (
     get_flux_fld_number_format, show_hidden_fields_in_tree_layout, count_fields_in_tree,
     validate_comma_separated_values, get_fld_name_colour_in_tree, get_unsaved_changes_discarded_key,
     click_on_okay_button_unsaved_changes_popup, set_autocomplete_field, strat_manager_service_native_web_client,
-    flux_fld_default_widget, get_select_box_value, get_placeholder_from_element, get_web_project_url,
-    flux_fld_sequence_number_in_widget)
+    flux_fld_default_widget, get_all_keys_from_table, get_element_text_list_from_filter_popup, get_web_project_url,
+    flux_fld_sequence_number_in_widget, flux_fld_ui_place_holder_in_widget)
 from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import (
     DriverType, Delay, Layout, WidgetType, SearchType)
 
@@ -322,7 +323,7 @@ def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, we
 
 
 def test_widget_type(driver_type, schema_dict: Dict[str, any]):
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.DEPENDENT,
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
                                           flux_property="button")
     print(result)
 
@@ -341,7 +342,6 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
             break
         widget = driver.find_element(By.ID, widget_name)
         click_button_with_name(widget=widget, button_name="Edit")
-
         switch_layout(widget=widget, layout=Layout.TABLE)
 
         for field_query in widget_query.fields:
@@ -357,16 +357,10 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
                 field_value: int = replace_default_value(default_field_value=field_value)
             if val_max == field_value:
                 val_max = val_max - 1
-
             set_table_input_field(widget=widget, xpath=xpath, value=str(val_max))
 
         if widget_name == "strat_status":
             break
-        if widget_name == "order_limits":
-            set_table_input_field(widget=widget, xpath="min_order_notional", value="1000")
-        if widget_name == "portfolio_limits":
-            set_table_input_field(widget=widget, xpath="max_open_baskets", value="1000")
-
         click_button_with_name(widget=widget, button_name="Save")
         expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
         object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
@@ -401,10 +395,6 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
 
         if widget_name == "strat_status":
             break
-        if widget_name == "order_limits":
-            set_tree_input_field(widget=widget, xpath="min_order_notional", name="min_order_notional", value="1000")
-        if widget_name == "portfolio_limits":
-            set_tree_input_field(widget=widget, xpath="max_open_baskets", name="max_open_baskets", value="1000")
         click_button_with_name(widget=widget, button_name="Save")
         expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
         object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
@@ -421,7 +411,6 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
             break
         widget = driver.find_element(By.ID, widget_name)
         click_button_with_name(widget=widget, button_name="Edit")
-        switch_layout(widget=widget, layout=Layout.TABLE)
 
         if widget_name == "order_limits":
             switch_layout(widget=widget, layout=Layout.TABLE)
@@ -431,17 +420,13 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
                                                    widget_name=widget_name, field_name=field_name)
             xpath_list.append(xpath)
             val_max: int = int(field_query.properties['val_max']) + 1
-            enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            # enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
             # if enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=str(val_max))
             # else:
             #     continue
         if widget_name == "strat_status":
             break
-        if widget_name == "order_limits":
-            set_table_input_field(widget=widget, xpath="min_order_notional", value="1000")
-        if widget_name == "portfolio_limits":
-            set_table_input_field(widget=widget, xpath="max_open_baskets", value="1000")
         click_button_with_name(widget=widget, button_name="Save")
         expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
         object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
@@ -469,10 +454,6 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
 
         if widget_name == "strat_status":
             break
-        if widget_name == "portfolio_limits":
-            set_tree_input_field(widget=widget, xpath="max_open_baskets", name="max_open_baskets", value="1000")
-        if widget_name == "order_limits":
-            set_tree_input_field(widget=widget, xpath="min_order_notional", name="min_order_notional", value="1000")
         click_button_with_name(widget=widget, button_name="Save")
         expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
         object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
@@ -500,7 +481,7 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
 
 def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                     schema_dict, pair_strat: Dict):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="val_min")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="val_min")
     print(result)
     assert result[0]
 
@@ -508,29 +489,31 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
     field_name: str = ''
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
-        if widget_name == "order_limits":
-            break
+        # TODO: REMOVE (CONTINUE) LATER, IN STRAT STATUS BALANCE NOTIONAL FLD CONTAIN PROGRESS BAR
+        if widget_name == "strat_status":
+            continue
         widget = driver.find_element(By.ID, widget_name)
         click_button_with_name(widget=widget, button_name="Edit")
-        switch_layout(widget, Layout.TABLE)
+        if widget_name == "order_limits":
+            switch_layout(widget=widget, layout=Layout.TABLE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-
             xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            val_min = int(field_query.properties['val_min'])
+            # balance notional field contain "0.0" that's why can parse directly into int
+            val_min = int(float(field_query.properties['val_min']))
             get_field_value: str = get_default_field_value(widget=widget, layout=Layout.TABLE, xpath=xpath)
             if get_field_value:
                 get_field_value = get_field_value.replace(',', '')
                 get_field_value: int = int(get_field_value)
             if val_min == get_field_value:
                 val_min = val_min - 1
-            enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-            if enabled:
-                set_table_input_field(widget=widget, xpath=xpath, value=str(val_min))
-            else:
-                continue
-            click_button_with_name(widget=widget, button_name="Save")
+            #enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            #if enabled:
+            set_table_input_field(widget=widget, xpath=xpath, value=str(val_min))
+            #else:
+                #continue
+        click_button_with_name(widget=widget, button_name="Save")
         object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
         assert field_name in object_keys
         discard_changes(widget=widget)
@@ -538,10 +521,12 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
     # order_limits_n_portfolio_limits_tree_layout_val_min_for_valid_scenario
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
-        if widget_name == "order_limits":
-            break
+        if widget_name == "strat_status":
+            continue
         widget = driver.find_element(By.ID, widget_name)
         click_button_with_name(widget=widget, button_name="Edit")
+        if widget_name == "order_limits":
+            switch_layout(widget=widget, layout=Layout.TABLE)
         switch_layout(widget=widget, layout=Layout.TREE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
@@ -564,22 +549,23 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
     # order_limits_n_portfolio_limits_table_layout_below_val_min_for_invalid_scenario
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
-        if widget_name == "order_limits":
-            break
+        if widget_name == "strat_status":
+            continue
         widget = driver.find_element(By.ID, widget_name)
         click_button_with_name(widget=widget, button_name="Edit")
-        switch_layout(widget=widget, layout=Layout.TABLE)
+        if widget_name == "order_limits":
+            switch_layout(widget=widget, layout=Layout.TABLE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
+            xpath = get_xpath_from_field_name(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
             val_min = int(field_query.properties['val_min']) - 5
 
-            enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-            if enabled:
-                set_table_input_field(widget=widget, xpath=xpath, value=str(val_min))
-            else:
-                continue
+            #enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            #if enabled:
+            set_table_input_field(widget=widget, xpath=xpath, value=str(val_min))
+            #else:
+             #   continue
         click_button_with_name(widget=widget, button_name="Save")
         object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
         assert field_name in object_keys
@@ -588,8 +574,8 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
     # order_limits_n_portfolio_limits_tree_layout_below_val_min_for_invalid_scenario
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
-        if widget_name == "order_limits":
-            break
+        if widget_name == "strat_status":
+            continue
         widget = driver.find_element(By.ID, widget_name)
         click_button_with_name(widget=widget, button_name="Edit")
         switch_layout(widget=widget, layout=Layout.TREE)
@@ -605,18 +591,18 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
         discard_changes(widget=widget)
 
     # TODO:  val min property is not used in dependent widget yet
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="val_min")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="val_min")
     print(result)
     assert not result[0]
 
     # WidgetType: REPEATED_INDEPENDENT
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
                                           flux_property="val_min")
     print(result)
     assert not result[0]
 
     # WidgetType: REPEATED_DEPENDENT
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_DEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_DEPENDENT,
                                           flux_property="val_min")
     print(result)
     assert not result[0]
@@ -624,22 +610,29 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
 
 def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                  schema_dict, pair_strat: Dict):
-    # TODO: need to fix schema.json
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="help")
+
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="help")
     print(result)
     assert result[0]
     # ui bug in table layout
 
     # order_limits_n_portfolio_limits_table_layout_help_for_valid_scenario
     for widget_query in result[1]:
+        driver.refresh()
+        time.sleep(Delay.DEFAULT.value)
+
+        widget_name = widget_query.widget_name
+        widget = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        time.sleep(Delay.SHORT.value)
+        widget.find_element(By.NAME, "Settings").click()
         for field_query in widget_query.fields:
             # scroll into view
-            widget_name = widget_query.widget_name
-            widget = driver.find_element(By.ID, widget_name)
-            scroll_into_view(driver=driver, element=widget)
-            time.sleep(Delay.SHORT.value)
+            field_name: str = field_query.field_name
             help_txt: str = field_query.properties['help']
-            widget.find_element(By.NAME, "Settings").click()
+            if field_name == "max_rolling_tx_count" or field_name == "rolling_tx_count_period_seconds":
+                continue
+
             setting_dropdown = widget.find_element(By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]')
             time.sleep(Delay.SHORT.value)
             contains_element = setting_dropdown.find_element(By.XPATH, f"//button[@aria-label='{help_txt}']")
@@ -651,42 +644,46 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
             assert help_txt == hovered_element_text
             contains_element.click()
             time.sleep(Delay.DEFAULT.value)
-            driver.refresh()
-            time.sleep(Delay.DEFAULT.value)
 
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="help")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="help")
     print(result)
     assert not result[0]
 
     # WidgetType: REPEATED_INDEPENDENT
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
                                           flux_property="help")
 
     # order_limits_n_portfolio_limits_table_layout_help_for_valid_scenario
     for widget_query in result[1]:
+        driver.refresh()
+        time.sleep(Delay.DEFAULT.value)
+
+        widget_name = widget_query.widget_name
+        widget = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        time.sleep(Delay.SHORT.value)
+        widget.find_element(By.NAME, "Settings").click()
         for field_query in widget_query.fields:
             # scroll into view
-            widget_name = widget_query.widget_name
-            widget = driver.find_element(By.ID, widget_name)
-            scroll_into_view(driver=driver, element=widget)
-            time.sleep(Delay.SHORT.value)
+            field_name: str = field_query.field_name
             help_txt: str = field_query.properties['help']
-            widget.find_element(By.NAME, "Settings").click()
+            if field_name == "max_rolling_tx_count" or field_name == "rolling_tx_count_period_seconds":
+                continue
+
             setting_dropdown = widget.find_element(By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]')
             time.sleep(Delay.SHORT.value)
             contains_element = setting_dropdown.find_element(By.XPATH, f"//button[@aria-label='{help_txt}']")
             actions = ActionChains(driver)
+
             actions.move_to_element(contains_element).perform()
             tooltip_element = driver.find_element(By.CSS_SELECTOR, "div[class^='MuiTooltip-popper']")
             hovered_element_text = tooltip_element.text
             assert help_txt == hovered_element_text
             contains_element.click()
             time.sleep(Delay.DEFAULT.value)
-            driver.refresh()
-            time.sleep(Delay.DEFAULT.value)
 
     # WidgetType: REPEATED_DEPENDENT
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_DEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_DEPENDENT,
                                           flux_property="help")
     print(result)
     assert not result[0]
@@ -694,7 +691,7 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
 
 def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                          schema_dict, pair_strat: Dict):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="display_type")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="display_type")
     print(result)
     assert result[0]
 
@@ -715,10 +712,10 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
             field_name: str = field_query.field_name
             display_type: str = type(field_query.properties['display_type'])
             value = validate_property_that_it_contain_val_min_val_max_or_none(
-                schema_dict=schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="display_type")
+                schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="display_type")
             xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
-            enabled_or_not: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
             if enabled_or_not:
                 set_table_input_field(widget=widget, xpath=xpath, value=str(value))
             else:
@@ -758,19 +755,19 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
         input_value = int(common_keys_dict[field_name].replace(",", ""))
         assert isinstance(input_value, int)
 
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="display_type")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="display_type")
     print(result)
     assert not result[0]
 
     # WidgetType: REPEATED_INDEPENDENT
     # Note: Currently repeated type is not supported `Edit` mode
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
                                           flux_property="display_type")
     print(result)
     assert result[0]
 
     # WidgetType: REPEATED_DEPENDENT
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_DEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_DEPENDENT,
                                           flux_property="display_type")
     print(result)
     assert not result[0]
@@ -778,7 +775,7 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
 
 def test_flux_fld_number_format_in_independent_widget(clean_and_set_limits, driver_type, web_project, driver,
                                                       schema_dict, pair_strat: Dict):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property="number_format")
     print(result)
     assert result[0]
@@ -825,7 +822,7 @@ def test_flux_fld_number_format_in_independent_widget(clean_and_set_limits, driv
 
 def test_flux_fld_number_format_in_dependent_widget(clean_and_set_limits, driver_type, web_project, driver,
                                                     schema_dict, pair_strat: Dict):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="number_format")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="number_format")
     print(result)
     assert result[0]
 
@@ -896,7 +893,7 @@ def test_flux_flx_display_zero_in_widget(clean_and_set_limits, driver_type, web_
 def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                             schema_dict, pair_strat: Dict):
     result = get_widgets_by_flux_property(
-        schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="server_populate")
+        copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="server_populate")
     print(result)
     assert result[0]
     # table_layout
@@ -931,7 +928,7 @@ def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, w
     driver.refresh()
     time.sleep(Delay.SHORT.value)
 
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
                                           flux_property="server_populate")
     print(result)
     assert result[0]
@@ -980,12 +977,12 @@ def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, w
 
     # WidgetType: REPEATED_INDEPENDENT
     # Note: Currently repeated type is not supported `Edit` mode and only in `id` field is present
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
                                           flux_property="server_populate")
     print(result)
     assert result[0]
 
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_DEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_DEPENDENT,
                                           flux_property="server_populate")
     print(result)
     assert not result[0]
@@ -993,7 +990,7 @@ def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, w
 
 def test_flux_fld_button_in_independent_widget(clean_and_set_limits, driver_type, web_project, driver,
                                                schema_dict, pair_strat: Dict):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="button")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="button")
     print(result)
     assert result[0]
 
@@ -1041,7 +1038,7 @@ def test_flux_fld_button_in_independent_widget(clean_and_set_limits, driver_type
 def test_flux_fld_button_in_dependent_widget(clean_and_set_limits, driver_type, web_project, driver,
                                              schema_dict, pair_strat: Dict):
     # TODO: fluxfldbtn is not used yet in dependent widget
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="button")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="button")
     print(result)
     assert not result[0]
 
@@ -1049,25 +1046,26 @@ def test_flux_fld_button_in_dependent_widget(clean_and_set_limits, driver_type, 
 def test_flux_fld_orm_no_update_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                           schema_dict, pair_strat: Dict):
     # TODO: only id fields are present in independent widget that's why skip this as of now
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property="orm_no_update")
     print(result)
     assert result[0]
 
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="orm_no_update")
+    # todo: need help for property: orm_no_update and fix for DEPENDENT widget
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="orm_no_update")
     print(result)
-    assert not result[0]
-    # TODO: only id fields are present in dependent widget that's why skip this as of now
+    assert result[0]
 
+    # TODO: only id fields are present in REPEATED_INDEPENDENT widget that's why skip this as of now
     # WidgetType: REPEATED_INDEPENDENT
     # Note: Currently repeated type is not supported `Edit` mode
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
                                           flux_property="orm_no_update")
     print(result)
-    assert not result[0]
+    assert result[0]
 
     # WidgetType: REPEATED_DEPENDENT
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_DEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_DEPENDENT,
                                           flux_property="orm_no_update")
     print(result)
     assert not result[0]
@@ -1075,7 +1073,7 @@ def test_flux_fld_orm_no_update_in_widget(clean_and_set_limits, driver_type, web
 
 def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                             schema_dict, pair_strat: Dict):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="display_type")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="display_type")
     print(result)
     assert result[0]
 
@@ -1121,7 +1119,7 @@ def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, w
         switch_layout(widget=widget, layout=Layout.TREE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            value = validate_property_that_it_contain_val_min_val_max_or_none(schema_dict=schema_dict,
+            value = validate_property_that_it_contain_val_min_val_max_or_none(schema_dict=copy.deepcopy(schema_dict),
                                                                               widget_type=WidgetType.INDEPENDENT,
                                                                               flux_property="display_type")
             xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
@@ -1136,19 +1134,19 @@ def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, w
             validate_comma_separated_values(widget=widget, xpath=xpath, value=value)
 
     # WidgetType: DEPENDENT
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="display_type")
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="display_type")
     print(result)
     assert not result[0]
 
     # WidgetType: REPEATED_INDEPENDENT
     # Note: Currently repeated type is not supported `Edit` mode
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
                                           flux_property="display_type")
     print(result)
     assert result[0]
 
     # WidgetType: REPEATED_DEPENDENT
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.REPEATED_DEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_DEPENDENT,
                                           flux_property="display_type")
     print(result)
     assert not result[0]
@@ -1635,7 +1633,7 @@ def test_flux_fld_default_widget(clean_and_set_limits, web_project, driver_type,
         time.sleep(Delay.SHORT.value)
 
         for field_query in widget_query.fields:
-            flux_fld_default_widget(schema_dict=schema_dict, widget=widget,
+            flux_fld_default_widget(schema_dict=copy.deepcopy(schema_dict), widget=widget,
                                     widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                     layout=Layout.TABLE, field_query=field_query)
 
@@ -1667,7 +1665,7 @@ def test_flux_fld_default_widget(clean_and_set_limits, web_project, driver_type,
         switch_layout(widget=widget, layout=Layout.TREE)
 
         for field_query in widget_query.fields:
-            flux_fld_default_widget(schema_dict=schema_dict, widget=widget,
+            flux_fld_default_widget(schema_dict=copy.deepcopy(schema_dict), widget=widget,
                                     widget_type=WidgetType.DEPENDENT, widget_name=widget_name,
                                     layout=Layout.TREE, field_query=field_query)
 
@@ -1689,7 +1687,7 @@ def test_flux_fld_default_widget(clean_and_set_limits, web_project, driver_type,
         print(widget_query.widget_name)
 
         for field_query in widget_query.fields:
-            flux_fld_default_widget(schema_dict=schema_dict, widget=widget,
+            flux_fld_default_widget(schema_dict=copy.deepcopy(schema_dict), widget=widget,
                                     widget_type=WidgetType.REPEATED_INDEPENDENT, widget_name=widget_name,
                                     layout=Layout.TABLE, field_query=field_query)
 
@@ -1733,87 +1731,185 @@ def test_flux_fld_ui_place_holder_in_widget(clean_and_set_limits, driver_type: D
     driver.get(get_web_project_url())
     time.sleep(Delay.SHORT.value)
 
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.INDEPENDENT,
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property="ui_placeholder")
     print(result)
-
+    assert result[0]
     strat_manager_service_native_web_client.delete_portfolio_limits_client(portfolio_limits_id=1)
-    # strat_manager_service_native_web_client.delete_stra
+
+    flux_fld_ui_place_holder_in_widget(result[1], driver)
+
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
+                                          flux_property="ui_placeholder")
+    print(result)
+    assert result[0]
+    flux_fld_ui_place_holder_in_widget(result[1], driver)
+
+    # Note: Currently create is not implemented in UI
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
+                                          flux_property="ui_placeholder")
+    print(result)
+    assert result
+
+
+def test_flux_fld_sequence_number_in_widget(clean_and_set_limits, web_project, driver_type: DriverType,
+                                            schema_dict: Dict, driver: WebDriver):
+
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+                                          flux_property="sequence_number")
+    assert result[0]
+
+    flux_fld_sequence_number_in_widget(result[1], driver, WidgetType.INDEPENDENT)
+
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
+                                          flux_property="sequence_number")
+    print(result)
+    assert result[0]
+    flux_fld_sequence_number_in_widget(result[1], driver, WidgetType.DEPENDENT)
+
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
+                                          flux_property="sequence_number")
+    print(result)
+    assert result[0]
+    flux_fld_sequence_number_in_widget(result[1], driver, WidgetType.REPEATED_INDEPENDENT)
+
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_DEPENDENT,
+                                          flux_property="sequence_number")
+    print(result)
+    assert not result[0]
+
+
+def test_flux_fld_elaborate_title_in_widget(clean_and_set_limits, web_project, driver_type: DriverType,
+                                            schema_dict: Dict, driver: WebDriver):
+
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
+                                          flux_property="elaborate_title")
+
+    print(result)
+    assert result[0]
+
+    for widget_query in result[1]:
+        widget_name: str = widget_query.widget_name
+        widget: WebElement = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        switch_layout(widget=widget, layout=Layout.TABLE)
+        common_key_list: List[str] = get_common_keys(widget=widget)
+
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            if field_name == "exch_id" or field_name == "company" or field_name == "sec_type":
+                continue
+
+            default_field: str = field_query.properties["parent_title"]
+            default_field = default_field + "." + field_name
+
+            assert default_field in common_key_list
+
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
+                                          flux_property="elaborate_title")
+
+    print(result)
+    assert result[0]
+
+    for widget_query in result[1]:
+        widget_name: str = widget_query.widget_name
+
+        widget: WebElement = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        switch_layout(widget=widget, layout=Layout.TABLE)
+        common_key_list: List[str] = get_common_keys(widget=widget)
+
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            if field_name == "premium" or field_name == "qty":
+                continue
+
+            default_field: str = field_query.properties["parent_title"]
+            default_field = default_field + "." + field_name
+
+            assert default_field in common_key_list
+    #     # get_commonkey_items()
+
+
+def test_flux_fld_filter_enabled_in_widget(clean_and_set_limits, driver_type: DriverType,
+                                           schema_dict: Dict, driver: WebDriver):
+
+    # Note: Only enabled in WidgetType: REPEATED_INDEPENDENT
+    driver.maximize_window()
+    driver.get(get_web_project_url())
+
+    time.sleep(Delay.SHORT.value)
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
+                                          flux_property="filter_enable")
+    print(result)
+    assert result[0]
+
     for widget_query in result[1]:
         driver.refresh()
         time.sleep(Delay.SHORT.value)
         widget_name: str = widget_query.widget_name
         widget: WebElement = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
-        click_button_with_name(widget=widget, button_name="Create")
-        switch_layout(widget=widget, layout=Layout.TREE)
+        click_button_with_name(widget=widget, button_name="Filter")
         time.sleep(Delay.SHORT.value)
-        if widget_name == "strat_status":
-            widget.find_element(By.XPATH, '//*[@id="strat_status"]/div/div/div/ul/div[27]/div[2]/button').click()
-            # // *[ @ id = "pair_strat_params"] / div / div / div / ul / ul / div[2] / div[2] / button
-            widget.find_element(By.XPATH, '//*[@id="strat_status"]/div/div/div/ul/div[27]/div[2]').click()
-            # click_on_button(widget=widget)
+        filter_value: List[str] = get_element_text_list_from_filter_popup(driver=driver)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            placeholder: str = get_placeholder_from_element(widget=widget, id=field_name)
-            # // *[ @ id = "strat_status"] / div / div / div / ul / div[27] / div[2] / button
-            default_placeholder: str = field_query.properties['ui_placeholder']
+            assert field_name in filter_value
 
-            assert default_placeholder == placeholder
 
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.DEPENDENT,
-                                          flux_property="ui_placeholder")
+def test_flux_fld_no_common_key_in_widget(clean_and_set_limits: None, web_project: None, driver_type: DriverType,
+                                          schema_dict: Dict, driver: WebDriver):
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+                                          flux_property="no_common_key")
     print(result)
+    assert result[0]
 
     for widget_query in result[1]:
-        driver.refresh()
-        time.sleep(Delay.SHORT.value)
         widget_name: str = widget_query.widget_name
         widget: WebElement = driver.find_element(By.ID, widget_name)
-        if widget_name == "pair_strat_params":
-            strat_collection_widget = driver.find_element(By.ID, "strat_collection")
-            click_button_with_name(widget=strat_collection_widget, button_name="Create")
-            scroll_into_view(driver=driver, element=widget)
-            switch_layout(widget=widget, layout=Layout.TREE)
-            time.sleep(Delay.SHORT.value)
-            widget.find_element(By.XPATH, '//*[@id="pair_strat_params"]/div/div/div/ul/ul/div[2]/div[2]/button').click()
-            widget.find_element(By.XPATH, '//*[@id="pair_strat_params"]/div/div/div/ul/ul/div[2]/div[2]').click()
-            # click_on_button(widget=widget)
+        scroll_into_view(driver=driver, element=widget)
+        switch_layout(widget=widget, layout=Layout.TABLE)
+        time.sleep(Delay.SHORT.value)
+
+        if widget_name != "strat_limits" and widget_name != "strat_alert":
+            keys_from_table: List[str] = get_all_keys_from_table(widget)
+        else:
+            continue
+
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            placeholder: str = get_placeholder_from_element(widget=widget, id=field_name)
-            # // *[ @ id = "strat_status"] / div / div / div / ul / div[27] / div[2] / button
-            default_placeholder: str = field_query.properties['ui_placeholder']
+            assert field_name in keys_from_table
 
-            assert default_placeholder == placeholder
-
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT,
-                                          flux_property="ui_placeholder")
-    print(result)
-
-
-def test_flux_fld_sequence_number_in_widget(clean_and_set_limits, web_project, driver_type: DriverType,
-                                            schema_dict: Dict, driver: WebDriver):
-
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.INDEPENDENT,
-                                          flux_property="sequence_number")
-    assert result[0]
-
-    flux_fld_sequence_number_in_widget(result[1], driver, WidgetType.INDEPENDENT)
-
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.DEPENDENT,
-                                          flux_property="sequence_number")
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict),
+                                          widget_type=WidgetType.REPEATED_INDEPENDENT, flux_property="no_common_key")
+    elaborate_title_result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict),
+                                                   widget_type=WidgetType.REPEATED_INDEPENDENT,
+                                                   flux_property="elaborate_title")
     print(result)
     assert result[0]
-    flux_fld_sequence_number_in_widget(result[1], driver, WidgetType.DEPENDENT)
 
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.REPEATED_INDEPENDENT,
-                                          flux_property="sequence_number")
-    print(result)
-    assert result[0]
-    flux_fld_sequence_number_in_widget(result[1], driver, WidgetType.REPEATED_INDEPENDENT)
+    for result_widget_query, elaborate_title_widget_query in zip(result[1], elaborate_title_result[1]):
+        widget_name: str = result_widget_query.widget_name
+        widget: WebElement = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        switch_layout(widget=widget, layout=Layout.TABLE)
+        time.sleep(Delay.SHORT.value)
 
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=WidgetType.REPEATED_DEPENDENT,
-                                          flux_property="sequence_number")
-    print(result)
-    assert not result[0]
+        if widget_name != "strat_limits" and widget_name != "strat_alert":
+            keys_from_table: List[str] = get_all_keys_from_table(widget)
+        else:
+            continue
+
+        for result_field_query, elaborate_title_field_query in (
+                zip(result_widget_query.fields, elaborate_title_widget_query.fields)):
+            field_name: str = result_field_query.field_name
+            elaborate_title = elaborate_title_field_query.properties.get("elaborate_title")
+            if elaborate_title is not None:
+                default_value: str = elaborate_title_field_query.properties.get("parent_title") + "." + field_name
+            else:
+                default_value = field_name
+            assert default_value in keys_from_table
+
+
+

@@ -120,6 +120,7 @@ message ExecutorUtilOptions{
   repeated string ExecutorKeySequence = 5; // field names delimited by '-'
   optional string LogKeySequence = 6; // field names delimited by '-'
   optional bool IsRepeated = 7 [default=true];
+  optional string CacheAsDictWithKeyField = 8;
 }
 
 message FluxImportFileModel {

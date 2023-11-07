@@ -42,6 +42,21 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
         self.strat_executor = None
         self.strat_executor_thread: Thread | None = None
 
+        raise_exception = False
+        pair_strat_tuple: Tuple[PairStrat, DateTime] = self.strat_cache.get_pair_strat()
+        if pair_strat_tuple is None:
+            raise_exception = True
+        else:
+            pair_strat, _ = pair_strat_tuple
+            if not pair_strat:
+                raise_exception = True
+        if raise_exception:
+            err_str_ = (
+                "Couldn't find any pair_strat in strat_cache, strat_cache must be loaded with pair_strat before"
+                "provided to object initialization - ignoring TradingDataManager init")
+            logging.error(err_str_)
+            raise Exception(err_str)
+
         if is_test_run:
             err_str_: str = f"strat executor running in test mode, is_test_run: {is_test_run}"
             print(f"CRITICAL: {err_str_}")
@@ -106,6 +121,7 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
                 with self.strat_cache.re_ent_lock:
                     # demon thread will tear down itself if strat_cache.stopped is True, it will also invoke
                     # set_pair_strat(None) on cache, enabling future reactivation + stops any processing until then
+                    self.strat_cache.set_strat_status(strat_status_)
                     self.strat_cache.stopped = True
                     self.strat_cache.notify_semaphore.release()
                 logging.warning(f"handle_strat_status_get_all_ws: removed cache entry of non ongoing strat;;;"

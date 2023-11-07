@@ -286,52 +286,52 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
-
-def handle_test_buy_sell_with_sleep_delays(buy_symbol: str, sell_symbol: str, pair_strat_: PairStratBaseModel,
-                                           expected_strat_limits_: StratLimits,
-                                           expected_start_status_: StratStatus,
-                                           last_trade_fixture_list: List[Dict],
-                                           symbol_overview_obj_list: List[SymbolOverviewBaseModel],
-                                           market_depth_basemodel_list: List[MarketDepthBaseModel],
-                                           top_of_book_list_: List[Dict]):
-    order_counts = 10
-    active_strat, executor_web_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list,
-                                           last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
-
-    for order_count in range(order_counts):
-        # Buy Order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-        # Running TopOfBook (this triggers expected buy order)
-        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0], False)
-
-        # Sell Order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-        # Running TopOfBook (this triggers expected buy order)
-        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1], False)
-
-        time.sleep(10)
-
-
-def test_place_sanity_orders_with_sleep_delays(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
-                                               expected_strat_limits_,
-                                               expected_start_status_, last_trade_fixture_list,
-                                               symbol_overview_obj_list, market_depth_basemodel_list,
-                                               top_of_book_list_):
-    symbol_pair_counter = 1
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
-        results = [executor.submit(handle_test_buy_sell_with_sleep_delays, buy_symbol, sell_symbol,
-                                   pair_strat_, expected_strat_limits_, expected_start_status_,
-                                   last_trade_fixture_list, symbol_overview_obj_list, market_depth_basemodel_list,
-                                   top_of_book_list_)
-                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
-
-        for future in concurrent.futures.as_completed(results):
-            if future.exception() is not None:
-                raise Exception(future.exception())
+# Test for some manual check - not checking anything functionally
+# def handle_test_buy_sell_with_sleep_delays(buy_symbol: str, sell_symbol: str, pair_strat_: PairStratBaseModel,
+#                                            expected_strat_limits_: StratLimits,
+#                                            expected_start_status_: StratStatus,
+#                                            last_trade_fixture_list: List[Dict],
+#                                            symbol_overview_obj_list: List[SymbolOverviewBaseModel],
+#                                            market_depth_basemodel_list: List[MarketDepthBaseModel],
+#                                            top_of_book_list_: List[Dict]):
+#     order_counts = 10
+#     active_strat, executor_web_client = (
+#         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+#                                            expected_start_status_, symbol_overview_obj_list,
+#                                            last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
+#
+#     for order_count in range(order_counts):
+#         # Buy Order
+#         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+#         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+#         # Running TopOfBook (this triggers expected buy order)
+#         run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0], False)
+#
+#         # Sell Order
+#         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+#         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+#         # Running TopOfBook (this triggers expected buy order)
+#         run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1], False)
+#
+#         time.sleep(10)
+#
+#
+# def test_place_sanity_orders_with_sleep_delays(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+#                                                expected_strat_limits_,
+#                                                expected_start_status_, last_trade_fixture_list,
+#                                                symbol_overview_obj_list, market_depth_basemodel_list,
+#                                                top_of_book_list_):
+#     symbol_pair_counter = 1
+#     with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
+#         results = [executor.submit(handle_test_buy_sell_with_sleep_delays, buy_symbol, sell_symbol,
+#                                    pair_strat_, expected_strat_limits_, expected_start_status_,
+#                                    last_trade_fixture_list, symbol_overview_obj_list, market_depth_basemodel_list,
+#                                    top_of_book_list_)
+#                    for buy_symbol, sell_symbol in buy_sell_symbol_list]
+#
+#         for future in concurrent.futures.as_completed(results):
+#             if future.exception() is not None:
+#                 raise Exception(future.exception())
 
 
 # def test_create_sanity_last_trade(static_data_, clean_and_set_limits, last_trade_fixture_list):
@@ -2438,6 +2438,57 @@ def test_get_max_id_query(clean_and_set_limits):
     assert order_limits_max_id.max_id_val == created_order_limits_obj.id, \
         f"max_id mismatch, expected {created_order_limits_obj.id} received {order_limits_max_id.max_id_val}"
 
+
+def test_get_aggressive_market_depths_query(
+        static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_start_status_, symbol_overview_obj_list, top_of_book_list_,
+        market_depth_basemodel_list, last_trade_fixture_list):
+    buy_sell_symbol_list = buy_sell_symbol_list[:2]
+
+    pair_strat_n_http_client_tuple_list = []
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        # activated_pair_start, executor_http_client = (
+        #     create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        #                             expected_start_status_, symbol_overview_obj_list, top_of_book_list_))
+
+        activated_pair_start, executor_http_client = (
+            create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_start_status_, symbol_overview_obj_list,
+                                               last_trade_fixture_list,
+                                               market_depth_basemodel_list, top_of_book_list_))
+
+        pair_strat_n_http_client_tuple_list.append((activated_pair_start, executor_http_client))
+
+        # creating market depths
+        # create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_http_client)
+
+    for pair_strat_n_http_client_tuple in pair_strat_n_http_client_tuple_list:
+        pair_strat, executor_http_client = pair_strat_n_http_client_tuple
+
+        query_symbol_side_list = [(pair_strat.pair_strat_params.strat_leg1.sec.sec_id, TickType.BID),
+                                  (pair_strat.pair_strat_params.strat_leg2.sec.sec_id, TickType.ASK)]
+
+        market_depth_list: List[MarketDepthBaseModel] = (
+            executor_http_client.get_aggressive_market_depths_query_client(query_symbol_side_list))
+
+        last_px = None
+        for market_depth_obj in market_depth_list:
+            # Checking symbol side
+            for query_symbol_side in query_symbol_side_list:
+                symbol, side = query_symbol_side
+                if market_depth_obj.symbol == symbol and market_depth_obj.side == side:
+                    break
+            else:
+                assert False, ("Unexpected: Found symbol or side not matching from any passed query symbol or side"
+                               "in received market_depth list")
+
+            # Checking Sort
+            if last_px is None:
+                last_px = market_depth_obj.px
+            else:
+                assert last_px > market_depth_obj.px, \
+                    (f"Unexpected: market_depth_list must be sorted in terms of decreasing px, "
+                     f"market_depth_list: {market_depth_list}")
 
 # def test_delete_all_test_db():
 #     from pymongo import MongoClient

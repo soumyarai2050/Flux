@@ -1,0 +1,105 @@
+syntax = "proto2";
+
+import "ui_option_utils.proto";
+import "flux_options.proto";
+import "projects_core.proto";
+
+package performance_benchmark;
+
+message RawPerformanceData{
+  option (FluxMsgJsonRootTimeSeries) = {
+    MongoVersion: 5.0,
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+    Granularity: Sec
+  };
+//  option (FluxMsgWidgetUIDataElement) = {
+//    x: 0,
+//    y: 32,
+//    w: 8,
+//    h: 8,
+//    is_repeated: true,
+//    widget_ui_data: {
+//      view_layout: UI_TABLE
+//    }
+//  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string callable_name = 2 [(FluxFldValMetaField) = true];
+  required string start_time = 3 [(FluxFldValIsDateTime) = true, (FluxFldValTimeField) = true];
+  required float delta = 6;
+}
+
+//message RawPerfDeltaByCallable {
+//  required string callable_name = 1;
+//  repeated float delta_list = 2;
+//}
+//
+//message AllCallableWithDeltaList{
+//  option (FluxMsgJsonQuery) = {
+//      QueryName: "get_all_callable_with_perf_delta",
+//      QueryParams: "start_datetime",
+//      QueryParamsDataType: "Datetime | None = None"
+//      QueryParams: "end_datetime",
+//      QueryParamsDataType: "Datetime | None = None"
+//  };
+//  repeated RawPerfDeltaByCallable raw_perf_delta_by_callable = 1;
+//}
+
+message RawPerformanceDataOfCallable{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_raw_performance_data_of_callable",
+      QueryParams: "callable_name",
+      QueryParamsDataType: "str"
+  };
+  repeated RawPerformanceData raw_performance_data = 1;
+}
+
+message ProcessedPerformanceAnalysis{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    PatchAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  // 5 min , 1 d, 5 d and forever
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 40,
+    w: 8,
+    h: 8,
+    is_repeated: true,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "strat_manager_service.proto"
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional string callable_name = 2;
+  optional float min = 3;
+  optional float max = 4;
+  optional float avg = 5;
+  optional float std_dev = 6;
+  optional float per_10 = 7;
+  optional float per_20 = 8;
+  optional float per_30 = 9;
+  optional float per_40 = 10;
+  optional float per_50 = 11;
+  optional float per_60 = 12;
+  optional float per_70 = 13;
+  optional float per_80 = 14;
+  optional float per_90 = 15;
+}
+
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+  optional ButtonType temp = 1;
+  optional DummyEnumP temp1 = 2;
+}

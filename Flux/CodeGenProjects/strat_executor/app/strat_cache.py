@@ -87,9 +87,6 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         self._market_depths_conts: List[MarketDepthsCont] | None = None
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
-        self.order_id_to_order_snapshot_dict: Dict[str, OrderSnapshot | OrderSnapshotBaseModel] = {}
-        self.order_id_to_cxl_order_dict: Dict[str, CancelOrder | CancelOrderBaseModel] = {}
-
     @property
     def get_symbol_side_snapshots(self) -> List[SymbolOverviewBaseModel | SymbolOverview | None]:
         return self._symbol_side_snapshots
@@ -131,20 +128,6 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
             self.leg1_trading_symbol, self.leg2_trading_symbol = self.get_trading_symbols()
         # else not required: passing None to clear pair_strat form cache is valid
         return self._pair_strat_update_date_time
-
-    def get_order_snapshot_from_order_id(self, order_id: str) -> OrderSnapshot | None:
-        return self.order_id_to_order_snapshot_dict.get(order_id)
-
-    def set_order_snapshot(self, order_snapshot: OrderSnapshotBaseModel | OrderSnapshot) -> DateTime:
-        self.order_id_to_order_snapshot_dict[order_snapshot.order_brief.order_id] = order_snapshot
-        return super().set_order_snapshot(order_snapshot)
-
-    def get_cancel_order_from_order_id(self, order_id: str) -> CancelOrder | None:
-        return self.order_id_to_cxl_order_dict.get(order_id)
-
-    def set_cancel_order(self, cancel_order: CancelOrderBaseModel | CancelOrder) -> DateTime:
-        self.order_id_to_cxl_order_dict[cancel_order.order_id] = cancel_order
-        return super().set_cancel_order(cancel_order)
 
     def get_symbol_side_snapshot_from_symbol(
             self, symbol: str, date_time: DateTime | None = None) -> Tuple[SymbolSideSnapshot, DateTime] | None:

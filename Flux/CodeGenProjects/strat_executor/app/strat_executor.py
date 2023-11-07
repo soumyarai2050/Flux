@@ -924,8 +924,9 @@ class StratExecutor:
                             cancel_order.order_id, cancel_order.side, None, cancel_order.security.sec_id,
                             underlying_account="NA")
 
-                if unprocessed_cancel_orders:
-                    return True
+                # if some update was on existing cancel_orders then this semaphore release was for that update only,
+                # therefore returning True to continue and wait for next semaphore release
+                return True
         # all else return false - no cancel_order to process
         return False
 

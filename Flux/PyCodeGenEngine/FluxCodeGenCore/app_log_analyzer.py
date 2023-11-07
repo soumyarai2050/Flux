@@ -11,12 +11,12 @@ from FluxPythonUtils.log_analyzer.log_analyzer import LogAnalyzer, LogDetail, AB
 
 
 class AppLogAnalyzer(LogAnalyzer, ABC):
-    def __init__(self, regex_file: str, config_yaml_dict: Dict, webclient_object,
+    def __init__(self, regex_file: str, config_yaml_dict: Dict, performance_benchmark_webclient_object,
                  raw_performance_data_model_type: Type[BaseModel],
                  log_details: List[LogDetail] | None = None,
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
                  debug_mode: bool = False):
-        super().__init__(regex_file, config_yaml_dict, webclient_object,
+        super().__init__(regex_file, config_yaml_dict, performance_benchmark_webclient_object,
                          raw_performance_data_model_type, log_details=log_details,
                          log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict)
         logging.info(f"starting pair_strat log analyzer. monitoring logs: {log_details}")

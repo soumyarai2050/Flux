@@ -91,6 +91,12 @@ message MarketDepth {
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
   };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_aggressive_market_depths",
+    QueryParams: "symbol_side_tuple_list",
+    QueryParamsDataType: "List[Tuple[str, TickType]]",
+    QueryRouteType: PATCH
+  };
   option (FluxMsgAggregateQueryVarName) = "cum_px_qty_aggregate_query";
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
