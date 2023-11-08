@@ -226,11 +226,10 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             create_order_snapshots: List[OrderSnapshot] = []
             update_order_snapshots: List[OrderSnapshot] = []
             for order_snapshot in order_snapshot_list:
-                if order_snapshot.order_brief.order_id in self.order_id_to_order_snapshot_cache_dict:
-                    update_order_snapshots.append(order_snapshot)
-                else:
+                if order_snapshot.order_status == OrderStatusType.OE_UNACK:
                     create_order_snapshots.append(order_snapshot)
-                self.order_id_to_order_snapshot_cache_dict[order_snapshot.order_brief.order_id] = order_snapshot
+                else:
+                    update_order_snapshots.append(order_snapshot)
 
             if create_order_snapshots:
                 await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_create_all_order_snapshot_http(
@@ -262,8 +261,8 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 order_snapshot_dict["_id"] = OrderSnapshot.next_id()    # overriding id for this server db if exists
             else:
                 order_snapshot_dict["_id"] = cached_order_snapshot.id   # updating _id from existing cache object
-            # order_id_to_order_snapshot_cache_dict will be updated later while db operation for order_snapshot
             order_snapshot = OrderSnapshot(**order_snapshot_dict)
+            self.order_id_to_order_snapshot_cache_dict[order_snapshot.order_brief.order_id] = order_snapshot
         return order_snapshot
 
     def _get_strat_brief_from_payload(self, payload_dict: Dict[str, Any]):
@@ -356,10 +355,10 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             try:
                 future.result()
             except HTTPException as http_e:
-                logging.exception(f"underlying_create_order_journal_http failed "
+                logging.exception(f"create_or_update_order_snapshot failed "
                                   f"with http_exception: {http_e.detail}")
             except Exception as e:
-                logging.exception(f"underlying_create_order_journal_http failed "
+                logging.exception(f"create_or_update_order_snapshot failed "
                                   f"with exception: {e}")
 
         # creating or updating strat_brief

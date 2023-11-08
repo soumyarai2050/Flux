@@ -746,17 +746,16 @@ def get_commonkey_items(widget: WebElement) -> Dict[str, any]:
 
 def get_flux_fld_number_format(widget: WebElement, xpath: str, layout: Layout) -> str:
     if layout == Layout.TREE:
-        tag: str = "div"
+        tag_name: str = "p"
+        element = widget.find_element(By.CLASS_NAME, "MuiInputAdornment-root")
     else:
-        tag: str = "td"
-    layout_xpath: str = f"//{tag}[@data-xpath='{xpath}']"
-    td_element = widget.find_element(By.XPATH, layout_xpath)
-    td_element.click()
-    time.sleep(2)
-    div_element = widget.find_element(By.CLASS_NAME, "MuiInputAdornment-root")
-    number_format_element = div_element.find_element(By.TAG_NAME, "p")
+        tag_name: str = "span"
+        xpath = get_table_input_field_xpath(xpath=xpath)
+        element = widget.find_element(By.XPATH, xpath)
+    number_format_element = element.find_element(By.TAG_NAME, tag_name)
     number_format = number_format_element.text
-    return number_format
+    # get only % from str
+    return number_format[-1]
 
 
 def get_pressed_n_unpressed_btn_txt(widget: WebElement) -> str:
@@ -1209,3 +1208,69 @@ def get_element_text_list_from_filter_popup(driver: WebDriver) -> List[str]:
     element_texts: List[str] = [element.text.replace(" ", "_") for element in elements]
 
     return element_texts
+
+def validate_unpressed_n_pressed_btn_txt(driver: WebDriver, widget: WebElement,
+                                         unpressed_caption: str, pressed_caption: str, index_no: int):
+    btn_td_elements: [WebElement] = widget.find_elements(By.CLASS_NAME, "MuiToggleButton-sizeMedium")
+    unpressed_btn_txt = btn_td_elements[index_no].text
+    btn_td_elements[index_no].click()
+    confirm_save(driver=driver)
+    pressed_btn_txt = btn_td_elements[index_no].text
+    assert unpressed_caption.upper() == unpressed_btn_txt
+    assert pressed_caption.upper() == pressed_btn_txt
+
+def validate_hide_n_show_in_common_key(widget: WebElement, text: str, key_type: str):
+    common_keys: List[str] = get_common_keys(widget=widget)
+    replaced_str_common_keys: List[str] = get_replaced_common_keys(common_keys_list=common_keys)
+    if key_type == "selected_checkbox":
+        assert text in replaced_str_common_keys, \
+            f"{text} field is not visible in common keys, expected to be visible"
+    else:
+        assert text not in replaced_str_common_keys, \
+            f"{text} field is visible in common keys, expected to be hidden"
+
+def validate_flux_fld_val_max_in_widget(driver: WebDriver, widget: WebElement, field_name_list: List[str]):
+    click_button_with_name(widget=widget, button_name="Save")
+    expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
+    object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
+    # object_keys.pop()
+    for field_name in field_name_list:
+        assert field_name in object_keys
+    confirm_save(driver=driver)
+    field_name_list.clear()
+
+def validate_flux_fld_val_min_in_widget(widget: WebElement, field_name: str):
+    click_button_with_name(widget=widget, button_name="Save")
+    object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
+    assert field_name in object_keys
+    discard_changes(widget=widget)
+
+
+def validate_flux_fld_display_type_in_widget(driver: WebDriver, widget: WebElement, field_name: str, layout: Layout):
+    if layout == Layout.TABLE:
+        click_button_with_name(widget=widget, button_name="Save")
+        confirm_save(driver=driver)
+        common_keys_dict = get_commonkey_items(widget=widget)
+        input_value = int(common_keys_dict[field_name].replace(",", ""))
+        assert isinstance(input_value, int)
+    else:
+        click_button_with_name(widget=widget, button_name="Save")
+        switch_layout(widget=widget, layout=Layout.TABLE)
+        common_keys_dict = get_commonkey_items(widget=widget)
+        input_value = int(common_keys_dict[field_name].replace(",", ""))
+        assert isinstance(input_value, int)
+
+
+def validate_flux_fld_number_format_in_widget(widget: WebElement, xpath: str, number_format_txt: str, layout: Layout):
+    if layout == Layout.TABLE:
+        number_format: str = get_flux_fld_number_format(widget=widget, xpath=xpath, layout=Layout.TABLE)
+    else:
+        number_format: str = get_flux_fld_number_format(widget=widget, xpath=xpath, layout=Layout.TREE)
+    assert number_format_txt == number_format
+
+def validate_flux_flx_display_zero_in_widget(driver: WebDriver, widget: WebElement, field_name: str, value: str):
+    click_button_with_name(widget=widget, button_name="Save")
+    confirm_save(driver=driver)
+    switch_layout(widget=widget, layout=Layout.TABLE)
+    get_common_key_dict = get_commonkey_items(widget=widget)
+    assert value == get_common_key_dict[field_name]

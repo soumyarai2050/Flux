@@ -24,7 +24,11 @@ from tests.CodeGenProjects.addressbook.web_ui.utility_test_functions import (
     validate_comma_separated_values, get_fld_name_colour_in_tree, get_unsaved_changes_discarded_key,
     click_on_okay_button_unsaved_changes_popup, set_autocomplete_field, strat_manager_service_native_web_client,
     flux_fld_default_widget, get_all_keys_from_table, get_element_text_list_from_filter_popup, get_web_project_url,
-    flux_fld_sequence_number_in_widget, flux_fld_ui_place_holder_in_widget)
+    flux_fld_sequence_number_in_widget, flux_fld_ui_place_holder_in_widget, validate_unpressed_n_pressed_btn_txt,
+    validate_hide_n_show_in_common_key, validate_flux_fld_val_max_in_widget,
+    validate_flux_fld_val_min_in_widget, validate_flux_fld_display_type_in_widget,
+    validate_flux_fld_number_format_in_widget,
+    validate_flux_flx_display_zero_in_widget)
 from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import (
     DriverType, Delay, Layout, WidgetType, SearchType)
 
@@ -69,8 +73,7 @@ def test_update_pair_strat_n_create_n_activate_strat_limits_using_tree_view(clea
     confirm_save(driver=driver)
     time.sleep(2)
 
-    # scroll into view
-    driver.execute_script('arguments[0].scrollIntoView(true)', strat_limits_widget)
+    scroll_into_view(driver=driver, element=strat_collection_widget)
     time.sleep(Delay.SHORT.value)
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
 
@@ -226,24 +229,17 @@ def test_field_hide_n_show_in_common_key(clean_and_set_limits, driver_type, web_
     inner_text: str = random.choice(replaced_str_common_keys)
 
     # searching the random key in setting and unselecting checkbox
-    setting_btn = pair_strat_widget.find_element(By.NAME, "Settings")
-    setting_btn.click()
+    click_button_with_name(widget=pair_strat_widget, button_name="Setting")
     select_n_unselect_checkbox(driver=driver, inner_text=inner_text)
 
-    # validating that unselected key is not visible on table view
-    common_keys: List[str] = get_common_keys(widget=pair_strat_widget)
-    replaced_str_common_keys: List[str] = get_replaced_common_keys(common_keys_list=common_keys)
-    assert inner_text not in replaced_str_common_keys, \
-        f"{inner_text} field is visible in common keys, expected to be hidden"
+    # validating that unselected key is not visible in table view
+    validate_hide_n_show_in_common_key(widget=pair_strat_widget, text=inner_text, key_type="unselected_checkbox")
 
     #  searching the random key in setting and selecting checkbox
     select_n_unselect_checkbox(driver=driver, inner_text=inner_text)
 
     # validating that selected checkbox is visible on table view
-    common_keys: List[str] = get_common_keys(widget=pair_strat_widget)
-    replaced_str_common_keys: List[str] = get_replaced_common_keys(common_keys_list=common_keys)
-    assert inner_text in replaced_str_common_keys, \
-        f"{inner_text} field is not visible in common keys, expected to be visible"
+    validate_hide_n_show_in_common_key(widget=pair_strat_widget, text=inner_text, key_type="selected_checkbox")
 
 
 def test_hide_n_show_in_table_view(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict):
@@ -252,14 +248,14 @@ def test_hide_n_show_in_table_view(clean_and_set_limits, driver_type, web_projec
     # activate_strat(driver=driver)
     # no data is present in symbol side snapshot widget
     symbol_side_snapshot_widget = driver.find_element(By.ID, "symbol_side_snapshot")
-    driver.execute_script('arguments[0].scrollIntoView(true)', symbol_side_snapshot_widget)
+    scroll_into_view(driver=driver, element=symbol_side_snapshot_widget)
 
     # selecting random table text from table view
     table_headers = get_table_headers(widget=symbol_side_snapshot_widget)
     inner_text = random.choice(table_headers)
 
     #  searching the selected random table text in setting and unselecting checkbox
-    symbol_side_snapshot_widget.find_element(By.NAME, "Settings").click()
+    click_button_with_name(widget=symbol_side_snapshot_widget, button_name="Setting")
     select_n_unselect_checkbox(driver=driver, inner_text=inner_text)
 
     # validating that unselected text is not visible on table view
@@ -323,13 +319,14 @@ def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, we
 
 
 def test_widget_type(driver_type, schema_dict: Dict[str, any]):
-    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property="button")
     print(result)
 
 
 def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                     schema_dict, pair_strat: Dict):
+
     result = get_widgets_by_flux_property(schema_dict, WidgetType.INDEPENDENT, "val_max")
     assert result[0]
     print(result)
@@ -358,17 +355,9 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
             if val_max == field_value:
                 val_max = val_max - 1
             set_table_input_field(widget=widget, xpath=xpath, value=str(val_max))
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, field_name_list=field_name_list)
 
-        if widget_name == "strat_status":
-            break
-        click_button_with_name(widget=widget, button_name="Save")
-        expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
-        object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
-        # object_keys.pop()
-        for field_name in field_name_list:
-            assert field_name in object_keys
-        confirm_save(driver=driver)
-        field_name_list.clear()
+
 
     # order_limits_n_portfolio_limits_tree_layout_val_max_for_valid_scenario
     field_name_list: List[str] = []
@@ -392,19 +381,12 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
             if val_max == field_value:
                 val_max = val_max - 1
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_max))
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, field_name_list=field_name_list)
 
-        if widget_name == "strat_status":
-            break
-        click_button_with_name(widget=widget, button_name="Save")
-        expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
-        object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
-        for field_name in field_name_list:
-            assert field_name in object_keys
-        confirm_save(driver=driver)
-        field_name_list.clear()
+
 
     # order_limits_n_portfolio_limits_table_layout_above_val_max_for_invalid_scenario
-    xpath_list: List[str] = []
+    field_name_list: List[str] = []
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         if widget_name == "strat_status":
@@ -418,25 +400,19 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
             field_name: str = field_query.field_name
             xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
-            xpath_list.append(xpath)
+            field_name_list.append(field_name)
             val_max: int = int(field_query.properties['val_max']) + 1
             # enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
             # if enabled:
-            set_table_input_field(widget=widget, xpath=xpath, value=str(val_max))
+            set_table_input_field(widget=widget, xpath=field_name, value=str(val_max))
             # else:
             #     continue
-        if widget_name == "strat_status":
-            break
-        click_button_with_name(widget=widget, button_name="Save")
-        expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
-        object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
-        for xpath in xpath_list:
-            assert xpath in object_keys
-        discard_changes(widget=widget)
-        xpath_list.clear()
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, field_name_list=field_name_list)
+
+
 
     # order_limits_n_portfolio_limits_tree_layout_above_val_max_for_invalid_scenario
-    xpath_list: List[str] = []
+    field_name_list: List[str] = []
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         if widget_name == "strat_status":
@@ -448,19 +424,11 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
             field_name: str = field_query.field_name
             xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
-            xpath_list.append(xpath)
+            field_name_list.append(field_name)
             val_max: int = int(field_query.properties['val_max']) + 1
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_max))
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, field_name_list=field_name_list)
 
-        if widget_name == "strat_status":
-            break
-        click_button_with_name(widget=widget, button_name="Save")
-        expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
-        object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
-        for xpath in xpath_list:
-            assert xpath in object_keys
-        discard_changes(widget=widget)
-        xpath_list.clear()
 
     result = get_widgets_by_flux_property(schema_dict, WidgetType.DEPENDENT, "val_max")
     print(result)
@@ -513,10 +481,7 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
             set_table_input_field(widget=widget, xpath=xpath, value=str(val_min))
             #else:
                 #continue
-        click_button_with_name(widget=widget, button_name="Save")
-        object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
-        assert field_name in object_keys
-        discard_changes(widget=widget)
+        validate_flux_fld_val_min_in_widget(widget=widget, field_name=field_name)
 
     # order_limits_n_portfolio_limits_tree_layout_val_min_for_valid_scenario
     for widget_query in result[1]:
@@ -541,10 +506,7 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
                 val_min = val_min - 1
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_min))
 
-        click_button_with_name(widget=widget, button_name="Save")
-        object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
-        assert field_name in object_keys
-        discard_changes(widget=widget)
+        validate_flux_fld_val_min_in_widget(widget=widget, field_name=field_name)
 
     # order_limits_n_portfolio_limits_table_layout_below_val_min_for_invalid_scenario
     for widget_query in result[1]:
@@ -565,11 +527,7 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
             #if enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=str(val_min))
             #else:
-             #   continue
-        click_button_with_name(widget=widget, button_name="Save")
-        object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
-        assert field_name in object_keys
-        discard_changes(widget=widget)
+        validate_flux_fld_val_min_in_widget(widget=widget, field_name=field_name)
 
     # order_limits_n_portfolio_limits_tree_layout_below_val_min_for_invalid_scenario
     for widget_query in result[1]:
@@ -585,10 +543,7 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
                                               field_name=field_name)
             val_min = int(field_query.properties['val_min']) - 5
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_min))
-        click_button_with_name(widget=widget, button_name="Save")
-        object_keys = get_object_keys_from_dialog_box(widget=widget)
-        assert field_name in object_keys
-        discard_changes(widget=widget)
+        validate_flux_fld_val_min_in_widget(widget=widget, field_name=field_name)
 
     # TODO:  val min property is not used in dependent widget yet
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="val_min")
@@ -627,7 +582,6 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
         time.sleep(Delay.SHORT.value)
         widget.find_element(By.NAME, "Settings").click()
         for field_query in widget_query.fields:
-            # scroll into view
             field_name: str = field_query.field_name
             help_txt: str = field_query.properties['help']
             if field_name == "max_rolling_tx_count" or field_name == "rolling_tx_count_period_seconds":
@@ -720,15 +674,10 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
                 set_table_input_field(widget=widget, xpath=xpath, value=str(value))
             else:
                 continue
-        click_button_with_name(widget=widget, button_name="Save")
-        confirm_save(driver=driver)
-        common_keys_dict = get_commonkey_items(widget=widget)
-        input_value = int(common_keys_dict[field_name].replace(",", ""))
-        assert isinstance(input_value, int)
+        validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name=field_name, layout=Layout.TABLE)
 
     # tree_layout
     field_name: str = ""
-    display_type: str = ""
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         if widget_name == "order_limits":
@@ -749,11 +698,7 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
             xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(value))
-        click_button_with_name(widget=widget, button_name="Save")
-        switch_layout(widget=widget, layout=Layout.TABLE)
-        common_keys_dict = get_commonkey_items(widget=widget)
-        input_value = int(common_keys_dict[field_name].replace(",", ""))
-        assert isinstance(input_value, int)
+        validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name=field_name, layout=Layout.TREE)
 
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="display_type")
     print(result)
@@ -781,7 +726,6 @@ def test_flux_fld_number_format_in_independent_widget(clean_and_set_limits, driv
     assert result[0]
 
     # table_layout
-    # in strats limits premium percentage not fetching with MuiInputAdornment-root
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         widget = driver.find_element(By.ID, widget_name)
@@ -790,16 +734,10 @@ def test_flux_fld_number_format_in_independent_widget(clean_and_set_limits, driv
         click_button_with_name(widget=widget, button_name="Edit")
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            # TODO: REMOVE CONTINUE LATER,for premium % field in order limits and portfolio
-            #  limits widget contain same xapth
-            if field_name == "premium_percentage" and widget_name == "strat_limits":
-                continue
             number_format_txt: str = field_query.properties['number_format']
             xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            # TODO: scroll horizontally
-            number_format: str = get_flux_fld_number_format(widget=widget, xpath=xpath, layout=Layout.TABLE)
-            assert number_format_txt == number_format
+            validate_flux_fld_number_format_in_widget(widget=widget, xpath=xpath, number_format_txt=number_format_txt, layout=Layout.TABLE)
 
     # tree_layout
     for widget_query in result[1]:
@@ -808,16 +746,13 @@ def test_flux_fld_number_format_in_independent_widget(clean_and_set_limits, driv
         scroll_into_view(driver=driver, element=widget)
         time.sleep(Delay.SHORT.value)
         switch_layout(widget=widget, layout=Layout.TREE)
-        time.sleep(10)
+        time.sleep(2)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            if field_name == "premium_percentage" and widget_name == "strat_limits":
-                continue
             number_format_txt: str = field_query.properties['number_format']
             xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            get_number_format: str = get_flux_fld_number_format(widget=widget, xpath=xpath, layout=Layout.TREE)
-            assert number_format_txt == get_number_format
+            validate_flux_fld_number_format_in_widget(widget=widget, xpath=xpath, number_format_txt=number_format_txt, layout=Layout.TREE)
 
 
 def test_flux_fld_number_format_in_dependent_widget(clean_and_set_limits, driver_type, web_project, driver,
@@ -841,9 +776,9 @@ def test_flux_fld_number_format_in_dependent_widget(clean_and_set_limits, driver
             number_format_txt: str = field_query.properties['number_format']
             xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            # TODO: UNABLE TO FIND (MuiInputAdornment-root) CLASS NAME IN PAIR STRAT BUT IN OTHER WIDGET WORKING FINE
-            number_format: str = get_flux_fld_number_format(widget=widget, xpath=xpath, layout=Layout.TABLE)
-            assert number_format_txt == number_format
+            validate_flux_fld_number_format_in_widget(widget=widget, xpath=xpath, number_format_txt=number_format_txt,
+                                                      layout=Layout.TABLE)
+
 
 
 def test_flux_flx_display_zero_in_widget(clean_and_set_limits, driver_type, web_project, driver,
@@ -867,11 +802,7 @@ def test_flux_flx_display_zero_in_widget(clean_and_set_limits, driver_type, web_
                                               field_name=field_name)
             value: str = "0"
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=value)
-            click_button_with_name(widget=widget, button_name="Save")
-            confirm_save(driver=driver)
-            switch_layout(widget=widget, layout=Layout.TABLE)
-            get_common_key_dict = get_commonkey_items(widget=widget)
-            assert value == get_common_key_dict[field_name]
+            validate_flux_flx_display_zero_in_widget(driver=driver, widget=widget, field_name=field_name, value=value)
 
     result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="display_zero")
     print(result)
@@ -995,13 +926,11 @@ def test_flux_fld_button_in_independent_widget(clean_and_set_limits, driver_type
     assert result[0]
 
     # table_layout
-    pressed_btn_txt: str = ""
-    unpressed_btn_txt: str = ""
     for widget_query in result[1]:
         i = 0
-        # TODO: BUG IN UI, STRAT STATE UNPRESSED CAPTION SHOULD BE ACTIVATE BUT IT IS PAUSE, REMOVE CONTINUE LATER
+        # TODO: BUG IN UI, STRAT STATUS UNPRESSED CAPTION SHOULD BE ACTIVATE BUT IT IS PAUSE, REMOVE CONTINUE LATER
         widget_name = widget_query.widget_name
-        if widget_name == "strat_status" or widget_name == "strat_limits":
+        if widget_name == "strat_status" or widget_name == "strat_limits" or widget_name == "portfolio_alert" or widget_name == "strat_alert":
             continue
         widget = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
@@ -1009,29 +938,10 @@ def test_flux_fld_button_in_independent_widget(clean_and_set_limits, driver_type
         if widget_name == "strat_limits":
             click_button_with_name(widget=widget, button_name="Edit")
         for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            # verify unpressed btn txt
-            if widget_name == "strat_status" or widget_name == "portfolio_status":
-                btn_element = widget.find_element(By.NAME, field_name)
-                unpressed_btn_txt: str = btn_element.text
-                btn_element.click()
-                confirm_save(driver=driver)
-                pressed_btn_txt = btn_element.text
-            else:
-                btn_td_elements: [WebElement] = widget.find_elements(By.CLASS_NAME, "Cell_cell_no_padding__hW0I5")
-                unpressed_btn_txt = btn_td_elements[i].text
-                btn_td_elements[i].click()
-                confirm_save(driver=driver)
-
-                pressed_btn_txt = btn_td_elements[i].text
-
-            # capitalize the letters to get expected result
             unpressed_caption: str = field_query.properties['button']['unpressed_caption']
             pressed_caption: str = field_query.properties['button']['pressed_caption']
-            assert unpressed_caption.upper() == unpressed_btn_txt
-            if widget_name == "portfolio_alert" or widget_name == "strat_alert":
-                continue
-            assert pressed_caption.upper() == pressed_btn_txt
+            validate_unpressed_n_pressed_btn_txt(driver=driver, widget=widget, unpressed_caption=unpressed_caption,
+                                                 pressed_caption=pressed_caption, index_no=i)
             i += 1
 
 
@@ -1083,13 +993,12 @@ def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, w
     # for widget_query in result[1]:
     #     widget_name = widget_query.widget_name
     #     widget = driver.find_element(By.ID, widget_name)
-    #     edit_btn = widget.find_element(By.NAME, "Edit")
-    #     edit_btn.click()
-    #     driver.execute_script('arguments[0].scrollIntoView(true)', widget)
+    #     click_button_with_name(widget=widget, button_name="Edit")
+    #     scroll_into_view(driver=driver, element=widget)
     #     time.sleep(Delay.SHORT.value)
     #     for field_query in widget_query.fields:
     #         field_name: str = field_query.field_name
-    #         value = validate_property_that_it_contain_val_min_or_val_max_or_none(
+    #         value = validate_property_that_it_contain_val_min_val_max_or_none(
     #             schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="display_type")
     #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
     #                                                widget_name=widget_name, field_name=field_name)
@@ -1098,14 +1007,12 @@ def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, w
     #             set_table_input_field(widget=widget, xpath=xpath, value=str(value))
     #         else:
     #             continue
-    #     widget.find_element(By.NAME, "Save").click()
+    #     click_button_with_name(widget=widget, button_name="Save")
     #     confirm_save(driver=driver)
-    #     common_keys_dict = get_commonkey_item(widget=widget)
+    #     common_keys_dict = get_commonkey_items(widget=widget)
     #     input_value = int(common_keys_dict[field_name].replace(",", ""))
 
     # tree_layout
-    xpath: str = ""
-    value: str = ""
     xpath_list: List[str] = []
     value_list: List[str] = []
     for widget_query in result[1]:

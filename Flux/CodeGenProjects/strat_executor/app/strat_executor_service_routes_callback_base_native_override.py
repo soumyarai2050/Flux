@@ -181,8 +181,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         self.pair_strat_id = get_pair_strat_id_from_cmd_argv()
         # since this init is called before db_init
         os.environ["DB_NAME"] = f"strat_executor_{self.pair_strat_id}"
-        datetime_str: str = datetime.datetime.now().strftime("%Y%m%d")
-        os.environ["LOG_FILE_NAME"] = f"strat_executor_{self.pair_strat_id}_logs_{datetime_str}.log"
+        self.datetime_str: Final[str] = datetime.datetime.now().strftime("%Y%m%d")
+        os.environ["LOG_FILE_NAME"] = f"strat_executor_{self.pair_strat_id}_logs_{self.datetime_str}.log"
         self.strat_leg_1: StratLeg | None = None  # will be set by once all_service_up test passes
         self.strat_leg_2: StratLeg | None = None  # will be set by once all_service_up test passes
         self.all_services_up: bool = False
@@ -203,11 +203,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         self.trading_data_manager: TradingDataManager | None = None
         self.simulate_config_yaml_file_path = (
                 EXECUTOR_PROJECT_DATA_DIR / f"executor_{self.pair_strat_id}_simulate_config.yaml")
-
-        create_logger(
-            "log_simulator", logging.DEBUG,
-            str(PurePath(__file__).parent.parent / "log" /
-                f"log_simulator_{self.pair_strat_id}_logs_{datetime_str}.log"))
+        self.log_simulator_file_path = (PurePath(__file__).parent.parent / "log" /
+                                        f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_str}.log")
+        create_logger("log_simulator", logging.DEBUG, str(self.log_simulator_file_path))
 
     def get_generic_read_route(self):
         return None
@@ -417,6 +415,11 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 err_str_ = (f"Something went wrong while deleting so shell script, "
                             f"exception: {e}")
                 logging.error(err_str_)
+
+            # renaming simulator log file
+            if os.path.exists(self.log_simulator_file_path):
+                datetime_str = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
+                os.rename(self.log_simulator_file_path, f"{self.log_simulator_file_path}.{datetime_str}")
 
     @staticmethod
     def create_n_run_so_shell_script(pair_strat):
