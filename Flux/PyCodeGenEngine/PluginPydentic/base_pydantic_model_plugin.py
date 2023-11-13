@@ -247,11 +247,15 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def _handle_unique_id_required_fields(self, message: protogen.Message, auto_gen_id_type: IdType) -> str:
         if auto_gen_id_type == IdType.INT_ID:
             output_str = "    _max_id_val: ClassVar[int | None] = None\n"
+            output_str += "    _max_update_id_val: ClassVar[int | None] = None\n"
             output_str += "    _mutex: ClassVar[Lock] = Lock()\n"
             output_str += f'    id: int = Field(default_factory=(lambda: {message.proto.name}.next_id()), ' \
                           f'description="Server generated unique Id", alias="_id")\n'
+            output_str += (f'    update_id: int = Field(default_factory=(lambda: {message.proto.name}.'
+                           f'next_update_id()), description="Server generated unique Update Id")\n')
         elif auto_gen_id_type == IdType.STR_ID:
             output_str = "    _mutex: ClassVar[Lock] = Lock()\n"
+            output_str += "    _max_update_id_val: ClassVar[int | None] = None\n"
             output_str += f'    id: str = Field(default_factory=(lambda: {message.proto.name}.next_id()), ' \
                           f'description="Server generated unique Id", alias="_id")\n'
         else:

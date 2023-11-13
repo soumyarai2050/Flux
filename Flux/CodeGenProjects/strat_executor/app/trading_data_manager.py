@@ -190,6 +190,30 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
             return  # No use-case for fx TOB at this time
         super().handle_top_of_book_get_all_ws(top_of_book_)
 
+    def handle_recovery_top_of_book(self, top_of_book_: TopOfBookBaseModel | TopOfBook):
+        # interface to update tob irrespective of time in crash recovery, Must be used only if required
+        with self.strat_cache.re_ent_lock:
+            self.strat_cache.set_recovery_top_of_book(top_of_book_)
+        logging.debug(f"Updated top_of_book cache in recovery;;; top_of_book_: {top_of_book_}")
+
+    def handle_recovery_order_journal(self, order_journal_: OrderJournal | OrderJournalBaseModel):
+        # interface to update order_journal in crash recovery, Must be used only if required
+        with self.strat_cache.re_ent_lock:
+            self.strat_cache.set_order_journal(order_journal_)
+        logging.debug(f"Updated order_journal cache in recovery;;; order_journal: {order_journal_}")
+
+    def handle_recovery_cancel_order(self, cancel_order_: CancelOrder | CancelOrderBaseModel):
+        # interface to update cancel_order in crash recovery, Must be used only if required
+        with self.strat_cache.re_ent_lock:
+            self.strat_cache.set_cancel_order(cancel_order_)
+        logging.debug(f"Updated cancel_order cache in recovery;;; cancel_order: {cancel_order_}")
+
+    def handle_recovery_new_order(self, new_order_: NewOrder | NewOrderBaseModel):
+        # interface to update new_order in crash recovery, Must be used only if required
+        with self.strat_cache.re_ent_lock:
+            self.strat_cache.set_new_order(new_order_)
+        logging.debug(f"Updated new_order cache in recovery;;; new_order: {new_order_}")
+
     def handle_market_depth_get_all_ws(self, market_depth_: MarketDepthBaseModel | MarketDepth, **kwargs):
         if market_depth_.symbol in StratCache.fx_symbol_overview_dict:
             # if we need fx Market Depth: StratCache needs to collect reference here (like we do in symbol_overview)

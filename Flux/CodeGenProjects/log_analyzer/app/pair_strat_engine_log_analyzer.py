@@ -292,7 +292,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                 raise Exception("unexpected error in _process_strat_alert_message. strat alert pattern not matched")
 
             matched_text = match[0]
-            log_message: str = message.replace(matched_text, " ")
+            log_message: str = message.replace("%%", " ")
             error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=prefix, log_message=log_message)
 
             # if error pattern does not match, ignore creating alert

@@ -223,22 +223,40 @@ class MDShellEnvData(BaseModel):
 
 
 def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_file_path: str, mode: str):
+    script_file_name = os.path.basename(generation_start_file_path)
+    log_file_path = PurePath(generation_start_file_path).parent.parent / "log" / f"{script_file_name}.log"
     with open(generation_start_file_path, "w") as fl:
         fl.write("#!/bin/bash\n")
-        fl.write("shopt -s expand_aliases\n")
+        fl.write(f"LOG_FILE_PATH={log_file_path}\n")
+        fl.write("echo Log_file_path: ${LOG_FILE_PATH}\n")
+        fl.write("shopt -s expand_aliases >>${LOG_FILE_PATH} 2>&1\n")
         fl.write("source ${HOME}/.bashrc\n")
-        fl.write("cdm\n")  # create this as alias in your bashrc to cd into market data run.sh script dir
-        fl.write("#export GDB_DEBUG=1  # uncomment if you want to run in debugger\n")
+        # create this as alias in your bashrc to cd into market data run.sh script dir
+        fl.write("cdm >>${LOG_FILE_PATH} 2>&1\n")
+        fl.write("#export GDB_DEBUG=1  # uncomment if you want the process to start in GDB\n")
         fl.write(f"export PROJECT_NAME='{str(md_shell_env_data.project_name)}'\n")
         # for FX , exclude exch_code, SUBSCRIPTION_DATA instead export FX=1 with mode SO
         if md_shell_env_data.exch_code is not None and md_shell_env_data.subscription_data is not None:
             fl.write(f"export EXCHANGE_CODE={md_shell_env_data.exch_code}\n")
             fl.write(f'export SUBSCRIPTION_DATA="{jsonable_encoder(md_shell_env_data.subscription_data)}"\n')
         else:
-            fl.write(f"export FX='1'\n")
+            fl.write(f"export FX=1\n")
             mode = "SO"  # overriding mode since fx is SO mode
-        fl.write(f"export HOST='{str(md_shell_env_data.host)}'\n")
-        fl.write(f"export PORT='{str(md_shell_env_data.port)}'\n")
-        fl.write(f"export DB_NAME='{str(md_shell_env_data.db_name)}'\n")
-        fl.write(f"export MODE='{str(mode)}'\n")
-        fl.write("./run.sh\n")
+        fl.write(f"export HOST={str(md_shell_env_data.host)}\n")
+        fl.write(f"export PORT={str(md_shell_env_data.port)}\n")
+        fl.write(f"export DB_NAME={str(md_shell_env_data.db_name)}\n")
+        fl.write(f"export MODE={str(mode)}\n")
+        fl.write('echo GDB_DEBUG: "${GDB_DEBUG}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo PROJECT_NAME: "${PROJECT_NAME}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo EXCHANGE_CODE: "${EXCHANGE_CODE}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo SUBSCRIPTION_DATA: "${SUBSCRIPTION_DATA}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo HOST: "${HOST}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo PORT: "${PORT}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo DB_NAME: "${DB_NAME}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo MODE: "${MODE}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('echo triggering run from "${PWD}" >>${LOG_FILE_PATH} 2>&1\n')
+        fl.write('if [ -z "$GDB_DEBUG" ] ; then\n')
+        fl.write("        ./run.sh >>${LOG_FILE_PATH} 2>&1\n")
+        fl.write("else\n")
+        fl.write("        ./run.sh\n")
+        fl.write("fi\n")

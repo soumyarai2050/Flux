@@ -13,6 +13,12 @@ enum InventorySource {
     QFII_OR_CONNECT = 5; // currently we don't support this
 }
 
+enum CBCreditSpreadSource {
+    CBCreditSpreadSource_UNSPECIFIED = 1;
+    CBCreditSpreadSource_USER = 2;
+    CBCreditSpreadSource_EXTERNAL = 3;
+}
+
 enum StratType {
     StratType_UNSPECIFIED = 1;
 }

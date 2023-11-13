@@ -382,6 +382,10 @@ async def generic_put_http(pydantic_class_type: Type[DocType], proto_package_nam
                            pydantic_obj_updated: DocType, filter_agg_pipeline: Any = None,
                            update_agg_pipeline: Any = None, has_links: bool = False,
                            return_obj_copy: bool | None = True) -> DocType | bool:
+    if stored_pydantic_obj.update_id == pydantic_obj_updated.update_id:
+        # this is for cases where fetched object is passed as update object with slight changes. In these cases,
+        # update id since is set as last stored id will not be increases automatically
+        pydantic_obj_updated.update_id = pydantic_class_type.next_update_id()
     return await _underlying_patch_n_put(pydantic_class_type, proto_package_name, stored_pydantic_obj,
                                          pydantic_obj_updated.dict(by_alias=True),
                                          filter_agg_pipeline,
@@ -479,6 +483,8 @@ async def generic_patch_http(pydantic_class_type: Type[DocType], proto_package_n
                              has_links: bool = False, return_obj_copy: bool | None = True
                              ) -> DocType | bool:
     assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json)
+    pydantic_obj_update_json["update_id"] = pydantic_class_type.next_update_id()
+
     try:
         updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(by_alias=True),
                                                          pydantic_obj_update_json)
@@ -554,7 +560,9 @@ async def generic_delete_http(pydantic_class_type: Type[DocType], proto_package_
     if id_is_int_type:
         pydantic_objs_count = await pydantic_class_type.count()
         if pydantic_objs_count == 0:
-            pydantic_class_type.init_max_id(0)
+            max_id_val = 0
+            max_update_id_vale = 0
+            pydantic_class_type.init_max_id(max_id_val, max_update_id_vale)
         # else not required: all good
     # else not required: if id is not int then it must be of PydanticObjectId so no handling required
 

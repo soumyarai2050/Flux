@@ -8,6 +8,7 @@ from fastapi.encoders import jsonable_encoder
 from queue import Queue
 import asyncio
 from pydantic import BaseModel
+import datetime
 
 # project imports
 from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_service_routes_callback import (
@@ -93,14 +94,14 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 # validate essential services are up, if so, set service ready state to true
                 if self.service_up:
                     if not self.service_ready:
-                        self.service_ready = True
-
                         # Running portfolio_limit_check_queue_handler
                         Thread(target=self.portfolio_limit_check_queue_handler, daemon=True).start()
 
                         # Updating order_snapshot cache and strat_brief cache
                         self.load_existing_order_snapshot()
                         self.load_existing_strat_brief()
+                    self.service_ready = True
+                    print(f"INFO: service is ready: {datetime.datetime.now().time()}")
 
                 if not self.service_up:
                     try:

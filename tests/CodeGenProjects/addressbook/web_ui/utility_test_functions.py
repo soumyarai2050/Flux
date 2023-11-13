@@ -51,7 +51,7 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
     scroll_into_view(driver=driver, element=strat_collection_widget)
     time.sleep(Delay.SHORT.value)
-    strat_collection_widget.find_element(By.NAME, "Create").click()
+    click_button_with_name(widget=strat_collection_widget, button_name="Create")
     time.sleep(Delay.SHORT.value)
 
     pair_strat_params_widget = driver.find_element(By.ID, "pair_strat_params")
@@ -69,12 +69,7 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     value = pair_strat["pair_strat_params"]["strat_leg1"]["side"]
     set_dropdown_field(widget=pair_strat_params_widget, xpath=xpath, name="side", value=value)
 
-    more_options_btn = pair_strat_params_widget.find_element(By.XPATH, "//button[@aria-label='options']")
-    more_options_btn.click()
-    time.sleep(2)
-    plus_icon = pair_strat_params_widget.find_element(By.CSS_SELECTOR, "div[class^='HeaderField_menu']")
-    plus_icon.click()
-    time.sleep(2)
+    show_nested_fld_in_tree_layout(widget=pair_strat_params_widget)
 
     # select strat_leg2.sec.sec_id
     xpath = "pair_strat_params.strat_leg2.sec.sec_id"
@@ -342,7 +337,7 @@ def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, l
     set_tree_input_field(widget=strat_limits_widget, xpath=xpath, name=name, value=value)
 
 
-def get_value_from_input_field(widget: WebElement, xpath: str, layout: Layout):
+def get_value_from_input_field(widget: WebElement, xpath: str, layout: Layout)-> str:
     parent_tag: str = ""
     if layout == Layout.TREE:
         parent_tag = "div"
@@ -461,7 +456,7 @@ def get_widget_type(widget_schema: Dict) -> WidgetType | None:
 
 
 def get_widgets_by_flux_property(schema_dict: Dict[str, any], widget_type: WidgetType,
-                                 flux_property: str) -> Tuple[bool, List[WidgetQuery] | None]:
+                                 flux_property: str):
     """
     Method to find widgets and fields containing the flux_property
     schema_dict: JSON schema dict
@@ -679,12 +674,11 @@ def verify_popup_type_n_save_or_discard_changes(widget: WebElement, driver: WebD
 
 
 def show_hidden_fields_in_tree_layout(widget: WebElement, driver: WebDriver) -> None:
-    show_element = widget.find_element(By.NAME, "Show")
-    show_element.click()
+    click_button_with_name(widget=widget, button_name="Show")
     list_element = driver.find_element(By.XPATH, "//ul[@role='listbox']")
-    li_element = list_element.find_element(By.TAG_NAME, "li")
-    span_element = li_element.find_element(By.TAG_NAME, "span")
-    span_element.click()
+    li_elements = list_element.find_elements(By.TAG_NAME, "li")
+    li_elements[0].click()
+
 
 
 def show_hidden_field_in_review_changes_popup(driver: WebDriver) -> None:
@@ -694,21 +688,36 @@ def show_hidden_field_in_review_changes_popup(driver: WebDriver) -> None:
         expand_button.click()
 
 
-def validate_property_that_it_contain_val_min_val_max_or_none(schema_dict, widget_type: WidgetType,
-                                                              flux_property: str) -> str:
-    result = get_widgets_by_flux_property(schema_dict, widget_type=widget_type, flux_property=flux_property)
-    for widget_query in result[1]:
-        for field_query in widget_query.fields:
-            val_min: str = (field_query.properties.get("val_min"))
-            val_max: str = (field_query.properties.get("val_max"))
-            if val_min is not None:
-                val_min: float = int(val_min) + 1.55
-                return str(val_min)
-            elif val_max is not None:
-                val_max: float = int(val_max) - 1.55
-                return str(val_max)
-            else:
-                return str(1000.5)
+# def validate_property_that_it_contain_val_min_val_max_or_none(schema_dict, widget_type: WidgetType,
+#                                                               flux_property: str) -> str:
+#     result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type, flux_property=flux_property)
+#     for widget_query in result[1]:
+#         for field_query in widget_query.fields:
+#             val_min: str = (field_query.properties.get("val_min"))
+#             val_max: str = (field_query.properties.get("val_max"))
+#             if val_min is not None:
+#                 val_min: float = int(val_min) + 1.55
+#                 return str(val_min)
+#             elif val_max is not None:
+#                 val_max: float = int(val_max) - 1.55
+#                 return str(val_max)
+#             else:
+#                 return str(1000.5)
+
+
+def validate_property_that_it_contain_val_min_val_max_or_none(val_max: str, val_min: str) -> str:
+    try:
+        if val_min:
+            val_min = float(val_min) + 1.55
+            # print(val_min)
+            # print(type(val_min))
+            return str(val_min)
+        elif val_max:
+            val_max = float(val_max) - 1.55
+            return str(val_max)
+    except ValueError:
+        print("Invalid input: must be a numeric value or empty.")
+    return str(1000.5)
 
 def validate_table_cell_enabled_or_not(widget: WebElement, xpath: str) -> bool:
     try:
@@ -733,8 +742,10 @@ def count_fields_in_tree(widget: WebElement) -> List[str]:
 
 def get_commonkey_items(widget: WebElement) -> Dict[str, any]:
 
-    common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
-    common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__ny8Fj")
+    # common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
+    common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__hOXaW")
+    # common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__ny8Fj")
+    common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__QEVHl")
     common_key_items: Dict[str] = {}
     for common_key_item_element in common_key_item_elements:
         common_key_item_txt = common_key_item_element.text.split(":")
@@ -764,11 +775,6 @@ def get_pressed_n_unpressed_btn_txt(widget: WebElement) -> str:
     return button_text
 
 
-def click_on_button(widget: WebElement) -> None:
-    btn_element = widget.find_element(By.CLASS_NAME, "MuiButtonBase-root")
-    btn_element.click()
-
-
 def get_table_layout_field_name(widget: WebElement):
     thead_elements = widget.find_elements(By.CLASS_NAME, "MuiTableCell-root")
     field_name_texts = []
@@ -777,12 +783,23 @@ def get_table_layout_field_name(widget: WebElement):
     return field_name_texts
 
 
-def validate_comma_separated_values(widget: WebElement, xpath: str, value: str):
-    entered_value = get_value_from_input_field(widget=widget, xpath=xpath, layout=Layout.TREE)
-    entered_value = entered_value.split(".")[0]
-    entered_value = entered_value.replace(",", "")
-    value = value.split(".")[0]
-    assert entered_value == value
+
+def validate_comma_separated_values(driver: WebDriver, widget: WebElement, layout: Layout, field_name_n_input_value: dict):
+    click_button_with_name(widget=widget, button_name="Save")
+    input_value: str
+    if layout == Layout.TABLE:
+        confirm_save(driver=driver)
+        common_keys: Dict[str, any] = get_commonkey_items(widget=widget)
+        for field_name, input_value in field_name_n_input_value.items():
+            value_from_ui: str = common_keys[field_name]
+            # getting common key value without comma and dot to validate, if value= "1,230.0" get "1230" only
+            assert value_from_ui.replace(",", "") == input_value.split(".")[0].replace(",", "")
+    elif layout == Layout.TREE:
+        switch_layout(widget=widget, layout=Layout.TREE)
+        for xpath, input_value in field_name_n_input_value.items():
+            value_from_ui: str = get_value_from_input_field(widget=widget, xpath=xpath, layout=Layout.TREE)
+            assert value_from_ui.replace(",", "") == input_value.split(".")[0].replace(",", "")
+    field_name_n_input_value.clear()
 
 
 def get_fld_name_colour_in_tree(widget: WebElement, xpath: str):
@@ -917,7 +934,7 @@ def expand_all_nested_fld_name_frm_review_changes_dialog(driver: WebDriver) -> N
 
 
 def get_widget_name_frm_schema(schema_dict, widget_type: WidgetType, flux_property: str) -> List[str]:
-    result = get_widgets_by_flux_property(schema_dict, widget_type=widget_type, flux_property=flux_property)
+    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type, flux_property=flux_property)
     assert result[0]
     name_lst: List[str] = []
     for widget_query in result[1]:
@@ -927,7 +944,7 @@ def get_widget_name_frm_schema(schema_dict, widget_type: WidgetType, flux_proper
 
 
 def get_fld_name_frm_schema(schema_dict, widget_type: WidgetType, flux_property: str) -> List[str]:
-    result = get_widgets_by_flux_property(schema_dict, widget_type=widget_type, flux_property=flux_property)
+    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type, flux_property=flux_property)
     assert result[0]
     name_lst: List[str] = []
     for widget_query in result[1]:
@@ -938,7 +955,7 @@ def get_fld_name_frm_schema(schema_dict, widget_type: WidgetType, flux_property:
 
 
 def get_property_value_frm_schema(schema_dict, widget_type: WidgetType, flux_property: str):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=widget_type, flux_property=flux_property)
+    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type, flux_property=flux_property)
     assert result[0]
     name_lst: List[str] = []
     for widget_query in result[1]:
@@ -1247,14 +1264,13 @@ def validate_flux_fld_val_min_in_widget(widget: WebElement, field_name: str):
 
 
 def validate_flux_fld_display_type_in_widget(driver: WebDriver, widget: WebElement, field_name: str, layout: Layout):
+    click_button_with_name(widget=widget, button_name="Save")
     if layout == Layout.TABLE:
-        click_button_with_name(widget=widget, button_name="Save")
         confirm_save(driver=driver)
         common_keys_dict = get_commonkey_items(widget=widget)
         input_value = int(common_keys_dict[field_name].replace(",", ""))
         assert isinstance(input_value, int)
     else:
-        click_button_with_name(widget=widget, button_name="Save")
         switch_layout(widget=widget, layout=Layout.TABLE)
         common_keys_dict = get_commonkey_items(widget=widget)
         input_value = int(common_keys_dict[field_name].replace(",", ""))
@@ -1274,3 +1290,42 @@ def validate_flux_flx_display_zero_in_widget(driver: WebDriver, widget: WebEleme
     switch_layout(widget=widget, layout=Layout.TABLE)
     get_common_key_dict = get_commonkey_items(widget=widget)
     assert value == get_common_key_dict[field_name]
+
+
+def get_replaced_str_default_field_value(default_field_value: str) -> int:
+    if default_field_value:
+        default_field_value = default_field_value.replace(',', '')
+        replaced_value: int = int(default_field_value)
+        return replaced_value
+
+def validate_val_min_n_default_fld_value_equal_or_not(val_min: int, replaced_default_field_value: int) -> bool:
+    if val_min == replaced_default_field_value:
+        return True
+    return False
+
+def validate_val_max_n_default_fld_value_equal_or_not(val_max: int, replaced_default_field_value: int) -> bool:
+    if val_max == replaced_default_field_value:
+        return True
+    return False
+
+
+def get_widget_web_element_by_name(driver: WebDriver, widget_name: str) -> WebElement:
+    widget = driver.find_element(By.ID, widget_name)
+    return widget
+
+def show_nested_fld_in_tree_layout(widget: WebElement):
+    try:
+        options_btn = widget.find_element(By.XPATH, "//button[@aria-label='options']")
+        options_btn.click()
+        time.sleep(Delay.SHORT.value)
+        plus_btn = widget.find_element(By.CSS_SELECTOR, "div[class^='HeaderField_menu']")
+        plus_btn.click()
+        time.sleep(Delay.SHORT.value)
+    except NoSuchElementException as e:
+        raise Exception(f"failed to click on plus button, nested fld is already visible in {widget}: ;;; exception: {e}")
+
+def get_val_min_n_val_max_of_fld(field_query: str)-> tuple[str, str]:
+    val_min: str = (field_query.properties.get("val_min"))
+    val_max: str = (field_query.properties.get("val_max"))
+    return val_min, val_max
+

@@ -26,16 +26,16 @@ class AppLogAnalyzer(LogAnalyzer, ABC):
             "warning": "Severity_WARNING"
         }
         self.error_patterns: Dict[str, re.Pattern] = {
-            "error": re.compile(r"ERROR"),
-            "critical": re.compile(r"CRITICAL"),
-            "warning": re.compile(r"WARNING")
+            "error": re.compile(r"ER(R)?OR"),
+            "critical": re.compile(r"CRIT(ICAL)?"),
+            "warning": re.compile(r"WARN(ING)?")
         }
         if debug_mode:
             logging.warning(f"Running log analyzer in DEBUG mode;;; log_files: {self.log_details}, "
                             f"debug_mode: {debug_mode}")
             self.error_patterns.update({
                 "info": re.compile(r"INFO"),
-                "debug": re.compile(r"DEBUG")
+                "debug": re.compile(r"DEB(U)?G")
             })
             self.severity_map.update({
                 "info": "Severity_INFO",

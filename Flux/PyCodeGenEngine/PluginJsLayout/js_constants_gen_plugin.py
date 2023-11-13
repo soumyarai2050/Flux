@@ -15,7 +15,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 import protogen
 from Flux.PyCodeGenEngine.PluginJsLayout.base_js_layout_plugin import BaseJSLayoutPlugin, main
 
-ui_proxy_project_dir = PurePath(__file__).parent.parent.parent / "CodeGenProjects" / "ui_proxy"
+ui_proxy_project_dir = PurePath(__file__).parent.parent.parent / "CodeGenProjects" / "ws_mux_demux_proxy"
 ui_proxy_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(
     str(ui_proxy_project_dir / "data" / "config.yaml"))
 

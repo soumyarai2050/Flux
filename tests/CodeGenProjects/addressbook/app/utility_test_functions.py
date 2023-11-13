@@ -8,6 +8,8 @@ import re
 import pexpect
 from csv import writer
 import os
+import glob
+from datetime import timedelta
 os.environ["PORT"] = "8081"
 os.environ["DBType"] = "beanie"
 
@@ -90,9 +92,39 @@ def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
 def drop_all_databases() -> None:
     mongo_server_uri: str = get_mongo_server_uri()
     for db_name in get_mongo_db_list(mongo_server_uri):
-        if "log_analyzer" == db_name or "addressbook" == db_name or "strat_executor_" in db_name:
+        if "log_analyzer" == db_name or "addressbook" == db_name or "post_trade_engine" == db_name or \
+                "strat_executor_" in db_name:
             drop_mongo_database(mongo_server_uri=mongo_server_uri, database_name=db_name)
         # else ignore drop database
+
+
+def clean_project_logs():
+    # clean all project log file, strat json.lock files, generated md, so scripts and script logs
+    addressbook_dir: PurePath = code_gen_projects_path / "addressbook"
+    log_analyzer_dir: PurePath = code_gen_projects_path / "log_analyzer"
+    post_trade_engine_dir: PurePath = code_gen_projects_path / "post_trade_engine"
+    strat_executor_dir: PurePath = code_gen_projects_path / "strat_executor"
+    log_file: str
+    # delete addressbook, log_analyzer, post_trade_engine, strat_executor log files
+    projects: List[str] = ["addressbook", "log_analyzer", "post_trade_engine", "strat_executor"]
+    for project in projects:
+        log_files: List[str] = glob.glob(str(code_gen_projects_path / f"{project}" / "log" / "*.log*"))
+        for log_file in log_files:
+            os.remove(log_file)
+    # delete fx_so script and script log
+    fx_script_n_log_files: List[str] = glob.glob(str(addressbook_dir / "scripts" / "fx_so.sh*"))
+    for log_file in fx_script_n_log_files:
+        os.remove(log_file)
+    # delete strat json.lock files, executor simulate config files, so/md scripts and script logs
+    lock_files: List[str] = glob.glob(str(strat_executor_dir / "data" / "*.json.lock"))
+    for lock_file in lock_files:
+        os.remove(lock_file)
+    executor_config_files: List[str] = glob.glob(str(strat_executor_dir / "data" / "executor_*_simulate_config.yaml"))
+    for executor_config_file in executor_config_files:
+        os.remove(executor_config_file)
+    pd_id_scripts_n_log_files: List[str] = glob.glob(str(strat_executor_dir / "scripts" / "*ps_id_*.sh*"))
+    for ps_id_file in pd_id_scripts_n_log_files:
+        os.remove(ps_id_file)
 
 #
 # def run_pair_strat_log_analyzer(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
@@ -1161,6 +1193,7 @@ def create_tob(buy_symbol: str, sell_symbol: str, top_of_book_json_list: List[Di
         assert stored_top_of_book_basemodel == top_of_book_basemodel, \
             f"Mismatch TopOfBook, expected {top_of_book_basemodel}, received {stored_top_of_book_basemodel}"
 
+
 def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side,
                 executor_web_client: StratExecutorServiceHttpClient):
     tob_obj = TopOfBookBaseModel(_id=stored_obj.id)
@@ -1191,14 +1224,17 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side,
             f"received {updated_tob_obj.ask_quote.px}"
 
 
-def run_buy_top_of_book(buy_symbol: str, executor_web_client: StratExecutorServiceHttpClient,
+def run_buy_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StratExecutorServiceHttpClient,
                         tob_json_dict: Dict, is_non_systematic_run: bool | None = None):
     buy_stored_tob: TopOfBookBaseModel | None = None
+    sell_stored_tob: TopOfBookBaseModel | None = None
 
     stored_tob_objs = executor_web_client.get_all_top_of_book_client()
     for tob_obj in stored_tob_objs:
         if tob_obj.symbol == buy_symbol:
             buy_stored_tob = tob_obj
+        elif tob_obj.symbol == sell_symbol:
+            sell_stored_tob = tob_obj
 
     # For place order non-triggered run
     _update_tob(buy_stored_tob, buy_stored_tob.bid_quote.px, Side.BUY, executor_web_client)
@@ -1207,16 +1243,22 @@ def run_buy_top_of_book(buy_symbol: str, executor_web_client: StratExecutorServi
     else:
         # For place order trigger run
         px = tob_json_dict.get("bid_quote").get("px")
+    sell_tob_update_datetime = DateTime.utcnow() - timedelta(milliseconds=1)
     _update_tob(buy_stored_tob, px, Side.BUY, executor_web_client)
+    sell_stored_tob.last_update_date_time = sell_tob_update_datetime
+    executor_web_client.patch_top_of_book_client(jsonable_encoder(sell_stored_tob, by_alias=True, exclude_none=True))
 
 
-def run_sell_top_of_book(sell_symbol: str, executor_web_client: StratExecutorServiceHttpClient,
+def run_sell_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StratExecutorServiceHttpClient,
                          tob_json_dict: Dict, is_non_systematic_run: bool | None = None):
+    buy_stored_tob: TopOfBookBaseModel | None = None
     sell_stored_tob: TopOfBookBaseModel | None = None
 
     stored_tob_objs = executor_web_client.get_all_top_of_book_client()
     for tob_obj in stored_tob_objs:
-        if tob_obj.symbol == sell_symbol:
+        if tob_obj.symbol == buy_symbol:
+            buy_stored_tob = tob_obj
+        elif tob_obj.symbol == sell_symbol:
             sell_stored_tob = tob_obj
 
     # For place order non-triggered run
@@ -1228,7 +1270,10 @@ def run_sell_top_of_book(sell_symbol: str, executor_web_client: StratExecutorSer
     else:
         # For place order trigger run
         px = tob_json_dict.get("ask_quote").get("px")
+    buy_tob_update_datetime = DateTime.utcnow() - timedelta(milliseconds=1)
     _update_tob(sell_stored_tob, px, Side.SELL, executor_web_client)
+    buy_stored_tob.last_update_date_time = buy_tob_update_datetime
+    executor_web_client.patch_top_of_book_client(jsonable_encoder(buy_stored_tob, by_alias=True, exclude_none=True))
 
 
 def run_last_trade(buy_symbol: str, sell_symbol: str, last_trade_json_list: List[Dict],
@@ -1763,7 +1808,7 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         # Running TopOfBook (this triggers expected buy order)
-        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run)
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, created tob")
 
         if not is_non_systematic_run:
@@ -1873,7 +1918,7 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         # Running TopOfBook (this triggers expected buy order)
-        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1], is_non_systematic_run)
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1], is_non_systematic_run)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, created tob")
 
         if not is_non_systematic_run:
@@ -2020,7 +2065,7 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
     buy_rej_last_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
         time.sleep(2)  # delay for order to get placed
 
         if buy_order_count < continues_order_count:
@@ -2050,7 +2095,7 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
     sell_special_order_count = 0
     for loop_count in range(1, max_loop_count_per_side + 1):
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
         time.sleep(2)  # delay for order to get placed
 
         if sell_order_count < continues_order_count:
@@ -2114,11 +2159,11 @@ def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, 
                                              executor_web_client: StratExecutorServiceHttpClient):
     loop_count = 1
     if side == Side.BUY:
-        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
         symbol = buy_symbol
         wait_stop_px = 110
     else:
-        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
         symbol = sell_symbol
         wait_stop_px = 120
 
@@ -2217,7 +2262,7 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list, max
         last_cxl_ack_id = None
         for loop_count in range(1, max_loop_count_per_side + 1):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
             time.sleep(2)  # delay for order to get placed
 
             last_id, last_cxl_ack_id, buy_order_count, buy_cxl_order_count = \
@@ -2234,7 +2279,7 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list, max
         last_cxl_ack_id = None
         for loop_count in range(1, max_loop_count_per_side + 1):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+            run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
             time.sleep(2)  # delay for order to get placed
 
             last_id, last_cxl_ack_id, sell_order_count, sell_cxl_order_count = \
@@ -2286,7 +2331,7 @@ def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, 
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
     loop_count = 1
-    run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
     return buy_symbol, sell_symbol, activated_strat, executor_http_client
 
 
@@ -2352,7 +2397,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symb
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     loop_count = 1
-    run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run=True)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
@@ -2391,7 +2436,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     loop_count = 1
-    run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run=True)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
@@ -2467,9 +2512,9 @@ def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy
                                                    executor_web_client: StratExecutorServiceHttpClient):
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     if check_symbol == buy_symbol:
-        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
     else:
-        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
     order_ack_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                         check_symbol, executor_web_client,
@@ -2493,9 +2538,9 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
                                                          config_dict, fill_id: str | None = None):
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     if check_symbol == buy_symbol:
-        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
     else:
-        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
     new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                         check_symbol, executor_web_client,

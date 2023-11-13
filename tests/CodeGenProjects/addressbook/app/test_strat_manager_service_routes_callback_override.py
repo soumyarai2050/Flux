@@ -23,8 +23,25 @@ else:
 
 
 # test cases requires addressbook and log_analyzer database to be present
-def _test_drop_all_databases():
+def test_deep_clean_database_n_logs():
     drop_all_databases()
+    clean_project_logs()
+
+
+def _test_sanity_create_strat_parallel(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+                                      expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+                                      top_of_book_list_):
+    symbol_pair_counter = 1
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
+        results = [executor.submit(create_n_activate_strat, buy_symbol,  copy.deepcopy(pair_strat_),
+                                   copy.deepcopy(expected_strat_limits_),
+                                   copy.deepcopy(expected_start_status_), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(top_of_book_list_))
+                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
 
 
 def test_clean_and_set_limits(clean_and_set_limits):
@@ -260,7 +277,7 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
         buy_ack_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                                 buy_symbol, executor_web_client,
@@ -271,7 +288,7 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
         sell_ack_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+            run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                                 sell_symbol, executor_web_client,
@@ -305,13 +322,13 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
 #         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
 #         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 #         # Running TopOfBook (this triggers expected buy order)
-#         run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0], False)
+#         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], False)
 #
 #         # Sell Order
 #         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
 #         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 #         # Running TopOfBook (this triggers expected buy order)
-#         run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1], False)
+#         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1], False)
 #
 #         time.sleep(10)
 #
@@ -610,13 +627,13 @@ def test_validate_kill_switch_systematic(static_data_, clean_and_set_limits, buy
         assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
                                                      "expected to be True"
 
-        run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
         # internally checking buy order
         order_journal = \
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                             buy_symbol, executor_web_client, expect_no_order=True)
 
-        run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
         # internally checking sell order
         order_journal = \
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
@@ -816,7 +833,7 @@ def test_filled_status(static_data_, clean_and_set_limits, buy_sell_symbol_list,
             # buy fills check
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
             loop_count = 1
-            run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
             time.sleep(2)  # delay for order to get placed
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -892,7 +909,7 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_li
         # buy fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(2)  # delay for order to get placed
 
         ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -903,10 +920,11 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_li
         filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_order_journal.order.qty)
         assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
                                                            f"received {latest_fill_journal.fill_qty}"
-        order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
-        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
-                                                                        f"OrderStatusType.OE_ACKED received " \
-                                                                        f"{order_snapshot.order_status}"
+        order_snapshot_before_over_fill = (
+            get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client))
+        assert order_snapshot_before_over_fill.order_status == OrderStatusType.OE_ACKED, \
+            "OrderStatus mismatched: expected status OrderStatusType.OE_ACKED received " \
+            f"{order_snapshot_before_over_fill.order_status}"
 
         # processing fill for over_fill
         executor_http_client.trade_simulator_process_fill_query_client(
@@ -923,18 +941,17 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_li
                                                            f"received {latest_fill_journal.fill_qty}"
 
         order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
-        assert order_snapshot.filled_qty == order_snapshot.order_brief.qty, "order_snapshot filled_qty mismatch: " \
-                                                                            f"expected complete fill, i.e.," \
-                                                                            f"{order_snapshot.order_brief.qty} " \
-                                                                            f"received {order_snapshot.filled_qty}"
-        assert order_snapshot.order_status == OrderStatusType.OE_FILLED, "OrderStatus mismatched: expected status " \
-                                                                         f"OrderStatusType.OE_FILLED received " \
-                                                                         f"{order_snapshot.order_status}"
+        assert order_snapshot.filled_qty == order_snapshot_before_over_fill.filled_qty, \
+            "order_snapshot filled_qty mismatch: expected unchanged fill as before fill to trigger over-fill, i.e.," \
+            f"{order_snapshot_before_over_fill.filled_qty} but received {order_snapshot.filled_qty}"
+        assert order_snapshot.order_status == order_snapshot_before_over_fill.order_status, \
+            f"OrderStatus mismatched: expected status {order_snapshot_before_over_fill.order_status} received " \
+            f"{order_snapshot.order_status}"
 
         time.sleep(15)
         strat_alerts: StratAlertBaseModel = log_analyzer_web_client.get_strat_alert_client(created_pair_strat.id)
 
-        check_str = "Unexpected: Received fill that makes order_snapshot OVER_FILLED"
+        check_str = "Unexpected: Received fill that will make order_snapshot OVER_FILLED"
         for alert in strat_alerts.alerts:
             if re.search(check_str, alert.alert_brief):
                 break
@@ -947,6 +964,12 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_li
             else:
                 assert False, f"Couldn't find any alert saying: {check_str}"
         assert True
+
+        # Checking if strat went to pause
+        strat_status = executor_http_client.get_strat_status_client(strat_status_id=created_pair_strat.id)
+        assert strat_status.strat_state == StratState.StratState_PAUSED, \
+            f"Expected Strat to be Paused, found state: {strat_status.strat_state}, strat_status: {strat_status}"
+
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -989,7 +1012,7 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, buy_sell_symbol_li
         # buy fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(5)  # delay for order to get placed
 
         ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -1045,6 +1068,12 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, buy_sell_symbol_li
             else:
                 assert False, f"Couldn't find any alert saying: {check_str}, received strat_alert: {strat_alerts}"
         assert True
+
+        # Checking if strat went to pause
+        strat_status = executor_http_client.get_strat_status_client(strat_status_id=created_pair_strat.id)
+        assert strat_status.strat_state == StratState.StratState_PAUSED, \
+            f"Expected Strat to be Paused, found state: {strat_status.strat_state}, strat_status: {strat_status}"
+
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -1191,9 +1220,9 @@ def test_cxl_rej(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
                     if check_symbol == buy_symbol:
-                        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+                        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
                     else:
-                        run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
+                        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
                     time.sleep(10)  # delay for order to get placed and trigger cxl
 
                     if order_count < continues_order_count:
@@ -1387,7 +1416,7 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, buy_sell_s
         order_create_time_list = []
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                 buy_symbol, executor_http_client,
@@ -1636,7 +1665,7 @@ def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, buy_
             cxl_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
                 time.sleep(2)  # delay for order to get placed
 
                 new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
@@ -1673,7 +1702,7 @@ def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, buy_
             cxl_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
+                run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
                 time.sleep(2)  # delay for order to get placed
 
                 new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
@@ -1749,7 +1778,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             acked_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
                 time.sleep(2)  # delay for order to get placed
 
                 new_order_id, acked_order_id, partial_ack_qty = \
@@ -1767,7 +1796,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             acked_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
+                run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
                 time.sleep(2)
 
                 new_order_id, acked_order_id, partial_ack_qty = \
@@ -1805,7 +1834,7 @@ def test_update_residual_query(static_data_, clean_and_set_limits, buy_sell_symb
     residual_qty = 5
 
     # creating tobs
-    run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
 
     # Since both side have same last trade px in test cases
     last_trade_px = top_of_book_list_[0].get("last_trade").get("px")
@@ -1874,7 +1903,7 @@ def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, buy_sell_symbo
         # buy test
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         latest_unack_obj = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
                                                                            executor_http_client)
@@ -2439,7 +2468,7 @@ def test_get_max_id_query(clean_and_set_limits):
         f"max_id mismatch, expected {created_order_limits_obj.id} received {order_limits_max_id.max_id_val}"
 
 
-def test_get_aggressive_market_depths_query(
+def test_get_market_depths_query(
         static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
         expected_strat_limits_, expected_start_status_, symbol_overview_obj_list, top_of_book_list_,
         market_depth_basemodel_list, last_trade_fixture_list):
@@ -2459,9 +2488,6 @@ def test_get_aggressive_market_depths_query(
 
         pair_strat_n_http_client_tuple_list.append((activated_pair_start, executor_http_client))
 
-        # creating market depths
-        # create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_http_client)
-
     for pair_strat_n_http_client_tuple in pair_strat_n_http_client_tuple_list:
         pair_strat, executor_http_client = pair_strat_n_http_client_tuple
 
@@ -2469,7 +2495,7 @@ def test_get_aggressive_market_depths_query(
                                   (pair_strat.pair_strat_params.strat_leg2.sec.sec_id, TickType.ASK)]
 
         market_depth_list: List[MarketDepthBaseModel] = (
-            executor_http_client.get_aggressive_market_depths_query_client(query_symbol_side_list))
+            executor_http_client.get_market_depths_query_client(query_symbol_side_list))
 
         last_px = None
         for market_depth_obj in market_depth_list:
@@ -2504,3 +2530,115 @@ def test_get_aggressive_market_depths_query(
 #                 db_name.startswith("post_trade_engine")):
 #             client.drop_database(name_or_database=db_name)
 
+    try:
+
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client.trade_simulator_reload_config_query_client()
+
+        total_order_count_for_each_side = 2
+
+        # Placing buy orders
+        buy_ack_order_id = None
+        for loop_count in range(total_order_count_for_each_side):
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+            run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+
+            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
+                                                                                buy_symbol, executor_web_client,
+                                                                                last_order_id=buy_ack_order_id)
+            buy_ack_order_id = ack_order_journal.order.order_id
+
+        # Placing sell orders
+        sell_ack_order_id = None
+        for loop_count in range(total_order_count_for_each_side):
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+            run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+
+            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
+                                                                                sell_symbol, executor_web_client,
+                                                                                last_order_id=sell_ack_order_id)
+            sell_ack_order_id = ack_order_journal.order.order_id
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def test_run_orders(buy_sell_symbol_list, pair_strat_,
+                                  expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+                                  top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list):
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_1_simulate_config.yaml"
+    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        executor_web_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists("127.0.0.1", 60699)
+
+        executor_web_client.trade_simulator_reload_config_query_client()
+
+        total_order_count_for_each_side = 2
+
+        # Placing buy orders
+        buy_ack_order_id = None
+
+        order_journals = executor_web_client.get_all_order_journal_client()
+        max_id = 0
+        for order_journal in order_journals:
+            if order_journal.order.security.sec_id == buy_symbol and order_journal.order_event == OrderEventType.OE_ACK:
+                if max_id < order_journal.id:
+                    buy_ack_order_id = order_journal.order.order_id
+
+        for loop_count in range(total_order_count_for_each_side):
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+            run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+
+            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
+                                                                                buy_symbol, executor_web_client,
+                                                                                last_order_id=buy_ack_order_id)
+            buy_ack_order_id = ack_order_journal.order.order_id
+
+        # Placing sell orders
+        sell_ack_order_id = None
+
+        order_journals = executor_web_client.get_all_order_journal_client()
+        max_id = 0
+        for order_journal in order_journals:
+            if order_journal.order.security.sec_id == sell_symbol and order_journal.order_event == OrderEventType.OE_ACK:
+                if max_id < order_journal.id:
+                    sell_ack_order_id = order_journal.order.order_id
+
+        for loop_count in range(total_order_count_for_each_side):
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
+            run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+
+            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
+                                                                                sell_symbol, executor_web_client,
+                                                                                last_order_id=sell_ack_order_id)
+            sell_ack_order_id = ack_order_journal.order.order_id
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))

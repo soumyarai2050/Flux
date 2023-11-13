@@ -92,7 +92,7 @@ message MarketDepth {
     depends_on_other_model_for_dynamic_url: true
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "get_aggressive_market_depths",
+    QueryName: "get_market_depths",
     QueryParams: "symbol_side_tuple_list",
     QueryParamsDataType: "List[Tuple[str, TickType]]",
     QueryRouteType: PATCH

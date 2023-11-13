@@ -95,21 +95,27 @@ class BareCamelBaseModel(BareBaseModel, CamelBaseModel):
 
 class IncrementalIdBaseModel(BaseModel):
     _max_id_val: ClassVar[int | None] = None
+    _max_update_id_val: ClassVar[int | None] = None
     _mutex: ClassVar[Lock] = Lock()
     read_ws_path_ws_connection_manager: ClassVar[Any] = None
     read_ws_path_with_id_ws_connection_manager: ClassVar[Any] = None
 
     @classmethod
-    def init_max_id(cls, max_val: int) -> None:
+    def init_max_id(cls, max_id_val: int, max_update_id_val: int) -> None:
         """
         This method must be called just after db is initialized, and it must be
         passed with current max id (if recovering) or 0 (if starting fresh)
         """
-        cls._max_id_val = max_val
+        cls._max_id_val = max_id_val
+        cls._max_update_id_val = max_update_id_val
 
     @classmethod
     def peek_max_id(cls) -> int:
         return cls._max_id_val
+
+    @classmethod
+    def peek_max_update_id(cls) -> int:
+        return cls._max_update_id_val
 
     @classmethod
     def next_id(cls) -> int:
@@ -118,8 +124,20 @@ class IncrementalIdBaseModel(BaseModel):
                 cls._max_id_val += 1
                 return cls._max_id_val
             else:
-                err_str = "init_max_id needs to be called to initialize max_id before calling get_auto_increment_id, " \
-                          f"occurred in model: {cls.__name__}"
+                err_str = ("init_max_id needs to be called to initialize _max_id_val before calling "
+                           f"get_auto_increment_id, occurred in model: {cls.__name__}")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+    @classmethod
+    def next_update_id(cls) -> int:
+        with cls._mutex:
+            if cls._max_update_id_val is not None:
+                cls._max_update_id_val += 1
+                return cls._max_update_id_val
+            else:
+                err_str = ("init_max_id needs to be called to initialize _max_update_id_val before calling "
+                           f"get_auto_increment_id, occurred in model: {cls.__name__}")
                 logging.exception(err_str)
                 raise Exception(err_str)
 

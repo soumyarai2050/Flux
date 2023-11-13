@@ -43,7 +43,7 @@ def test_min_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -96,7 +96,7 @@ def test_max_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -150,7 +150,7 @@ def test_max_order_qty_breach(static_data_, clean_and_set_limits, buy_sell_symbo
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -203,7 +203,7 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -285,7 +285,7 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -339,7 +339,7 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -402,7 +402,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -544,7 +544,7 @@ def test_breach_threshold_px_for_max_basis_points(static_data_, clean_and_set_li
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -626,7 +626,7 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -704,7 +704,7 @@ def test_breach_threshold_px_for_max_px_by_deviation(static_data_, clean_and_set
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -781,7 +781,7 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -899,7 +899,7 @@ def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -985,7 +985,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -1047,7 +1047,7 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -1168,7 +1168,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -1234,7 +1234,7 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
         executor_http_client.trade_simulator_reload_config_query_client()
 
         # Positive Check
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
 
         # placing new non-systematic new_order
         px = 100
@@ -1314,7 +1314,7 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
 
         # Positive Check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
@@ -1362,7 +1362,7 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
 
         # Positive Check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
@@ -1430,7 +1430,7 @@ def test_strat_done_after_exhausted_consumable_notional(
         # Positive Check
         # buy fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(2)  # delay for order to get placed
 
         buy_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -1442,7 +1442,7 @@ def test_strat_done_after_exhausted_consumable_notional(
 
         # Sell fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[0])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(2)  # delay for order to get placed
 
         sell_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol,
@@ -1458,7 +1458,7 @@ def test_strat_done_after_exhausted_consumable_notional(
 
         # buy fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(2)  # delay for order to get placed
         ack_order_journal = (
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol, executor_http_client,
@@ -1506,7 +1506,7 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -1594,7 +1594,7 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
@@ -1675,7 +1675,7 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
         last_buy_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
             new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                 buy_symbol, executor_http_client,
@@ -1686,7 +1686,7 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
         last_sell_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
+            run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
 
             new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                 sell_symbol, executor_http_client,
@@ -1739,7 +1739,7 @@ def handle_place_single_side_orders_for_portfolio_limits_test(buy_symbol: str, s
             last_order_id = None
             for loop_count in range(total_order_count_for_each_side):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
                 new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                     buy_symbol, executor_http_client,
@@ -1755,7 +1755,7 @@ def handle_place_single_side_orders_for_portfolio_limits_test(buy_symbol: str, s
             last_order_id = None
             for loop_count in range(total_order_count_for_each_side):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
+                run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
 
                 new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                     sell_symbol, executor_http_client,
@@ -1821,7 +1821,7 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, buy_sell_symbol_li
             executor_http_clients_n_last_order_id_tuple_list):
         # Triggering new buy order
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
                                                                             executor_http_client,
@@ -1829,7 +1829,7 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, buy_sell_symbol_li
 
         # Triggering sell buy order
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
 
         # will raise assertion internally if new order found
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol,
@@ -1904,7 +1904,7 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
             executor_http_clients_n_last_order_id_tuple_list):
         # Triggering new buy order
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         # will raise assertion internally if new order found
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
@@ -1981,7 +1981,7 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
             executor_http_clients_n_last_order_id_tuple_list):
         # Triggering new buy order
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
 
         # will raise assertion internally if new order found
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol,
@@ -2056,7 +2056,7 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
             executor_http_clients_n_last_order_id_tuple_list):
         # Triggering new buy order
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         # will raise assertion internally if no new order found
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
@@ -2237,7 +2237,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
             executor_http_clients_n_last_order_id_tuple_list):
         # Triggering new buy order
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
                                                                             executor_http_client,
@@ -2245,7 +2245,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
 
         # Triggering sell buy order
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(sell_symbol, executor_http_client, top_of_book_list_[1])
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
 
         # will raise assertion internally if new order found
         new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol,
@@ -2320,7 +2320,7 @@ def test_all_strat_pause_for_max_reject_limit_breach(
     executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id = (
         executor_http_clients_n_last_order_id_tuple_list)[0]
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-    run_buy_top_of_book(buy_symbol, executor_http_client, top_of_book_list_[0])
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
     latest_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_REJ, buy_symbol,
                                                                            executor_http_client,

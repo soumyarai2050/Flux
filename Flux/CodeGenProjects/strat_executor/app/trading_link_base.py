@@ -11,6 +11,7 @@ from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_servi
     OrderBrief, OrderJournal, OrderJournalBaseModel, OrderEventType, FillsJournalBaseModel
 from Flux.CodeGenProjects.strat_executor.app.get_pair_strat_n_executor_client import *
 
+
 def add_to_texts(order_brief: OrderBrief, msg: str):
     if order_brief.text is None:
         order_brief.text = [msg]
@@ -59,7 +60,7 @@ class TradingLinkBase(ABC):
     @classmethod
     @abstractmethod
     async def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,
-                              account: str, exchange: str | None = None, text: List[str] | None = None) -> OrderJournal | None:
+                              account: str, exchange: str | None = None, text: List[str] | None = None) -> bool:
         """
         derived to implement connector to underlying link provider
         """
@@ -67,7 +68,7 @@ class TradingLinkBase(ABC):
     @classmethod
     @abstractmethod
     async def place_cxl_order(cls, order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
-                              system_sec_id: str | None = None, underlying_account: str | None = None) -> OrderJournal | None:
+                              system_sec_id: str | None = None, underlying_account: str | None = None) -> bool:
         """
         derived to implement connector to underlying link provider
         """

@@ -47,6 +47,8 @@ class TradeSimulator(TradingLinkBase):
                     logging.error(f"bad configuration : multiple symbol matches found for passed symbol: {symbol};;;"
                                   f"found_symbol_configurations: "
                                   f"{[str(found_symbol_config) for found_symbol_config in found_symbol_config_list]}")
+            else:
+                return cls.symbol_configs.get(re.compile("default", re.IGNORECASE))  # default symbol config
         return None
 
     def __init__(self):

@@ -56,7 +56,7 @@ def test_place_order_and_check_fill(pair_strat_, expected_start_status_,
         # placing sell order
         current_itr_expected_sell_order_journal_ = copy.deepcopy(sell_order_)
         current_itr_expected_sell_order_journal_.order.security.sec_id = sell_symbol
-        run_sell_top_of_book(sell_symbol, False)
+        run_sell_top_of_book(buy_symbol, sell_symbol, False)
 
         # Waiting for tob to trigger place order
         sell_tob_last_update_date_time_tracker = \

@@ -223,7 +223,7 @@ def create_stop_md_script(running_process_name: str, generation_stop_file_path: 
         fl.write('  echo "nothing to kill"\n')
         fl.write('else\n')
         fl.write('  echo "PC: $PROCESS_COUNT"\n')
-        fl.write(f'  `pgrep {running_process_name} | xargs kill`"\n')
+        fl.write(f'  `pgrep {running_process_name} | xargs kill`\n')
         fl.write('fi\n')
 
 

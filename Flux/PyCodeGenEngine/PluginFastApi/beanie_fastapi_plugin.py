@@ -167,7 +167,9 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         output_str += f"{self.fastapi_app_name} = FastAPI(title='CRUD API of {self.proto_file_name}')\n\n\n"
         output_str += f"async def init_max_id_handler(document):\n"
         output_str += f'    max_val = await document.find_all().max("_id")\n'
-        output_str += f'    document.init_max_id(int(max_val) if max_val is not None else 0)\n\n\n'
+        output_str += f'    max_update_val = await document.find_all().max("update_id")\n'
+        output_str += (f'    document.init_max_id(int(max_val) if max_val is not None else 0, '
+                       f'int(max_update_val) if max_update_val is not None else 0)\n\n\n')
         output_str += f'@{self.fastapi_app_name}.on_event("startup")\n'
         output_str += f'async def connect():\n'
         output_str += f'    await init_db()\n'

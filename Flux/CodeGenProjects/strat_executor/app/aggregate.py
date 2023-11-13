@@ -406,22 +406,33 @@ def get_open_order_snapshots_for_symbol(symbol: str):
     return {"aggregate": [
         {
             "$match": {
-                "$and": [
+                "$or": [
                     {
-                        "order_brief.security.sec_id": symbol
+                        "$and": [
+                            {
+                                "order_brief.security.sec_id": symbol
+                            },
+                            {
+                                "order_status": "OE_UNACK"
+                            }
+                        ]
                     },
                     {
-                        "order_status": "OE_ACKED"
-                    },
-                    {
-                        "order_status": "OE_UNACK"
+                        "$and": [
+                            {
+                                "order_brief.security.sec_id": symbol
+                            },
+                            {
+                                "order_status": "OE_ACKED"
+                            }
+                        ]
                     }
                 ]
             },
         }]}
 
 
-def get_aggressive_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
+def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
     agg_pipeline = {
         "aggregate": [
             {
@@ -446,13 +457,16 @@ def get_aggressive_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
         ]
     }
 
+    symbol_set = set()
     for symbol_side_tuple in symbol_side_tuple_list:
         symbol, side = symbol_side_tuple
 
         # Adding first match by symbol
-        agg_pipeline["aggregate"][0]["$match"]["$or"].append({
-            "symbol": symbol
-        })
+        if symbol not in symbol_set:
+            agg_pipeline["aggregate"][0]["$match"]["$or"].append({
+                "symbol": symbol
+            })
+        symbol_set.add(symbol)
 
         # Adding second match with symbol n side
         agg_pipeline["aggregate"][1]["$match"]["$or"].append({

@@ -35,6 +35,12 @@ class MarketDepthsCont:
             logging.error(f"get_market_depths: Unsupported Side requested: {side}, returning empty list")
             return []
 
+    def set_market_depths(self, side: str, market_depths: List[MarketDepthBaseModel] | List[MarketDepth]):
+        if side == "BID":
+            self.bid_market_depths = market_depths
+        elif side == "ASK":
+            self.ask_market_depths = market_depths
+
     def set_market_depth(self, market_depth: MarketDepthBaseModel | MarketDepth):
         if market_depth.side == TickType.BID:
             for bid_market_depth in self.bid_market_depths:
@@ -82,10 +88,47 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         self._symbol_overviews_update_date_time: DateTime = DateTime.utcnow()
 
         self._top_of_books: List[TopOfBookBaseModel | TopOfBook | None] = [None, None]  # pre-create space for 2 legs
-        self._top_of_books_update_date_time: DateTime = DateTime.utcnow()
+        self._tob_leg1_update_date_time: DateTime = DateTime.utcnow()
+        self._tob_leg2_update_date_time: DateTime = DateTime.utcnow()
 
         self._market_depths_conts: List[MarketDepthsCont] | None = None
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
+
+        # order-snapshot is also stored in here iff order snapshot is open [and removed from here if otherwise]
+        self._order_id_to_open_order_snapshot_dict: Dict[Any, OrderSnapshotBaseModel | OrderSnapshot] = {}   # no open
+        self._open_order_snapshots_update_date_time: DateTime = DateTime.utcnow()
+
+    def set_order_snapshot(self, order_snapshot: OrderSnapshotBaseModel | OrderSnapshot) -> DateTime:
+        """
+        override to enrich _order_id_to_open_order_snapshot_dict [invoke base first and then act here]
+        """
+        _order_snapshots_update_date_time = super().set_order_snapshot(order_snapshot)
+        if order_snapshot.order_status not in [OrderStatusType.OE_DOD, OrderStatusType.OE_FILLED]:
+            self._order_id_to_open_order_snapshot_dict[order_snapshot.order_brief.order_id] = order_snapshot
+        elif order_snapshot.order_status == OrderStatusType.OE_OVER_FILLED:
+            # ideally code would move the strat to error state when it sees overfill - this only handles corner cases
+            logging.error("Unexpected: Order found overfilled - strat will block [has open order will force fail]")
+        else:
+            # Providing second argument None prevents the KeyError exception
+            self._order_id_to_open_order_snapshot_dict.pop(order_snapshot.order_brief.order_id, None)
+        pass    # ignore - helps with debug
+
+    def get_open_order_count_from_cache(self) -> int:
+        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
+        return len(self._order_id_to_open_order_snapshot_dict)
+
+    # not working this partially filled orders - check why
+    def get_open_order_count(self) -> int:
+        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
+        assert(self._strat_limits, self._strat_limits.max_open_orders_per_side, self._strat_brief,
+               self._strat_brief.pair_sell_side_trading_brief,
+               self._strat_brief.pair_sell_side_trading_brief.consumable_open_orders,
+               self._strat_brief.pair_buy_side_trading_brief.consumable_open_orders)
+        max_open_orders_per_side = self._strat_limits.max_open_orders_per_side
+        open_order_count: int = int(
+            max_open_orders_per_side - self._strat_brief.pair_sell_side_trading_brief.consumable_open_orders +
+            max_open_orders_per_side - self._strat_brief.pair_buy_side_trading_brief.consumable_open_orders)
+        return open_order_count
 
     @property
     def get_symbol_side_snapshots(self) -> List[SymbolOverviewBaseModel | SymbolOverview | None]:
@@ -190,50 +233,79 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                               f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
         return None
 
-    def get_top_of_book(
-            self, date_time: DateTime | None = None) -> Tuple[List[TopOfBookBaseModel| TopOfBook], DateTime] | None:
-        if date_time is None or date_time < self._top_of_books_update_date_time:
+    def get_top_of_book(self, date_time: DateTime | None = None) -> \
+            Tuple[List[TopOfBookBaseModel| TopOfBook], DateTime] | None:
+        if date_time is None or (date_time < self._tob_leg1_update_date_time and date_time < self._tob_leg2_update_date_time):
             with self.re_ent_lock:
                 if self._top_of_books[0] is not None and self._top_of_books[1] is not None:
-                    _top_of_books_update_date_time = copy.deepcopy(self._top_of_books_update_date_time)
+                    _top_of_books_update_date_time = copy.deepcopy(
+                        self._tob_leg1_update_date_time if self._tob_leg1_update_date_time < self._tob_leg2_update_date_time else self._tob_leg2_update_date_time)
                     _top_of_books = copy.deepcopy(self._top_of_books)
                     return _top_of_books, _top_of_books_update_date_time
         # all else's return None
         return None
 
     def set_top_of_book(self, top_of_book: TopOfBookBaseModel | TopOfBook) -> DateTime | None:
-        if top_of_book.last_update_date_time > self._top_of_books_update_date_time:
-            if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+        if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+            if top_of_book.last_update_date_time > self._tob_leg1_update_date_time:
                 self._top_of_books[0] = top_of_book
-                self._top_of_books_update_date_time = top_of_book.last_update_date_time
+                self._tob_leg1_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
-            elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
-                self._top_of_books[1] = top_of_book
-                self._top_of_books_update_date_time = top_of_book.last_update_date_time
-                return top_of_book.last_update_date_time
+            elif top_of_book.last_trade and (self._top_of_books[0].last_trade is None or (
+                    top_of_book.last_trade.last_update_date_time >
+                    self._top_of_books[0].last_trade.last_update_date_time)):
+                self._top_of_books[0].last_trade = top_of_book.last_trade
+                # artificially update TOB datetime for next pickup by app
+                self._tob_leg1_update_date_time += timedelta(milliseconds=1)
             else:
-                logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "
-                              f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
-                              f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
+                delta = self._tob_leg1_update_date_time - top_of_book.last_update_date_time
+                logging.debug(f"leg1 set_top_of_book called for: {top_of_book.symbol} with update_date_time older by: "
+                              f"{delta} period, ignoring this TOB;;;stored tob: {self._top_of_books[0]}"
+                              f" update received [discarded] TOB: {top_of_book}")
+                return None
+        elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+            if top_of_book.last_update_date_time > self._tob_leg2_update_date_time:
+                self._top_of_books[1] = top_of_book
+                self._tob_leg2_update_date_time = top_of_book.last_update_date_time
+                return top_of_book.last_update_date_time
+            elif top_of_book.last_trade and (self._top_of_books[1].last_trade is None or (
+                    top_of_book.last_trade.last_update_date_time >
+                    self._top_of_books[1].last_trade.last_update_date_time)):
+                self._top_of_books[1].last_trade = top_of_book.last_trade
+                # artificially update TOB datetime for next pickup by app
+                self._tob_leg2_update_date_time += timedelta(milliseconds=1)
+            else:
+                delta = self._tob_leg2_update_date_time - top_of_book.last_update_date_time
+                logging.debug(f"leg2 set_top_of_book called for: {top_of_book.symbol} with update_date_time older by: "
+                              f"{delta} period, ignoring this TOB;;;stored tob: {self._top_of_books[1]}"
+                              f" update received [discarded] TOB: {top_of_book}")
                 return None
         else:
-            logging.debug(f"set_top_of_book called with old last_update_date_time, ignoring this TOB, "
-                          f"latest_update_date_time: {self._top_of_books_update_date_time}, "
-                          f"update received TOB: {top_of_book}")
+            logging.error(f"set_top_of_book called with non matching symbol: {top_of_book.symbol}, "
+                          f"supported symbols: {self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id}, "
+                          f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
             return None
 
-    def get_market_depth(
-            self, symbol: str, side: Side, sorted_reverse: bool = False, date_time: DateTime | None = None
-    ) -> Tuple[List[MarketDepthBaseModel | MarketDepth], DateTime] | None:
+    # TODO: check recovery logic
+    # def set_recovery_top_of_book(self, top_of_book: TopOfBookBaseModel | TopOfBook) -> DateTime | None:
+    #     return self._set_top_of_book(top_of_book)
+
+    def get_market_depth(self, symbol: str, side: Side, sorted_reverse: bool = False,
+                         date_time: DateTime | None = None) -> \
+            Tuple[List[MarketDepthBaseModel | MarketDepth], DateTime] | None:
         if date_time is None or date_time < self._market_depths_update_date_time:
             with self.re_ent_lock:
                 if self._market_depths_conts is not None:
-                    _market_depths_by_symbol: MarketDepthsCont
-                    for stored_symbol, _market_depths_by_symbol in self._market_depths_conts:
-                        if stored_symbol == symbol:
-                            _market_depths_update_date_time = copy.deepcopy(self._market_depths_update_date_time)
-                            filtered_market_depths: List[MarketDepthBaseModel | MarketDepth] = copy.deepcopy(
-                                _market_depths_by_symbol.get_market_depths(side))
+                    _market_depth_cont: MarketDepthsCont
+                    for _market_depth_cont in self._market_depths_conts:
+                        if _market_depth_cont.symbol == symbol:
+                            # deep copy not needed as new updates override the entire container [only
+                            # set_sorted_market_depths interface available for update]
+                            _market_depths_update_date_time = self._market_depths_update_date_time
+                            # _market_depths_update_date_time = copy.deepcopy(self._market_depths_update_date_time)
+                            # filtered_market_depths: List[MarketDepthBaseModel | MarketDepth] = copy.deepcopy(
+                            filtered_market_depths: List[MarketDepthBaseModel | MarketDepth] = \
+                                _market_depth_cont.get_market_depths(side)
                             if sorted_reverse:
                                 filtered_market_depths.sort(reverse=True, key=lambda x: x.position)
                             return filtered_market_depths, _market_depths_update_date_time
@@ -241,6 +313,8 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         return None
 
     def set_market_depth(self, market_depth: MarketDepthBaseModel | MarketDepth) -> DateTime:
+        """
+        # old code - now disabled [ At this time we expect only set_sorted_market_depths to be called ]
         if self._market_depths_conts is None:
             _market_depths_cont = MarketDepthsCont(market_depth.symbol)
             _market_depths_cont.set_market_depth(market_depth)
@@ -256,6 +330,30 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                 self._market_depths_conts.append(_market_depths_cont)
         self._market_depths_update_date_time = market_depth.exch_time
         return self._market_depths_update_date_time
+        """
+        raise NotImplementedError
+
+    def set_sorted_market_depths(self, system_symbol: str, side: str, newest_exch_time: datetime,
+                                 sorted_market_depths: List[MarketDepthBaseModel | MarketDepth]) -> DateTime:
+        if self._market_depths_conts is None:
+            self._market_depths_conts = []
+            _market_depths_cont = MarketDepthsCont(system_symbol)
+            _market_depths_cont.set_market_depth(side, sorted_market_depths)
+            self._market_depths_conts.append(_market_depths_cont)
+        else:
+            _market_depths_cont: MarketDepthsCont
+            for _market_depths_cont in self._market_depths_conts:
+                if _market_depths_cont.symbol == system_symbol:
+                    _market_depths_cont.set_market_depths(side, sorted_market_depths)
+            else:
+                _market_depths_cont = MarketDepthsCont(system_symbol)
+                _market_depths_cont.set_market_depths(side, sorted_market_depths)
+                self._market_depths_conts.append(_market_depths_cont)
+        self._market_depths_update_date_time = newest_exch_time
+        return self._market_depths_update_date_time
+
+    def has_unack_leg(self) -> bool:
+        return self.has_unack_leg1() or self.has_unack_leg2()
 
     def set_has_unack_leg1(self, has_unack: bool):
         self.unack_leg1 = has_unack
@@ -275,9 +373,9 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
     def __str__(self):
         return f"stopped: {self.stopped}, primary_leg_trading_symbol: {self.leg1_trading_symbol},  " \
                f"secondary_leg_trading_symbol: {self.leg2_trading_symbol}, pair_strat: {self._pair_strat}, " \
-               f"unack_leg1 {self.unack_leg1}, unack_leg2 {self.unack_leg2}" \
-               f"strat_brief: {self._strat_brief}, cancel_orders: [{self._cancel_orders}], " \
-               f"new_orders: [{self._new_orders}], order_snapshots: {self._order_snapshots}, " \
+               f"unack_leg1 {self.unack_leg1}, unack_leg2 {self.unack_leg2}, " \
+               f"strat_brief: {self._strat_brief}, cancel_orders: {self._order_id_to_cancel_order_dict}, " \
+               f"new_orders: [{self._new_orders}], order_snapshots: {self._order_id_to_order_snapshot_dict}, " \
                f"order_journals: {self._order_journals}, fills_journals: {self._fills_journals}, " \
                f"_symbol_overview: {[str(symbol_overview) for symbol_overview in self._symbol_overviews] if self._symbol_overviews else str(None)}, " \
                f"top of books: {[str(top_of_book) for top_of_book in self._top_of_books] if self._top_of_books else str(None)}, " \

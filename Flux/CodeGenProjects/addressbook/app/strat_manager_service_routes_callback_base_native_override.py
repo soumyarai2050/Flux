@@ -157,8 +157,71 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 else:
                     should_sleep = True
                     # any periodic refresh code goes here
+
+                    # Checking and Restarting crashed executors
+                    self.run_crashed_executors()
             else:
                 should_sleep = True
+
+    def run_crashed_executors(self) -> None:
+        # coro needs public method
+        run_coro = self.async_run_crashed_executors()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"async_run_crashed_executors failed with exception: {e}")
+
+    async def async_run_crashed_executors(self) -> None:
+        pending_strats: List[PairStrat] = []
+        pending_strats_id_list: List[int] = []
+        for pair_strat_id, executor_process in self.pair_strat_id_to_executor_process_dict.items():
+            if executor_process.poll() is not None:
+                logging.info(f"Subprocess for pair_strat with id: {pair_strat_id} found killed, "
+                             f"restarting again ...")
+                pending_strats_id_list.append(pair_strat_id)
+
+                pair_strat: PairStrat = (
+                    await StratManagerServiceRoutesCallbackBaseNativeOverride.
+                    underlying_read_pair_strat_by_id_http(pair_strat_id))
+                pending_strats.append(pair_strat)
+
+        for pair_strat_id in pending_strats_id_list:
+            del self.pair_strat_id_to_executor_process_dict[pair_strat_id]
+
+        if pending_strats:
+            logging.info(f">>> pending_strats: {pending_strats}")
+            await self._async_start_executor_server_by_task_submit(pending_strats, is_crash_recovery=True)
+
+    async def _async_start_executor_server_by_task_submit(self, pending_strats: List[PairStrat],
+                                                          is_crash_recovery: bool | None = False):
+        tasks: List = []
+        for idx, pending_strat in enumerate(pending_strats):
+            task = asyncio.create_task(self._start_executor_server(pending_strat, is_crash_recovery), name=str(idx))
+            tasks.append(task)
+
+        completed_tasks: Set | None = None
+        pending_tasks: Set | None = None
+        while True:
+            try:
+                completed_tasks, pending_tasks = \
+                    await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, timeout=60)
+            except Exception as e:
+                logging.exception(f"start_executor_server asyncio.wait failed with exception: {e}")
+            while completed_tasks:
+                completed_task = None
+                try:
+                    completed_task = completed_tasks.pop()
+                    completed_task.result()
+                except Exception as e:
+                    idx = int(completed_task.get_name())
+                    logging.exception(f"start_executor_server failed;;; exception: {e}, pair_strat: "
+                                      f"{pending_strats[idx]}")
+            if pending_tasks:
+                tasks = [*pending_tasks, ]
+            else:
+                break
 
     @staticmethod
     def create_n_run_fx_so_shell_script():
@@ -184,32 +247,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             pending_strats.append(pair_strat)
 
         if pending_strats:
-            tasks: List = []
-            for idx, pending_strat in enumerate(pending_strats):
-                task = asyncio.create_task(self._start_executor_server(pending_strat), name=str(idx))
-                tasks.append(task)
-
-            completed_tasks: Set | None = None
-            pending_tasks: Set | None = None
-            while True:
-                try:
-                    completed_tasks, pending_tasks = \
-                        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, timeout=60)
-                except Exception as e:
-                    logging.exception(f"start_executor_server asyncio.wait failed with exception: {e}")
-                while completed_tasks:
-                    completed_task = None
-                    try:
-                        completed_task = completed_tasks.pop()
-                        completed_task.result()
-                    except Exception as e:
-                        idx = int(completed_task.get_name())
-                        logging.exception(f"start_executor_server failed;;; exception: {e}, pair_strat: "
-                                          f"{pending_strats[idx]}")
-                if pending_tasks:
-                    tasks = [*pending_tasks, ]
-                else:
-                    break
+            await self._async_start_executor_server_by_task_submit(pending_strats)
 
     def run_existing_executors(self) -> None:
         if self.asyncio_loop:
@@ -489,7 +527,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
         return [update_pair_strat]
 
-    async def _start_executor_server(self, pair_strat: PairStrat) -> None:
+    async def _start_executor_server(self, pair_strat: PairStrat, is_crash_recovery: bool | None = None) -> None:
         if pair_strat.port is not None:
             # If pair strat already exists and executor already have run before
 
@@ -499,12 +537,17 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
         code_gen_projects_dir = PurePath(__file__).parent.parent.parent
         executor_path = code_gen_projects_dir / "strat_executor" / "scripts" / 'launch_beanie_fastapi.py'
-        executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', '&'])
+        if is_crash_recovery:
+            executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', "1", '&'])
+        else:
+            executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', '&'])
         self.pair_strat_id_to_executor_process_dict[pair_strat.id] = executor
 
     def _close_executor_server(self, pair_strat_id: int) -> None:
         process = self.pair_strat_id_to_executor_process_dict[pair_strat_id]
         process.terminate()
+
+        del self.pair_strat_id_to_executor_process_dict[pair_strat_id]
 
     async def get_ongoing_strats_symbol_n_exch_query_pre(self,
                                                          ongoing_strat_symbols_class_type: Type[
@@ -635,8 +678,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                             f"{get_symbol_side_key([(sec_id, side)])}")
                 logging.error(err_str_)
                 raise HTTPException(detail=err_str_, status_code=400)
-
-            del self.pair_strat_id_to_executor_process_dict[pydantic_obj_to_be_deleted.id]
 
         else:
             err_str_ = ("Strat is not running, Deletion of strat that is not in running_state is not supported, "

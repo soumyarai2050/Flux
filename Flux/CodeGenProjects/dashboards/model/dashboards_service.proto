@@ -28,23 +28,25 @@ message RTDash {
   optional DashLeg leg3 = 3 [(FluxFldOrmNoUpdate) = true, (FluxFldFilterEnable) = true, (FluxFldTitle) = "H", (FluxFldHelp) = "H Shares Tickers"]; // wont be set for non AH/HA strat
   optional float max_buy_notional = 4 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldDisplayType) = "int"];
   optional float max_sell_notional = 5 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldDisplayType) = "int"];
-  optional float mkt_premium = 6 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CB Premium", (FluxFldMappingSrc) = "mkt_premium:BarData.premium"];
-  optional float mkt_premium_change = 7 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldMappingSrc) = "mkt_premium_change:BarData.premium_change"];  // against yesterday cb / eqt close and current conversion price
-  optional float cb_credit_spread = 8 [(FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "bps", (FluxFldTitle) = "CBCreditSpread"];
-  optional float cb_implied_volatility = 9 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CBImpliedVol"];
+  optional float mkt_premium = 6 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CB Premium", (FluxFldMappingSrc) = "BarData.premium"];
+  optional float mkt_premium_change = 7 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldMappingSrc) = "BarData.premium_change"];  // against yesterday cb / eqt close and current conversion price
+  optional int64 cb_credit_spread = 8 [(FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "bps", (FluxFldTitle) = "CBCreditSpread"];
+  optional CBCreditSpreadSource cb_credit_spread_source = 9 [(FluxFldTitle) = "CBCreditSpreadSource", (FluxFldHelp) = "if set by UI to user - any external supplied spread value is overridden with this"];
+  optional float cb_implied_volatility = 10 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CBImpliedVol", (FluxFldMappingSrc) = "ImpliedVolData.iv"];
+  optional float cb_implied_volatility_change = 11 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CBImpliedVolChange", (FluxFldMappingSrc) = "ImpliedVolData.iv_change"];
 
   // same as portfolio eligible brokers except filtered by server [strat specific symbol(s)] + user allowed to mod down + TODO move summary fields to both legs - allows for in future CB borrow
-  optional int64 cum_usd_notional = 10 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all USD notional in the underlying locate requests"];
-  optional float avg_max_rate = 11 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "avg of all avg_rate in the underlying locate requests"];
-  optional string cum_strat = 12 [(FluxFldServerPopulate) = true];
-  optional string last_update_time = 13 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true, (FluxFldHelp) = "most recent of all update_time(s) in the underlying"];
-  optional string notes = 14 [(FluxFldServerPopulate) = true, (FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "server generated: holds newline concatanated ashare_locate_requests.note field data"];
-  repeated InventoryRequest ashare_locate_requests = 15 [(FluxFldAbbreviated) = "JSON"];
-  optional InventorySummary indicative_summary = 16 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
-  optional InventorySummary locate_summary = 17 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
-  optional InventorySummary pth_summary = 18 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
-  optional InventorySummary sod_summary = 19 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
-  repeated Broker eligible_brokers = 20 [(FluxFldServerPopulate) = true, (FluxFldHelp) = "Indicative / SOD / Locate / PTH limits"];
+  optional int64 cum_usd_notional = 12 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all USD notional in the underlying locate requests"];
+  optional float avg_max_rate = 13 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "avg of all avg_rate in the underlying locate requests"];
+  optional string cum_strat = 14 [(FluxFldServerPopulate) = true];
+  optional string last_update_time = 15 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true, (FluxFldHelp) = "most recent of all update_time(s) in the underlying"];
+  optional string notes = 16 [(FluxFldServerPopulate) = true, (FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "server generated: holds newline concatanated ashare_locate_requests.note field data"];
+  repeated InventoryRequest ashare_locate_requests = 17 [(FluxFldAbbreviated) = "JSON"];
+  optional InventorySummary indicative_summary = 18 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
+  optional InventorySummary locate_summary = 19 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
+  optional InventorySummary pth_summary = 20 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
+  optional InventorySummary sod_summary = 21 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
+  repeated Broker eligible_brokers = 22 [(FluxFldServerPopulate) = true, (FluxFldHelp) = "Indicative / SOD / Locate / PTH limits"];
 }
 
 message Dash {
@@ -75,6 +77,7 @@ message Dash {
 message DashCollection {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
@@ -96,7 +99,7 @@ message DashCollection {
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string dash_name = 2;
-  repeated string loaded_dashes = 3 [(FluxFldMicroSeparator) = "@", (FluxFldAbbreviated) = "Id:Dash.id^CB:Dash.rt_dash.leg1.sec.sec_id^CBCompany:Dash.rt_dash.leg1.company^CBExch:Dash.rt_dash.leg1.exch_id^CBVwap:Dash.rt_dash.leg1.vwap^CBVwapChng %:Dash.rt_dash.leg1.vwap_change^CBMkt $:Dash.rt_dash.leg1.market_notional^CBOur $:Dash.rt_dash.leg1.consumed_notional^MaxBuy $:Dash.rt_dash.max_buy_notional^MaxSell $:Dash.rt_dash.max_sell_notional^Premium %:Dash.rt_dash.mkt_premium^PremiumChng %:Dash.rt_dash.mkt_premium_change^EQT:Dash.rt_dash.leg2.sec.sec_id^EQTCompany:Dash.rt_dash.leg2.company^EQTExch:Dash.rt_dash.leg2.exch_id^EQTVwap:Dash.rt_dash.leg2.vwap^EQTVwapChng %:Dash.rt_dash.leg2.vwap_change^EQTMkt $:Dash.rt_dash.leg2.market_notional^EQTOur $:Dash.rt_dash.leg2.consumed_notional^Indicative %:Dash.rt_dash.indicative_summary.avg_rate^Indicative $:Dash.rt_dash.indicative_summary.usd_notional^LReqstStrat:Dash.rt_dash.cum_strat^LReqstMax %:Dash.rt_dash.avg_max_rate^LReqst $:Dash.rt_dash.cum_usd_notional^LReqstTime:Dash.rt_dash.last_update_time^LReqstNote:Dash.rt_dash.notes^Locate %:Dash.rt_dash.locate_summary.avg_rate^Locate $:Dash.rt_dash.locate_summary.usd_notional^PTH %:Dash.rt_dash.pth_summary.avg_rate^PTH $:Dash.rt_dash.pth_summary.usd_notional^SOD %:Dash.rt_dash.sod_summary.avg_rate^SOD $:Dash.rt_dash.sod_summary.usd_notional"];
+  repeated string loaded_dashes = 3 [(FluxFldMicroSeparator) = "@", (FluxFldAbbreviated) = "Id:Dash.id^CB:Dash.rt_dash.leg1.sec.sec_id^CBCompany:Dash.rt_dash.leg1.company^CBExch:Dash.rt_dash.leg1.exch_id^CBVwap:Dash.rt_dash.leg1.vwap^CBVwapChng%:Dash.rt_dash.leg1.vwap_change^CBMkt $:Dash.rt_dash.leg1.market_notional^CBOur $:Dash.rt_dash.leg1.consumed_notional^MaxBuy $:Dash.rt_dash.max_buy_notional^MaxSell $:Dash.rt_dash.max_sell_notional^Premium %:Dash.rt_dash.mkt_premium^PremiumChng %:Dash.rt_dash.mkt_premium_change^CBIVol:Dash.rt_dash.cb_implied_volatility^CBIVolChng:Dash.rt_dash.cb_implied_volatility_change^CBSpread:Dash.rt_dash.cb_credit_spread^EQT:Dash.rt_dash.leg2.sec.sec_id^EQTCompany:Dash.rt_dash.leg2.company^EQTExch:Dash.rt_dash.leg2.exch_id^EQTVwap:Dash.rt_dash.leg2.vwap^EQTVwapChng %:Dash.rt_dash.leg2.vwap_change^EQTMkt $:Dash.rt_dash.leg2.market_notional^EQTOur $:Dash.rt_dash.leg2.consumed_notional^Indicative %:Dash.rt_dash.indicative_summary.avg_rate^Indicative $:Dash.rt_dash.indicative_summary.usd_notional^LReqstStrat:Dash.rt_dash.cum_strat^LReqstMax %:Dash.rt_dash.avg_max_rate^LReqst $:Dash.rt_dash.cum_usd_notional^LReqstTime:Dash.rt_dash.last_update_time^LReqstNote:Dash.rt_dash.notes^Locate %:Dash.rt_dash.locate_summary.avg_rate^Locate $:Dash.rt_dash.locate_summary.usd_notional^PTH %:Dash.rt_dash.pth_summary.avg_rate^PTH $:Dash.rt_dash.pth_summary.usd_notional^SOD %:Dash.rt_dash.sod_summary.avg_rate^SOD $:Dash.rt_dash.sod_summary.usd_notional"];
   //Any dashes that don't match user desired filter move to buffered
   repeated string buffered_dashes = 4 [(FluxFldHide) = "True"];
 }
@@ -105,6 +108,7 @@ message DashCollection {
 message DashFilters {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
@@ -131,12 +135,14 @@ message DashFilters {
   optional Inventory inventory = 7;
   optional bool has_ashare_locate_request = 8;
   optional OptimizerCriteria optimizer_criteria = 9;
-  optional SortCriteria sort_criteria =10 [(FluxFldAutoComplete) = "level1:DashFld_List, level2: DashFld_List, level3: DashFld_List"];
+  optional SortCriteria sort_criteria = 10 [(FluxFldAutoComplete) = "level1:DashFld_List, level2: DashFld_List, level3: DashFld_List"];
 }
 
+// Widget - 1
 message DashFiltersCollection {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
@@ -168,22 +174,46 @@ message BarData {
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
-    ExpireAfterSeconds: 60
+    ExpireAfterSeconds: 31536000
   };
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
   required string start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required string end_time = 4 [(FluxFldValIsDateTime) = true];
   optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3"];
-  optional float vwap_change = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3", (FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
+  optional float vwap_change = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3", (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
   optional float premium = 7 [(FluxFldProjections) = "4", (FluxFldProjections) = "6"];
-  optional float premium_change = 8 [(FluxFldProjections) = "5", (FluxFldProjections) = "6"];
-  optional float open = 9;
-  optional float high = 10;
-  optional float low = 11;
-  optional float close = 12;
-  optional int32 volume = 13;
-  optional int32 bar_count = 14;
+  optional float premium_change = 8 [(FluxFldProjections) = "5", (FluxFldProjections) = "6", (FluxFldNumberFormat) = "%"];
+  optional float iv = 9 [(FluxFldProjections) = "7", (FluxFldProjections) = "9"];
+  optional float iv_change = 10 [(FluxFldProjections) = "8", (FluxFldProjections) = "9", (FluxFldNumberFormat) = "%"];
+  optional float open = 11;
+  optional float high = 12;
+  optional float low = 13;
+  optional float close = 14;
+  optional int32 volume = 15;
+  optional int32 cum_volume = 16 [(FluxFldHelp) = "Bar`s day`s cumulative volume"];
+  optional int32 bar_count = 17;
+}
+
+message ImpliedVol {
+  option (FluxMsgJsonRootTimeSeries) = {
+    MongoVersion: 5.0,
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+    Granularity: Sec,
+    ExpireAfterSeconds: 31536000
+  };
+  required int32 id = 1;
+  required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
+  required string compute_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
+  required string end_time = 4 [(FluxFldValIsDateTime) = true];
+  optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3"];
+  optional float underlying_vwap = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3"];
+  optional float iv = 7 [(FluxFldProjections) = "4", (FluxFldProjections) = "6"];
+  optional float iv_change = 8 [(FluxFldProjections) = "5", (FluxFldProjections) = "6"];
 }
 
 message BarDataSymbolNLatestUpdateDateTime{
@@ -216,6 +246,7 @@ message Dummy {
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional Severity severity = 2;
   optional InventoryCSVRequest inv_sev_req = 3;
+  optional Side side = 4;
 }
 
 message DashList {
