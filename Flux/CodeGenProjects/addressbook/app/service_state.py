@@ -25,8 +25,9 @@ class ServiceState(BaseModel):
             self.first_error_time = DateTime.utcnow()
             return 0
 
-    def handle_exception(self, e: Exception):
-        error_str: str = f"{self.error_prefix} failed;;;exception: {e}"
+    def handle_exception(self, e: Exception, inspect_trace=None):
+        error_str: str = f"{self.error_prefix} failed;;;exception: {e}, " \
+                         f"{inspect_trace[-1][3] if inspect_trace else None}"
         logging.error(error_str, exc_info=True)
         if (last_error_interval_in_sec := self.record_error(e)) == 0:
             # raise alert

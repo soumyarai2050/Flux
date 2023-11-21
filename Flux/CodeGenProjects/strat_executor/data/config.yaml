@@ -37,3 +37,4 @@ raw_performance_data_processor_loop_wait: 2  # sec
 
 is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
+allow_multiple_open_orders_per_strat: False

@@ -1,6 +1,11 @@
 # standard imports
+import logging
+from datetime import timedelta
 from threading import RLock, Semaphore
+from typing import Dict, Tuple, Optional, ClassVar
 import copy
+import pytz
+from pendulum import DateTime
 
 # project imports
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_models_log_keys import get_pair_strat_log_key
@@ -95,7 +100,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         self._market_depths_update_date_time: DateTime = DateTime.utcnow()
 
         # order-snapshot is also stored in here iff order snapshot is open [and removed from here if otherwise]
-        self._order_id_to_open_order_snapshot_dict: Dict[Any, OrderSnapshotBaseModel | OrderSnapshot] = {}   # no open
+        self._order_id_to_open_order_snapshot_dict: Dict[Any, OrderSnapshotBaseModel | OrderSnapshot] = {}  # no open
         self._open_order_snapshots_update_date_time: DateTime = DateTime.utcnow()
 
     def set_order_snapshot(self, order_snapshot: OrderSnapshotBaseModel | OrderSnapshot) -> DateTime:
@@ -106,21 +111,21 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         if order_snapshot.order_status not in [OrderStatusType.OE_DOD, OrderStatusType.OE_FILLED]:
             self._order_id_to_open_order_snapshot_dict[order_snapshot.order_brief.order_id] = order_snapshot
         elif order_snapshot.order_status == OrderStatusType.OE_OVER_FILLED:
-            # ideally code would move the strat to error state when it sees overfill - this only handles corner cases
+            # ideally code would move the strat to pause state when it sees overfill - this only handles corner cases
             logging.error("Unexpected: Order found overfilled - strat will block [has open order will force fail]")
         else:
-            # Providing second argument None prevents the KeyError exception
+            # Providing the second argument None prevents the KeyError exception
             self._order_id_to_open_order_snapshot_dict.pop(order_snapshot.order_brief.order_id, None)
-        pass    # ignore - helps with debug
+        pass  # ignore - helps with debug
 
     def get_open_order_count_from_cache(self) -> int:
         """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
         return len(self._order_id_to_open_order_snapshot_dict)
 
-    # not working this partially filled orders - check why
+    # not working with partially filled orders - check why
     def get_open_order_count(self) -> int:
         """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
-        assert(self._strat_limits, self._strat_limits.max_open_orders_per_side, self._strat_brief,
+        assert (self._strat_limits, self._strat_limits.max_open_orders_per_side, self._strat_brief,
                self._strat_brief.pair_sell_side_trading_brief,
                self._strat_brief.pair_sell_side_trading_brief.consumable_open_orders,
                self._strat_brief.pair_buy_side_trading_brief.consumable_open_orders)
@@ -172,8 +177,8 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         # else not required: passing None to clear pair_strat form cache is valid
         return self._pair_strat_update_date_time
 
-    def get_symbol_side_snapshot_from_symbol(
-            self, symbol: str, date_time: DateTime | None = None) -> Tuple[SymbolSideSnapshot, DateTime] | None:
+    def get_symbol_side_snapshot_from_symbol(self, symbol: str, date_time: DateTime | None = None) -> \
+            Tuple[SymbolSideSnapshot, DateTime] | None:
         symbol_side_snapshot_tuple = self.get_symbol_side_snapshot(date_time)
         if symbol_side_snapshot_tuple is not None:
             symbol_side_snapshot_list, _ = symbol_side_snapshot_tuple
@@ -234,8 +239,9 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         return None
 
     def get_top_of_book(self, date_time: DateTime | None = None) -> \
-            Tuple[List[TopOfBookBaseModel| TopOfBook], DateTime] | None:
-        if date_time is None or (date_time < self._tob_leg1_update_date_time and date_time < self._tob_leg2_update_date_time):
+            Tuple[List[TopOfBookBaseModel | TopOfBook], DateTime] | None:
+        if date_time is None or (
+                date_time < self._tob_leg1_update_date_time and date_time < self._tob_leg2_update_date_time):
             with self.re_ent_lock:
                 if self._top_of_books[0] is not None and self._top_of_books[1] is not None:
                     _top_of_books_update_date_time = copy.deepcopy(
@@ -263,6 +269,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                               f"{delta} period, ignoring this TOB;;;stored tob: {self._top_of_books[0]}"
                               f" update received [discarded] TOB: {top_of_book}")
                 return None
+            # else not needed - common log outside handles this
         elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
             if top_of_book.last_update_date_time > self._tob_leg2_update_date_time:
                 self._top_of_books[1] = top_of_book
@@ -286,10 +293,6 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                           f"{self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id}")
             return None
 
-    # TODO: check recovery logic
-    # def set_recovery_top_of_book(self, top_of_book: TopOfBookBaseModel | TopOfBook) -> DateTime | None:
-    #     return self._set_top_of_book(top_of_book)
-
     def get_market_depth(self, symbol: str, side: Side, sorted_reverse: bool = False,
                          date_time: DateTime | None = None) -> \
             Tuple[List[MarketDepthBaseModel | MarketDepth], DateTime] | None:
@@ -299,7 +302,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                     _market_depth_cont: MarketDepthsCont
                     for _market_depth_cont in self._market_depths_conts:
                         if _market_depth_cont.symbol == symbol:
-                            # deep copy not needed as new updates override the entire container [only
+                            # deep copy not needed as new updates overwrite the entire container [only
                             # set_sorted_market_depths interface available for update]
                             _market_depths_update_date_time = self._market_depths_update_date_time
                             # _market_depths_update_date_time = copy.deepcopy(self._market_depths_update_date_time)
@@ -338,7 +341,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         if self._market_depths_conts is None:
             self._market_depths_conts = []
             _market_depths_cont = MarketDepthsCont(system_symbol)
-            _market_depths_cont.set_market_depth(side, sorted_market_depths)
+            _market_depths_cont.set_market_depths(side, sorted_market_depths)
             self._market_depths_conts.append(_market_depths_cont)
         else:
             _market_depths_cont: MarketDepthsCont

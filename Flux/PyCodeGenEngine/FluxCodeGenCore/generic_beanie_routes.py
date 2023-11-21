@@ -279,7 +279,6 @@ async def generic_post_http(pydantic_class_type: Type[DocType],
         return True
 
 
-
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_post_all_http(pydantic_class_type: Type[DocType], proto_package_name: str,
@@ -597,7 +596,9 @@ async def generic_delete_all_http(pydantic_class_type: Type[DocType], proto_pack
     if id_is_int_type:
         pydantic_objs_count = await pydantic_class_type.count()
         if pydantic_objs_count == 0:
-            pydantic_class_type.init_max_id(0)
+            max_id_val = 0
+            max_update_id_vale = 0
+            pydantic_class_type.init_max_id(max_id_val, max_update_id_vale)
         # else not required: all good
     # else not required: if id is not int then it must be of PydanticObjectId so no handling required
 

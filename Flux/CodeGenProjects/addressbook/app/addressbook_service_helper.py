@@ -148,10 +148,10 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Po
 
 
 def get_new_order_limits() -> OrderLimits:
-    order_limits_obj: OrderLimits = OrderLimits(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                                                max_order_qty=500, min_order_notional=100,
-                                                max_order_notional=90_000)
-    return order_limits_obj
+    ord_limit_obj: OrderLimits = OrderLimits(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                                             max_order_qty=500, min_order_notional=100,
+                                             max_order_notional=90_000)
+    return ord_limit_obj
 
 
 def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:

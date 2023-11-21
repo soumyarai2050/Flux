@@ -28,14 +28,14 @@ def test_min_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -74,21 +74,21 @@ def test_max_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_
                                    expected_start_status_, symbol_overview_obj_list,
                                    last_trade_fixture_list, market_depth_basemodel_list,
                                    top_of_book_list_, buy_order_, sell_order_,
-                                   max_loop_count_per_side, residual_wait_sec):
+                                   max_loop_count_per_side):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
                                                  last_trade_fixture_list, market_depth_basemodel_list,
                                                  top_of_book_list_))
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -127,7 +127,7 @@ def test_max_order_qty_breach(static_data_, clean_and_set_limits, buy_sell_symbo
                               expected_start_status_, symbol_overview_obj_list,
                               last_trade_fixture_list, market_depth_basemodel_list,
                               top_of_book_list_, buy_order_, sell_order_,
-                              max_loop_count_per_side, residual_wait_sec):
+                              max_loop_count_per_side):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -135,14 +135,14 @@ def test_max_order_qty_breach(static_data_, clean_and_set_limits, buy_sell_symbo
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -180,7 +180,7 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
                                             expected_start_status_, symbol_overview_obj_list,
                                             last_trade_fixture_list, market_depth_basemodel_list,
                                             top_of_book_list_, buy_order_, sell_order_,
-                                            max_loop_count_per_side, residual_wait_sec):
+                                            max_loop_count_per_side):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -188,14 +188,14 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -263,21 +263,21 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
                                                    expected_start_status_, symbol_overview_obj_list,
                                                    last_trade_fixture_list, market_depth_basemodel_list,
                                                    top_of_book_list_, buy_order_, sell_order_,
-                                                   max_loop_count_per_side, residual_wait_sec):
+                                                   max_loop_count_per_side):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
                                                  last_trade_fixture_list, market_depth_basemodel_list,
                                                  top_of_book_list_))
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -324,14 +324,14 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -343,6 +343,9 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         market_depth_list = executor_http_client.get_all_market_depth_client()
@@ -387,14 +390,14 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -406,6 +409,9 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)   # wait to get open order residual
 
         # Negative Check
         tob_list = executor_http_client.get_all_top_of_book_client()
@@ -424,7 +430,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
         px = 100
         qty = 90
         check_str = f"blocked generated BUY order, symbol: {buy_symbol}, side: {Side.BUY} as aggressive_quote" \
-                    f" is found None"
+                    f" is not found or has no px"
         assert_fail_msg = "Could not find any alert containing message to block orders tob last trade as None"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_msg,
@@ -475,14 +481,14 @@ def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symb
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -520,7 +526,7 @@ def test_breach_threshold_px_for_max_basis_points(static_data_, clean_and_set_li
                                                   expected_start_status_, symbol_overview_obj_list,
                                                   last_trade_fixture_list, market_depth_basemodel_list,
                                                   top_of_book_list_, buy_order_, sell_order_,
-                                                  max_loop_count_per_side, residual_wait_sec):
+                                                  max_loop_count_per_side):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -529,14 +535,14 @@ def test_breach_threshold_px_for_max_basis_points(static_data_, clean_and_set_li
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -603,7 +609,7 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
                           last_trade_fixture_list, symbol_overview_obj_list,
                           market_depth_basemodel_list, expected_order_limits_,
                           expected_portfolio_limits_, max_loop_count_per_side,
-                          buy_sell_symbol_list, residual_wait_sec):
+                          buy_sell_symbol_list):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -611,14 +617,14 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -680,7 +686,7 @@ def test_breach_threshold_px_for_max_px_by_deviation(static_data_, clean_and_set
                                                      expected_start_status_, symbol_overview_obj_list,
                                                      last_trade_fixture_list, market_depth_basemodel_list,
                                                      top_of_book_list_, buy_order_, sell_order_,
-                                                     max_loop_count_per_side, residual_wait_sec):
+                                                     max_loop_count_per_side):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -689,14 +695,14 @@ def test_breach_threshold_px_for_max_px_by_deviation(static_data_, clean_and_set
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -766,14 +772,14 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -785,6 +791,9 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)   # wait to get open order residual
 
         # Negative Check
         market_depth_list = executor_http_client.get_all_market_depth_client()
@@ -875,7 +884,7 @@ def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_
                                                     expected_start_status_, symbol_overview_obj_list,
                                                     last_trade_fixture_list, market_depth_basemodel_list,
                                                     top_of_book_list_, buy_order_, sell_order_,
-                                                    max_loop_count_per_side, residual_wait_sec):
+                                                    max_loop_count_per_side):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -884,14 +893,14 @@ def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -970,7 +979,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activated_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -989,6 +998,9 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)   # wait to get open order residual
 
         # Negative check
         # placing new non-systematic new_order
@@ -1023,7 +1035,7 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
                                                          expected_start_status_, symbol_overview_obj_list,
                                                          last_trade_fixture_list, market_depth_basemodel_list,
                                                          top_of_book_list_, buy_order_, sell_order_,
-                                                         max_loop_count_per_side, residual_wait_sec):
+                                                         max_loop_count_per_side):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -1032,14 +1044,14 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1144,7 +1156,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
                                                           expected_start_status_, symbol_overview_obj_list,
                                                           last_trade_fixture_list, market_depth_basemodel_list,
                                                           top_of_book_list_, buy_order_, sell_order_,
-                                                          max_loop_count_per_side, residual_wait_sec):
+                                                          max_loop_count_per_side):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -1153,14 +1165,14 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1220,7 +1232,7 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -1243,6 +1255,9 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
 
         placed_new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
                                                                                    executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)   # wait to get open order residual
 
         # Negative Check
         # making last trade unavailable to next order call to make consumable_participation_qty negative
@@ -1272,7 +1287,7 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
                                                           expected_start_status_, symbol_overview_obj_list,
                                                           last_trade_fixture_list, market_depth_basemodel_list,
                                                           top_of_book_list_, buy_order_, sell_order_,
-                                                          max_loop_count_per_side, residual_wait_sec):
+                                                          max_loop_count_per_side):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
 
@@ -1280,12 +1295,11 @@ def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_an
     activate_pair_strat, executor_http_client = (
         create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                 copy.deepcopy(expected_strat_limits_),
-                                copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_list_))
-    # creating market_depth
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_http_client)
+                                copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_list_,
+                                market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -1342,12 +1356,11 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
     activate_pair_strat, executor_http_client = (
         create_n_activate_strat(buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                 copy.deepcopy(expected_strat_limits_),
-                                copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_list_))
-    # creating market_depth
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_http_client)
+                                copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_list_,
+                                market_depth_basemodel_list))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{activate_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -1367,6 +1380,9 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)   # wait to get open order residual
 
         # Negative check
         # removing last_trade for negative check
@@ -1394,10 +1410,10 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def test_strat_done_after_exhausted_consumable_notional(
+def test_strat_done_after_exhausted_buy_consumable_notional(
         static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, expected_order_limits_):
+        top_of_book_list_, buy_order_, sell_order_, expected_order_limits_, residual_wait_sec):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
 
@@ -1414,7 +1430,7 @@ def test_strat_done_after_exhausted_consumable_notional(
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -1434,23 +1450,12 @@ def test_strat_done_after_exhausted_consumable_notional(
         time.sleep(2)  # delay for order to get placed
 
         buy_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
-                                                                            executor_http_client)
+                                                                                executor_http_client, assert_code=1)
         order_snapshot = get_order_snapshot_from_order_id(buy_ack_order_journal.order.order_id, executor_http_client)
         assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
                                                                         f"OrderStatusType.OE_ACKED received " \
                                                                         f"{order_snapshot.order_status}"
-
-        # Sell fills check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-        time.sleep(2)  # delay for order to get placed
-
-        sell_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol,
-                                                                            executor_http_client)
-        order_snapshot = get_order_snapshot_from_order_id(sell_ack_order_journal.order.order_id, executor_http_client)
-        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
-                                                                        f"OrderStatusType.OE_ACKED received " \
-                                                                        f"{order_snapshot.order_status}"
+        time.sleep(residual_wait_sec)   # wait to get buy order residual
 
         # Negative Check
         # Next placed order must not get placed, instead it should find consumable_notional as exhausted for further
@@ -1463,7 +1468,81 @@ def test_strat_done_after_exhausted_consumable_notional(
         ack_order_journal = (
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol, executor_http_client,
                                                             last_order_id=buy_ack_order_journal.order.order_id,
-                                                            expect_no_order=True))
+                                                            expect_no_order=True, assert_code=3))
+        strat_status = executor_http_client.get_strat_status_client(created_pair_strat.id)
+        assert strat_status.strat_state == StratState.StratState_DONE, (
+            f"Mismatched strat_state, expected {StratState.StratState_DONE}, received {strat_status.strat_state}")
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def test_strat_done_after_exhausted_sell_consumable_notional(
+        static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
+        top_of_book_list_, buy_order_, sell_order_, expected_order_limits_, residual_wait_sec):
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    # updating order_limits
+    expected_order_limits_.min_order_notional = 15000
+    expected_order_limits_.id = 1
+    strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+
+    # setting strat_limits for this test
+    expected_strat_limits_.max_cb_notional = 18000
+    created_pair_strat, executor_http_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 95
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.trade_simulator_reload_config_query_client()
+
+        # Positive Check
+
+        # Sell fills check
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
+        time.sleep(2)  # delay for order to get placed
+
+        sell_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol,
+                                                                                 executor_http_client, assert_code=2)
+        order_snapshot = get_order_snapshot_from_order_id(sell_ack_order_journal.order.order_id, executor_http_client)
+        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
+                                                                        f"OrderStatusType.OE_ACKED received " \
+                                                                        f"{order_snapshot.order_status}"
+        time.sleep(residual_wait_sec)   # wait to get sell order residual
+
+        # Negative Check
+        # Next placed order must not get placed, instead it should find consumable_notional as exhausted for further
+        # orders and should come out of executor run and must set strat_state to StratState_DONE
+
+        # sell fills check
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
+        time.sleep(2)  # delay for order to get placed
+        ack_order_journal = (
+            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol, executor_http_client,
+                                                            last_order_id=sell_ack_order_journal.order.order_id,
+                                                            expect_no_order=True, assert_code=3))
         strat_status = executor_http_client.get_strat_status_client(created_pair_strat.id)
         assert strat_status.strat_state == StratState.StratState_DONE, (
             f"Mismatched strat_state, expected {StratState.StratState_DONE}, received {strat_status.strat_state}")
@@ -1491,14 +1570,14 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1510,6 +1589,9 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)   # wait to get open order residual
 
         # Negative check
         strat_brief_list = executor_http_client.get_all_strat_brief_client()
@@ -1528,7 +1610,8 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         # placing new non-systematic new_order
         px = 1000
         qty = 90
-        check_str = "blocked generated BUY order, not enough consumable_open_notional"
+        check_str = (f"blocked symbol_side_key: symbol-side={buy_symbol}-{Side.BUY} order, "
+                     "breaches available consumable open notional")
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
@@ -1551,7 +1634,8 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         # placing new non-systematic new_order
         px = 7000
         qty = 90
-        check_str = "blocked generated SELL order, not enough consumable_open_notional"
+        check_str = (f"blocked symbol_side_key: symbol-side={sell_symbol}-{Side.SELL} order, "
+                     "breaches available consumable open notional")
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
@@ -1571,7 +1655,7 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
                                                       expected_start_status_, symbol_overview_obj_list,
                                                       last_trade_fixture_list, market_depth_basemodel_list,
                                                       top_of_book_list_, buy_order_, sell_order_,
-                                                      max_loop_count_per_side, residual_wait_sec):
+                                                      max_loop_count_per_side):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -1579,14 +1663,14 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1646,7 +1730,7 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
                                                             expected_strat_limits_, expected_start_status_,
                                                             symbol_overview_obj_list,
                                                             last_trade_fixture_list, market_depth_basemodel_list,
-                                                            top_of_book_list_):
+                                                            top_of_book_list_, expect_no_order=False):
     # making conditions suitable for this test
     expected_strat_limits_.max_open_orders_per_side = 10
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 1000
@@ -1657,10 +1741,13 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
-    total_order_count_for_each_side = 2
+    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        total_order_count_for_each_side = 1
+    else:
+        total_order_count_for_each_side = 2
 
     try:
         # updating yaml_configs according to this test
@@ -1679,19 +1766,22 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
 
             new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                 buy_symbol, executor_http_client,
+                                                                                expect_no_order=expect_no_order,
                                                                                 last_order_id=last_buy_order_id)
             last_buy_order_id = new_order_journal.order.order_id
 
         # Placing sell orders
         last_sell_order_id = None
-        for loop_count in range(total_order_count_for_each_side):
-            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
+        if executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            for loop_count in range(total_order_count_for_each_side):
+                run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+                run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
 
-            new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                                sell_symbol, executor_http_client,
-                                                                                last_order_id=last_sell_order_id)
-            last_sell_order_id = new_order_journal.order.order_id
+                new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                                    sell_symbol, executor_http_client,
+                                                                                    expect_no_order=expect_no_order,
+                                                                                    last_order_id=last_sell_order_id)
+                last_sell_order_id = new_order_journal.order.order_id
 
         return executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id
     except AssertionError as e:
@@ -1720,10 +1810,13 @@ def handle_place_single_side_orders_for_portfolio_limits_test(buy_symbol: str, s
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
-    total_order_count_for_each_side = 2
+    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        total_order_count_for_each_side = 1
+    else:
+        total_order_count_for_each_side = 2
 
     try:
         # updating yaml_configs according to this test
@@ -1785,26 +1878,36 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, buy_sell_symbol_li
                           last_trade_fixture_list, market_depth_basemodel_list,
                           top_of_book_list_, buy_order_, sell_order_,
                           max_loop_count_per_side, expected_portfolio_limits_):
-    # INFO:
-    # Test sets max_open_baskets = 8, first triggers 2 strat_executors and places 2 orders each side from each executor,
-    # these 8 orders must pass for positive check, then one more order is placed per side in
-    # any one executor so BUY order must tigger all-strat pause and SELL order must not be placed since strats
-    # are paused  + alert must be created in portfolio_alerts
+    # > INFO:
+    # Test sets max_open_baskets = 7,
+    # - if multi open orders are allowed:
+    # first triggers 2 strat_executors and places 2 orders each side from each executor,
+    # these 8 orders must pass for positive check and 8th order must breach max_open_baskets limits
+    # and must trigger all-strat pause, then one more BUY order is placed in
+    # any one executor, so it must not be placed since strats are paused + alert must be created in portfolio_alerts
+    # - if multi open orders are not allowed:
+    # first triggers 8 strat_executors and places 1 order BUY side from each executor,
+    # these 8 orders must pass for positive check and 8th order must breach max_open_baskets limits
+    # and must trigger all-strat pause, then one more strat is created and BUY order is placed,
+    # so it must not be placed since strats are paused + alert must be created in portfolio_alerts
 
     # Updating portfolio limits
-    expected_portfolio_limits_.max_open_baskets = 8
+    expected_portfolio_limits_.max_open_baskets = 7
     strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
-    buy_sell_symbol_list = buy_sell_symbol_list[:2]
+    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:8]
+    else:
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:2]
     executor_http_clients_n_last_order_id_tuple_list = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_place_both_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
                                    deepcopy(pair_strat_),
                                    deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   deepcopy(top_of_book_list_))
-                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+                                   deepcopy(top_of_book_list_), False)
+                   for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -1814,29 +1917,16 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, buy_sell_symbol_li
             executor_http_clients_n_last_order_id_tuple_list.append(
                 (executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id))
 
-    # Till this point since max_open_buckets limits is not breached all orders must have been
-    # placed but any new order must not be placed, checking that now...
+    # Till this point since max_open_buckets limits must have breached and any new order must not be placed,
+    # checking that now...
 
-    for executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id in (
-            executor_http_clients_n_last_order_id_tuple_list):
-        # Triggering new buy order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-
-        new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
-                                                                            executor_http_client,
-                                                                            last_order_id=last_buy_order_id)
-
-        # Triggering sell buy order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
-
-        # will raise assertion internally if new order found
-        new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol,
-                                                                            executor_http_client,
-                                                                            expect_no_order=True,
-                                                                            last_order_id=last_sell_order_id)
-        break
+    new_buy_sell_symbol_list = buy_sell_symbol_list[8]
+    buy_symbol = new_buy_sell_symbol_list[0]
+    sell_symbol = new_buy_sell_symbol_list[1]
+    handle_place_both_side_orders_for_portfolio_limits_test(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        expect_no_order=True)
 
     # Checking alert in portfolio_alert
     check_str = "max_open_baskets breached"
@@ -1869,25 +1959,33 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
                                             top_of_book_list_, buy_order_, sell_order_,
                                             max_loop_count_per_side, expected_portfolio_limits_):
     # INFO:
-    # Test sets max_open_notional_per_side = 45_000, first triggers 2 strat_executors and places 2 orders BUY side
-    # from each executor, these 4 must pass for positive check and fourth order must breach limit and as a result
-    # all-strat pause also should get triggered, then one more BUY order place is tried but that should get ignored
-    # due to all strat pause + alert must be created in portfolio_alerts
+    # Test sets max_open_notional_per_side = 45_000,
+
+    # - if multi open orders are allowed:
+    # triggers 2 strat_executors and places 2 orders BUY side from each executor
+    # - if multi open orders are not allowed:
+    # creates 4 strats and places each Buy Order from each executor
+
+    # these 4 must pass for positive check and fourth order must breach limit and as a result
+    # all-strat pause also should get triggered + alert must be created in portfolio_alerts
 
     # Updating portfolio limits
-    expected_portfolio_limits_.max_open_notional_per_side = 45_000
+    expected_portfolio_limits_.max_open_notional_per_side = 36_000
     strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
-    buy_sell_symbol_list = buy_sell_symbol_list[:2]
+    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:4]
+    else:
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:2]
     executor_http_clients_n_last_order_id_tuple_list = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_place_single_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
                                    deepcopy(pair_strat_),
                                    deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
                                    deepcopy(top_of_book_list_), Side.BUY)
-                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+                   for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -1896,22 +1994,6 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
             executor_http_client, buy_symbol, sell_symbol, last_buy_order_id = future.result()
             executor_http_clients_n_last_order_id_tuple_list.append(
                 (executor_http_client, buy_symbol, sell_symbol, last_buy_order_id))
-
-    # Till this point, since last order must have breached max_open_notional_per_side limits, all strat-pause must
-    # have been triggered and next order must get ignored, checking that now...
-
-    for executor_http_client, buy_symbol, sell_symbol, last_buy_order_id in (
-            executor_http_clients_n_last_order_id_tuple_list):
-        # Triggering new buy order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-
-        # will raise assertion internally if new order found
-        new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
-                                                                            executor_http_client,
-                                                                            expect_no_order=True,
-                                                                            last_order_id=last_buy_order_id)
-        break
 
     time.sleep(2)
 
@@ -1946,16 +2028,24 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
                                              top_of_book_list_, buy_order_, sell_order_,
                                              max_loop_count_per_side, expected_portfolio_limits_):
     # INFO:
-    # Test sets max_open_notional_per_side = 38_500, first triggers 2 strat_executors and places 2 orders BUY side
-    # from each executor, these 4 must pass for positive check and fourth order must breach limit and as a result
-    # all-strat pause also should get triggered, then one more BUY order place is tried but that should get ignored
-    # due to all strat pause + alert must be created in portfolio_alerts
+    # Test sets max_open_notional_per_side = 30_800,
+
+    # - if multi open orders are allowed:
+    # triggers 2 strat_executors and places 2 orders SELL side from each executor
+    # - if multi open orders are not allowed:
+    # creates 4 strats and places each SELL Order from each executor
+
+    # these 4 must pass for positive check and fourth order must breach limit and as a result
+    # all-strat pause also should get triggered + alert must be created in portfolio_alerts
 
     # Updating portfolio limits
-    expected_portfolio_limits_.max_open_notional_per_side = 38_500
+    expected_portfolio_limits_.max_open_notional_per_side = 30_800
     strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
-    buy_sell_symbol_list = buy_sell_symbol_list[:2]
+    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:4]
+    else:
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:2]
     executor_http_clients_n_last_order_id_tuple_list = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_place_single_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
@@ -1964,7 +2054,7 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
                                    deepcopy(top_of_book_list_), Side.SELL)
-                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+                   for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -1973,22 +2063,6 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
             executor_http_client, buy_symbol, sell_symbol, last_sell_order_id = future.result()
             executor_http_clients_n_last_order_id_tuple_list.append(
                 (executor_http_client, buy_symbol, sell_symbol, last_sell_order_id))
-
-    # Till this point, since last order must have breached max_open_notional_per_side limits, all strat-pause must
-    # have been triggered and next order must get ignored, checking that now...
-
-    for executor_http_client, buy_symbol, sell_symbol, last_sell_order_id in (
-            executor_http_clients_n_last_order_id_tuple_list):
-        # Triggering new buy order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
-
-        # will raise assertion internally if new order found
-        new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol,
-                                                                            executor_http_client,
-                                                                            expect_no_order=True,
-                                                                            last_order_id=last_sell_order_id)
-        break
 
     # Checking alert in portfolio_alert
     check_str = "max_open_notional_per_side breached for SELL side"
@@ -2022,47 +2096,80 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
         top_of_book_list_, buy_order_, sell_order_,
         max_loop_count_per_side, expected_portfolio_limits_):
     # INFO:
-    # Test sets max_gross_n_open_notional = 134_000, first triggers 2 strat_executors and places 2 orders each
-    # side from each executor, these 8 orders must pass for positive check, then one more BUY order is placed in
+    # Test sets max_gross_n_open_notional = 134_000
+
+    # - if multi open orders are allowed:
+    # triggers 2 strat_executors and places 2 orders each side from each executor
+    # - if multi open orders are not allowed:
+    # triggers 8 strat_executors out of which 4 places BUY orders each and rest 4 places SELL orders each
+
+    # these 8 orders must pass for positive check, then one more BUY order is placed in
     # any executor and this new order journal must trigger all strat-pause + alert must be created in strat_alert
 
     # Updating portfolio limits
-    expected_portfolio_limits_.max_gross_n_open_notional = 150_000
+    expected_portfolio_limits_.max_gross_n_open_notional = 130_000
     strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
-    buy_sell_symbol_list = buy_sell_symbol_list[:2]
-    executor_http_clients_n_last_order_id_tuple_list = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
-        results = [executor.submit(handle_place_both_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
-                                   deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
-                                   deepcopy(symbol_overview_obj_list),
-                                   deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   deepcopy(top_of_book_list_))
-                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+    if executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:2]
+        executor_http_clients_n_last_order_id_tuple_list = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_sell_symbol_list)) as executor:
+            results = [executor.submit(handle_place_both_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
+                                       deepcopy(pair_strat_),
+                                       deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
+                                       deepcopy(symbol_overview_obj_list),
+                                       deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
+                                       deepcopy(top_of_book_list_), False)
+                       for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
 
-        for future in concurrent.futures.as_completed(results):
-            if future.exception() is not None:
-                raise Exception(future.exception())
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise Exception(future.exception())
 
-            executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id = future.result()
-            executor_http_clients_n_last_order_id_tuple_list.append(
-                (executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id))
+                executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id = future.result()
+                executor_http_clients_n_last_order_id_tuple_list.append(
+                    (executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id))
+    else:
+        sliced_buy_symbol_list = buy_sell_symbol_list[:4]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_symbol_list)) as executor:
+            results = [
+                executor.submit(handle_place_single_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
+                                deepcopy(pair_strat_),
+                                deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
+                                deepcopy(symbol_overview_obj_list),
+                                deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
+                                deepcopy(top_of_book_list_), Side.BUY)
+                for buy_symbol, sell_symbol in sliced_buy_symbol_list]
 
-    # Till this point since max_open_buckets limits is not breached all orders must have been
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise Exception(future.exception())
+
+        sliced_sell_symbol_list = buy_sell_symbol_list[4:8]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_sell_symbol_list)) as executor:
+            results = [
+                executor.submit(handle_place_single_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
+                                deepcopy(pair_strat_),
+                                deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
+                                deepcopy(symbol_overview_obj_list),
+                                deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
+                                deepcopy(top_of_book_list_), Side.SELL)
+                for buy_symbol, sell_symbol in sliced_sell_symbol_list]
+
+            for future in concurrent.futures.as_completed(results):
+                if future.exception() is not None:
+                    raise Exception(future.exception())
+
+    # Till this point since max_open_buckets limits is breached in last order, all orders must have been
     # placed but any new order must not be placed, checking that now...
 
-    for executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id in (
-            executor_http_clients_n_last_order_id_tuple_list):
-        # Triggering new buy order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-
-        # will raise assertion internally if no new order found
-        new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
-                                                                            executor_http_client,
-                                                                            last_order_id=last_buy_order_id)
-        break
+    new_buy_sell_symbol_list = buy_sell_symbol_list[8]
+    buy_symbol = new_buy_sell_symbol_list[0]
+    sell_symbol = new_buy_sell_symbol_list[1]
+    handle_place_both_side_orders_for_portfolio_limits_test(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        expect_no_order=True)
 
     # Checking alert in portfolio_alert
     check_str = "max_gross_n_open_notional breached,"
@@ -2092,7 +2199,7 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
 def all_strat_pause_test_for_max_reject_limit_breach(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_):
+        top_of_book_list_, residual_wait_sec):
     # explicitly setting waived_min_orders to 10 for this test case
     expected_strat_limits_.cancel_rate.waived_min_orders = 10
     created_pair_strat, executor_http_client = (
@@ -2101,7 +2208,7 @@ def all_strat_pause_test_for_max_reject_limit_breach(
                                            last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -2123,7 +2230,7 @@ def all_strat_pause_test_for_max_reject_limit_breach(
         last_buy_rej_id, last_sell_rej_id = (
             handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
                                   last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
-                                  False, executor_http_client, config_dict))
+                                  False, executor_http_client, config_dict, residual_wait_sec))
         return executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id
     except AssertionError as e:
         raise AssertionError(e)
@@ -2145,7 +2252,10 @@ def test_last_n_sec_order_counts(static_data_, clean_and_set_limits, buy_sell_sy
     expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds = 10000
     strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
-    buy_sell_symbol_list = buy_sell_symbol_list[:2]
+    if executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        buy_sell_symbol_list = buy_sell_symbol_list[:2]
+    else:
+        buy_sell_symbol_list = buy_sell_symbol_list[:8]
     executor_http_clients_n_last_order_id_tuple_list = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_place_both_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
@@ -2153,7 +2263,7 @@ def test_last_n_sec_order_counts(static_data_, clean_and_set_limits, buy_sell_sy
                                    deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   deepcopy(top_of_book_list_))
+                                   deepcopy(top_of_book_list_), False)
                    for buy_symbol, sell_symbol in buy_sell_symbol_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -2200,27 +2310,36 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
                                                    max_loop_count_per_side, residual_wait_sec,
                                                    expected_portfolio_limits_):
     # INFO:
-    # Test has rolling_max_order_count.max_rolling_tx_count = 8 and
-    # rolling_max_order_count.rolling_tx_count_period_seconds = 10000 that means within 10000 secs 9th rej
-    # will trigger all strat-pause. Test will create 2 strats and will place 2 order each side to equal threshold of
-    # 8 rej orders after which one more order will be placed per side from any executor so, one must trigger
-    # all strat-pause and other must get ignored since strats got paused + alert must be present in portfolio alerts
+    # Test has rolling_max_order_count.max_rolling_tx_count = 7 and
+    # rolling_max_order_count.rolling_tx_count_period_seconds = 10000 that means within 10000 secs 8th new order
+    # will trigger all strat-pause.
+
+    # - if multi open orders are allowed:
+    # Test will create 2 strats and will place 2 order each side
+    # - if multi open orders are not allowed:
+    # Test will create 8 strats and will place BUY order from each executor
+
+    # 8th new order must breach limit and trigger all strat-pause and any new order must get ignored since strats
+    # got paused + alert must be present in portfolio alerts
 
     # Updating portfolio limits
-    expected_portfolio_limits_.rolling_max_order_count.max_rolling_tx_count = 8
+    expected_portfolio_limits_.rolling_max_order_count.max_rolling_tx_count = 7
     expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds = 10000
     strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
-    buy_sell_symbol_list = buy_sell_symbol_list[:2]
+    if executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:2]
+    else:
+        sliced_buy_sell_symbol_list = buy_sell_symbol_list[:8]
     executor_http_clients_n_last_order_id_tuple_list = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(sliced_buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_place_both_side_orders_for_portfolio_limits_test, buy_symbol, sell_symbol,
                                    deepcopy(pair_strat_),
                                    deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   deepcopy(top_of_book_list_))
-                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+                                   deepcopy(top_of_book_list_), False)
+                   for buy_symbol, sell_symbol in sliced_buy_sell_symbol_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -2230,29 +2349,15 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
             executor_http_clients_n_last_order_id_tuple_list.append(
                 (executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id))
 
-    # Till this point since max_open_buckets limits is not breached all orders must have been
-    # placed but any new order must not be placed, checking that now...
+    time.sleep(2)
 
-    for executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id in (
-            executor_http_clients_n_last_order_id_tuple_list):
-        # Triggering new buy order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-
-        new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
-                                                                            executor_http_client,
-                                                                            last_order_id=last_buy_order_id)
-
-        # Triggering sell buy order
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
-
-        # will raise assertion internally if new order found
-        new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol,
-                                                                            executor_http_client,
-                                                                            expect_no_order=True,
-                                                                            last_order_id=last_sell_order_id)
-        break
+    new_buy_sell_symbol_list = buy_sell_symbol_list[8]
+    buy_symbol = new_buy_sell_symbol_list[0]
+    sell_symbol = new_buy_sell_symbol_list[1]
+    handle_place_both_side_orders_for_portfolio_limits_test(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        expect_no_order=True)
 
     # Checking alert in portfolio_alert
     check_str = "max_allowed_orders_within_period breached"
@@ -2282,7 +2387,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
 def test_all_strat_pause_for_max_reject_limit_breach(
         static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, max_loop_count_per_side, expected_portfolio_limits_):
+        top_of_book_list_, max_loop_count_per_side, expected_portfolio_limits_, residual_wait_sec):
     # INFO:
     # Test has rolling_max_reject_count.max_rolling_tx_count = 4 and
     # rolling_max_reject_count.rolling_tx_count_period_seconds = 10000 that means within 10000 secs 5th rej
@@ -2304,7 +2409,7 @@ def test_all_strat_pause_for_max_reject_limit_breach(
                                    deepcopy(expected_strat_limits_), deepcopy(expected_start_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_trade_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   deepcopy(top_of_book_list_))
+                                   deepcopy(top_of_book_list_), residual_wait_sec)
                    for buy_symbol, sell_symbol in buy_sell_symbol_list]
 
         for future in concurrent.futures.as_completed(results):

@@ -44,7 +44,7 @@ def buy_sell_symbol_list():
 
 @pytest.fixture()
 def residual_wait_sec() -> int:
-    return 80
+    return 20
 
 
 @pytest.fixture
@@ -302,7 +302,7 @@ def expected_strat_limits_():
       },
       "residual_restriction": {
         "max_residual": 100_000,
-        "residual_mark_seconds": 40
+        "residual_mark_seconds": 10
       },
       "eligible_brokers": [],
       "strat_limits_update_seq_num": 0

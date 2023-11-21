@@ -4,13 +4,13 @@ import logging
 import os
 import sys
 import threading
-from pathlib import PurePath
 import time
+from pathlib import PurePath
 from threading import Thread
 import math
 import traceback
 from fastapi.encoders import jsonable_encoder
-from typing import Callable
+from typing import Callable, Final
 import subprocess
 import stat
 
@@ -24,12 +24,16 @@ from Flux.CodeGenProjects.strat_executor.app.trading_link import get_trading_lin
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import \
     get_consumable_participation_qty_http, get_symbol_side_key, \
-    get_strat_brief_log_key, create_stop_md_script
+    get_strat_brief_log_key, create_stop_md_script, executor_config_yaml_dict
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
     create_md_shell_script, MDShellEnvData)
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore
+from Flux.CodeGenProjects.post_trade_engine.generated.Pydentic.post_trade_engine_service_model_imports import (
+    IsPortfolioLimitsBreached)
+from Flux.CodeGenProjects.post_trade_engine.app.post_trade_engine_service_helper import (
+    post_trade_engine_service_http_client)
 
 
 class StratExecutor:
@@ -46,8 +50,8 @@ class StratExecutor:
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
             underlying_get_market_depth_from_index_fields_http, underlying_partial_update_strat_status_http,
-            underlying_update_residuals_query_http, underlying_get_aggressive_market_depths_query_http)
-        cls.underlying_get_aggressive_market_depths_query_http = underlying_get_aggressive_market_depths_query_http
+            underlying_update_residuals_query_http, underlying_get_market_depths_query_http)
+        cls.underlying_get_aggressive_market_depths_query_http = underlying_get_market_depths_query_http
         cls.underlying_get_market_depth_from_index_fields_http = underlying_get_market_depth_from_index_fields_http
         cls.underlying_partial_update_strat_status_http = underlying_partial_update_strat_status_http
         cls.underlying_update_residuals_query_http = underlying_update_residuals_query_http
@@ -63,9 +67,11 @@ class StratExecutor:
     def __init__(self, trading_data_manager_: TradingDataManager, strat_cache: StratCache):
         # prevents consuming any market data older than current time
         self.is_dev_env = True
-
-        self.leg1_consumed_depth_time: DateTime = DateTime.now()
-        self.leg2_consumed_depth_time: DateTime = DateTime.now()
+        self.allow_multiple_open_orders_per_strat: Final[bool] = allow_multiple_open_orders_per_strat \
+            if (allow_multiple_open_orders_per_strat :=
+                executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat")) is not None else False
+        self.leg1_consumed_depth_time: DateTime = DateTime.utcnow()
+        self.leg2_consumed_depth_time: DateTime = DateTime.utcnow()
         self.leg1_consumed_depth: MarketDepth | None = None
         self.leg2_consumed_depth: MarketDepth | None = None
 
@@ -101,8 +107,8 @@ class StratExecutor:
         self.order_pase_seconds = 0
         # internal rejects to use:  -ive internal_reject_count + current date time as order id
         self.internal_reject_count = 0
-        # 1-time prepare param used by update_aggresive_market_depths_in_cache call for this strat [init on first use]
-        self.aggresive_symbol_side_tuples_dict: Dict[str, List[Tuple[str, str]]] = {}
+        # 1-time prepare param used by update_aggressive_market_depths_in_cache call for this strat [init on first use]
+        self.aggressive_symbol_side_tuples_dict: Dict[str, List[Tuple[str, str]]] = {}
         StratExecutor.initialize_underlying_http_routes()  # Calling underlying instances init
 
     def check_order_eligibility(self, side: Side, check_notional: float) -> bool:
@@ -121,16 +127,16 @@ class StratExecutor:
             else:
                 return False
 
-    def init_aggresive_symbol_side_tuples_dict(self) -> bool:
-        if self.aggresive_symbol_side_tuples_dict:
-            logging.warning("init_aggresive_symbol_side_tuples_dict invoked in pre-initialized "
+    def init_aggressive_symbol_side_tuples_dict(self) -> bool:
+        if self.aggressive_symbol_side_tuples_dict:
+            logging.warning("init_aggressive_symbol_side_tuples_dict invoked on pre-initialized "
                             "aggressive_symbol_side_tuples_dict")
             return True  # its pre-initialized, not ideal, but not wrong either
 
         # 2. get pair-strat: no checking if it's updated since last checked (required for TOB extraction)
         pair_strat: PairStrat = self._get_latest_pair_strat()
         if pair_strat is None:
-            logging.error("init_aggresive_symbol_side_tuples_dict invoked but no pair strat found in cache")
+            logging.error("init_aggressive_symbol_side_tuples_dict invoked but no pair strat found in cache")
             return False
 
         leg1 = pair_strat.pair_strat_params.strat_leg1
@@ -140,22 +146,22 @@ class StratExecutor:
         leg2_sec: str = leg2.sec.sec_id
         leg2_aggressive_side_str: str = "ASK" if leg2.side == Side.BUY else "BID"
 
-        self.aggresive_symbol_side_tuples_dict = {"symbol_side_tuples_list": [(leg1_sec, leg1_aggressive_side_str),
+        self.aggressive_symbol_side_tuples_dict = {"symbol_side_tuple_list": [(leg1_sec, leg1_aggressive_side_str),
                                                                               (leg2_sec, leg2_aggressive_side_str)]}
         return True
 
     def update_aggressive_market_depths_in_cache(self) -> Tuple[List[MarketDepth], List[MarketDepth]]:
-        if not self.aggresive_symbol_side_tuples_dict:
-            if not self.init_aggresive_symbol_side_tuples_dict():
-                return [], []   # error logged internally
+        if not self.aggressive_symbol_side_tuples_dict:
+            if not self.init_aggressive_symbol_side_tuples_dict():
+                return [], []  # error logged internally
 
         # coro needs public method
         run_coro = \
-            StratExecutor.underlying_get_aggressive_market_depths_query_http(self.aggresive_symbol_side_tuples_dict)
+            StratExecutor.underlying_get_aggressive_market_depths_query_http(self.aggressive_symbol_side_tuples_dict)
         future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
 
         try:
-            symbol_side_tuple_list: List = list(self.aggresive_symbol_side_tuples_dict.values())[0]
+            symbol_side_tuple_list: List = list(self.aggressive_symbol_side_tuples_dict.values())[0]
             sym1, sym1_aggressive_side = symbol_side_tuple_list[0]
             sym2, sym2_aggressive_side = symbol_side_tuple_list[1]
             sym1_filtered_market_depths: List[MarketDepth] = []  # sym1 may not be same as strat leg1
@@ -191,7 +197,7 @@ class StratExecutor:
                         logging.error(f"update_aggressive_market_depths_in_cache, invalid px or qty: {md.px}, {md.qty} "
                                       f"found for symbol: {md.symbol}, ignoring depth;;; {md}")
 
-                # sort by px - most aggresive to passive (reverse sorts big to small)
+                # sort by px - most aggressive to passive (reverse sorts big to small)
                 sym1_filtered_market_depths.sort(reverse=(sym1_aggressive_side == "ASK"), key=lambda x: x.px)
                 sym2_filtered_market_depths.sort(reverse=(sym2_aggressive_side == "ASK"), key=lambda x: x.px)
 
@@ -309,7 +315,7 @@ class StratExecutor:
                         order_limits: OrderLimitsBaseModel, px: float, usd_px: float, qty: int,
                         side: Side, system_symbol: str, err_dict: Dict[str, any] | None = None,
                         is_eqt: bool | None = None, check_mask: int = OrderControl.ORDER_CONTROL_SUCCESS) -> int:
-
+        ret_val: int
         if err_dict is None:
             err_dict = dict()
         try:
@@ -341,9 +347,10 @@ class StratExecutor:
                     if strat_status.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
                         logging.error("Secondary Block place order - strat not in activ state or outside market hours")
                         return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
-                # set unack for subsequent orders this symbol to be blocked until this order goes through
+                # set unack for subsequent orders - this symbol to be blocked until this order goes through
                 self.set_unack(system_symbol, True)
-                if not self.trading_link_place_new_order(px, qty, side, trading_symbol, system_symbol, account, exchange):
+                if not self.trading_link_place_new_order(px, qty, side, trading_symbol, system_symbol, account,
+                                                         exchange):
                     # reset unack for subsequent orders to go through - this order did fail to go through
                     self.set_unack(system_symbol, False)
                     return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
@@ -367,9 +374,9 @@ class StratExecutor:
         try:
             order_sent_status = future.result()
             return order_sent_status
-        except Exception as e_:
+        except Exception as e:
             logging.exception(f"trading_link_place_new_order failed for {system_symbol} px-qty-side: {px}-{qty}-{side}"
-                              f" with exception: {e_}")
+                              f" with exception;;;{e}")
             return False
 
     def check_consumable_concentration(self, strat_brief: StratBrief | StratBriefBaseModel,
@@ -399,11 +406,11 @@ class StratExecutor:
         if symbol_overview_tuple:
             symbol_overview, _ = symbol_overview_tuple
             if not symbol_overview:
-                logging.error(f"block generated {side} order, symbol_overview missing for symbol: {system_symbol}, "
-                              f"for strat_cache: {self.strat_cache.get_key()}, limit up/down needs "
-                              f"symbol overview, strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
+                logging.error(f"blocked generated {side} order, symbol_overview missing for symbol: {system_symbol}, "
+                              f"for strat_cache: {self.strat_cache.get_key()}, limit up/down check needs "
+                              f"symbol_overview, strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
                 return OrderControl.ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL
-            elif symbol_overview.limit_dn_px or not symbol_overview.limit_up_px:
+            elif not symbol_overview.limit_dn_px or not symbol_overview.limit_up_px:
                 logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} order, "
                               f"limit up/down px not available limit-dn px: {symbol_overview.limit_dn_px}, found {px}"
                               f", limit-up px: {symbol_overview.limit_up_px}")
@@ -420,10 +427,10 @@ class StratExecutor:
 
             # max_open_cb_notional check
             if order_usd_notional > strat_brief.pair_sell_side_trading_brief.consumable_open_notional:
-                logging.error(f"blocked generated SELL order, breaches available consumable notional, expected less "
-                              f"than: {strat_brief.pair_sell_side_trading_brief.consumable_open_notional}, order needs:"
-                              f" {order_usd_notional}, for symbol_side_key: "
-                              f"{get_symbol_side_key([(system_symbol, side)])}")
+                logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} order, "
+                              f"breaches available consumable open notional, expected less than: "
+                              f"{strat_brief.pair_sell_side_trading_brief.consumable_open_notional}, order needs:"
+                              f" {order_usd_notional}")
                 checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL
 
             # covers: max cb notional, max open cb notional & max net filled notional
@@ -461,7 +468,7 @@ class StratExecutor:
             # max_open_cb_notional check
             if order_usd_notional > strat_brief.pair_buy_side_trading_brief.consumable_open_notional:
                 logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} order, "
-                              f"breaches available consumable notional, order needs: "
+                              f"breaches available consumable open notional, order needs: "
                               f"{strat_brief.pair_buy_side_trading_brief.consumable_open_notional}, expected less than:"
                               f" {order_usd_notional}")
                 checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL
@@ -508,7 +515,6 @@ class StratExecutor:
                           f"{self.strat_limit.market_trade_volume_participation.applicable_period_seconds}, "
                           f"strat_brief_key: {strat_brief_key}, check failed")
             checks_passed |= OrderControl.ORDER_CONTROL_UNUSABLE_CONSUMABLE_PARTICIPATION_QTY_FAIL
-
         # checking max_net_filled_notional
         if order_usd_notional > strat_brief.consumable_nett_filled_notional:
             logging.error(f"blocked generated order, not enough consumable_nett_filled_notional available, "
@@ -534,11 +540,7 @@ class StratExecutor:
             return None  # None return blocks the order from going further
 
         aggressive_side = Side.BUY if side == Side.SELL else Side.SELL
-        market_depths_tuple: Tuple[List[MarketDepthBaseModel | MarketDepth], DateTime] | None
-        market_depths_tuple = self.strat_cache.get_market_depth(system_symbol, aggressive_side)
-        market_depths: List[MarketDepthBaseModel | MarketDepth] | None = None
-        if market_depths_tuple is not None:
-            market_depths, _ = market_depths_tuple
+        market_depths, _ = self.strat_cache.get_market_depth(system_symbol, aggressive_side)
         return self._get_breach_threshold_px(top_of_book, order_limits, side, system_symbol, market_depths)
 
     def _get_breach_threshold_px(self, top_of_book: TopOfBookBaseModel, order_limits: OrderLimitsBaseModel,
@@ -555,14 +557,14 @@ class StratExecutor:
                           f"depths: {[str(market_depth) for market_depth in market_depths]}")
             return None
         if not top_of_book.last_trade:
-            logging.error(f"block generated BUY order, symbol: {system_symbol}, side: {side}; top_of_book.last_trade"
+            logging.error(f"blocked generated BUY order, symbol: {system_symbol}, side: {side}; top_of_book.last_trade"
                           f" is found None, symbol_side_key: {get_symbol_side_key([(system_symbol, side)])};;;"
                           f"tob: {top_of_book}")
-            return None  # None return blocks the order going further
+            return None  # None return blocks the order from going further
         aggressive_quote: QuoteOptional | None = None
         if side == Side.BUY:
             aggressive_quote = top_of_book.ask_quote
-            if not aggressive_quote:
+            if not aggressive_quote or not aggressive_quote.px:
                 logging.error(f"blocked generated BUY order, symbol: {system_symbol}, side: {side} as aggressive_quote"
                               f" is not found or has no px, symbol_side_key: "
                               f"{get_symbol_side_key([(system_symbol, side)])};;;aggressive_quote: {aggressive_quote}")
@@ -575,7 +577,7 @@ class StratExecutor:
 
         else:
             aggressive_quote = top_of_book.bid_quote
-            if not aggressive_quote or not aggressive_quote.px:
+            if not aggressive_quote:
                 logging.error(f"blocked generated SELL order, symbol: {system_symbol}, side: {side} as aggressive_quote"
                               f" is found None, symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
                 return None  # 0 return blocks the order from going further
@@ -599,7 +601,6 @@ class StratExecutor:
 
         if check_mask == OrderControl.ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL:
             return checks_passed  # skip other checks - they were conducted before, this is adjusted order
-
         checks_passed_ = OrderControl.check_max_order_notional(order_limits, order_usd_notional, system_symbol, side)
 
         if checks_passed_ != OrderControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
@@ -653,7 +654,7 @@ class StratExecutor:
                 (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
                  str(pair_strat.pair_strat_params.strat_leg1.sec.sec_type)),
                 (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_type.name))
+                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_type))
             ]
         db_name = os.environ["DB_NAME"]
         exch_code = "SS" if pair_strat.pair_strat_params.strat_leg1.exch_id == "SSE" else "SZ"
@@ -706,6 +707,35 @@ class StratExecutor:
 
         self._update_strat_state(strat_status_basemodel)
 
+    def check_n_pause_strat_before_run_if_portfolio_limit_breached(self):
+        # Checking if portfolio_limits are still not breached
+        is_portfolio_limits_breached_model_list: List[IsPortfolioLimitsBreached] = (
+            post_trade_engine_service_http_client.is_portfolio_limits_breached_query_client())
+
+        if len(is_portfolio_limits_breached_model_list) == 1:
+            is_portfolio_limits_breached: bool = (
+                is_portfolio_limits_breached_model_list[0].is_portfolio_limits_breached)
+            if is_portfolio_limits_breached:
+                pair_strat_tuple = self.strat_cache.get_pair_strat()
+                if pair_strat_tuple is not None:
+                    pair_strat, _ = pair_strat_tuple
+                    strat_status_basemodel = StratStatusBaseModel(_id=pair_strat.id)
+                    strat_status_basemodel.strat_state = StratState.StratState_PAUSED
+                    self._update_strat_state(strat_status_basemodel)
+                    logging.error("Putting Activated Strat to PAUSE, found portfolio_limits breached already, "
+                                  f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
+                else:
+                    logging.error(f"Can't find pair_strat in strat_cache, found portfolio_limits "
+                                  f"breached but couldn't update strat_status: strat_cache: {str(self.strat_cache)}")
+            # else not required: if portfolio_limits are fine then ignore
+        else:
+            err_str_ = ("is_portfolio_limits_breached_query_client must return list of exact one "
+                        f"IsPortfolioLimitsBreached model, but found length: "
+                        f"{len(is_portfolio_limits_breached_model_list)}, "
+                        f"is_portfolio_limits_breached_model_list: "
+                        f"{is_portfolio_limits_breached_model_list}")
+            logging.error(err_str_)
+
     def run(self):
         ret_val: int = -5000
         max_retry_count: Final[int] = 10
@@ -714,7 +744,7 @@ class StratExecutor:
         pair_strat: PairStratBaseModel | None = None
         while pair_strat_tuple is None or pair_strat is None:
             # getting pair_strat
-            pair_strat_tuple: Tuple[PairStratBaseModel, DateTime] = self.strat_cache.get_pair_strat()
+            pair_strat_tuple = self.strat_cache.get_pair_strat()
             if pair_strat_tuple is None:
                 logging.error("Can't find pair_strat_tuple even while entered executor's run method, likely bug "
                               "in loading strat_cache with pair_strat")
@@ -741,6 +771,7 @@ class StratExecutor:
 
         try:
             StratExecutor.create_n_run_md_shell_script(pair_strat, start_sh_file_path, stop_sh_file_path)
+            self.check_n_pause_strat_before_run_if_portfolio_limit_breached()
 
             while 1:
                 try:
@@ -838,12 +869,12 @@ class StratExecutor:
         return leg1_px / leg2_px
 
     def _place_order(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
-                     order_limits: OrderLimitsBaseModel, quote: QuoteOptional, tob: TopOfBookBaseModel):
+                     order_limits: OrderLimitsBaseModel, quote: QuoteOptional, tob: TopOfBookBaseModel) -> float:
         """returns float posted notional of the order sent"""
         # fail-safe
         strat_status_tuple = self.strat_cache.get_strat_status()
         if strat_status_tuple is not None:
-            strat_status, strat_status_update_date_time = self.strat_cache.get_strat_status()
+            strat_status, strat_status_update_date_time = strat_status_tuple
             # If strat status not active, don't act, just return [check MD state and take action if required]
             if strat_status.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
                 logging.error("Blocked place order - strat not in activ state")
@@ -859,7 +890,7 @@ class StratExecutor:
         else:
             logging.error(f"0 value found in ask TOB - ignoring px: {quote.px}, qty: {quote.qty}, pair_strat_key: "
                           f"{get_pair_strat_log_key(pair_strat)}")
-            return 0  # no order sent = 0 posted notional
+            return 0  # no order sent = no posted notional
 
     def _check_tob_and_place_order(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
                                    order_limits: OrderLimitsBaseModel, top_of_books: List[TopOfBookBaseModel]) -> int:
@@ -907,8 +938,8 @@ class StratExecutor:
                           f"{[str(tob) for tob in top_of_books]}")
         return order_placed
 
-    def _check_tob_and_place_order_test(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
-                                        order_limits: OrderLimitsBaseModel,
+    def _check_tob_and_place_order_test(self, pair_strat: PairStratBaseModel | PairStrat,
+                                        strat_brief: StratBriefBaseModel, order_limits: OrderLimitsBaseModel,
                                         top_of_books: List[TopOfBookBaseModel]) -> int:
         buy_top_of_book: TopOfBookBaseModel | None = None
         sell_top_of_book: TopOfBookBaseModel | None = None
@@ -922,6 +953,7 @@ class StratExecutor:
             top_of_books, self._top_of_books_update_date_time = top_of_book_and_date_tuple
             if top_of_books is not None and len(top_of_books) == 2:
                 if top_of_books[0] is not None and top_of_books[1] is not None:
+                    self.update_aggressive_market_depths_in_cache()
                     latest_update_date_time: DateTime | None = None
                     for top_of_book in top_of_books:
                         if latest_update_date_time is None:
@@ -951,6 +983,9 @@ class StratExecutor:
                                     logging.error(err_str_)
                                     raise Exception(err_str_)
                                 latest_update_date_time = top_of_book.last_update_date_time
+                    # tob tuple last_update_date_time is set to least of the 2 tobs update time
+                    # setting it to latest_update_date_time to allow order to be placed
+                    self._top_of_books_update_date_time = latest_update_date_time
 
                     if buy_top_of_book is not None:
                         if buy_top_of_book.bid_quote.last_update_date_time == \
@@ -1012,7 +1047,7 @@ class StratExecutor:
                             cancel_order.order_id, cancel_order.side, None, cancel_order.security.sec_id,
                             underlying_account="NA")
 
-                # if some update was on existing cancel_orders then this semaphore release was for this update only,
+                # if some update was on existing cancel_orders then this semaphore release was for that update only,
                 # therefore returning True to continue and wait for next semaphore release
                 return True
         # all else return false - no cancel_order to process
@@ -1037,7 +1072,7 @@ class StratExecutor:
             strat_brief:
             ol: current order limits as set by system / user
         Returns:
-            0: indicated done; no notional to consume on at-least 1 leg & no-open orders for this strat in market
+            0: indicates done; no notional to consume on at-least 1 leg & no-open orders for this strat in market
             -1: indicates needs-processing; strat has notional left to consume on either of the legs
             + number: indicates finishing: no notional to consume on at-least 1 leg but open orders for strat in market
         """
@@ -1048,7 +1083,7 @@ class StratExecutor:
                 strat_brief.pair_sell_side_trading_brief.consumable_notional < ol.min_order_notional):
             # sell leg of strat is done - if either leg is done - strat is done
             logging.info(f"Sell Side Leg is done, no open orders remaining + sell-remainder: "
-                         f"{strat_brief.pair_sell_side_trading_brief.consumable_notional} is less than"
+                         f"{strat_brief.pair_sell_side_trading_brief.consumable_notional} is less than allowed"
                          f" min_order_notional: {ol.min_order_notional}, no further orders possible")
             strat_done = True
         # else not required, more notional to consume on sell leg - strat done is set to 1 (no error, not done)
@@ -1056,7 +1091,7 @@ class StratExecutor:
                 strat_brief.pair_buy_side_trading_brief.consumable_notional < ol.min_order_notional):
             # buy leg of strat is done - if either leg is done - strat is done
             logging.info(f"Buy Side Leg is done, no open orders remaining + buy-remainder: "
-                         f"{strat_brief.pair_buy_side_trading_brief.consumable_notional} is less than"
+                         f"{strat_brief.pair_buy_side_trading_brief.consumable_notional} is less than allowed"
                          f" min_order_notional: {ol.min_order_notional}, no further orders possible")
             strat_done = True
         # else not required, more notional to consume on buy leg - strat done is set to 1 (no error, not done)
@@ -1065,6 +1100,7 @@ class StratExecutor:
                 logging.info(f"Strat is done")
             else:
                 logging.warning(f"Strat is finishing [if / after strat open orders: {open_order_count} are filled]")
+            return open_order_count  # [ returns 0 or + ive number] - Done or Finishing
         else:
             return -1  # in progress
 
@@ -1078,6 +1114,18 @@ class StratExecutor:
             portfolio_status, self._portfolio_status_update_date_time = portfolio_status_tuple
         return portfolio_status
 
+    def is_strat_ready_for_next_opportunity(self, log_error: bool = False) -> bool:
+        open_order_count: int = self.strat_cache.get_open_order_count_from_cache()
+        if self.strat_cache.has_unack_leg():
+            if log_error:
+                logging.debug(f"blocked opportunity search, has unack leg and {open_order_count} open order(s)")
+            return False
+        elif (not self.allow_multiple_open_orders_per_strat) and 0 != open_order_count:
+            if log_error:
+                logging.debug(f"blocked opportunity search, has {open_order_count} open order(s)")
+            return False
+        else:
+            return True
 
     def _get_latest_pair_strat(self) -> PairStrat | None:
         pair_strat_tuple = self.strat_cache.get_pair_strat()
@@ -1109,11 +1157,13 @@ class StratExecutor:
 
                 # 1. check if portfolio status has updated since we last checked
                 portfolio_status: PortfolioStatusBaseModel | None = self._get_latest_portfolio_status()
-                if portfolio_status is None: continue
+                if portfolio_status is None:
+                    continue
 
                 # 2. get pair-strat: no checking if it's updated since last checked (required for TOB extraction)
                 pair_strat: PairStrat = self._get_latest_pair_strat()
-                if pair_strat is None: return -1
+                if pair_strat is None:
+                    return -1
 
                 strat_status_tuple = self.strat_cache.get_strat_status()
                 if strat_status_tuple is not None:
@@ -1162,11 +1212,11 @@ class StratExecutor:
                             continue
                         # else not needed - move forward, more processing needed to complete the strat
                     else:
-                        logging.error(f"order_limits not found for strat: {self.strat_cache}, can't proceed")
+                        logging.error(f"Can't proceed: order_limits/strat_limit not found for trading_cache: "
+                                      f"{self.trading_data_manager.trading_cache}; strat_cache: {self.strat_cache}")
                         continue  # go next run - we don't stop processing for one faulty strat_cache
                 else:
-                    logging.error(f"Can't proceed: order_limits/strat_limit not found for trading_cache: "
-                                  f"{self.trading_data_manager.trading_cache}; strat_cache: {self.strat_cache}")
+                    logging.error(f"order_limits_tuple not found for strat: {self.strat_cache}, can't proceed")
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
                 # 4. get top_of_book (new or old to be checked by respective strat based on strat requirement)
@@ -1209,9 +1259,7 @@ class StratExecutor:
                     continue
 
                 # 7. continue only if past-pair (iff triggered) has no open/unack orders
-                open_orders_count: int = self.strat_cache.get_open_order_count_from_cache()
-                if self.strat_cache.has_unack_leg() or 0 != open_orders_count:
-                    logging.debug(f"blocked processing - part pair is still has {open_orders_count} open order(s)")
+                if not self.is_strat_ready_for_next_opportunity(log_error=True):
                     continue
 
                 # 8. If any manual new_order requested: apply risk checks (maybe no strat param checks?) & send out
@@ -1219,6 +1267,7 @@ class StratExecutor:
                 if new_orders_and_date_tuple is not None:
                     new_orders, self._new_orders_update_date_time = new_orders_and_date_tuple
                     if new_orders is not None:
+                        self.update_aggressive_market_depths_in_cache()
                         final_slice = len(new_orders)
                         unprocessed_new_orders: List[NewOrderBaseModel] = new_orders[
                                                                           self._new_orders_processed_slice:final_slice]

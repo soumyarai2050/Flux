@@ -12,6 +12,7 @@ import sys
 import stat
 import datetime
 import subprocess
+import glob
 
 # project imports
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_routes_callback import (
@@ -22,7 +23,7 @@ from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper impor
     get_symbol_side_snapshot_log_key, all_service_up_check, host,
     strat_manager_service_http_client, get_consumable_participation_qty,
     get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
-    EXECUTOR_PROJECT_DATA_DIR, is_ongoing_strat, log_analyzer_service_http_client, main_config_yaml_dict,
+    EXECUTOR_PROJECT_DATA_DIR, is_ongoing_strat, log_analyzer_service_http_client, executor_config_yaml_dict,
     EXECUTOR_PROJECT_SCRIPTS_DIR, get_default_max_notional, post_trade_engine_service_http_client)
 from FluxPythonUtils.scripts.utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger)
@@ -215,7 +216,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         self.web_client = None
         self.strat_cache: StratCache | None = None
 
-        self.min_refresh_interval: int = parse_to_int(main_config_yaml_dict.get("min_refresh_interval"))
+        self.min_refresh_interval: int = parse_to_int(executor_config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
         self.trading_data_manager: TradingDataManager | None = None
@@ -243,12 +244,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     ##################
     # Start-Up Methods
     ##################
-
-    def _apply_checks_n_log_error(self, strat_status_obj: StratStatus, is_create: bool = False) -> bool:
-        """
-        implement any strat management checks here (create / update strats)
-        """
-        return True
 
     def static_data_periodic_refresh(self):
         pass
@@ -333,9 +328,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                             # else not required: not updating if already is_executor_running
                             logging.debug("Marked pair_strat.is_partially_running True")
 
-                            # creating and running so_shell script
-                            self.create_n_run_so_shell_script(pair_strat)
-
                             self.all_services_up = True
                             logging.debug("Marked all_services_up True")
                             should_sleep = False
@@ -368,8 +360,13 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         try:
                             self.static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
                             if self.static_data is not None:
+                                # creating and running so_shell script
+                                pair_strat = strat_manager_service_http_client.get_pair_strat_client(self.pair_strat_id)
+                                self.create_n_run_so_shell_script(pair_strat)
                                 static_data_service_state.ready = True
                                 logging.debug("Marked static_data_service_state.ready True")
+                                # we just got static data - no need to sleep - force no sleep
+                                should_sleep = False
                             else:
                                 raise Exception("self.static_data init to None, unexpected!!")
                         except Exception as e:
@@ -454,12 +451,12 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         subscription_data = \
             [
                 (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
-                 pair_strat.pair_strat_params.strat_leg1.sec.sec_type.name),
+                 str(pair_strat.pair_strat_params.strat_leg1.sec.sec_type)),
                 (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
-                 pair_strat.pair_strat_params.strat_leg2.sec.sec_type.name)
+                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_type))
             ]
         db_name = os.environ["DB_NAME"]
-        exch_code = pair_strat.pair_strat_params.strat_leg1.exch_id  # ideally get from pair_strat
+        exch_code = "SS" if pair_strat.pair_strat_params.strat_leg1.exch_id == "SSE" else "SZ"
 
         md_shell_env_data: MDShellEnvData = (
             MDShellEnvData(subscription_data=subscription_data, host=pair_strat.host,
@@ -523,6 +520,12 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     return True
         # all else - return False
         return False
+
+    def _apply_checks_n_log_error(self) -> bool:
+        """
+        implement any strat management checks here (create / update strats)
+        """
+        return True
 
     def _check_n_create_default_strat_limits(self):
         strat_limits_tuple: Tuple[StratLimits, DateTime] = self.strat_cache.get_strat_limits()
@@ -860,13 +863,12 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview)
 
         # updating top of book
-        tobs: List[TopOfBook] = \
-            await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_top_of_book_http()
-        for tob in tobs:
-            if self.is_crash_recovery:
-                self.trading_data_manager.handle_recovery_top_of_book(tob)
-            else:
+        if not self.is_crash_recovery:
+            tobs: List[TopOfBook] = \
+                await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_top_of_book_http()
+            for tob in tobs:
                 self.trading_data_manager.handle_top_of_book_get_all_ws(tob)
+        # Avoiding tob updates recovery after crash
 
         # updating fx_symbol_overview
         fx_symbol_overview_list = strat_manager_service_http_client.get_all_fx_symbol_overview_client()
@@ -1018,33 +1020,36 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     # Get specific Data handling Methods
     ####################################
 
-    async def _get_top_of_book_from_symbol(self, symbol: str):
-        top_of_book_list: List[TopOfBook] = \
-            await (StratExecutorServiceRoutesCallbackBaseNativeOverride.
-                   underlying_get_top_of_book_from_symbol_query_http(symbol))
-        if len(top_of_book_list) != 1:
-            err_str_ = f"TopOfBook should be one per symbol received {len(top_of_book_list)} for symbol {symbol} " \
-                       f"- {top_of_book_list}"
-            logging.error(err_str_)
-            return None
+    def _get_top_of_book_from_symbol(self, symbol: str):
+        tob_tuple: Tuple[List[TopOfBook], DateTime] = self.strat_cache.get_top_of_book()
+        if tob_tuple is not None:
+            tob_list, _ = tob_tuple
+            if tob_list[0].symbol == symbol:
+                return tob_list[0]
+            elif tob_list[1].symbol == symbol:
+                return tob_list[1]
+            else:
+                err_str_ = f"Can't find any tob with symbol {symbol} in strat_cache"
+                logging.error(err_str_)
         else:
-            return top_of_book_list[0]
+            err_str_ = f"Can't find tob list in strat_cache for symbol: {symbol}"
+            logging.error(err_str_)
 
-    async def __get_residual_obj(self, side: Side, strat_brief: StratBrief) -> Residual | None:
+    def __get_residual_obj(self, side: Side, strat_brief: StratBrief) -> Residual | None:
         if side == Side.BUY:
             residual_qty = strat_brief.pair_buy_side_trading_brief.residual_qty
             other_leg_residual_qty = strat_brief.pair_sell_side_trading_brief.residual_qty
             top_of_book_obj = \
-                await self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_trading_brief.security.sec_id)
+                self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_trading_brief.security.sec_id)
             other_leg_top_of_book = \
-                await self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_trading_brief.security.sec_id)
+                self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_trading_brief.security.sec_id)
         else:
             residual_qty = strat_brief.pair_sell_side_trading_brief.residual_qty
             other_leg_residual_qty = strat_brief.pair_buy_side_trading_brief.residual_qty
             top_of_book_obj = \
-                await self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_trading_brief.security.sec_id)
+                self._get_top_of_book_from_symbol(strat_brief.pair_sell_side_trading_brief.security.sec_id)
             other_leg_top_of_book = \
-                await self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_trading_brief.security.sec_id)
+                self._get_top_of_book_from_symbol(strat_brief.pair_buy_side_trading_brief.security.sec_id)
 
         if top_of_book_obj is None or other_leg_top_of_book is None:
             logging.error(f"Received both leg's TOBs as {top_of_book_obj} and {other_leg_top_of_book}, "
@@ -1142,9 +1147,11 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             case CommandType.CLEAR_STRAT:
                 for symbol, side in [(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side),
                                      (self.strat_leg_2.sec.sec_id, self.strat_leg_2.side)]:
-                    file_path = EXECUTOR_PROJECT_DATA_DIR / f"{symbol}_{side}_{DateTime.date(DateTime.utcnow())}.json.lock"
-                    if os.path.exists(file_path):
-                        os.remove(file_path)
+                    strat_lock_file_name: str = f"{symbol}_{side}_{self.pair_strat_id}_" \
+                                                f"{DateTime.date(DateTime.utcnow())}.json.lock"
+                    lock_file_path = EXECUTOR_PROJECT_DATA_DIR / strat_lock_file_name
+                    if os.path.exists(lock_file_path):
+                        os.remove(lock_file_path)
             case CommandType.RESET_STATE:
                 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_beanie_database \
                     import document_models
@@ -1154,7 +1161,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 logging.error(f"create_command_n_control_pre failed. unrecognized command_type: {other_}")
 
     async def _update_strat_limits_pre(self, stored_strat_limits_obj: StratLimits,
-                                        updated_strat_limits_obj: StratLimits):
+                                       updated_strat_limits_obj: StratLimits):
         pass
 
     async def update_strat_limits_pre(self, stored_strat_limits_obj: StratLimits,
@@ -1203,21 +1210,25 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         """
         Return true if check passed false otherwise
         """
-        check_passed = False
-        if updated_strat_status_obj.strat_state == StratState.StratState_ACTIVE:
-            check_passed = self._apply_checks_n_log_error(updated_strat_status_obj)
+        check_passed = True
+        if stored_strat_status_obj.strat_state != StratState.StratState_ACTIVE and \
+                updated_strat_status_obj.strat_state == StratState.StratState_ACTIVE:
+            check_passed = self._apply_checks_n_log_error()
             if not check_passed:
                 # some check is violated, move strat to error
                 updated_strat_status_obj.strat_state = StratState.StratState_ERROR
-            # else not required - no alerts - all checks passed
-            if stored_strat_status_obj.strat_state != StratState.StratState_ACTIVE:
-                for symbol, side in [(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side),
-                                     (self.strat_leg_2.sec.sec_id, self.strat_leg_2.side)]:
-                    file_path = EXECUTOR_PROJECT_DATA_DIR / f"{symbol}_{side}_{DateTime.date(DateTime.utcnow())}.json.lock"
-                    with open(file_path, "w") as fl:
-                        pass
-
-            # else not required: pair_strat_id_n_today_activated_tickers_dict is updated only if we activate a new strat
+            else:
+                # create strat lock file only if moving the strat state from StratState_READY to StratState_ACTIVE
+                if stored_strat_status_obj.strat_state == StratState.StratState_READY:
+                    for symbol, side in [(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side),
+                                         (self.strat_leg_2.sec.sec_id, self.strat_leg_2.side)]:
+                        strat_lock_file_name: str = f"{symbol}_{side}_{self.pair_strat_id}_" \
+                                                    f"{DateTime.date(DateTime.utcnow())}.json.lock"
+                        lock_file_path = EXECUTOR_PROJECT_DATA_DIR / strat_lock_file_name
+                        with open(lock_file_path, "w") as fl:
+                            pass
+                # else not required
+            # else not required: lock files are generated only if we activate a new strat
         return check_passed
 
     async def update_strat_status_pre(self, stored_strat_status_obj: StratStatus,
@@ -1295,7 +1306,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         # updating order notional in order journal obj
 
         if order_journal_obj.order_event == OrderEventType.OE_NEW and order_journal_obj.order.px == 0:
-            top_of_book_obj = await self._get_top_of_book_from_symbol(order_journal_obj.order.security.sec_id)
+            top_of_book_obj = self._get_top_of_book_from_symbol(order_journal_obj.order.security.sec_id)
             if top_of_book_obj is not None:
                 order_journal_obj.order.px = top_of_book_obj.last_trade.px
             else:
@@ -1381,8 +1392,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     await self._create_update_symbol_side_snapshot_from_order_journal(order_journal_obj,
                                                                                       order_snapshot)
                 if symbol_side_snapshot is not None:
-                    updated_strat_brief = await self._update_strat_brief_from_order(order_snapshot,
-                                                                                    symbol_side_snapshot)
+                    updated_strat_brief = await self._update_strat_brief_from_order_or_fill(order_journal_obj,
+                                                                                            order_snapshot,
+                                                                                            symbol_side_snapshot)
                     if updated_strat_brief is not None:
                         await self._update_strat_status_from_order_journal(order_journal_obj, order_snapshot,
                                                                            symbol_side_snapshot, updated_strat_brief)
@@ -1471,8 +1483,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_order_journal(
                             order_journal_obj, order_snapshot)
                         if symbol_side_snapshot is not None:
-                            updated_strat_brief = await self._update_strat_brief_from_order(order_snapshot,
-                                                                                            symbol_side_snapshot)
+                            updated_strat_brief = (
+                                await self._update_strat_brief_from_order_or_fill(order_journal_obj, order_snapshot,
+                                                                                  symbol_side_snapshot))
                             if updated_strat_brief is not None:
                                 await self._update_strat_status_from_order_journal(
                                     order_journal_obj, order_snapshot, symbol_side_snapshot, updated_strat_brief)
@@ -1579,8 +1592,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                             await self._create_update_symbol_side_snapshot_from_order_journal(order_journal_obj,
                                                                                               order_snapshot)
                         if symbol_side_snapshot is not None:
-                            updated_strat_brief = await self._update_strat_brief_from_order(order_snapshot,
-                                                                                            symbol_side_snapshot)
+                            updated_strat_brief = (
+                                await self._update_strat_brief_from_order_or_fill(order_journal_obj, order_snapshot,
+                                                                                  symbol_side_snapshot))
                             if updated_strat_brief is not None:
                                 await self._update_strat_status_from_order_journal(
                                     order_journal_obj, order_snapshot, symbol_side_snapshot, updated_strat_brief)
@@ -1833,7 +1847,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     update_strat_status_obj.balance_notional = \
                         strat_limits.max_cb_notional - update_strat_status_obj.total_fill_sell_notional
 
-                updated_residual = await self.__get_residual_obj(order_snapshot.order_brief.side, strat_brief)
+                updated_residual = self.__get_residual_obj(order_snapshot.order_brief.side, strat_brief)
                 if updated_residual is not None:
                     update_strat_status_obj.residual = updated_residual
 
@@ -1848,8 +1862,10 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                               f"strat_status_tuple: {strat_status_tuple}, strat_limits_tuple: {strat_limits_tuple}")
                 return
 
-    async def _update_strat_brief_from_order(self, order_snapshot: OrderSnapshot,
-                                             symbol_side_snapshot: SymbolSideSnapshot) -> StratBrief | None:
+    async def _update_strat_brief_from_order_or_fill(self, order_journal_or_fills_journal: OrderJournal | FillsJournal,
+                                                     order_snapshot: OrderSnapshot,
+                                                     symbol_side_snapshot: SymbolSideSnapshot,
+                                                     received_fill_after_dod: bool | None = None) -> StratBrief | None:
 
         security = symbol_side_snapshot.security
         side = symbol_side_snapshot.side
@@ -1864,10 +1880,71 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 strat_brief_obj, _ = strat_brief_tuple
                 if strat_limits_tuple is not None:
                     strat_limits, _ = strat_limits_tuple
-                    open_qty = (symbol_side_snapshot.total_qty -
-                                (symbol_side_snapshot.total_filled_qty + symbol_side_snapshot.total_cxled_qty))
-                    open_notional = open_qty * self.get_usd_px(order_snapshot.order_brief.px,
-                                                               order_snapshot.order_brief.security.sec_id)
+
+                    if side == Side.BUY:
+                        fetched_open_qty = strat_brief_obj.pair_buy_side_trading_brief.open_qty
+                        fetched_open_notional = strat_brief_obj.pair_buy_side_trading_brief.open_notional
+                    else:
+                        fetched_open_qty = strat_brief_obj.pair_sell_side_trading_brief.open_qty
+                        fetched_open_notional = strat_brief_obj.pair_sell_side_trading_brief.open_notional
+
+                    if isinstance(order_journal_or_fills_journal, OrderJournal):
+                        order_journal: OrderJournal = order_journal_or_fills_journal
+                        if order_journal.order_event == OrderEventType.OE_NEW:
+                            # When order_event is OE_NEW then just adding current order's total qty to existing
+                            # open_qty + total notional (total order Qty * order px) to exist open_notional
+                            if fetched_open_qty is None:
+                                fetched_open_qty = 0
+                            if fetched_open_notional is None:
+                                fetched_open_notional = 0
+                            open_qty = fetched_open_qty + order_snapshot.order_brief.qty
+                            open_notional = (
+                                    fetched_open_notional + (
+                                        order_snapshot.order_brief.qty *
+                                        self.get_usd_px(order_snapshot.order_brief.px,
+                                                        order_snapshot.order_brief.security.sec_id)))
+                        elif order_journal.order_event == OrderEventType.OE_REJ:
+                            # When order_event is OE_REJ then just removing current order's total qty from existing
+                            # open_qty + total notional (total order Qty * order px) from existing open_notional
+                            open_qty = fetched_open_qty - order_snapshot.order_brief.qty
+                            open_notional = (
+                                    fetched_open_notional - (
+                                        order_snapshot.order_brief.qty *
+                                        self.get_usd_px(order_snapshot.order_brief.px,
+                                                        order_snapshot.order_brief.security.sec_id)))
+                        elif order_journal.order_event == OrderEventType.OE_CXL_ACK:
+                            # When order_event is OE_CXL_ACK then removing current order's unfilled qty from existing
+                            # open_qty + unfilled notional (unfilled order Qty * order px) from existing open_notional
+                            unfilled_qty = order_snapshot.order_brief.qty - order_snapshot.filled_qty
+                            open_qty = fetched_open_qty - unfilled_qty
+                            open_notional = (
+                                    fetched_open_notional - (
+                                        unfilled_qty * self.get_usd_px(order_snapshot.order_brief.px,
+                                                                       order_snapshot.order_brief.security.sec_id)))
+                        else:
+                            err_str_: str = (f"Unsupported OrderEventType: Must be either of "
+                                             f"[{OrderEventType.OE_NEW}, {OrderEventType.OE_REJ}, "
+                                             f"{OrderEventType.OE_CXL_ACK}], "
+                                             f"Found: {order_journal_or_fills_journal.order_event} - ignoring "
+                                             f"strat_brief update")
+                            logging.error(err_str_)
+                            return
+                    elif isinstance(order_journal_or_fills_journal, FillsJournal):
+                        # For fills, removing current fill's qty from existing
+                        # open_qty + current fill's notional (fill_qty * order_px) from existing open_notional
+                        fills_journal: FillsJournal = order_journal_or_fills_journal
+                        open_qty = fetched_open_qty - fills_journal.fill_qty
+                        open_notional = (
+                                fetched_open_notional - (
+                                    fills_journal.fill_qty *
+                                    self.get_usd_px(order_snapshot.order_brief.px,
+                                                    order_snapshot.order_brief.security.sec_id)))
+                    else:
+                        err_str_: str = ("Unsupported Journal type: Must be either OrderJournal or FillsJournal, "
+                                         f"Found type: {type(order_journal_or_fills_journal)} - ignoring "
+                                         f"strat_brief update")
+                        logging.error(err_str_)
+                        return
                     consumable_notional = (strat_limits.max_cb_notional - symbol_side_snapshot.total_fill_notional -
                                            open_notional)
                     consumable_open_notional = strat_limits.max_open_cb_notional - open_notional
@@ -1915,7 +1992,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                              consumable_concentration=consumable_concentration,
                                              participation_period_order_qty_sum=participation_period_order_qty_sum,
                                              consumable_cxl_qty=consumable_cxl_qty,
-                                             indicative_consumable_participation_qty=indicative_consumable_participation_qty,
+                                             indicative_consumable_participation_qty=
+                                             indicative_consumable_participation_qty,
                                              all_bkr_cxlled_qty=symbol_side_snapshot.total_cxled_qty,
                                              open_notional=open_notional,
                                              open_qty=open_qty)
@@ -1928,12 +2006,16 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         other_leg_residual_qty = strat_brief_obj.pair_buy_side_trading_brief.residual_qty
                         stored_pair_strat_trading_brief = strat_brief_obj.pair_sell_side_trading_brief
                         other_leg_symbol = strat_brief_obj.pair_buy_side_trading_brief.security.sec_id
-                    top_of_book_obj = await self._get_top_of_book_from_symbol(symbol)
-                    other_leg_top_of_book = await self._get_top_of_book_from_symbol(other_leg_symbol)
+                    top_of_book_obj = self._get_top_of_book_from_symbol(symbol)
+                    other_leg_top_of_book = self._get_top_of_book_from_symbol(other_leg_symbol)
                     if top_of_book_obj is not None and other_leg_top_of_book is not None:
                         if order_snapshot.order_status == OrderStatusType.OE_DOD:
-                            residual_qty = stored_pair_strat_trading_brief.residual_qty + \
-                                           (order_snapshot.order_brief.qty - order_snapshot.filled_qty)
+                            if received_fill_after_dod:
+                                residual_qty = (stored_pair_strat_trading_brief.residual_qty -
+                                                order_snapshot.last_update_fill_qty)
+                            else:
+                                residual_qty = stored_pair_strat_trading_brief.residual_qty + \
+                                               (order_snapshot.order_brief.qty - order_snapshot.filled_qty)
                             # Updating residual_qty
                             updated_pair_side_brief_obj.residual_qty = residual_qty
                         else:
@@ -2078,17 +2160,24 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             # signifies some unexpected exception occurred so complete update was not done,
             # therefore avoiding portfolio_limit checks too
 
-    async def _update_portfolio_status_from_fill_journal(self, order_snapshot_obj: OrderSnapshot):
+    async def _update_portfolio_status_from_fill_journal(self, order_snapshot_obj: OrderSnapshot,
+                                                         received_fill_after_dod: bool):
 
         match order_snapshot_obj.order_brief.side:
             case Side.BUY:
-                update_overall_buy_notional = \
-                    (order_snapshot_obj.last_update_fill_qty *
-                     self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                     order_snapshot_obj.order_brief.security.sec_id)) - \
-                    (order_snapshot_obj.last_update_fill_qty *
-                     self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                     order_snapshot_obj.order_brief.security.sec_id))
+                if received_fill_after_dod:
+                    update_overall_buy_notional = \
+                        (order_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(order_snapshot_obj.last_update_fill_px,
+                                         order_snapshot_obj.order_brief.security.sec_id))
+                else:
+                    update_overall_buy_notional = \
+                        (order_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(order_snapshot_obj.last_update_fill_px,
+                                         order_snapshot_obj.order_brief.security.sec_id)) - \
+                        (order_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                         order_snapshot_obj.order_brief.security.sec_id))
                 update_overall_buy_fill_notional = \
                     (self.get_usd_px(order_snapshot_obj.last_update_fill_px,
                                      order_snapshot_obj.order_brief.security.sec_id) *
@@ -2097,11 +2186,19 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     overall_buy_notional=update_overall_buy_notional,
                     overall_buy_fill_notional=update_overall_buy_fill_notional)
             case Side.SELL:
-                update_overall_sell_notional = \
-                    (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.last_update_fill_px,
-                                                                               order_snapshot_obj.order_brief.security.sec_id)) - \
-                    (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                                               order_snapshot_obj.order_brief.security.sec_id))
+                if received_fill_after_dod:
+                    update_overall_sell_notional = \
+                        (order_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(order_snapshot_obj.last_update_fill_px,
+                                         order_snapshot_obj.order_brief.security.sec_id))
+                else:
+                    update_overall_sell_notional = \
+                        (order_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(order_snapshot_obj.last_update_fill_px,
+                                         order_snapshot_obj.order_brief.security.sec_id)) - \
+                        (order_snapshot_obj.last_update_fill_qty *
+                         self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                         order_snapshot_obj.order_brief.security.sec_id))
                 update_overall_sell_fill_notional = \
                     self.get_usd_px(order_snapshot_obj.last_update_fill_px,
                                     order_snapshot_obj.order_brief.security.sec_id) * \
@@ -2117,7 +2214,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 return
 
     async def _update_symbol_side_snapshot_from_fill_applied_order_snapshot(
-            self, order_snapshot_obj: OrderSnapshot) -> SymbolSideSnapshot:
+            self, order_snapshot_obj: OrderSnapshot, received_fill_after_dod: bool) -> SymbolSideSnapshot:
         async with SymbolSideSnapshot.reentrant_lock:
             symbol_side_snapshot_tuple = self.strat_cache.get_symbol_side_snapshot_from_symbol(
                 order_snapshot_obj.order_brief.security.sec_id)
@@ -2139,6 +2236,13 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 updated_symbol_side_snapshot_obj.last_update_fill_px = order_snapshot_obj.last_update_fill_px
                 updated_symbol_side_snapshot_obj.last_update_fill_qty = order_snapshot_obj.last_update_fill_qty
                 updated_symbol_side_snapshot_obj.last_update_date_time = order_snapshot_obj.last_update_date_time
+                if received_fill_after_dod:
+                    updated_symbol_side_snapshot_obj.total_cxled_qty = (
+                        symbol_side_snapshot_obj.total_cxled_qty - order_snapshot_obj.last_update_fill_qty)
+                    updated_symbol_side_snapshot_obj.total_cxled_notional = (
+                        symbol_side_snapshot_obj.total_cxled_notional -
+                        (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                                                     order_snapshot_obj.order_brief.security.sec_id)))
 
                 updated_symbol_side_snapshot_obj = \
                     await (StratExecutorServiceRoutesCallbackBaseNativeOverride.
@@ -2169,11 +2273,15 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             # avoiding any update if strat is non-ongoing
             return
 
-        async with OrderSnapshot.reentrant_lock:    # for read-write atomicity
+        async with (OrderSnapshot.reentrant_lock):    # for read-write atomicity
             order_snapshot_obj = self.strat_cache.get_order_snapshot_from_order_id(fills_journal_obj.order_id)
 
             if order_snapshot_obj is not None:
-                if order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
+                if order_snapshot_obj.order_status in [OrderStatusType.OE_ACKED, OrderStatusType.OE_DOD]:
+                    received_fill_after_dod = False
+                    if order_snapshot_obj.order_status == OrderStatusType.OE_DOD:
+                        received_fill_after_dod = True
+
                     if (total_filled_qty := order_snapshot_obj.filled_qty) is not None:
                         updated_total_filled_qty = total_filled_qty + fills_journal_obj.fill_qty
                     else:
@@ -2181,27 +2289,56 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     received_fill_notional = fills_journal_obj.fill_notional
                     last_update_fill_qty = fills_journal_obj.fill_qty
                     last_update_fill_px = fills_journal_obj.fill_px
+                    updated_cxl_qty = None
+                    updated_cxl_notional = None
+                    order_status = None
 
+                    pause_strat: bool = False
                     if order_snapshot_obj.order_brief.qty == updated_total_filled_qty:
-                        order_status = OrderStatusType.OE_FILLED
+                        if received_fill_after_dod:
+                            logging.error("Unexpected: Received fill that makes order_snapshot OE_FILLED which is "
+                                          "already of state OE_DOD, ignoring this fill and putting this strat to "
+                                          f"PAUSE;;; fills_journal {fills_journal_obj}, order_snapshot: "
+                                          f"{order_snapshot_obj}")
+                            pause_strat = True
+                        else:
+                            order_status = OrderStatusType.OE_FILLED
                     elif order_snapshot_obj.order_brief.qty < updated_total_filled_qty:
                         vacant_fill_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
                         non_required_received_fill_qty = fills_journal_obj.fill_qty - vacant_fill_qty
 
-                        logging.error(f"Unexpected: Received fill that will make order_snapshot OVER_FILLED, "
-                                      f"vacant_fill_qty: {vacant_fill_qty}, received fill_qty: "
-                                      f"{fills_journal_obj.fill_qty}, extra_qty: {non_required_received_fill_qty} "
-                                      f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
-                                      f"ignoring order_snapshot updates for this fill and putting strat to PAUSE;;; "
-                                      f"fills_journal {fills_journal_obj}, order_snapshot: {order_snapshot_obj}")
+                        if received_fill_after_dod:
+                            logging.error(f"Unexpected: Received fill that will make order_snapshot OVER_FILLED which "
+                                          f"is already OE_DOD, vacant_fill_qty: {vacant_fill_qty}, received fill_qty: "
+                                          f"{fills_journal_obj.fill_qty}, extra_qty: {non_required_received_fill_qty} "
+                                          f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
+                                          f"ignoring order_snapshot updates for this fill and putting strat to PAUSE"
+                                          f";;; fills_journal {fills_journal_obj}, order_snapshot: "
+                                          f"{order_snapshot_obj}")
+                        else:
+                            logging.error(f"Unexpected: Received fill that will make order_snapshot OVER_FILLED, "
+                                          f"vacant_fill_qty: {vacant_fill_qty}, received fill_qty: "
+                                          f"{fills_journal_obj.fill_qty}, extra_qty: {non_required_received_fill_qty} "
+                                          f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
+                                          f"ignoring order_snapshot updates for this fill and putting strat to PAUSE"
+                                          f";;; fills_journal {fills_journal_obj}, order_snapshot: "
+                                          f"{order_snapshot_obj}")
+                        pause_strat = True
+                    else:
+                        if received_fill_after_dod:
+                            updated_cxl_qty = order_snapshot_obj.cxled_qty - fills_journal_obj.fill_qty
+                            updated_cxl_notional = (
+                                updated_cxl_qty * self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                                                  order_snapshot_obj.order_brief.security.sec_id))
+
+                    if pause_strat:
                         strat_status = StratStatusOptional(_id=self.pair_strat_id,
                                                            strat_state=StratState.StratState_PAUSED)
                         (await StratExecutorServiceRoutesCallbackBaseNativeOverride.
                          underlying_partial_update_strat_status_http(jsonable_encoder(strat_status, by_alias=True,
                                                                                       exclude_none=True)))
                         return None
-                    else:
-                        order_status = order_snapshot_obj.order_status
+                    # else not required: If pause is not triggered, updating order_snapshot and other models
 
                     if (last_filled_notional := order_snapshot_obj.fill_notional) is not None:
                         updated_fill_notional = last_filled_notional + received_fill_notional
@@ -2217,19 +2354,24 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                 _id=order_snapshot_obj.id, filled_qty=updated_total_filled_qty,
                                 avg_fill_px=updated_avg_fill_px, fill_notional=updated_fill_notional,
                                 last_update_fill_qty=last_update_fill_qty, last_update_fill_px=last_update_fill_px,
+                                cxled_qty=updated_cxl_qty, cxled_notional=updated_cxl_notional,
                                 last_update_date_time=fills_journal_obj.fill_date_time, order_status=order_status).json(
                                 by_alias=True, exclude_none=True))))
                     symbol_side_snapshot = \
-                        await self._update_symbol_side_snapshot_from_fill_applied_order_snapshot(order_snapshot_obj)
+                        await self._update_symbol_side_snapshot_from_fill_applied_order_snapshot(
+                            order_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
                     if symbol_side_snapshot is not None:
-                        updated_strat_brief = await self._update_strat_brief_from_order(order_snapshot_obj,
-                                                                                        symbol_side_snapshot)
+                        updated_strat_brief = await self._update_strat_brief_from_order_or_fill(
+                            fills_journal_obj, order_snapshot_obj, symbol_side_snapshot,
+                            received_fill_after_dod=received_fill_after_dod)
                         if updated_strat_brief is not None:
-                            await self._update_strat_status_from_fill_journal(order_snapshot_obj, symbol_side_snapshot,
-                                                                              updated_strat_brief)
+                            await self._update_strat_status_from_fill_journal(
+                                order_snapshot_obj, symbol_side_snapshot, updated_strat_brief,
+                                received_fill_after_dod=received_fill_after_dod)
                         # else not required: if updated_strat_brief is None then it means some error occurred in
                         # _update_strat_brief_from_order which would have got added to alert already
-                        await self._update_portfolio_status_from_fill_journal(order_snapshot_obj)
+                        await self._update_portfolio_status_from_fill_journal(
+                            order_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
 
                         return strat_status.id, order_snapshot_obj, updated_strat_brief
 
@@ -2260,7 +2402,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
     async def _update_strat_status_from_fill_journal(self, order_snapshot_obj: OrderSnapshot,
                                                      symbol_side_snapshot: SymbolSideSnapshot,
-                                                     strat_brief_obj: StratBrief):
+                                                     strat_brief_obj: StratBrief,
+                                                     received_fill_after_dod: bool):
         strat_limits_tuple = self.strat_cache.get_strat_limits()
 
         async with StratStatus.reentrant_lock:
@@ -2273,20 +2416,23 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 update_strat_status_obj = StratStatusOptional(_id=fetched_strat_status_obj.id)
                 match order_snapshot_obj.order_brief.side:
                     case Side.BUY:
-                        update_strat_status_obj.total_open_buy_qty = (fetched_strat_status_obj.total_open_buy_qty -
-                                                                      order_snapshot_obj.last_update_fill_qty)
-                        update_strat_status_obj.total_open_buy_notional = (
-                                fetched_strat_status_obj.total_open_buy_notional -
-                                (order_snapshot_obj.last_update_fill_qty *
-                                 self.get_usd_px(order_snapshot_obj.order_brief.px,
-                                                 order_snapshot_obj.order_brief.security.sec_id)))
-                        if fetched_strat_status_obj.total_open_buy_qty == 0:
-                            update_strat_status_obj.avg_open_buy_px = 0
-                        else:
-                            update_strat_status_obj.avg_open_buy_px = \
-                                self.get_local_px_or_notional(fetched_strat_status_obj.total_open_buy_notional,
-                                                              order_snapshot_obj.order_brief.security.sec_id) / \
-                                fetched_strat_status_obj.total_open_buy_qty
+                        if not received_fill_after_dod:
+                            update_strat_status_obj.total_open_buy_qty = (fetched_strat_status_obj.total_open_buy_qty -
+                                                                          order_snapshot_obj.last_update_fill_qty)
+                            update_strat_status_obj.total_open_buy_notional = (
+                                    fetched_strat_status_obj.total_open_buy_notional -
+                                    (order_snapshot_obj.last_update_fill_qty *
+                                     self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                                     order_snapshot_obj.order_brief.security.sec_id)))
+                            update_strat_status_obj.total_open_sell_notional = (
+                                fetched_strat_status_obj.total_open_sell_notional)
+                            if fetched_strat_status_obj.total_open_buy_qty == 0:
+                                update_strat_status_obj.avg_open_buy_px = 0
+                            else:
+                                update_strat_status_obj.avg_open_buy_px = \
+                                    self.get_local_px_or_notional(fetched_strat_status_obj.total_open_buy_notional,
+                                                                  order_snapshot_obj.order_brief.security.sec_id) / \
+                                    fetched_strat_status_obj.total_open_buy_qty
                         update_strat_status_obj.total_fill_buy_qty = (
                                 fetched_strat_status_obj.total_fill_buy_qty + order_snapshot_obj.last_update_fill_qty)
                         update_strat_status_obj.total_fill_buy_notional = (
@@ -2298,26 +2444,39 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                             self.get_local_px_or_notional(update_strat_status_obj.total_fill_buy_notional,
                                                           order_snapshot_obj.order_brief.security.sec_id) / \
                             update_strat_status_obj.total_fill_buy_qty
-                        update_strat_status_obj.total_open_sell_notional = (
-                            fetched_strat_status_obj.total_open_sell_notional)
                         update_strat_status_obj.total_fill_sell_notional = (
                             fetched_strat_status_obj.total_fill_sell_notional)
+                        if received_fill_after_dod:
+                            update_strat_status_obj.total_cxl_buy_qty = (
+                                    fetched_strat_status_obj.total_cxl_buy_qty -
+                                    order_snapshot_obj.last_update_fill_qty)
+                            update_strat_status_obj.total_cxl_buy_notional = (
+                                fetched_strat_status_obj.total_cxl_buy_notional -
+                                (self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                                 order_snapshot_obj.order_brief.security.sec_id) *
+                                 order_snapshot_obj.last_update_fill_qty))
+                            update_strat_status_obj.total_cxl_sell_notional = (
+                                fetched_strat_status_obj.total_cxl_sell_notional)
 
                     case Side.SELL:
-                        update_strat_status_obj.total_open_sell_qty = (
-                                fetched_strat_status_obj.total_open_sell_qty - order_snapshot_obj.last_update_fill_qty)
-                        update_strat_status_obj.total_open_sell_notional = (
-                                fetched_strat_status_obj.total_open_sell_notional -
-                                (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
-                                    order_snapshot_obj.order_brief.px,
-                                    order_snapshot_obj.order_brief.security.sec_id)))
-                        if update_strat_status_obj.total_open_sell_qty == 0:
-                            update_strat_status_obj.avg_open_sell_px = 0
-                        else:
-                            update_strat_status_obj.avg_open_sell_px = \
-                                self.get_local_px_or_notional(fetched_strat_status_obj.total_open_sell_notional,
-                                                              order_snapshot_obj.order_brief.security.sec_id) / \
-                                fetched_strat_status_obj.total_open_sell_qty
+                        if not received_fill_after_dod:
+                            update_strat_status_obj.total_open_sell_qty = (
+                                    fetched_strat_status_obj.total_open_sell_qty -
+                                    order_snapshot_obj.last_update_fill_qty)
+                            update_strat_status_obj.total_open_sell_notional = (
+                                    fetched_strat_status_obj.total_open_sell_notional -
+                                    (order_snapshot_obj.last_update_fill_qty * self.get_usd_px(
+                                        order_snapshot_obj.order_brief.px,
+                                        order_snapshot_obj.order_brief.security.sec_id)))
+                            update_strat_status_obj.total_open_buy_notional = (
+                                fetched_strat_status_obj.total_open_buy_notional)
+                            if update_strat_status_obj.total_open_sell_qty == 0:
+                                update_strat_status_obj.avg_open_sell_px = 0
+                            else:
+                                update_strat_status_obj.avg_open_sell_px = \
+                                    self.get_local_px_or_notional(fetched_strat_status_obj.total_open_sell_notional,
+                                                                  order_snapshot_obj.order_brief.security.sec_id) / \
+                                    fetched_strat_status_obj.total_open_sell_qty
                         update_strat_status_obj.total_fill_sell_qty = (
                                 fetched_strat_status_obj.total_fill_sell_qty + order_snapshot_obj.last_update_fill_qty)
                         update_strat_status_obj.total_fill_sell_notional = (
@@ -2329,21 +2488,34 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                             self.get_local_px_or_notional(update_strat_status_obj.total_fill_sell_notional,
                                                           order_snapshot_obj.order_brief.security.sec_id) / \
                             update_strat_status_obj.total_fill_sell_qty
-                        update_strat_status_obj.total_open_buy_notional = (
-                            fetched_strat_status_obj.total_open_buy_notional)
                         update_strat_status_obj.total_fill_buy_notional = (
                             fetched_strat_status_obj.total_fill_buy_notional)
 
+                        if received_fill_after_dod:
+                            update_strat_status_obj.total_cxl_sell_qty = (
+                                    fetched_strat_status_obj.total_cxl_sell_qty -
+                                    order_snapshot_obj.last_update_fill_qty)
+                            update_strat_status_obj.total_cxl_sell_notional = (
+                                fetched_strat_status_obj.total_cxl_sell_notional -
+                                (self.get_usd_px(order_snapshot_obj.order_brief.px,
+                                                 order_snapshot_obj.order_brief.security.sec_id) *
+                                 order_snapshot_obj.last_update_fill_qty))
+                            update_strat_status_obj.total_cxl_buy_notional = (
+                                fetched_strat_status_obj.total_cxl_buy_notional)
                     case other_:
                         err_str_ = f"Unsupported Side Type {other_} received for order_snapshot_key: " \
                                    f"{get_order_snapshot_log_key(order_snapshot_obj)} while updating strat_status;;; " \
                                    f"order_snapshot: {order_snapshot_obj}"
                         logging.error(err_str_)
                         return
-                update_strat_status_obj.total_open_exposure = (update_strat_status_obj.total_open_buy_notional -
-                                                               update_strat_status_obj.total_open_sell_notional)
+                if not received_fill_after_dod:
+                    update_strat_status_obj.total_open_exposure = (update_strat_status_obj.total_open_buy_notional -
+                                                                   update_strat_status_obj.total_open_sell_notional)
                 update_strat_status_obj.total_fill_exposure = (update_strat_status_obj.total_fill_buy_notional -
                                                                update_strat_status_obj.total_fill_sell_notional)
+                if received_fill_after_dod:
+                    update_strat_status_obj.total_cxl_exposure = (update_strat_status_obj.total_cxl_buy_notional -
+                                                                  update_strat_status_obj.total_cxl_sell_notional)
                 if update_strat_status_obj.total_fill_buy_notional < update_strat_status_obj.total_fill_sell_notional:
                     update_strat_status_obj.balance_notional = \
                         strat_limits.max_cb_notional - update_strat_status_obj.total_fill_buy_notional
@@ -2351,7 +2523,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     update_strat_status_obj.balance_notional = \
                         strat_limits.max_cb_notional - update_strat_status_obj.total_fill_sell_notional
 
-                updated_residual = await self.__get_residual_obj(order_snapshot_obj.order_brief.side, strat_brief_obj)
+                updated_residual = self.__get_residual_obj(order_snapshot_obj.order_brief.side, strat_brief_obj)
                 if updated_residual is not None:
                     update_strat_status_obj.residual = updated_residual
 
@@ -2631,7 +2803,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
                 if strat_status_tuple is not None:
                     strat_status, _ = strat_status_tuple
-                    updated_residual = await self.__get_residual_obj(side, updated_strat_brief)
+                    updated_residual = self.__get_residual_obj(side, updated_strat_brief)
                     if updated_residual is not None:
                         strat_status = StratStatusOptional(_id=strat_status.id, residual=updated_residual)
                         (await StratExecutorServiceRoutesCallbackBaseNativeOverride.
@@ -2885,7 +3057,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         return []
 
     async def get_market_depths_query_pre(self, market_depth_class_type: Type[MarketDepth],
-                                                     payload_dict: Dict[str, Any]):
+                                          payload_dict: Dict[str, Any]):
         symbol_side_tuple_list = payload_dict.get("symbol_side_tuple_list")
         if symbol_side_tuple_list is None:
             err_str_ = "Can't find symbol_side_tuple_list in payload from query"

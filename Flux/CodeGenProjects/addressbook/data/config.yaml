@@ -36,7 +36,7 @@ raw_perf_data_config:
 raw_performance_data_processor_loop_wait: 2  # sec
 
 is_test_run: True
-is_sanity_test_run: True  # controls invocation of Test Strat Cide vs Actual Strat Code
+is_sanity_test_run: True  # controls invocation of Test Strat Code vs Actual Strat Code
 log_level: "debug"  # log lvl in int or basic log lvl name
 
 # to be used by plugins to take proto files form these projects to generated combined output

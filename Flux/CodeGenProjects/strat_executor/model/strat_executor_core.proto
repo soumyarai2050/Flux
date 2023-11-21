@@ -45,7 +45,7 @@ message OpenInterestParticipation{
 }
 
 message CancelRate{
-  required int32 max_cancel_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "20", (FluxFldHelp) = "% of total size sent to market [BUY+SELL] - ignoring what happened to the qty on exchange (e.g. reject / cancelled are also counted)"];
+  required int32 max_cancel_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "35", (FluxFldHelp) = "% of total size sent to market [BUY+SELL] - ignoring what happened to the qty on exchange (e.g. reject / cancelled are also counted)"];
   optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
   optional int32 waived_min_orders = 3 [(FluxFldHelp) = "enforce check only after waived_min_orders have been sent to market irrespective of the participant order outcome -ack, reject, cancelled, lapsed"];
 }

@@ -170,7 +170,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                           "compareJSONObjects,\n"
             output_str += "    getNewItem, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId, createCollections, " \
                           "getWidgetOptionById, getWidgetTitle,\n"
-            output_str += "    getAbbreviatedCollections, getServerUrl, getAbbreviatedDependentWidgets\n"
+            output_str += ("    getAbbreviatedCollections, getServerUrl, getAbbreviatedDependentWidgets, "
+                           "isWebSocketAlive\n")
         output_str += "} from '../utils';\n"
         output_str += "/* custom components */\n"
         output_str += "import WidgetContainer from '../components/WidgetContainer';\n"
@@ -574,6 +575,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                               f"useState([]);\n"
                 output_str += f"    const [oldActive{dependent_message}List, setOldActive{dependent_message}List] = " \
                               f"useState(active{dependent_message}List);\n"
+                output_str += f"    const prevActive{dependent_message}List = useRef([]);\n"
+                output_str += f"    const prevOldActive{dependent_message}List = useRef([]);\n"
                 output_str += "    const [disableWs, setDisableWs] = useState(false);\n"
                 output_str += "    const getAllWsDict = useRef({});\n"
                 output_str += "    const getWsDict = useRef({});\n"
@@ -946,6 +949,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             dependent_message = self.abbreviated_dependent_message_name
             dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
             if dependent_msg_list_from_another_proto:
+                output_str += "    useEffect(() => {\n"
+                output_str += f"        prevActive{dependent_message}List.current = active{dependent_message}List;\n"
+                output_str += "    }, " + f"[active{dependent_message}List])\n\n"
+                output_str += "    useEffect(() => {\n"
+                output_str += f"        prevOldActive{dependent_message}List.current = oldActive{dependent_message}List;\n"
+                output_str += "    }, " + f"[oldActive{dependent_message}List])\n\n"
+
                 output_str += "    useEffect(() => {\n"
                 for dep_msg_name in dependent_msg_list_from_another_proto:
                     output_str += f"        dispatch(setSelected{dep_msg_name}Id(selected{dependent_message}Id));\n"
@@ -1383,25 +1393,27 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }, [getAllWsWorker])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += "        if (disableWs) {\n"
-            output_str += "            for (let socketId in socketDict.current) {\n"
-            output_str += "                socketId *= 1;\n"
-            output_str += "                const socket = socketDict.current[socketId];\n"
+            output_str += "            // close all websockets if disableWs is set to true\n"
+            output_str += "            for (let id in socketDict.current) {\n"
+            output_str += "                id *= 1;\n"
+            output_str += "                let socket = socketDict.current[id];\n"
             if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
+                output_str += "                if (isWebSocketAlive(socket)) socket.close();\n"
                 dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += (f"                const {dep_msg_camel_cased}Socket = "
-                                       f"{dep_msg_camel_cased}SocketDict.current[socketId];\n")
-                    output_str += "                if (socket) socket.close();\n"
+                        output_str += (f"                let {dep_msg_camel_cased}Socket = "
+                                       f"{dep_msg_camel_cased}SocketDict.current[id];\n")
+                    # output_str += "                if (socket) socket.close();\n"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += (f"                if ({dep_msg_camel_cased}Socket) "
+                        output_str += (f"                if (isWebSocketAlive({dep_msg_camel_cased}Socket)) "
                                        f"{dep_msg_camel_cased}Socket.close();\n")
-                    output_str += "                delete socketDict.current[socketId];\n"
+                    output_str += "                delete socketDict.current[id];\n"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += f"                delete {dep_msg_camel_cased}SocketDict.current[socketId];\n"
+                        output_str += f"                delete {dep_msg_camel_cased}SocketDict.current[id];\n"
 
                 else:
                     output_str += "                if (socket) socket.close();\n"
@@ -1410,63 +1422,62 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                if (socket) socket.close();\n"
                 output_str += "                delete socketDict.current[socketId];\n"
             output_str += "            }\n"
-            output_str += "        }" + f" else if (active{dependent_message}List) " + "{\n"
-            output_str += f"            if (!_.isEqual(active{dependent_message}List, " \
+            output_str += "        }" + f" else if (active{dependent_message}List && !_.isEqual(active{dependent_message}List, " \
                           f"oldActive{dependent_message}List)) " + "{\n"
-            output_str += f"                runFlush.current = false;\n"
-            output_str += f"                const updated{dependent_message}List = " \
+            output_str += f"            runFlush.current = false;\n"
+            output_str += f"            const updated{dependent_message}List = " \
                           f"active{dependent_message}List.filter(key => key !== undefined);\n"
-            output_str += f"                const loadedIds = updated{dependent_message}List.map(key => " \
+            output_str += f"            const loadedIds = updated{dependent_message}List.map(key => " \
                           f"getIdFromAbbreviatedKey(abbreviated, key));\n"
-            output_str += "                const createSocket = async (id) => {\n"
-            output_str += "                    return new Promise((resolve, reject) => {\n"
-            output_str += "                        let socket = socketDict.current.hasOwnProperty(id) ? " \
+            output_str += "            const createSocket = async (id) => {\n"
+            output_str += "                return new Promise((resolve, reject) => {\n"
+            output_str += "                    let socket = socketDict.current.hasOwnProperty(id) ? " \
                           "socketDict.current[id] : null;\n"
             if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
                 dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += (f"                        let {dep_msg_camel_cased}Socket = "
+                        output_str += (f"                    let {dep_msg_camel_cased}Socket = "
                                        f"{dep_msg_camel_cased}SocketDict.current.hasOwnProperty(id) ? "
                                        f"{dep_msg_camel_cased}SocketDict.current[id] : null;\n")
-            output_str += "                        if (!socket || (socket.readyState === WebSocket.CLOSING || " \
-                          "socket.readyState === WebSocket.CLOSED)) {\n"
-            output_str += "                            if (socket) socket.close();\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
-                if dependent_msg_list_from_another_proto:
+                    output_str += f"                    if (isWebSocketAlive(socket)"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
-                                       f"{dep_msg_camel_cased}Socket.close();\n")
-            output_str += "                            socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
+                        output_str += f" && isWebSocketAlive({dep_msg_camel_cased}Socket)"
+                    output_str += ") {\n"
+            output_str += "                        resolve();\n"
+            output_str += "                    } else {\n"
+            output_str += "                        socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
                           "'ws')}/get-"+f"{abbreviated_dependent_msg_snake_cased}"+"-ws/${id}`);\n"
-            output_str += "                            socketDict.current = { ...socketDict.current, [id]: socket };\n"
-            output_str += "                            socket.onmessage = (event) => {\n"
-            output_str += "                                let updatedObj = JSON.parse(event.data);\n"
+            output_str += "                        socketDict.current = { ...socketDict.current, [id]: socket };\n"
+            output_str += "                        socket.onmessage = (event) => {\n"
+            output_str += "                            let updatedObj = JSON.parse(event.data);\n"
             if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
                 dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
                 if dependent_msg_list_from_another_proto:
-
-                    output_str += (f"                                const "
+                    output_str += (f"                            const "
                                    f"{abbreviated_dependent_msg_camel_cased}Collections = "
                                    f"dependentWidgetCollectionsDict['{abbreviated_dependent_msg_snake_cased}'];\n")
-                    output_str += (f"                                const isRunningCheckField = "
+                    output_str += (f"                            const isRunningCheckField = "
                                    f"{abbreviated_dependent_msg_camel_cased}Collections."
                                    "find(col => col.hasOwnProperty('server_running_status')).key;\n")
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
                         dep_msg_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
-                        output_str += (f"                                const {dep_msg_camel_cased}Schema "
+                        output_str += (f"                            const {dep_msg_camel_cased}Schema "
                                        f"= schema['{dep_msg_snake_cased}'];\n")
-                        output_str += (f"                                const {dep_msg_camel_cased}Url = "
+                        output_str += (f"                            const {dep_msg_camel_cased}Url = "
                                        f"getServerUrl({dep_msg_camel_cased}Schema, updatedObj, "
                                        f"isRunningCheckField);\n")
-                        output_str += f"                                if ({dep_msg_camel_cased}Url)"+" {\n"
+                        output_str += f"                            if ({dep_msg_camel_cased}Url)"+" {\n"
+                        output_str += (f"                                if (!isWebSocketAlive("
+                                       f"{dep_msg_camel_cased}Socket))")+" {\n"
                         output_str += (f"                                    {dep_msg_camel_cased}Socket = " +
                                        "new WebSocket(`${" + f"{dep_msg_camel_cased}Url.replace('http', 'ws')"+
                                        "}/get"+f"-{dep_msg_snake_cased}-ws/$"+"{id}`);\n")
+                        output_str += (f"                                    {dep_msg_camel_cased}SocketDict."
+                                       f"current[id] = {dep_msg_camel_cased}Socket;\n")
                         output_str += (f"                                    {dep_msg_camel_cased}Socket"
                                        ".onmessage = (event) => {\n")
                         output_str += ("                                        let updatedObj = "
@@ -1474,76 +1485,90 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         output_str += (f"                                        getAll{dep_msg_name}Dict"
                                        ".current[updatedObj[DB_ID]] = updatedObj;\n")
                         output_str += "                                    }\n"
-                        output_str += (f"                                    {dep_msg_camel_cased}"
-                                       "Socket.onclose = () => {\n")
-                        output_str += (f"                                        delete {dep_msg_camel_cased}Socket"
-                                       "Dict.current[id];\n")
-                        output_str += "                                    }\n"
                         output_str += "                                }\n"
-            output_str += f"                                getAll{dependent_message}Dict.current[updatedObj[DB_ID]] " \
+                        output_str += "                            }\n"
+            output_str += f"                            getAll{dependent_message}Dict.current[updatedObj[DB_ID]] " \
                           f"= updatedObj;\n"
-            output_str += "                                setTimeout(() => resolve(), 250);\n"
-            output_str += "                            }\n"
-            output_str += "                            socket.onclose = () => {\n"
-            output_str += "                                delete socketDict.current[id];\n"
-            output_str += "                            }\n"
-            output_str += "                        } else {\n"
             output_str += "                            resolve();\n"
             output_str += "                        }\n"
-            output_str += "                        /* close the websocket on cleanup */\n"
-            output_str += "                        return () => {\n"
-            output_str += "                            if (socket) socket.close();\n"
+            output_str += "                    }\n"
+            output_str += "                })\n"
+            output_str += "            }\n\n"
+            output_str += "            const createAllSockets = async () => {\n"
+            output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
+            output_str += "                    id *= 1;\n"
+            output_str += "                    if (!loadedIds.includes(id)) {\n"
+            output_str += "                        let socket = socketDict.current[id];\n"
             if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
                 dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
                 if dependent_msg_list_from_another_proto:
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
-                                       f"{dep_msg_camel_cased}Socket.close();\n")
-            output_str += "                        }\n"
-            output_str += "                    })\n"
-            output_str += "                }\n\n"
-            output_str += "                const createAllSockets = async () => {\n"
-            output_str += "                    const socketPromises = loadedIds.map(id => createSocket(id));\n"
-            output_str += "                    await Promise.all(socketPromises);\n"
-            output_str += "                    _.keys(socketDict.current).forEach(id => {\n"
-            output_str += "                        id *= 1;\n"
-            output_str += "                        if (!loadedIds.includes(id)) {\n"
-            output_str += "                            let socket = socketDict.current[id];\n"
-            if layout_type == JsxFileGenPlugin.simple_abbreviated_type:
-                dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
-                if dependent_msg_list_from_another_proto:
-                    for dep_msg_name in dependent_msg_list_from_another_proto:
-                        dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += (f"                            let {dep_msg_camel_cased}Socket = "
+                        output_str += (f"                        let {dep_msg_camel_cased}Socket = "
                                        f"{dep_msg_camel_cased}SocketDict.current[id];\n")
-                    output_str += "                            /* close the websocket on cleanup */\n"
-                    output_str += "                            if (socket) socket.close();\n"
+                    output_str += "                        if (isWebSocketAlive(socket)) socket.close();\n"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += (f"                            if ({dep_msg_camel_cased}Socket) "
+                        output_str += (f"                        if (isWebSocketAlive({dep_msg_camel_cased}Socket)) "
                                        f"{dep_msg_camel_cased}Socket.close();\n")
-                    output_str += "                            delete socketDict.current[id];\n"
+                    output_str += "                        delete socketDict.current[id];\n"
                     for dep_msg_name in dependent_msg_list_from_another_proto:
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                        output_str += (f"                            delete {dep_msg_camel_cased}SocketDict."
+                        output_str += (f"                        delete {dep_msg_camel_cased}SocketDict."
                                        f"current[id];\n")
+                    output_str += "                    }\n"
+                    output_str += "                })\n"
+                    output_str += "                const socketPromises = loadedIds.map(id => createSocket(id));\n"
+                    output_str += "                await Promise.all(socketPromises);\n"
+                    output_str += "                runFlush.current = true;\n"
+                    output_str += "            }\n"
+                    output_str += "            createAllSockets();\n"
+                    output_str += "        }\n"
+                    output_str += "        return () => {\n"
+                    output_str += (f"            if (_.isEqual(active{dependent_message}List, "
+                                   f"prevActive{dependent_message}List.current) "
+                                   f"&& _.isEqual(oldActive{dependent_message}List, "
+                                   f"prevOldActive{dependent_message}List)) "+"{\n")
+                    output_str += ("                // no dependency change (except disableWs which is acceptable case "
+                                   "for all sockets close)\n")
+                    output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
+                    output_str += "                    let socket = socketDict.current[id];\n"
+                    output_str += "                    if (isWebSocketAlive(socket)) socket.close();\n"
+                    for dep_msg_name in dependent_msg_list_from_another_proto:
+                        dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
+                        output_str += (f"                    let {dep_msg_camel_cased}Socket = "
+                                       f"{dep_msg_camel_cased}SocketDict.current[id];\n")
+                        output_str += (f"                    if (isWebSocketAlive({dep_msg_camel_cased}Socket)) "
+                                       f"{dep_msg_camel_cased}Socket.close();\n")
+                    output_str += "                })\n"
+                    output_str += "            }\n"
+                    output_str += "        }\n"
+                    output_str += "    },"+(f" [active{dependent_message}List, oldActive{dependent_message}List, "
+                                            f"disableWs])\n\n")
                 else:
                     output_str += "                            /* close the websocket on cleanup */\n"
                     output_str += "                            if (socket) socket.close();\n"
                     output_str += "                            delete socketDict.current[id];\n"
+                    output_str += "                        }\n"
+                    output_str += "                    })\n"
+                    output_str += "                    runFlush.current = true;\n"
+                    output_str += "                }\n"
+                    output_str += "                createAllSockets();\n"
+                    output_str += "            }\n"
+                    output_str += "        }\n"
+                    output_str += "    }" + f", [active{dependent_message}List, oldActive{dependent_message}List, disableWs])\n\n"
             else:
                 output_str += "                            /* close the websocket on cleanup */\n"
                 output_str += "                            if (socket) socket.close();\n"
                 output_str += "                            delete socketDict.current[id];\n"
-            output_str += "                        }\n"
-            output_str += "                    })\n"
-            output_str += "                    runFlush.current = true;\n"
-            output_str += "                }\n"
-            output_str += "                createAllSockets();\n"
-            output_str += "            }\n"
-            output_str += "        }\n"
-            output_str += "    }" + f", [active{dependent_message}List, oldActive{dependent_message}List, disableWs])\n\n"
+                output_str += "                        }\n"
+                output_str += "                    })\n"
+                output_str += "                    runFlush.current = true;\n"
+                output_str += "                }\n"
+                output_str += "                createAllSockets();\n"
+                output_str += "            }\n"
+                output_str += "        }\n"
+                output_str += "    }" + f", [active{dependent_message}List, oldActive{dependent_message}List, disableWs])\n\n"
             output_str += "    useEffect(() => {\n"
             output_str += f"        const intervalId = setInterval(flush{dependent_message}GetAllWs, 250);\n"
             output_str += "        return () => {\n"

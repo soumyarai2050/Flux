@@ -30,6 +30,7 @@ from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_ht
     LogAnalyzerServiceHttpClient)
 from Flux.CodeGenProjects.post_trade_engine.app.post_trade_engine_service_helper import (
     post_trade_engine_service_http_client)
+from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import get_symbol_side_key
 
 code_gen_projects_dir_path = PurePath(__file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects"
 
@@ -46,6 +47,8 @@ md_config_yaml_path = MARKET_DATA_DIR / "data" / "config.yaml"
 md_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(md_config_yaml_path))
 
 STRAT_EXECUTOR = code_gen_projects_dir_path / "strat_executor"
+executor_config_yaml_path: PurePath = STRAT_EXECUTOR / "data" / "config.yaml"
+executor_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(executor_config_yaml_path))
 
 HOST: Final[str] = "127.0.0.1"
 PAIR_STRAT_CACHE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
@@ -122,8 +125,8 @@ def clean_project_logs():
     executor_config_files: List[str] = glob.glob(str(strat_executor_dir / "data" / "executor_*_simulate_config.yaml"))
     for executor_config_file in executor_config_files:
         os.remove(executor_config_file)
-    pd_id_scripts_n_log_files: List[str] = glob.glob(str(strat_executor_dir / "scripts" / "*ps_id_*.sh*"))
-    for ps_id_file in pd_id_scripts_n_log_files:
+    ps_id_scripts_n_log_files: List[str] = glob.glob(str(strat_executor_dir / "scripts" / "*ps_id_*.sh*"))
+    for ps_id_file in ps_id_scripts_n_log_files:
         os.remove(ps_id_file)
 
 #
@@ -301,10 +304,7 @@ def update_expected_strat_brief_for_buy(loop_count: int, expected_order_snapshot
     expected_strat_brief_obj.pair_buy_side_trading_brief.open_notional = open_notional
     expected_strat_brief_obj.pair_buy_side_trading_brief.all_bkr_cxlled_qty = \
         expected_symbol_side_snapshot.total_cxled_qty
-    # if expected_order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
-    #     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 4
-    # else:
-    expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 5
+    expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 4
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_notional = \
         expected_strat_limits.max_cb_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_notional = \
@@ -348,10 +348,7 @@ def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
     expected_strat_brief_obj.pair_sell_side_trading_brief.open_notional = open_notional
     expected_strat_brief_obj.pair_sell_side_trading_brief.all_bkr_cxlled_qty = \
         expected_symbol_side_snapshot.total_cxled_qty
-    # if expected_order_snapshot_obj.order_status == OrderStatusType.OE_ACKED:
-    #     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 4
-    # else:
-    expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 5
+    expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 4
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_notional = \
         expected_strat_limits.max_cb_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_notional = \
@@ -1237,16 +1234,19 @@ def run_buy_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: 
             sell_stored_tob = tob_obj
 
     # For place order non-triggered run
-    _update_tob(buy_stored_tob, buy_stored_tob.bid_quote.px, Side.BUY, executor_web_client)
+    sell_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
+    executor_web_client.patch_top_of_book_client(jsonable_encoder(sell_stored_tob, by_alias=True, exclude_none=True))
+    _update_tob(buy_stored_tob, tob_json_dict.get("bid_quote").get("px") - 10, Side.BUY, executor_web_client)
     if is_non_systematic_run:
         px = tob_json_dict.get("bid_quote").get("px") - 10
     else:
         # For place order trigger run
         px = tob_json_dict.get("bid_quote").get("px")
-    sell_tob_update_datetime = DateTime.utcnow() - timedelta(milliseconds=1)
-    _update_tob(buy_stored_tob, px, Side.BUY, executor_web_client)
-    sell_stored_tob.last_update_date_time = sell_tob_update_datetime
+
+    time.sleep(1)
+    sell_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
     executor_web_client.patch_top_of_book_client(jsonable_encoder(sell_stored_tob, by_alias=True, exclude_none=True))
+    _update_tob(buy_stored_tob, px, Side.BUY, executor_web_client)
 
 
 def run_sell_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StratExecutorServiceHttpClient,
@@ -1262,6 +1262,8 @@ def run_sell_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client:
             sell_stored_tob = tob_obj
 
     # For place order non-triggered run
+    buy_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
+    executor_web_client.patch_top_of_book_client(jsonable_encoder(buy_stored_tob, by_alias=True, exclude_none=True))
     _update_tob(sell_stored_tob, sell_stored_tob.ask_quote.px - 10, Side.SELL, executor_web_client)
 
     if is_non_systematic_run:
@@ -1270,10 +1272,12 @@ def run_sell_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client:
     else:
         # For place order trigger run
         px = tob_json_dict.get("ask_quote").get("px")
-    buy_tob_update_datetime = DateTime.utcnow() - timedelta(milliseconds=1)
-    _update_tob(sell_stored_tob, px, Side.SELL, executor_web_client)
-    buy_stored_tob.last_update_date_time = buy_tob_update_datetime
+
+    time.sleep(1)
+
+    buy_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
     executor_web_client.patch_top_of_book_client(jsonable_encoder(buy_stored_tob, by_alias=True, exclude_none=True))
+    _update_tob(sell_stored_tob, px, Side.SELL, executor_web_client)
 
 
 def run_last_trade(buy_symbol: str, sell_symbol: str, last_trade_json_list: List[Dict],
@@ -1301,8 +1305,10 @@ def symbol_overview_list() -> List[SymbolOverviewBaseModel]:
 
     symbols = ["CB_Sec_1", "EQT_Sec_1"]  # Add more symbols if needed
 
+    id: int = 1
     for symbol in symbols:
         symbol_overview = {
+            "_id": id,
             "symbol": symbol,
             "company": "string",
             "status": "string",
@@ -1319,6 +1325,8 @@ def symbol_overview_list() -> List[SymbolOverviewBaseModel]:
             "force_publish": True
         }
 
+        id += 1
+
         symbol_overview_obj_list.append(SymbolOverviewBaseModel(**symbol_overview))
 
     return symbol_overview_obj_list
@@ -1328,8 +1336,9 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
                             expected_strat_limits: StratLimits,
                             expected_strat_status: StratStatus,
                             symbol_overview_obj_list: List[SymbolOverviewBaseModel],
-                            top_of_book_json_list: List[Dict]
-) -> Tuple[PairStratBaseModel, StratExecutorServiceHttpClient]:
+                            top_of_book_json_list: List[Dict],
+                            market_depth_basemodel_list: List[MarketDepthBaseModel]
+                            ) -> Tuple[PairStratBaseModel, StratExecutorServiceHttpClient]:
     pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id = buy_symbol
     pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id = sell_symbol
     stored_pair_strat_basemodel = \
@@ -1365,6 +1374,10 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
 
     executor_web_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(
         updated_pair_strat.host, updated_pair_strat.port)
+
+    # creating market_depth
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
+    print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # running symbol_overview
     run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list, executor_web_client)
@@ -1628,11 +1641,12 @@ def get_latest_order_journal_with_status_and_symbol(expected_order_event, expect
                                                     expect_no_order: bool | None = None,
                                                     last_order_id: str | None = None,
                                                     max_loop_count: int | None = None,
-                                                    loop_wait_secs: int | None = None):
+                                                    loop_wait_secs: int | None = None,
+                                                    assert_code: int = 0):
     start_time = DateTime.utcnow()
     placed_order_journal = None
     if max_loop_count is None:
-        max_loop_count = 40
+        max_loop_count = 20
     if loop_wait_secs is None:
         loop_wait_secs = 2
 
@@ -1659,12 +1673,12 @@ def get_latest_order_journal_with_status_and_symbol(expected_order_event, expect
 
     if expect_no_order:
         assert placed_order_journal is None, f"Expected no new order for symbol {expected_symbol}, " \
-                                             f"received {placed_order_journal}"
+                                             f"received {placed_order_journal} - assert_code: {assert_code}"
         placed_order_journal = OrderJournalBaseModel(order=OrderBriefOptional(order_id=last_order_id))
     else:
         assert placed_order_journal is not None, \
             f"Can't find any order_journal with symbol {expected_symbol} order_event {expected_order_event}, " \
-            f"expect_no_order {expect_no_order} and last_order_id {last_order_id}"
+            f"expect_no_order {expect_no_order} and last_order_id {last_order_id} - assert_code: {assert_code}"
 
     return placed_order_journal
 
@@ -1718,16 +1732,13 @@ def create_pre_order_test_requirements(buy_symbol: str, sell_symbol: str, pair_s
     # Creating Strat
     active_pair_strat, executor_web_client = create_n_activate_strat(
         buy_symbol, sell_symbol, copy.deepcopy(pair_strat_), copy.deepcopy(expected_strat_limits_),
-        copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_json_list)
+        copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_json_list,
+        market_depth_basemodel_list)
     print(f"strat created, buy_symbol: {buy_symbol}, sell symbol: {sell_symbol}")
 
     # running Last Trade
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     print(f"LastTrade created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-    # creating market_depth
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, executor_web_client)
-    print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # time.sleep(100)
     # Adding strat in strat_collection
@@ -1861,8 +1872,6 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed order ACK of order_id {order_id}")
 
         buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
-        # TradeSimulator.process_fill(order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
-        #                             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
         executor_web_client.trade_simulator_process_fill_query_client(
             order_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
             Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
@@ -2053,7 +2062,7 @@ def verify_rej_orders(check_ack_to_reject_orders: bool, last_order_id: int | Non
 def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
                           last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
                           check_ack_to_reject_orders: bool, executor_web_client: StratExecutorServiceHttpClient,
-                          config_dict):
+                          config_dict, residual_wait_secs):
     # explicitly setting waived_min_orders to 10 for this test case
     expected_strat_limits_.cancel_rate.waived_min_orders = 10
 
@@ -2086,6 +2095,9 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
 
         if check_order_event == OrderEventType.OE_REJ:
             buy_rej_last_id = last_id
+
+    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+        time.sleep(residual_wait_secs)  # to start sell after buy is completely done
 
     # sell fills check
     continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol, config_dict)
@@ -2177,11 +2189,6 @@ def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, 
                                                                            last_order_id=order_id)
     order_id = placed_order_journal.order.order_id
 
-    # TradeSimulator.process_order_ack(order_id, placed_order_journal.order.px,
-    #                                  placed_order_journal.order.qty,
-    #                                  placed_order_journal.order.side,
-    #                                  placed_order_journal.order.security.sec_id,
-    #                                  placed_order_journal.order.underlying_account)
     executor_web_client.trade_simulator_process_order_ack_query_client(
         order_id, placed_order_journal.order.px,
         placed_order_journal.order.qty,
@@ -2197,9 +2204,6 @@ def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, 
             underlying_account = f"{underlying_account_prefix}_1"
         else:
             underlying_account = f"{underlying_account_prefix}_2"
-        # TradeSimulator.process_fill(order_id, fill_px, fill_qty,
-        #                             placed_order_journal.order.side,
-        #                             placed_order_journal.order.security.sec_id, underlying_account)
         executor_web_client.trade_simulator_process_fill_query_client(
             order_id, fill_px, fill_qty,
             placed_order_journal.order.side,
@@ -2253,7 +2257,7 @@ def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id:
 
 
 def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list, max_loop_count_per_side, top_of_book_list_,
-                           executor_web_client: StratExecutorServiceHttpClient, config_dict):
+                           executor_web_client: StratExecutorServiceHttpClient, config_dict, residual_wait_sec):
         # buy fills check
         continues_order_count, continues_special_order_count = get_continuous_order_configs(buy_symbol, config_dict)
         buy_order_count = 0
@@ -2270,6 +2274,9 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list, max
                                                  buy_order_count, continues_order_count,
                                                  buy_cxl_order_count, continues_special_order_count,
                                                  executor_web_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)   # to start sell after buy is completely done
 
         # sell fills check
         continues_order_count, continues_special_order_count = get_continuous_order_configs(sell_symbol, config_dict)

@@ -190,12 +190,6 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
             return  # No use-case for fx TOB at this time
         super().handle_top_of_book_get_all_ws(top_of_book_)
 
-    def handle_recovery_top_of_book(self, top_of_book_: TopOfBookBaseModel | TopOfBook):
-        # interface to update tob irrespective of time in crash recovery, Must be used only if required
-        with self.strat_cache.re_ent_lock:
-            self.strat_cache.set_recovery_top_of_book(top_of_book_)
-        logging.debug(f"Updated top_of_book cache in recovery;;; top_of_book_: {top_of_book_}")
-
     def handle_recovery_order_journal(self, order_journal_: OrderJournal | OrderJournalBaseModel):
         # interface to update order_journal in crash recovery, Must be used only if required
         with self.strat_cache.re_ent_lock:

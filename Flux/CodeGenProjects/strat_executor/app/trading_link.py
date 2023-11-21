@@ -5,8 +5,8 @@ from Flux.CodeGenProjects.strat_executor.app.log_trade_simulator import LogTrade
 config_dict = TradingLinkBase.pair_strat_config_dict
 is_test_run: bool = config_dict.get("is_test_run")
 
-# trade_simulator: TradeSimulator = TradeSimulator()
-trade_simulator: LogTradeSimulator = LogTradeSimulator()
+# trade_simulator: TradeSimulator = TradeSimulator() if is_test_run else None
+trade_simulator: LogTradeSimulator = LogTradeSimulator() if is_test_run else None
 
 
 def get_trading_link() -> TradingLinkBase:

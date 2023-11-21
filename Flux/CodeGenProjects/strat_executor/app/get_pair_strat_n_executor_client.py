@@ -20,11 +20,11 @@ EXECUTOR_PROJECT_DATA_DIR = EXECUTOR_PROJECT_DIR / 'data'
 EXECUTOR_PROJECT_SCRIPTS_DIR = EXECUTOR_PROJECT_DIR / 'scripts'
 main_config_yaml_path: PurePath = EXECUTOR_PROJECT_DATA_DIR / "config.yaml"
 try:
-    main_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(main_config_yaml_path))
+    executor_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(main_config_yaml_path))
 except FileNotFoundError as e:
     err_str = f"Can't find data/config.yaml"
     logging.exception(err_str)
     raise FileNotFoundError(err_str)
 
-host = main_config_yaml_dict.get("server_host")
+host = executor_config_yaml_dict.get("server_host")
 

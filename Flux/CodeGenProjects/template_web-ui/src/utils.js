@@ -1009,7 +1009,7 @@ export function generateRowTrees(jsondata, collections, xpath) {
                 //     tree['data-id'] = i;
                 // }
                 // array object should be of flat-type
-                tree['data-id'] = i;
+                tree['data-id'] = jsondata[i][DB_ID];
 
                 if (trees.length > 0 && _.isEqual(trees[trees.length - 1], tree)) {
                     continue;
@@ -3102,4 +3102,13 @@ export function sortColumns(collections, columnOrders, isCollectionType = false)
         return 1;
     })
     return collections;
+}
+
+export function isWebSocketAlive(webSocket) {
+    if (webSocket) {
+        if (webSocket.readyState === WebSocket.OPEN || webSocket.readyState === WebSocket.CONNECTING) {
+            return true;
+        }
+    }
+    return false;
 }

@@ -74,6 +74,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         self.container_model: Type = ContainerObject
         self.order_id_to_order_snapshot_cache_dict: Dict[str, OrderSnapshot] = {}
         self.strat_id_to_strat_brief_cache_dict: Dict[int, StratBrief] = {}
+        self.portfolio_limit_check_lock: AsyncRLock = AsyncRLock()
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -374,150 +375,135 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 logging.exception(f"create_or_update_strat_brief failed "
                                   f"with exception: {e}")
 
-    def check_max_open_baskets(self, max_open_baskets: int) -> bool:
+    async def check_max_open_baskets(self, max_open_baskets: int) -> bool:
         pause_all_strats = False
-        run_coro = PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
-            get_open_order_counts())
-        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        order_snapshot_list: List[OrderSnapshot] = await (
+            PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
+                get_open_order_counts()))
+        open_order_count: int = len(order_snapshot_list)
 
-        # block for task to finish
-        try:
-            order_snapshot_list: List[OrderSnapshot] = future.result()
-        except Exception as e:
-            logging.exception(f"underlying_read_order_snapshot_http failed with exception: {e}")
+        if max_open_baskets - open_order_count < 0:
+            logging.error(f"max_open_baskets breached, allowed max_open_baskets: "
+                          f"{max_open_baskets}, current open_order_count {open_order_count} - "
+                          f"initiating all strat pause")
+            pause_all_strats = True
+        return pause_all_strats
+
+    async def check_rolling_max_order_count(self, rolling_order_count_period_seconds: int, max_rolling_tx_count: int):
+        pause_all_strats = False
+
+        order_count_updated_order_journals: List[OrderJournal] = (
+            await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.
+            underlying_get_last_n_sec_orders_by_event_query_http(rolling_order_count_period_seconds,
+                                                                 OrderEventType.OE_NEW))
+
+        if len(order_count_updated_order_journals) == 1:
+            rolling_new_order_count = order_count_updated_order_journals[-1].current_period_order_count
+        elif len(order_count_updated_order_journals) > 1:
+            err_str_ = ("Must receive only one object in list by get_last_n_sec_orders_by_event_query, "
+                        f"received {len(order_count_updated_order_journals)}, avoiding this check, "
+                        f"received list: {order_count_updated_order_journals}")
+            logging.error(err_str_)
+            return False
         else:
-            open_order_count: int = len(order_snapshot_list)
-
-            if max_open_baskets - open_order_count < 0:
-                logging.error(f"max_open_baskets breached, allowed max_open_baskets: "
-                              f"{max_open_baskets}, current open_order_count {open_order_count} - "
-                              f"initiating all strat pause")
-                pause_all_strats = True
+            rolling_new_order_count = 0
+        if rolling_new_order_count > max_rolling_tx_count:
+            logging.error(f"max_allowed_orders_within_period breached: "
+                          f"{order_count_updated_order_journals[0].current_period_order_count} "
+                          f"orders in past {rolling_order_count_period_seconds} secs, "
+                          f"allowed orders within this period is {max_rolling_tx_count}"
+                          f"- initiating all strat pause")
+            pause_all_strats = True
         return pause_all_strats
 
-    def check_rolling_max_order_count(self, rolling_order_count_period_seconds: int, max_rolling_tx_count: int):
+    async def check_rolling_max_rej_count(self, rolling_rej_count_period_seconds: int, max_rolling_tx_count: int):
         pause_all_strats = False
-        run_coro = (PostTradeEngineServiceRoutesCallbackBaseNativeOverride.
-                    underlying_get_last_n_sec_orders_by_event_query_http(rolling_order_count_period_seconds,
-                                                                         OrderEventType.OE_NEW))
-        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
-        # block for task to finish
-        try:
-            order_count_updated_order_journals = future.result()
-        except Exception as e:
-            logging.exception(f"underlying_get_last_n_sec_orders_by_event_query_http failed "
-                              f"with exception: {e}")
+        order_count_updated_order_journals: List[OrderJournal] = (
+            await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.
+            underlying_get_last_n_sec_orders_by_event_query_http(rolling_rej_count_period_seconds, "OE_REJ"))
+        if len(order_count_updated_order_journals) == 1:
+            rolling_rej_order_count = order_count_updated_order_journals[0].current_period_order_count
+        elif len(order_count_updated_order_journals) > 0:
+            err_str_ = ("Must receive only one object in list from get_last_n_sec_orders_by_event_query, "
+                        f"received: {len(order_count_updated_order_journals)}, avoiding this check, "
+                        f"received list: {order_count_updated_order_journals}")
+            logging.error(err_str_)
+            return False
         else:
-            if len(order_count_updated_order_journals) == 1:
-                rolling_new_order_count = order_count_updated_order_journals[-1].current_period_order_count
-            elif len(order_count_updated_order_journals) > 1:
-                err_str_ = ("Must receive only one object in list by get_last_n_sec_orders_by_event_query, "
-                            f"received {len(order_count_updated_order_journals)}, avoiding this check, "
-                            f"received list: {order_count_updated_order_journals}")
-                logging.error(err_str_)
-                return False
-            else:
-                rolling_new_order_count = 0
-            if rolling_new_order_count > max_rolling_tx_count:
-                logging.error(f"max_allowed_orders_within_period breached: "
-                              f"{order_count_updated_order_journals[0].current_period_order_count} "
-                              f"orders in past {rolling_order_count_period_seconds} secs, "
-                              f"allowed orders within this period is {max_rolling_tx_count}"
-                              f"- initiating all strat pause")
+            rolling_rej_order_count = 0
+
+        if rolling_rej_order_count > max_rolling_tx_count:
+            logging.error(f"max_allowed_rejection_within_period breached: "
+                          f"{order_count_updated_order_journals[0].current_period_order_count} "
+                          f"rejections in past {rolling_rej_count_period_seconds} secs, "
+                          f"allowed rejections within this period is {max_rolling_tx_count}"
+                          f"- initiating all strat pause")
+            pause_all_strats = True
+        return pause_all_strats
+
+    async def check_all_portfolio_limits(self) -> bool:
+        async with self.portfolio_limit_check_lock:
+            portfolio_limits = strat_manager_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
+
+            pause_all_strats = False
+
+            # Checking portfolio_limits.max_open_baskets
+            max_open_baskets_breached = await self.check_max_open_baskets(portfolio_limits.max_open_baskets)
+            if max_open_baskets_breached:
                 pause_all_strats = True
-        return pause_all_strats
 
-    def check_rolling_max_rej_count(self, rolling_rej_count_period_seconds: int, max_rolling_tx_count: int):
-        run_coro = (PostTradeEngineServiceRoutesCallbackBaseNativeOverride.
-                    underlying_get_last_n_sec_orders_by_event_query_http(rolling_rej_count_period_seconds, "OE_REJ"))
-        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+            # block for task to finish
+            total_buy_open_notional = 0
+            total_sell_open_notional = 0
+            for strat_brief in self.strat_id_to_strat_brief_cache_dict.values():
+                # Buy side check
+                total_buy_open_notional += strat_brief.pair_buy_side_trading_brief.open_notional
+                # Sell side check
+                total_sell_open_notional += strat_brief.pair_sell_side_trading_brief.open_notional
 
-        pause_all_strats = False
-
-        # block for task to finish
-        try:
-            order_count_updated_order_journals: List[OrderJournal] = future.result()
-        except Exception as e:
-            logging.exception(f"underlying_get_last_n_sec_orders_by_event_query_http failed for Rej check"
-                              f"with exception: {e}")
-        else:
-            if len(order_count_updated_order_journals) == 1:
-                rolling_rej_order_count = order_count_updated_order_journals[0].current_period_order_count
-            elif len(order_count_updated_order_journals) > 0:
-                err_str_ = ("Must receive only one object in list from get_last_n_sec_orders_by_event_query, "
-                            f"received: {len(order_count_updated_order_journals)}, avoiding this check, "
-                            f"received list: {order_count_updated_order_journals}")
-                logging.error(err_str_)
-                return False
-            else:
-                rolling_rej_order_count = 0
-
-            if rolling_rej_order_count > max_rolling_tx_count:
-                logging.error(f"max_allowed_rejection_within_period breached: "
-                              f"{order_count_updated_order_journals[0].current_period_order_count} "
-                              f"rejections in past {rolling_rej_count_period_seconds} secs, "
-                              f"allowed rejections within this period is {max_rolling_tx_count}"
-                              f"- initiating all strat pause")
+            logging.info(f">>>B>>> {portfolio_limits.max_open_notional_per_side} - {total_buy_open_notional}")
+            if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
+                logging.error(f"max_open_notional_per_side breached for BUY side, "
+                              f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                              f"current total_buy_open_notional {total_buy_open_notional}"
+                              f" - initiating all strat pause")
                 pause_all_strats = True
-        return pause_all_strats
 
-    def check_all_portfolio_limits(self) -> bool:
-        portfolio_limits = strat_manager_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
+            logging.info(f">>>S>>> {portfolio_limits.max_open_notional_per_side} - {total_buy_open_notional}")
+            if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
+                logging.error(f"max_open_notional_per_side breached for SELL side, "
+                              f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                              f"current total_sell_open_notional {total_sell_open_notional}"
+                              f" - initiating all strat pause")
+                pause_all_strats = True
 
-        pause_all_strats = False
+            # Checking portfolio_limits.max_gross_n_open_notional
+            portfolio_status = strat_manager_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
+            total_open_notional = total_buy_open_notional + total_sell_open_notional
+            total_gross_n_open_notional = (total_open_notional + portfolio_status.overall_buy_fill_notional +
+                                           portfolio_status.overall_sell_fill_notional)
+            if portfolio_limits.max_gross_n_open_notional < total_gross_n_open_notional:
+                logging.error(f"max_gross_n_open_notional breached, "
+                              f"allowed max_gross_n_open_notional: {portfolio_limits.max_gross_n_open_notional}, "
+                              f"current total_gross_n_open_notional {total_gross_n_open_notional}"
+                              f" - initiating all strat pause")
+                pause_all_strats = True
 
-        # Checking portfolio_limits.max_open_baskets
-        if self.check_max_open_baskets(portfolio_limits.max_open_baskets):
-            pause_all_strats = True
+            # Checking portfolio_limits.rolling_max_order_count
+            rolling_max_order_count_breached: bool = await self.check_rolling_max_order_count(
+                    portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds,
+                    portfolio_limits.rolling_max_order_count.max_rolling_tx_count)
+            if rolling_max_order_count_breached:
+                pause_all_strats = True
 
-        # block for task to finish
-        total_buy_open_notional = 0
-        total_sell_open_notional = 0
-        for strat_brief in self.strat_id_to_strat_brief_cache_dict.values():
-            # Buy side check
-            total_buy_open_notional += strat_brief.pair_buy_side_trading_brief.open_notional
-            # Sell side check
-            total_sell_open_notional += strat_brief.pair_sell_side_trading_brief.open_notional
-
-        if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
-            logging.error(f"max_open_notional_per_side breached for BUY side, "
-                          f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                          f"current total_buy_open_notional {total_buy_open_notional}"
-                          f" - initiating all strat pause")
-            pause_all_strats = True
-
-        if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
-            logging.error(f"max_open_notional_per_side breached for SELL side, "
-                          f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                          f"current total_sell_open_notional {total_sell_open_notional}"
-                          f" - initiating all strat pause")
-            pause_all_strats = True
-
-        # Checking portfolio_limits.max_gross_n_open_notional
-        portfolio_status = strat_manager_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
-        total_open_notional = total_buy_open_notional + total_sell_open_notional
-        total_gross_n_open_notional = (total_open_notional + portfolio_status.overall_buy_fill_notional +
-                                       portfolio_status.overall_sell_fill_notional)
-        if portfolio_limits.max_gross_n_open_notional < total_gross_n_open_notional:
-            logging.error(f"max_gross_n_open_notional breached, "
-                          f"allowed max_gross_n_open_notional: {portfolio_limits.max_gross_n_open_notional}, "
-                          f"current total_gross_n_open_notional {total_gross_n_open_notional}"
-                          f" - initiating all strat pause")
-            pause_all_strats = True
-
-        # Checking portfolio_limits.rolling_max_order_count
-        if self.check_rolling_max_order_count(
-                portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds,
-                portfolio_limits.rolling_max_order_count.max_rolling_tx_count):
-            pause_all_strats = True
-
-        # checking portfolio_limits.rolling_max_reject_count
-        if self.check_rolling_max_rej_count(
-                portfolio_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
-                portfolio_limits.rolling_max_reject_count.max_rolling_tx_count):
-            pause_all_strats = True
-        return pause_all_strats
+            # checking portfolio_limits.rolling_max_reject_count
+            rolling_max_rej_count_breached: bool = await self.check_rolling_max_rej_count(
+                    portfolio_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
+                    portfolio_limits.rolling_max_reject_count.max_rolling_tx_count)
+            if rolling_max_rej_count_breached:
+                pause_all_strats = True
+            return pause_all_strats
 
     def _portfolio_limit_check_queue_handler(self, strat_id_list: List[int],
                                              strat_id_to_container_obj_dict: Dict[int, ContainerObject]):
@@ -532,8 +518,23 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             self.update_db(order_journal_list, order_snapshot_list, strat_brief)
 
             # Checking Portfolio limits and Pausing ALL Strats if limit found breached
-            if self.check_all_portfolio_limits():
+            run_coro = self.check_all_portfolio_limits()
+            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+
+            # block for task to finish
+            try:
+                pause_all_strats: bool = future.result()
+            except Exception as e:
+                logging.exception(f"check_all_portfolio_limits failed, exception: {e}")
+                return None
+            if pause_all_strats:
                 self.pause_all_strats()
+
+    async def is_portfolio_limits_breached_query_pre(
+            self, is_portfolio_limits_breached_class_type: Type[IsPortfolioLimitsBreached]):
+        logging.info(">>>> Query Call")
+        pause_all_strats = await self.check_all_portfolio_limits()
+        return [IsPortfolioLimitsBreached(is_portfolio_limits_breached=pause_all_strats)]
 
     def portfolio_limit_check_queue_handler(self):
         while 1:
@@ -575,4 +576,5 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         strat_brief_list: List[StratBrief] = \
             await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http()
         self._load_existing_strat_brief(strat_brief_list)
+
         return []

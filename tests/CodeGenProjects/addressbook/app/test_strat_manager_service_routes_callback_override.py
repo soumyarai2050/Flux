@@ -23,21 +23,26 @@ else:
 
 
 # test cases requires addressbook and log_analyzer database to be present
-def test_deep_clean_database_n_logs():
+def _test_deep_clean_database_n_logs():
     drop_all_databases()
     clean_project_logs()
 
 
+def _test_clean_database_n_logs():
+    clean_all_collections_ignoring_ui_layout([])
+    clean_project_logs()
+
+
 def _test_sanity_create_strat_parallel(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
-                                      expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
-                                      top_of_book_list_):
-    symbol_pair_counter = 1
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
-        results = [executor.submit(create_n_activate_strat, buy_symbol,  copy.deepcopy(pair_strat_),
+                                       expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+                                       top_of_book_list_, market_depth_basemodel_list):
+    max_count = int(len(buy_sell_symbol_list)/2)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_count) as executor:
+        results = [executor.submit(create_n_activate_strat, buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
                                    copy.deepcopy(expected_strat_limits_),
                                    copy.deepcopy(expected_start_status_), copy.deepcopy(symbol_overview_obj_list),
-                                   copy.deepcopy(top_of_book_list_))
-                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+                                   copy.deepcopy(top_of_book_list_), copy.deepcopy(market_depth_basemodel_list))
+                   for buy_symbol, sell_symbol in buy_sell_symbol_list[:max_count]]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -232,12 +237,14 @@ def test_patch_all(clean_and_set_limits, web_client):
 
 # sanity test to create and activate pair_strat
 def test_create_pair_strat(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
-                           expected_strat_limits_, expected_start_status_, symbol_overview_obj_list, top_of_book_list_):
+                           expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+                           top_of_book_list_, market_depth_basemodel_list):
     # creates and activates multiple pair_strats
     buy_sell_symbol_list = buy_sell_symbol_list[:1]
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                expected_start_status_, symbol_overview_obj_list, top_of_book_list_)
+                                expected_start_status_, symbol_overview_obj_list, top_of_book_list_,
+                                market_depth_basemodel_list)
 
 
 # sanity test to create orders
@@ -258,11 +265,10 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
-
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
@@ -284,6 +290,10 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
                                                                                 last_order_id=buy_ack_order_id)
             buy_ack_order_id = ack_order_journal.order.order_id
 
+            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                # Sleeping to let the order get cxlled
+                time.sleep(residual_wait_sec)
+
         # Placing sell orders
         sell_ack_order_id = None
         for loop_count in range(total_order_count_for_each_side):
@@ -294,6 +304,11 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, buy_sell_symbol
                                                                                 sell_symbol, executor_web_client,
                                                                                 last_order_id=sell_ack_order_id)
             sell_ack_order_id = ack_order_journal.order.order_id
+
+            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                # Sleeping to let the order get cxlled
+                time.sleep(residual_wait_sec)
+
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -527,7 +542,7 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                    copy.deepcopy(expected_start_status_), copy.deepcopy(expected_strat_brief_),
                                    copy.deepcopy(expected_portfolio_status_), copy.deepcopy(top_of_book_list_),
                                    copy.deepcopy(last_trade_fixture_list), copy.deepcopy(symbol_overview_obj_list),
-                                   copy.deepcopy(market_depth_basemodel_list))
+                                   copy.deepcopy(market_depth_basemodel_list), False)
                    for buy_symbol, sell_symbol in buy_sell_symbol_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -698,7 +713,7 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, buy_sell_sy
                                                market_depth_basemodel_list, top_of_book_list_))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -720,6 +735,9 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, buy_sell_sy
                                                                        sell_symbol,
                                                                        last_trade_fixture_list, top_of_book_list_,
                                                                        order_id, config_dict, executor_http_client)
+                    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                        # Sleeping to let the order get cxlled
+                        time.sleep(residual_wait_sec)
                 time.sleep(5)
                 strat_status: StratStatusBaseModel = executor_http_client.get_strat_status_client(created_pair_strat.id)
                 if check_symbol == buy_symbol:
@@ -760,7 +778,7 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, buy_s
                                                last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -783,6 +801,9 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, buy_s
                                                                              sell_symbol, last_trade_fixture_list,
                                                                              top_of_book_list_, order_id,
                                                                              executor_http_client, config_dict)
+                    if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                        # Sleeping to let the order get cxlled
+                        time.sleep(residual_wait_sec)
 
                 symbol_configs = get_symbol_configs(check_symbol, config_dict)
                 strat_status: StratStatusBaseModel = executor_http_client.get_strat_status_client(created_pair_strat.id)
@@ -817,7 +838,7 @@ def test_filled_status(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                market_depth_basemodel_list, top_of_book_list_))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -893,7 +914,7 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, buy_sell_symbol_li
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -996,7 +1017,7 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, buy_sell_symbol_li
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -1087,7 +1108,7 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, buy_sell_symbol_li
 def test_ack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                            expected_start_status_, symbol_overview_obj_list,
                            last_trade_fixture_list, market_depth_basemodel_list,
-                           top_of_book_list_, max_loop_count_per_side):
+                           top_of_book_list_, max_loop_count_per_side, residual_wait_sec):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     buy_sell_symbol_list = buy_sell_symbol_list[:2]
@@ -1101,7 +1122,7 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol_l
                                                last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -1117,7 +1138,7 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol_l
 
             handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
                                   last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
-                                  True, executor_http_client, config_dict)
+                                  True, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -1132,7 +1153,7 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol_l
 def test_unack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                              expected_start_status_, symbol_overview_obj_list,
                              last_trade_fixture_list, market_depth_basemodel_list,
-                             top_of_book_list_, max_loop_count_per_side):
+                             top_of_book_list_, max_loop_count_per_side, residual_wait_sec):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     buy_sell_symbol_list = buy_sell_symbol_list[:2]
@@ -1146,7 +1167,7 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol
                                                last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -1160,13 +1181,9 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, buy_sell_symbol
             # updating simulator's configs
             executor_http_client.trade_simulator_reload_config_query_client()
 
-            # updating fixture values for this test-case
-            max_loop_count_per_side = 2
-            buy_sell_symbol_list = buy_sell_symbol_list[:2]
-
             handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
                                   last_trade_fixture_list, top_of_book_list_, max_loop_count_per_side,
-                                  False, executor_http_client, config_dict)
+                                  False, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -1196,7 +1213,7 @@ def test_cxl_rej(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                                market_depth_basemodel_list, top_of_book_list_))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -1255,14 +1272,15 @@ def test_cxl_rej(static_data_, clean_and_set_limits, buy_sell_symbol_list,
 def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, buy_sell_symbol_list,
                                        pair_strat_, expected_strat_limits_,
                                        expected_start_status_, sample_alert, symbol_overview_obj_list,
-                                       top_of_book_list_):
+                                       top_of_book_list_, market_depth_basemodel_list):
     # creating strat
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
     total_loop_count = 5
     active_pair_strat, executor_http_client = create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_,
                                                                       expected_strat_limits_, expected_start_status_,
-                                                                      symbol_overview_obj_list, top_of_book_list_)
+                                                                      symbol_overview_obj_list, top_of_book_list_,
+                                                                      market_depth_basemodel_list)
     alert_id_list = []
     broker_id_list = []
     for loop_count in range(total_loop_count):
@@ -1329,12 +1347,13 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
                                                       pair_strat_, expected_strat_limits_,
                                                       expected_start_status_, symbol_overview_obj_list,
                                                       last_trade_fixture_list, market_depth_basemodel_list,
-                                                      top_of_book_list_):
+                                                      top_of_book_list_, residual_wait_sec):
     underlying_account_prefix: str = "Acc"
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
     buy_order_id = None
     sell_order_id = None
+    buy_sell_symbol_list = buy_sell_symbol_list[:2]
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         active_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
@@ -1345,6 +1364,9 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
             create_fills_for_underlying_account_test(buy_symbol, sell_symbol, top_of_book_list_,
                                                      buy_tob_last_update_date_time_tracker, buy_order_id,
                                                      underlying_account_prefix, Side.BUY, executor_http_client)
+
+        time.sleep(residual_wait_sec)   #
+
         # sell handling
         sell_tob_last_update_date_time_tracker, sell_order_id = \
             create_fills_for_underlying_account_test(buy_symbol, sell_symbol, top_of_book_list_,
@@ -1383,7 +1405,7 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, buy_sell_s
                                   pair_strat_, expected_strat_limits_,
                                   expected_start_status_, symbol_overview_obj_list,
                                   last_trade_fixture_list, market_depth_basemodel_list,
-                                  top_of_book_list_, buy_fill_journal_):
+                                  top_of_book_list_, buy_fill_journal_, residual_wait_sec):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
     total_order_count_for_each_side = 10
@@ -1398,7 +1420,7 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, buy_sell_s
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -1423,7 +1445,10 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, buy_sell_s
                                                                                 last_order_id=buy_new_order_id)
             buy_new_order_id = ack_order_journal.order.order_id
             order_create_time_list.append(ack_order_journal.order_event_date_time)
-            time.sleep(2)
+            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                time.sleep(residual_wait_sec)   # wait for this order to get cancelled by residual
+            else:
+                time.sleep(2)
 
         order_create_time_list.reverse()
         for loop_count in range(total_order_count_for_each_side):
@@ -1463,11 +1488,11 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, buy_sell_s
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
-                               expected_start_status_, symbol_overview_obj_list,
+def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+                               expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                                last_trade_fixture_list, market_depth_basemodel_list,
                                top_of_book_list_, buy_order_, sell_order_,
-                               max_loop_count_per_side):
+                               max_loop_count_per_side, residual_wait_sec):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     buy_sell_symbol_list = buy_sell_symbol_list[:2]
@@ -1480,7 +1505,7 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_symb
                                                market_depth_basemodel_list, top_of_book_list_))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -1494,8 +1519,8 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_symb
             # updating simulator's configs
             executor_http_client.trade_simulator_reload_config_query_client()
 
-            handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list,
-                                   max_loop_count_per_side, top_of_book_list_, executor_http_client, config_dict)
+            handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list, max_loop_count_per_side,
+                                   top_of_book_list_, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -1511,7 +1536,7 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_sy
                                  expected_start_status_, symbol_overview_obj_list,
                                  last_trade_fixture_list, market_depth_basemodel_list,
                                  top_of_book_list_, buy_order_, sell_order_,
-                                 max_loop_count_per_side):
+                                 max_loop_count_per_side, residual_wait_sec):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     buy_sell_symbol_list = buy_sell_symbol_list[:2]
@@ -1525,7 +1550,7 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_sy
                                                market_depth_basemodel_list, top_of_book_list_))
 
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -1539,8 +1564,8 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_sy
             # updating simulator's configs
             executor_http_client.trade_simulator_reload_config_query_client()
 
-            handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list,
-                                   max_loop_count_per_side, top_of_book_list_, executor_http_client, config_dict)
+            handle_unsolicited_cxl(buy_symbol, sell_symbol, last_trade_fixture_list, max_loop_count_per_side,
+                                   top_of_book_list_, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -1647,7 +1672,7 @@ def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, buy_
                                                last_trade_fixture_list,
                                                market_depth_basemodel_list, top_of_book_list_))
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -1746,7 +1771,7 @@ def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, buy_
 def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                      expected_strat_limits_, top_of_book_list_,
                      expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                     market_depth_basemodel_list, buy_sell_symbol_list):
+                     market_depth_basemodel_list, buy_sell_symbol_list, residual_wait_sec):
     partial_ack_qty: int | None = None
 
     # updating fixture values for this test-case
@@ -1760,7 +1785,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                                                last_trade_fixture_list,
                                                market_depth_basemodel_list, top_of_book_list_))
         config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
         try:
@@ -1785,6 +1810,9 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                     handle_partial_ack_checks(buy_symbol, new_order_id, acked_order_id, executor_http_client,
                                               config_dict)
 
+                if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                    time.sleep(residual_wait_sec)    # wait to make this open order residual
+
             time.sleep(5)
             strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
             assert partial_ack_qty * max_loop_count_per_side == strat_status.total_fill_buy_qty, \
@@ -1803,7 +1831,8 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                     handle_partial_ack_checks(sell_symbol, new_order_id, acked_order_id, executor_http_client,
                                               config_dict)
 
-            time.sleep(5)
+                if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                    time.sleep(residual_wait_sec)    # wait to make this open order residual
 
             strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
             assert partial_ack_qty * max_loop_count_per_side == strat_status.total_fill_sell_qty, \
@@ -1885,7 +1914,7 @@ def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, buy_sell_symbo
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -1958,7 +1987,7 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
                                                  top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -2029,7 +2058,7 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, c
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -2075,7 +2104,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -2121,7 +2150,7 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clea
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -2165,7 +2194,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, cle
                                            market_depth_basemodel_list, top_of_book_list_))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
@@ -2516,22 +2545,390 @@ def test_get_market_depths_query(
                     (f"Unexpected: market_depth_list must be sorted in terms of decreasing px, "
                      f"market_depth_list: {market_depth_list}")
 
-# def test_delete_all_test_db():
-#     from pymongo import MongoClient
-#
-#     uri = get_mongo_server_uri()
-#     client = MongoClient(uri)
-#     db_list = client.list_database_names()
-#
-#     for db_name in db_list:
-#         if (db_name.startswith("log_analyzer") or
-#                 db_name.startswith("strat_executor_") or
-#                 db_name.startswith("addressbook") or
-#                 db_name.startswith("post_trade_engine")):
-#             client.drop_database(name_or_database=db_name)
+
+def test_fills_after_acked_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+                                           expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+                                           last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+                                           buy_order_, sell_order_, max_loop_count_per_side,
+                                           buy_fill_journal_, sell_fill_journal_,
+                                           expected_strat_brief_):
+    # updating fixture values for this test-case
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    # explicitly setting waived_min_orders to 10 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_orders = 10
+    active_pair_strat, executor_http_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
+            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1  # all orders - unsol_cxl
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
+        # updating simulator's configs
+        executor_http_client.trade_simulator_reload_config_query_client()
+
+        for symbol in [buy_symbol, sell_symbol]:
+
+            print(f"Checking symbol: {symbol}")
+            run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+            if symbol == buy_symbol:
+                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+            else:
+                run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
+            time.sleep(2)  # delay for order to get placed
+
+            latest_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK,
+                                                                                   symbol, executor_http_client)
+            order_snapshot_list = executor_http_client.get_all_order_snapshot_client()
+            for order_snapshot in order_snapshot_list:
+                if order_snapshot.order_brief.order_id == latest_order_journal.order.order_id:
+                    order_snapshot_before_fill = order_snapshot
+                    break
+            else:
+                assert False, \
+                    ("Unexpected: Can't find order_snapshot having order_id in "
+                     f"order_snapshot list, order_id: {latest_order_journal.order.order_id}, "
+                     f"order_snapshot_list: {order_snapshot_list}")
+
+            symbol_side_snapshot_list = executor_http_client.get_all_symbol_side_snapshot_client()
+            for symbol_side_snapshot in symbol_side_snapshot_list:
+                if symbol_side_snapshot.security.sec_id == latest_order_journal.order.security.sec_id:
+                    symbol_side_snapshot_before_fill = symbol_side_snapshot
+                    break
+            else:
+                assert False, \
+                    ("Unexpected: Can't find symbol_side_snapshot having symbol: "
+                     f"{latest_order_journal.order.security.sec_id}, "
+                     f"order_snapshot_list: {order_snapshot_list}")
+
+            strat_brief_list = executor_http_client.get_all_strat_brief_client()
+            assert len(strat_brief_list) == 1, \
+                ("Unexpected: This test created single strat so expected single strat_brief in "
+                 f"strat_brief_list , received length: {len(strat_brief_list)}, "
+                 f"strat_brief_list: {strat_brief_list}")
+            strat_brief_before_fill = strat_brief_list[0]
+
+            strat_status_before_fill = executor_http_client.get_strat_status_client(active_pair_strat.id)
+
+            portfolio_status_before_fill = strat_manager_service_native_web_client.get_portfolio_status_client(1)
+
+            # Placing Fill after order_snapshot is OE_DOD
+            if buy_fill_journal_.fill_symbol == symbol:
+                fill_journal_obj = copy.deepcopy(buy_fill_journal_)
+            else:
+                fill_journal_obj = copy.deepcopy(sell_fill_journal_)
+
+            fill_journal_obj.fill_qty = 20
+            if symbol == buy_symbol:
+                executor_http_client.trade_simulator_process_fill_query_client(
+                    latest_order_journal.order.order_id, fill_journal_obj.fill_px, fill_journal_obj.fill_qty,
+                    Side.BUY, symbol, fill_journal_obj.underlying_account)
+            else:
+                executor_http_client.trade_simulator_process_fill_query_client(
+                    latest_order_journal.order.order_id, fill_journal_obj.fill_px, fill_journal_obj.fill_qty,
+                    Side.SELL, symbol, fill_journal_obj.underlying_account)
+
+            placed_fill_journal_obj = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id,
+                                                                            executor_http_client)
+            # OrderSnapshot check
+            order_snapshot_list = executor_http_client.get_all_order_snapshot_client()
+            for order_snapshot in order_snapshot_list:
+                if order_snapshot.order_brief.order_id == placed_fill_journal_obj.order_id:
+                    order_snapshot_after_fill = order_snapshot_list[0]
+                    break
+            else:
+                assert False, \
+                    ("Unexpected: Can't find order_snapshot having order_id in "
+                     f"order_snapshot list, order_id: {placed_fill_journal_obj.order_id}, "
+                     f"order_snapshot_list: {order_snapshot_list}")
+            assert order_snapshot_after_fill.order_status == OrderStatusType.OE_DOD, \
+                (f"Unexpected: OrderStatus mismatched, expected order_status: {OrderStatusType.OE_DOD}, "
+                 f"received order_status: {order_snapshot_after_fill.order_status}")
+            filled_qty = get_partial_allowed_fill_qty(symbol, config_dict, fill_journal_obj.fill_qty)
+            assert order_snapshot_after_fill.filled_qty == order_snapshot_before_fill.filled_qty + filled_qty, \
+                (f"Unexpected: OrderSnapshot's filled_qty mismatched, "
+                 f"expected: {order_snapshot_before_fill.filled_qty + filled_qty}, "
+                 f"received {order_snapshot_after_fill.filled_qty}")
+            assert order_snapshot_after_fill.fill_notional == (
+                    order_snapshot_before_fill.fill_notional +
+                    (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))), \
+                (f"Unexpected: OrderSnapshot's fill_notional mismatched, "
+                 f"expected: {order_snapshot_before_fill.fill_notional + (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))}, "
+                 f"received {order_snapshot_after_fill.fill_notional}")
+            assert order_snapshot_after_fill.cxled_qty == order_snapshot_before_fill.cxled_qty - filled_qty, \
+                (f"Unexpected: OrderSnapshot's cxled_qty mismatched, "
+                 f"expected: {order_snapshot_before_fill.cxled_qty - filled_qty}, "
+                 f"received {order_snapshot_after_fill.cxled_qty}")
+            assert order_snapshot_after_fill.cxled_notional == (
+                    order_snapshot_before_fill.cxled_notional -
+                    (get_px_in_usd(order_snapshot_after_fill.order_brief.px)*filled_qty)), \
+                (f"Unexpected: OrderSnapshot's cxled_notional mismatched, "
+                 f"expected: {order_snapshot_before_fill.cxled_notional - (get_px_in_usd(order_snapshot_after_fill.order_brief.px)*filled_qty)}, "
+                 f"received {order_snapshot_after_fill.cxled_notional}")
+
+            # SymbolSideSnapshot check
+            symbol_side_snapshot_list = executor_http_client.get_all_symbol_side_snapshot_client()
+            for symbol_side_snapshot in symbol_side_snapshot_list:
+                if symbol_side_snapshot.security.sec_id == latest_order_journal.order.security.sec_id:
+                    symbol_side_snapshot_after_fill = symbol_side_snapshot
+                    break
+            else:
+                assert False, \
+                    ("Unexpected: Can't find symbol_side_snapshot having symbol: "
+                     f"{latest_order_journal.order.security.sec_id}, "
+                     f"order_snapshot_list: {order_snapshot_list}")
+            assert (symbol_side_snapshot_after_fill.total_filled_qty ==
+                    symbol_side_snapshot_before_fill.total_filled_qty + filled_qty), \
+                (f"Unexpected: SymbolSideSnapshot's total_filled_qty mismatched, "
+                 f"expected: {symbol_side_snapshot_before_fill.total_filled_qty + filled_qty}, "
+                 f"received {symbol_side_snapshot_after_fill.total_filled_qty}")
+            assert (symbol_side_snapshot_after_fill.total_fill_notional ==
+                    symbol_side_snapshot_before_fill.total_fill_notional +
+                    (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))), \
+                (f"Unexpected: SymbolSideSnapshot's total_fill_notional mismatched, "
+                 f"expected: {symbol_side_snapshot_before_fill.total_fill_notional + (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))}, "
+                 f"received {symbol_side_snapshot_after_fill.total_fill_notional}")
+            assert symbol_side_snapshot_after_fill.total_cxled_qty == (
+                    symbol_side_snapshot_before_fill.total_cxled_qty - filled_qty), \
+                (f"Unexpected: SymbolSideSnapshot's total_cxled_qty mismatched, "
+                 f"expected: {symbol_side_snapshot_before_fill.total_cxled_qty - filled_qty}, "
+                 f"received {symbol_side_snapshot_after_fill.total_cxled_qty}")
+            assert symbol_side_snapshot_after_fill.total_cxled_notional == (
+                    symbol_side_snapshot_before_fill.total_cxled_notional -
+                    (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)), \
+                (f"Unexpected: SymbolSideSnapshot's total_cxled_notional mismatched, "
+                 f"expected: {symbol_side_snapshot_before_fill.total_cxled_notional - (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)}, "
+                 f"received {symbol_side_snapshot_after_fill.total_cxled_notional}")
+
+            # StratBrief Check
+            strat_brief_list = executor_http_client.get_all_strat_brief_client()
+            assert len(strat_brief_list) == 1, \
+                ("Unexpected: This test created single strat so expected single strat_brief in "
+                 f"strat_brief_list , received length: {len(strat_brief_list)}, "
+                 f"strat_brief_list: {strat_brief_list}")
+            strat_brief_after_fill = strat_brief_list[0]
+
+            if symbol == buy_symbol:
+                update_expected_strat_brief_for_buy(1, order_snapshot_after_fill,
+                                                    symbol_side_snapshot_after_fill,
+                                                    expected_strat_limits_, expected_strat_brief_,
+                                                    order_snapshot_after_fill.last_update_date_time)
+                strat_brief_after_fill.pair_buy_side_trading_brief.indicative_consumable_participation_qty = None
+                strat_brief_after_fill.pair_buy_side_trading_brief.participation_period_order_qty_sum = None
+                # Since sell side of strat_brief is not updated in this test
+                strat_brief_after_fill.pair_sell_side_trading_brief = expected_strat_brief_.pair_sell_side_trading_brief
+                strat_brief_after_fill.pair_buy_side_trading_brief.last_update_date_time = None
+                expected_strat_brief_.pair_buy_side_trading_brief.last_update_date_time = None
+                expected_strat_brief_.id = active_pair_strat.id
+
+                # Updating residual_qty and indicative_consumable_residual
+                expected_strat_brief_.pair_buy_side_trading_brief.residual_qty = (
+                        strat_brief_before_fill.pair_buy_side_trading_brief.residual_qty - filled_qty)
+                current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
+                expected_strat_brief_.pair_buy_side_trading_brief.indicative_consumable_residual = \
+                    expected_strat_limits_.residual_restriction.max_residual - \
+                    ((expected_strat_brief_.pair_buy_side_trading_brief.residual_qty * current_leg_last_trade_px) -
+                     (0 * other_leg_last_trade_px))
+                expected_strat_brief_.pair_buy_side_trading_brief.consumable_open_orders = 5
+                assert expected_strat_brief_ == strat_brief_after_fill, \
+                    f"Unexpected: Mismatched strat_brief, expected {expected_strat_brief_}, received {strat_brief_list}"
+            else:
+                update_expected_strat_brief_for_sell(1, 1, order_snapshot_after_fill,
+                                                     symbol_side_snapshot_after_fill,
+                                                     expected_strat_limits_, expected_strat_brief_,
+                                                     order_snapshot_after_fill.last_update_date_time)
+                expected_strat_brief_.id = active_pair_strat.id
+                # Since buy side of strat_brief is already checked
+                strat_brief_after_fill.pair_sell_side_trading_brief.indicative_consumable_participation_qty = None
+                strat_brief_after_fill.pair_sell_side_trading_brief.participation_period_order_qty_sum = None
+                strat_brief_after_fill.pair_sell_side_trading_brief.last_update_date_time = None
+                expected_strat_brief_.pair_sell_side_trading_brief.last_update_date_time = None
+
+                # Updating residual_qty and indicative_consumable_residual
+                expected_strat_brief_.pair_sell_side_trading_brief.residual_qty = (
+                        strat_brief_before_fill.pair_sell_side_trading_brief.residual_qty - filled_qty)
+                current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
+                expected_strat_brief_.pair_sell_side_trading_brief.indicative_consumable_residual = \
+                    expected_strat_limits_.residual_restriction.max_residual - \
+                    ((expected_strat_brief_.pair_sell_side_trading_brief.residual_qty * current_leg_last_trade_px) -
+                     (0 * other_leg_last_trade_px))
+
+                expected_strat_brief_.pair_sell_side_trading_brief.indicative_consumable_residual = \
+                    expected_strat_limits_.residual_restriction.max_residual - \
+                    ((expected_strat_brief_.pair_sell_side_trading_brief.residual_qty * current_leg_last_trade_px) -
+                     (strat_brief_after_fill.pair_buy_side_trading_brief.residual_qty * other_leg_last_trade_px))
+                expected_strat_brief_.pair_sell_side_trading_brief.consumable_open_orders = 5
+
+                assert (expected_strat_brief_.pair_sell_side_trading_brief ==
+                        strat_brief_after_fill.pair_sell_side_trading_brief), \
+                    f"Unexpected: Mismatched strat_brief, expected {expected_strat_brief_}, received {strat_brief_list}"
+
+            # StratStatus Check
+            strat_status_after_fill = executor_http_client.get_strat_status_client(active_pair_strat.id)
+            if symbol == buy_symbol:
+                assert (strat_status_after_fill.total_fill_buy_qty ==
+                        strat_status_before_fill.total_fill_buy_qty + filled_qty), \
+                    (f"Unexpected: Mismatched strat_status's total_fill_buy_qty, "
+                     f"expected {strat_status_before_fill.total_fill_buy_qty + filled_qty}, "
+                     f"received {strat_status_after_fill.total_fill_buy_qty}")
+                assert strat_status_after_fill.total_fill_buy_notional == (
+                        strat_status_before_fill.total_fill_buy_notional +
+                        (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))), \
+                    (f"Unexpected: Mismatched strat_status's total_fill_buy_notional, "
+                     f"expected {strat_status_before_fill.total_fill_buy_notional + (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))}, "
+                     f"received {strat_status_after_fill.total_fill_buy_notional}")
+                assert strat_status_after_fill.total_fill_exposure == strat_status_after_fill.total_fill_buy_notional, \
+                    (f"Unexpected: Mismatched strat_status's total_fill_exposure, "
+                     f"expected {strat_status_after_fill.total_fill_buy_notional}, "
+                     f"received {strat_status_after_fill.total_fill_exposure}")
+                assert strat_status_after_fill.total_cxl_buy_qty == strat_status_before_fill.total_cxl_buy_qty - filled_qty, \
+                    (f"Unexpected: Mismatched strat_status's total_cxl_buy_qty, "
+                     f"expected {strat_status_before_fill.total_cxl_buy_qty - filled_qty}, "
+                     f"received {strat_status_after_fill.total_cxl_buy_qty}")
+                assert strat_status_after_fill.total_cxl_buy_notional == (
+                        strat_status_before_fill.total_cxl_buy_notional -
+                        (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)), \
+                    (f"Unexpected: Mismatched strat_status's total_cxl_buy_notional, "
+                     f"expected {strat_status_before_fill.total_cxl_buy_notional - (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)}, "
+                     f"received {strat_status_after_fill.total_cxl_buy_notional}")
+                assert (strat_status_after_fill.total_cxl_exposure ==
+                        strat_status_before_fill.total_cxl_exposure -
+                        (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)), \
+                    (f"Unexpected: Mismatched strat_status's total_cxl_exposure, "
+                     f"expected {strat_status_before_fill.total_cxl_exposure - (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)}, "
+                     f"received {strat_status_after_fill.total_cxl_exposure}")
+                residual_notional = abs((strat_brief_after_fill.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
+                    current_leg_last_trade_px)) -
+                                        (strat_brief_after_fill.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
+                                            other_leg_last_trade_px)))
+                residual = Residual(security=active_pair_strat.pair_strat_params.strat_leg1.sec,
+                                    residual_notional=residual_notional)
+                assert strat_status_after_fill.residual == residual, \
+                    (f"Unexpected: Mismatched strat_status's residual, "
+                     f"expected {residual}, received {strat_status_after_fill.residual}")
+                balance_notional = \
+                    expected_strat_limits_.max_cb_notional - strat_status_after_fill.total_fill_sell_notional
+                assert strat_status_after_fill.balance_notional == balance_notional, \
+                    (f"Unexpected: Mismatched strat_status's balance_notional, "
+                     f"expected {balance_notional}, received {strat_status_after_fill.balance_notional}")
+            else:
+                assert (strat_status_after_fill.total_fill_sell_qty ==
+                        strat_status_before_fill.total_fill_sell_qty + filled_qty), \
+                    (f"Unexpected: Mismatched strat_status's total_fill_sell_qty, "
+                     f"expected {strat_status_before_fill.total_fill_sell_qty + filled_qty}, "
+                     f"received {strat_status_after_fill.total_fill_sell_qty}")
+                assert strat_status_after_fill.total_fill_sell_notional == (
+                        strat_status_before_fill.total_fill_sell_notional +
+                        (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))), \
+                    (f"Unexpected: Mismatched strat_status's total_fill_sell_notional, "
+                     f"expected {strat_status_before_fill.total_fill_sell_notional + (filled_qty * get_px_in_usd(fill_journal_obj.fill_px))}, "
+                     f"received {strat_status_after_fill.total_fill_sell_notional}")
+                assert strat_status_after_fill.total_fill_exposure == (
+                        strat_status_after_fill.total_fill_buy_notional -
+                        strat_status_after_fill.total_fill_sell_notional), \
+                    (f"Unexpected: Mismatched strat_status's total_fill_exposure, "
+                     f"expected {strat_status_after_fill.total_fill_buy_notional - strat_status_after_fill.total_fill_sell_notional}, "
+                     f"received {strat_status_after_fill.total_fill_exposure}")
+                assert strat_status_after_fill.total_cxl_sell_qty == strat_status_before_fill.total_cxl_sell_qty - filled_qty, \
+                    (f"Unexpected: Mismatched strat_status's total_cxl_sell_qty, "
+                     f"expected {strat_status_before_fill.total_cxl_sell_qty - filled_qty}, "
+                     f"received {strat_status_after_fill.total_cxl_sell_qty}")
+                assert strat_status_after_fill.total_cxl_sell_notional == (
+                        strat_status_before_fill.total_cxl_sell_notional -
+                        (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)), \
+                    (f"Unexpected: Mismatched strat_status's total_cxl_sell_notional, "
+                     f"expected {strat_status_before_fill.total_cxl_sell_notional - (get_px_in_usd(order_snapshot_after_fill.order_brief.px) * filled_qty)}, "
+                     f"received {strat_status_after_fill.total_cxl_sell_notional}")
+                assert (strat_status_after_fill.total_cxl_exposure ==
+                        strat_status_after_fill.total_cxl_buy_notional - strat_status_after_fill.total_cxl_sell_notional), \
+                    (f"Unexpected: Mismatched strat_status's total_cxl_exposure, "
+                     f"expected {strat_status_after_fill.total_cxl_buy_notional - (strat_status_after_fill.total_fill_sell_notional + (filled_qty * get_px_in_usd(fill_journal_obj.fill_px)))}, "
+                     f"received {strat_status_after_fill.total_cxl_exposure}")
+                residual_notional = abs(
+                    (strat_brief_after_fill.pair_buy_side_trading_brief.residual_qty * get_px_in_usd(
+                        current_leg_last_trade_px)) -
+                    (strat_brief_after_fill.pair_sell_side_trading_brief.residual_qty * get_px_in_usd(
+                        other_leg_last_trade_px)))
+                residual = Residual(security=active_pair_strat.pair_strat_params.strat_leg1.sec,
+                                    residual_notional=residual_notional)
+                assert strat_status_after_fill.residual == residual, \
+                    (f"Unexpected: Mismatched strat_status's residual, "
+                     f"expected {residual}, received {strat_status_after_fill.residual}")
+                balance_notional = \
+                    expected_strat_limits_.max_cb_notional - strat_status_after_fill.total_fill_buy_notional
+                assert strat_status_after_fill.balance_notional == balance_notional, \
+                    (f"Unexpected: Mismatched strat_status's balance_notional, "
+                     f"expected {balance_notional}, received {strat_status_after_fill.balance_notional}")
+
+            # Checking portfolio_status
+            portfolio_status_after_fill = strat_manager_service_native_web_client.get_portfolio_status_client(1)
+            if symbol == buy_symbol:
+                assert portfolio_status_after_fill.overall_buy_notional == (
+                        portfolio_status_before_fill.overall_buy_notional + placed_fill_journal_obj.fill_notional), \
+                    (f"Unexpected: Mismatched portfolio_status's overall_buy_notional, "
+                     f"expected {portfolio_status_before_fill.overall_buy_notional + placed_fill_journal_obj.fill_notional}, "
+                     f"received {portfolio_status_after_fill.overall_buy_notional}")
+                assert portfolio_status_after_fill.overall_buy_fill_notional == (
+                        portfolio_status_before_fill.overall_buy_fill_notional + placed_fill_journal_obj.fill_notional), \
+                    (f"Unexpected: Mismatched portfolio_status's overall_buy_fill_notional, "
+                     f"expected {portfolio_status_before_fill.overall_buy_fill_notional + placed_fill_journal_obj.fill_notional}, "
+                     f"received {portfolio_status_after_fill.overall_buy_fill_notional}")
+            else:
+                assert portfolio_status_after_fill.overall_sell_notional == (
+                        portfolio_status_before_fill.overall_sell_notional + placed_fill_journal_obj.fill_notional), \
+                    (f"Unexpected: Mismatched portfolio_status's overall_buy_notional, "
+                     f"expected {portfolio_status_before_fill.overall_sell_notional + placed_fill_journal_obj.fill_notional}, "
+                     f"received {portfolio_status_after_fill.overall_sell_notional}")
+                assert portfolio_status_after_fill.overall_sell_fill_notional == (
+                        portfolio_status_before_fill.overall_sell_fill_notional + placed_fill_journal_obj.fill_notional), \
+                    (f"Unexpected: Mismatched portfolio_status's overall_buy_fill_notional, "
+                     f"expected {portfolio_status_before_fill.overall_sell_fill_notional + placed_fill_journal_obj.fill_notional}, "
+                     f"received {portfolio_status_after_fill.overall_sell_fill_notional}")
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def _test_create_pair_strat_n_few_orders_for_crash_check(
+        static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, residual_wait_sec):
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+    # making limits suitable for this test
+    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.residual_restriction.max_residual = 105000
+
+    created_pair_strat, executor_web_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
@@ -2546,23 +2943,30 @@ def test_get_market_depths_query(
         buy_ack_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                                 buy_symbol, executor_web_client,
                                                                                 last_order_id=buy_ack_order_id)
             buy_ack_order_id = ack_order_journal.order.order_id
 
+            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                time.sleep(residual_wait_sec)  # wait to make this open order residual
+
         # Placing sell orders
         sell_ack_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+            run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                                 sell_symbol, executor_web_client,
                                                                                 last_order_id=sell_ack_order_id)
             sell_ack_order_id = ack_order_journal.order.order_id
+
+            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                time.sleep(residual_wait_sec)  # wait to make this open order residual
+
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -2573,25 +2977,26 @@ def test_get_market_depths_query(
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def test_run_orders(buy_sell_symbol_list, pair_strat_,
-                                  expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
-                                  top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list):
+def _test_create_orders_after_crash_recovery(
+        buy_sell_symbol_list, pair_strat_, expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, residual_wait_sec):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_1_simulate_config.yaml"
-    config_dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
     try:
-
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
-        executor_web_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists("127.0.0.1", 60699)
+        # IMPORTANT: update this port with recovery port before running this test
+        port: int = 35521
+        executor_web_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists("127.0.0.1", port)
 
         executor_web_client.trade_simulator_reload_config_query_client()
 
@@ -2609,12 +3014,15 @@ def test_run_orders(buy_sell_symbol_list, pair_strat_,
 
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(buy_symbol, executor_web_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                                 buy_symbol, executor_web_client,
                                                                                 last_order_id=buy_ack_order_id)
             buy_ack_order_id = ack_order_journal.order.order_id
+
+            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                time.sleep(residual_wait_sec)  # wait to make this open order residual
 
         # Placing sell orders
         sell_ack_order_id = None
@@ -2628,12 +3036,16 @@ def test_run_orders(buy_sell_symbol_list, pair_strat_,
 
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_sell_top_of_book(sell_symbol, executor_web_client, top_of_book_list_[1])
+            run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
             ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                                 sell_symbol, executor_web_client,
                                                                                 last_order_id=sell_ack_order_id)
             sell_ack_order_id = ack_order_journal.order.order_id
+
+            if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+                time.sleep(residual_wait_sec)  # wait to make this open order residual
+
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -2642,3 +3054,46 @@ def test_run_orders(buy_sell_symbol_list, pair_strat_,
         raise Exception(e)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def _test_delete_all_test_db():
+    from pymongo import MongoClient
+
+    uri = get_mongo_server_uri()
+    client = MongoClient(uri)
+    db_list = client.list_database_names()
+
+    for db_name in db_list:
+        if (db_name.startswith("log_analyzer") or
+                db_name.startswith("strat_executor_") or
+                db_name.startswith("addressbook") or
+                db_name.startswith("post_trade_engine")):
+            client.drop_database(name_or_database=db_name)
+
+
+def _test_clean_all_logs():
+    import shutil
+    path = PurePath("/home/tanishq/Documents/Github/FluxCodeGenEngine/Flux/CodeGenProjects")
+    for project in ["log_analyzer", "addressbook", "post_trade_engine", "strat_executor"]:
+        log_dir = path / project / "log"
+        if os.path.exists(log_dir):
+            shutil.rmtree(log_dir)
+
+
+# def test_log_trade_simulator_trigger_kill_switch_and_resume_trading():
+#     log_dir: PurePath = PurePath(
+#         __file__).parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects" / "addressbook" / "log "
+#     configure_logger("debug", str(log_dir), "test_log_trade_simulator.log")
+#
+#     LogTradeSimulator.trigger_kill_switch()
+#     time.sleep(5)
+#
+#     portfolio_status_id = 1
+#     portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(portfolio_status_id)
+#     assert portfolio_status.kill_switch
+#
+#     LogTradeSimulator.revoke_kill_switch_n_resume_trading()
+#     time.sleep(5)
+#
+#     portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(portfolio_status_id)
+#     assert not portfolio_status.kill_switch

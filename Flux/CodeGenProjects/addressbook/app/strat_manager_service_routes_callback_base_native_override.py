@@ -128,7 +128,11 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                         # running all existing executor
                         self.run_existing_executors()
                         self.service_ready = True
-                        print(f"INFO: service is ready: {datetime.datetime.now().time()}")
+                    self.service_ready = True
+                    print(f"INFO: service is ready: {datetime.datetime.now().time()}")
+                else:
+                    logging.warning(f"_app_launch_pre_thread_func: service not ready yet;;;service_up : "
+                                    f"{self.service_up}")
                 if not self.service_up:
                     try:
                         if is_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
@@ -493,7 +497,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             updated_pair_strat_obj.pair_strat_params_update_seq_num = 0
         updated_pair_strat_obj.pair_strat_params_update_seq_num += 1
         updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
-
         return updated_pair_strat_obj
 
     async def partial_update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj_dict: Dict):

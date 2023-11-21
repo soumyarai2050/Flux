@@ -1,3 +1,4 @@
+import json
 from typing import Optional
 
 from selenium import webdriver
@@ -10,7 +11,7 @@ from selenium.webdriver.common.keys import Keys
 from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import *
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import test_config_file_path, \
-    strat_manager_service_native_web_client
+    strat_manager_service_native_web_client, create_tob
 
 
 SIMPLE_DATA_TYPE_LIST: Final[List[DataType]] = \
@@ -452,6 +453,8 @@ def get_widget_type(widget_schema: Dict) -> WidgetType | None:
                 return WidgetType.REPEATED_DEPENDENT
             else:
                 return WidgetType.DEPENDENT
+        elif layout in ["UI_ABBREVIATED_FILTER"] and is_json_root:
+            return WidgetType.ABBREVIATED
         return None
 
 
@@ -475,7 +478,10 @@ def get_widgets_by_flux_property(schema_dict: Dict[str, any], widget_type: Widge
             elif field_properties["type"] in COMPLEX_DATA_TYPE_LIST:
                 if field_properties.get("underlying_type") is not None and \
                         field_properties["underlying_type"] in SIMPLE_DATA_TYPE_LIST:
+                    if flux_property in field_properties:
+                        field_queries.append(FieldQuery(field_name=field, properties=field_properties))
                     continue
+
                 ref_path: str = field_properties["items"]["$ref"]
                 ref_list: List[str] = ref_path.split("/")[1:]
                 child_schema: Dict[str, any] = schema_dict[ref_list[0]][ref_list[1]] if len(ref_list) == 2 \
@@ -511,7 +517,8 @@ def get_widgets_by_flux_property(schema_dict: Dict[str, any], widget_type: Widge
         current_schema_widget_type: WidgetType = get_widget_type(widget_schema)
         if current_schema_widget_type == widget_type:
             field_queries: List[FieldQuery] = []
-            search_schema_for_flux_property(widget_schema)
+            schema_copy = copy.deepcopy(widget_schema)  # Create a deep copy of the schema
+            search_schema_for_flux_property(schema_copy)
             if field_queries:
                 widget_query: WidgetQuery = WidgetQuery(widget_name=widget_name, fields=field_queries)
                 widget_queries.append(widget_query)
@@ -555,7 +562,7 @@ def get_xpath_from_field_name(schema_dict: Dict[str, any], widget_type: WidgetTy
     return None
 
 
-def override_default_limits(order_limits: OrderLimitsBaseModel, portfolio_limits: PortfolioLimitsBaseModel):
+def override_default_limits(order_limits: OrderLimitsBaseModel, portfolio_limits: PortfolioLimitsBaseModel) -> None:
     updated_order_limits: OrderLimitsBaseModel = OrderLimitsBaseModel(_id=order_limits.id, max_basis_points=150,
                                                                       max_px_deviation=2, min_order_notional=1_000,
                                                                       max_order_notional=400000)
@@ -568,7 +575,7 @@ def override_default_limits(order_limits: OrderLimitsBaseModel, portfolio_limits
         updated_portfolio_limits, by_alias=True, exclude_none=True))
 
 
-def override_strat_limit(strat_executor_service_http_client: StratExecutorServiceHttpClient):
+def override_strat_limit(strat_executor_service_http_client: StratExecutorServiceHttpClient)-> None:
     strat_limit_list: List[StratLimitsBaseModel] = strat_executor_service_http_client.get_all_strat_limits_client()
 
     for strat_limit in strat_limit_list:
@@ -634,14 +641,13 @@ def confirm_save(driver: WebDriver) -> None:
     time.sleep(Delay.SHORT.value)
 
 
-def select_n_unselect_checkbox(driver: WebDriver, inner_text: str) -> None:
+def select_or_unselect_checkbox(driver: WebDriver, field_name: str) -> None:
     settings_dropdown: WebElement = driver.find_element(By.CLASS_NAME, "MuiPopover-paper")
     dropdown_elements = settings_dropdown.find_elements(By.TAG_NAME, "li")
-
     span_element: WebElement
     for dropdown_element in dropdown_elements:
         dropdown_label = dropdown_element.find_element(By.CSS_SELECTOR, "label")
-        if dropdown_label.text == inner_text:
+        if dropdown_label.text == field_name:
             dropdown_label.click()
             time.sleep(Delay.DEFAULT.value)
             break
@@ -688,23 +694,6 @@ def show_hidden_field_in_review_changes_popup(driver: WebDriver) -> None:
         expand_button.click()
 
 
-# def validate_property_that_it_contain_val_min_val_max_or_none(schema_dict, widget_type: WidgetType,
-#                                                               flux_property: str) -> str:
-#     result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type, flux_property=flux_property)
-#     for widget_query in result[1]:
-#         for field_query in widget_query.fields:
-#             val_min: str = (field_query.properties.get("val_min"))
-#             val_max: str = (field_query.properties.get("val_max"))
-#             if val_min is not None:
-#                 val_min: float = int(val_min) + 1.55
-#                 return str(val_min)
-#             elif val_max is not None:
-#                 val_max: float = int(val_max) - 1.55
-#                 return str(val_max)
-#             else:
-#                 return str(1000.5)
-
-
 def validate_property_that_it_contain_val_min_val_max_or_none(val_max: str, val_min: str) -> str:
     try:
         if val_min:
@@ -742,10 +731,10 @@ def count_fields_in_tree(widget: WebElement) -> List[str]:
 
 def get_commonkey_items(widget: WebElement) -> Dict[str, any]:
 
-    # common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
-    common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__hOXaW")
-    # common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__ny8Fj")
-    common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__QEVHl")
+    common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
+    # common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__hOXaW")
+    common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__ny8Fj")
+    # common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__QEVHl")
     common_key_items: Dict[str] = {}
     for common_key_item_element in common_key_item_elements:
         common_key_item_txt = common_key_item_element.text.split(":")
@@ -888,7 +877,7 @@ def get_common_keys(widget: WebElement) -> List[str]:
     common_keys_text = []
     for key_element in common_key_elements:
         span_element = key_element.find_element(By.TAG_NAME, "span")
-        common_keys_text.append(span_element.text.split(":")[0])
+        common_keys_text.append(span_element.text.split(":")[0].split("[")[0])
     return common_keys_text
 
 
@@ -912,7 +901,8 @@ def get_replaced_common_keys(common_keys_list: List) -> List[str]:
     return list_of_common_keys
 
 
-def get_table_headers(widget: WebElement) -> list:
+def get_table_headers(widget: WebElement) -> List[str]:
+    # row fld names
     name: str = "span[class^='MuiButtonBase-root']"
     span_elements: List[WebElement] = widget.find_elements(By.CSS_SELECTOR, name)
     table_headers: List[str] = [span_element.text.replace(" ", "_") for span_element in span_elements]
@@ -965,13 +955,12 @@ def get_property_value_frm_schema(schema_dict, widget_type: WidgetType, flux_pro
     return name_lst
 
 
-def replace_default_value(default_field_value) -> int:
+def get_replaced_str(default_field_value: str) -> int:
     default_field_value = default_field_value.replace(',', '')
-    default_field_value: int = int(default_field_value)
-    return default_field_value
+    return int(default_field_value)
 
 
-def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_list: List[TopOfBookBaseModel],
+def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_list,
                               market_depth_list: List[MarketDepthBaseModel], last_trade_list: List[LastTradeBaseModel],
                               fills_journal_list: List[FillsJournalBaseModel],
                               order_snapshot_list: List[OrderSnapshotBaseModel],
@@ -1004,10 +993,8 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_list: List[TopOfBoo
 
     executor_web_client = StratExecutorServiceHttpClient(pair_strat.host, pair_strat.port)
 
-    expected_top_of_book_list: List[TopOfBookBaseModel] = (
-        executor_web_client.create_all_top_of_book_client(top_of_book_list))
-    assert top_of_book_list == expected_top_of_book_list
 
+    create_tob("CB_Sec_1", "EQT_Sec_1", top_of_book_list, executor_web_client)
     expected_market_depth_list: List[MarketDepthBaseModel] = (
         executor_web_client.create_all_market_depth_client(market_depth_list))
     for expected_market_depth, market_depth in zip(expected_market_depth_list, market_depth_list):
@@ -1226,6 +1213,55 @@ def get_element_text_list_from_filter_popup(driver: WebDriver) -> List[str]:
 
     return element_texts
 
+
+def flux_fld_title_in_widgets(result: List[WidgetQuery], widget_type: WidgetType, driver: WebDriver) -> None:
+    for widget_query in result:
+        widget_name: str = widget_query.widget_name
+        print(widget_name)
+        # fixme: `portfolio_status` and `strat_alert` is not been created
+        #  (`strat_status`: most of the field is not present )
+        if widget_name == "portfolio_status" or widget_name == "strat_alert" or widget_name == "strat_status":
+            continue
+        widget: WebElement = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        switch_layout(widget=widget, layout=Layout.TABLE)
+        click_button_with_name(widget=widget, button_name="Show")
+        time.sleep(Delay.SHORT.value)
+        common_key_list: List[str] = get_common_keys(widget=widget)
+        common_key_list = [key.replace(" ", "_") for key in common_key_list]
+        print(common_key_list)
+        for field_query in widget_query.fields:
+            if widget_type == WidgetType.INDEPENDENT:
+                field_title: str = field_query.properties["title"].replace(" ", "_")
+                if (field_title != "max_contract_qty" and field_title != "security" and field_title != "positions" and
+                        field_title != "eligible_brokers_update_count"):
+                    assert field_title in common_key_list
+            elif widget_type == WidgetType.DEPENDENT:
+                field_name: str = field_query.field_name
+                field_title: str | None = field_query.properties.get("parent_title")
+                if field_title is not None:
+                    field_title = field_title + "." + field_name
+                else:
+                    field_title = field_query.properties["title"].replace(" ", "_")
+                print(field_title)
+                if (field_name != "exch_id" and field_name != "sec_id" and field_name != "sec_type" and
+                        field_name != "company"):
+                    assert field_title in common_key_list
+
+
+def flux_fld_autocomplete_in_widgets(result: List[WidgetQuery], auto_complete_dict: Dict[str, any]):
+    for widget_query in result:
+        for field_query in widget_query.fields:
+            auto_complete_value_list = [field_auto_complete_property.split(":")[1]
+                                        if ":" in field_auto_complete_property
+                                        else field_auto_complete_property.split("=")[1]
+            if "=" in field_auto_complete_property else field_auto_complete_property for field_auto_complete_property
+                                        in field_query.properties.get("auto_complete").split(",")]
+            for auto_complete_value in auto_complete_value_list:
+                assert (auto_complete_value in auto_complete_dict or
+                        (auto_complete_value in values for values in auto_complete_dict.values()))
+
+
 def validate_unpressed_n_pressed_btn_txt(driver: WebDriver, widget: WebElement,
                                          unpressed_caption: str, pressed_caption: str, index_no: int):
     btn_td_elements: [WebElement] = widget.find_elements(By.CLASS_NAME, "MuiToggleButton-sizeMedium")
@@ -1236,25 +1272,31 @@ def validate_unpressed_n_pressed_btn_txt(driver: WebDriver, widget: WebElement,
     assert unpressed_caption.upper() == unpressed_btn_txt
     assert pressed_caption.upper() == pressed_btn_txt
 
-def validate_hide_n_show_in_common_key(widget: WebElement, text: str, key_type: str):
-    common_keys: List[str] = get_common_keys(widget=widget)
-    replaced_str_common_keys: List[str] = get_replaced_common_keys(common_keys_list=common_keys)
-    if key_type == "selected_checkbox":
-        assert text in replaced_str_common_keys, \
-            f"{text} field is not visible in common keys, expected to be visible"
-    else:
-        assert text not in replaced_str_common_keys, \
-            f"{text} field is visible in common keys, expected to be hidden"
 
-def validate_flux_fld_val_max_in_widget(driver: WebDriver, widget: WebElement, field_name_list: List[str]):
+def validate_hide_n_show_in_common_key(widget: WebElement, field_name: str, key_type: str):
+    common_keys: List[str] = get_common_keys(widget=widget)
+    replaced_common_keys: List[str] = get_replaced_common_keys(common_keys_list=common_keys)
+    if key_type == "selected_checkbox":
+        assert field_name in replaced_common_keys, \
+            f"{field_name} field is not visible in common keys, expected to be visible"
+    else:
+        assert field_name not in replaced_common_keys, \
+            f"{field_name} field is visible in common keys, expected to be hidden"
+
+
+def validate_flux_fld_val_max_in_widget(driver: WebDriver, widget: WebElement, input_type: str, xpath_lst: List[str]):
     click_button_with_name(widget=widget, button_name="Save")
     expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
     object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
     # object_keys.pop()
-    for field_name in field_name_list:
-        assert field_name in object_keys
-    confirm_save(driver=driver)
-    field_name_list.clear()
+    for xpath in xpath_lst:
+        assert xpath in object_keys
+    if input_type == "valid":
+        confirm_save(driver=driver)
+    else:
+        discard_changes(widget=widget)
+    xpath_lst.clear()
+
 
 def validate_flux_fld_val_min_in_widget(widget: WebElement, field_name: str):
     click_button_with_name(widget=widget, button_name="Save")
@@ -1284,6 +1326,7 @@ def validate_flux_fld_number_format_in_widget(widget: WebElement, xpath: str, nu
         number_format: str = get_flux_fld_number_format(widget=widget, xpath=xpath, layout=Layout.TREE)
     assert number_format_txt == number_format
 
+
 def validate_flux_flx_display_zero_in_widget(driver: WebDriver, widget: WebElement, field_name: str, value: str):
     click_button_with_name(widget=widget, button_name="Save")
     confirm_save(driver=driver)
@@ -1298,10 +1341,12 @@ def get_replaced_str_default_field_value(default_field_value: str) -> int:
         replaced_value: int = int(default_field_value)
         return replaced_value
 
+
 def validate_val_min_n_default_fld_value_equal_or_not(val_min: int, replaced_default_field_value: int) -> bool:
     if val_min == replaced_default_field_value:
         return True
     return False
+
 
 def validate_val_max_n_default_fld_value_equal_or_not(val_max: int, replaced_default_field_value: int) -> bool:
     if val_max == replaced_default_field_value:
@@ -1312,6 +1357,7 @@ def validate_val_max_n_default_fld_value_equal_or_not(val_max: int, replaced_def
 def get_widget_web_element_by_name(driver: WebDriver, widget_name: str) -> WebElement:
     widget = driver.find_element(By.ID, widget_name)
     return widget
+
 
 def show_nested_fld_in_tree_layout(widget: WebElement):
     try:
@@ -1324,8 +1370,74 @@ def show_nested_fld_in_tree_layout(widget: WebElement):
     except NoSuchElementException as e:
         raise Exception(f"failed to click on plus button, nested fld is already visible in {widget}: ;;; exception: {e}")
 
-def get_val_min_n_val_max_of_fld(field_query: str)-> tuple[str, str]:
+
+def get_val_min_n_val_max_of_fld(field_query: str) -> Tuple[str, str]:
     val_min: str = (field_query.properties.get("val_min"))
     val_max: str = (field_query.properties.get("val_max"))
     return val_min, val_max
 
+
+def convert_schema_dict_to_widget_query(schema_dict: Dict[str, Any]) -> List[WidgetQuery]:
+    widget_queries = []
+
+    for widget_name, widget_data in schema_dict.items():
+        fields = []
+        if "properties" in widget_data:
+            for field_name, field_data in widget_data["properties"].items():
+                field = FieldQuery(field_name=field_name, properties=field_data)
+                fields.append(field)
+
+        widget_query = WidgetQuery(
+            widget_name=widget_name,
+            widget_data=widget_data,
+            fields=fields,
+        )
+
+        widget_queries.append(widget_query)
+
+    return widget_queries
+
+
+def update_schema_json(schema_dict: Dict[str, any], update_widget_name: str, update_field_name: str,
+                       extend_field_name: str, value: any, project_name: str) -> None:
+
+    project_path: PurePath = code_gen_projects_dir_path / project_name
+
+    schema_path: PurePath = project_path / "web-ui" / "public" / "schema.json"
+
+    for widget_name, widget_data in schema_dict.items():
+        widget_properties = widget_data.get("properties")
+        if widget_name == update_widget_name and widget_properties is not None:
+            widget_properties[update_field_name][extend_field_name] = value
+
+    with open(str(schema_path), "w") as f:
+        json.dump(schema_dict, f, indent=2)
+
+
+def save_layout(driver: WebDriver, layout_name: str) -> None:
+    driver.find_element(By.NAME, "SaveLayout").click()
+    time.sleep(Delay.SHORT.value)
+    element: WebElement = driver.find_element(By.XPATH, '/html/body/div[2]/div[3]/div/div[1]/div/div/input')
+    element.click()
+    time.sleep(Delay.SHORT.value)
+    element.send_keys(Keys.CONTROL + "a")
+    element.send_keys(Keys.BACK_SPACE)
+    element.send_keys(layout_name)
+    # save the layout
+    driver.find_element(By.XPATH, "/html/body/div[2]/div[3]/div/div[2]/button[2]").click()
+
+
+def change_layout(driver: WebDriver, layout_name: str) -> None:
+    # change the layout
+    element = driver.find_element(By.NAME, "LoadLayout")
+    element.click()
+
+    time.sleep(Delay.SHORT.value)
+    element = driver.find_element(By.XPATH, '/html/body/div[2]/div[3]/div/div[1]/div/div/div/input')
+    element.click()
+    element.clear()
+    element.send_keys(layout_name)
+    element.send_keys(Keys.ARROW_DOWN + Keys.ENTER)
+
+    driver.find_element(By.XPATH, "/html/body/div[2]/div[3]/div/div[2]/button[2]").click()
+    time.sleep(Delay.SHORT.value)

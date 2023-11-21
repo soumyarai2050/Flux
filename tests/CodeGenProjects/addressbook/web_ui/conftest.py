@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from selenium.webdriver.support import expected_conditions as EC  # noqa
@@ -198,6 +200,7 @@ def top_of_book_list_():
                 "total_trading_security_size": 100,
                 "market_trade_volume": [
                     {
+                        "_id": id,
                         "participation_period_last_trade_qty_sum": 90,
                         "applicable_period_seconds": 180
                     }
@@ -207,8 +210,7 @@ def top_of_book_list_():
 
         ])
 
-    top_of_book_list = [TopOfBookBaseModel(**top_of_book_json) for top_of_book_json in input_data]
-    yield top_of_book_list
+    yield input_data
 
 
 @pytest.fixture()
@@ -447,3 +449,53 @@ def strat_limits() -> Dict[str, any]:
         }
     }
     yield strat_limits
+
+
+@pytest.fixture
+def set_micro_seperator_and_clean(schema_dict: Dict[str, any]):
+    update_schema_json(schema_dict=copy.deepcopy(schema_dict), project_name="addressbook",
+                       update_widget_name="strat_collection", update_field_name="loaded_strat_keys",
+                       extend_field_name="micro_separator", value="=")
+    yield
+
+    schema_path: PurePath = code_gen_projects_dir_path / "addressbook" / "web-ui" / "public" / "schema.json"
+    with open(str(schema_path), "w") as file:
+        json.dump(schema_dict, file, indent=2)
+
+
+@pytest.fixture
+def ui_layout_list_(schema_dict):
+    ui_layout: UILayoutBaseModel = UILayoutBaseModel()
+    ui_layout.id = 1
+    ui_layout.profile_id = "test"
+    widget_ui_data_elements: List[WidgetUIDataElement] = []
+
+    x: int = 10
+    y: int = 7
+    w: int = 4
+    h: int = 3
+    for widget_name, widget_schema in schema_dict.items():
+        x += 5
+        y += 3
+        w += 6
+        h += 2
+        if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
+            continue
+        widget_ui_data_element: WidgetUIDataElement = WidgetUIDataElement()
+        widget_ui_data_element.i = widget_name
+        widget_ui_data_element.x = x
+        widget_ui_data_element.y = y
+        widget_ui_data_element.w = w
+        widget_ui_data_element.h = h
+
+        widget_ui_data = widget_schema.get("widget_ui_data_element").get("widget_ui_data")
+        if widget_ui_data is not None:
+            ui_data: List[WidgetUIData] = []
+            for _ in widget_ui_data:
+                ui_data.append(WidgetUIData(**_))
+            widget_ui_data_element.widget_ui_data = ui_data
+
+        widget_ui_data_elements.append(widget_ui_data_element)
+    ui_layout.widget_ui_data_elements = widget_ui_data_elements
+
+    yield ui_layout

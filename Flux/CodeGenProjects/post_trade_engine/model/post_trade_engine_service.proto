@@ -36,6 +36,13 @@ message ReloadCache{
   required bool reload_result = 1;
 }
 
+message IsPortfolioLimitsBreached{
+    option (FluxMsgJsonQuery) = {
+    QueryName: "is_portfolio_limits_breached"
+  };
+  required bool is_portfolio_limits_breached = 1;
+}
+
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage{
   optional DummyEnumSO temp1 = 1;

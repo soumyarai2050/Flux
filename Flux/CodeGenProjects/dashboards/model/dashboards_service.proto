@@ -34,13 +34,13 @@ message RTDash {
   optional CBCreditSpreadSource cb_credit_spread_source = 9 [(FluxFldTitle) = "CBCreditSpreadSource", (FluxFldHelp) = "if set by UI to user - any external supplied spread value is overridden with this"];
   optional float cb_implied_volatility = 10 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CBImpliedVol", (FluxFldMappingSrc) = "ImpliedVolData.iv"];
   optional float cb_implied_volatility_change = 11 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CBImpliedVolChange", (FluxFldMappingSrc) = "ImpliedVolData.iv_change"];
-
   // same as portfolio eligible brokers except filtered by server [strat specific symbol(s)] + user allowed to mod down + TODO move summary fields to both legs - allows for in future CB borrow
   optional int64 cum_usd_notional = 12 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all USD notional in the underlying locate requests"];
   optional float avg_max_rate = 13 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "avg of all avg_rate in the underlying locate requests"];
   optional string cum_strat = 14 [(FluxFldServerPopulate) = true];
+  // optional string cum_qty = 12 [(FluxFldServerPopulate) = true, (FluxFldHide) = 'True', (FluxFldHelp) = 'sum of all USD qty of the underlying OR computed cum_qty (cum_usd_notional / sec_last_usd_px) '];
   optional string last_update_time = 15 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true, (FluxFldHelp) = "most recent of all update_time(s) in the underlying"];
-  optional string notes = 16 [(FluxFldServerPopulate) = true, (FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "server generated: holds newline concatanated ashare_locate_requests.note field data"];
+  optional string notes = 16 [(FluxFldServerPopulate) = true, (FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "server generated: holds newline concatenated ashare_locate_requests.note field data"];
   repeated InventoryRequest ashare_locate_requests = 17 [(FluxFldAbbreviated) = "JSON"];
   optional InventorySummary indicative_summary = 18 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
   optional InventorySummary locate_summary = 19 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
@@ -195,7 +195,7 @@ message BarData {
   optional int32 bar_count = 17;
 }
 
-message ImpliedVol {
+message ImpliedVolData {
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 5.0,
     CreateOp: AggregateType_UNSPECIFIED,
