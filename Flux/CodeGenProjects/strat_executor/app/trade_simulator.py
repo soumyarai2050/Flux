@@ -282,7 +282,9 @@ class TradeSimulator(TradingLinkBase):
             cls.cxl_rej_symbol_to_bool_dict[system_sec_id] = False
             await cls.process_cxl_rej(order_brief)
         else:
-            await cls.process_cxl_ack(order_brief)
+            symbol_configs = cls.get_symbol_configs(system_sec_id)
+            if not symbol_configs.get("avoid_cxl_ack_after_cxl_req"):
+                await cls.process_cxl_ack(order_brief)
 
     @classmethod
     def trigger_kill_switch(cls) -> bool:

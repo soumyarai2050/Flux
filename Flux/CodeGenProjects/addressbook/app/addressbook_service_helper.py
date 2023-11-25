@@ -1,7 +1,7 @@
 import sys
 from threading import Lock
 
-from Flux.CodeGenProjects.addressbook.app.aggregate import get_pair_strat_filter
+from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_client import \
     StratManagerServiceHttpClient
@@ -17,7 +17,7 @@ config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_
 ps_host, ps_port = (config_yaml_dict.get("server_host"),
                     parse_to_int(config_yaml_dict.get("main_server_beanie_port")))
 
-strat_manager_service_http_client = \
+strat_manager_service_http_client: StratManagerServiceHttpClient = \
     StratManagerServiceHttpClient.set_or_get_if_instance_exists(ps_host, ps_port)
 
 # loading strat_executor's project's config.yaml
@@ -81,6 +81,13 @@ def is_service_up(ignore_error: bool = False, is_server: bool = False):
                               f"exception: {e}")
         # else not required - silently ignore error is true
         return False
+
+
+def is_ongoing_strat(pair_strat: PairStrat | PairStratBaseModel) -> bool:
+    return pair_strat.strat_state not in [StratState.StratState_UNSPECIFIED,
+                                          StratState.StratState_READY,
+                                          StratState.StratState_DONE,
+                                          StratState.StratState_SNOOZED]
 
 
 @except_n_log_alert()
@@ -170,10 +177,10 @@ def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
 
 
 # caller must take any locks as required for any read-write consistency - function operates without lock
-async def get_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
+async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
     from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import \
         underlying_read_pair_strat_http
-    read_pair_strat_filter = get_pair_strat_filter(sec_id)
+    read_pair_strat_filter = get_ongoing_pair_strat_filter(sec_id)
     pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
 
     match_level_1_pair_strats: List[PairStrat] = list()
@@ -189,7 +196,7 @@ async def get_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[P
 
 
 async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Side) -> PairStrat | None:
-    match_level_1_pair_strats, match_level_2_pair_strats = await get_strats_from_symbol_n_side(sec_id, side)
+    match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
     if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
         logging.error(f"error: No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
         return
@@ -211,6 +218,13 @@ async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Sid
                     f"{get_symbol_side_key([(sec_id, side)])} found, one "
                     f"match expected, found: {len(match_level_2_pair_strats)}")
         return pair_strat
+
+
+def get_strat_key_from_pair_strat(pair_strat: PairStrat | PairStratBaseModel):
+    strat_key = f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}-" \
+                f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}-" \
+                f"{pair_strat.pair_strat_params.strat_leg1.side}-{pair_strat.id}"
+    return strat_key
 
 
 class MDShellEnvData(BaseModel):

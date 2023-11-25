@@ -1,3 +1,4 @@
+import json
 from typing import Dict, List
 import random
 import time
@@ -5,9 +6,11 @@ import copy
 
 import pytest
 from selenium.common import NoSuchElementException
+from fastapi.encoders import jsonable_encoder
 
 # third party imports
 from selenium.webdriver import ActionChains, Keys
+from selenium.webdriver.support.ui import Select
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
@@ -17,8 +20,8 @@ from selenium.webdriver.support import expected_conditions as EC  # noqa
 from tests.CodeGenProjects.addressbook.web_ui.utility_test_functions import (
     click_button_with_name, set_tree_input_field, confirm_save, create_strat_limits_using_tree_view, switch_layout,
     activate_strat, validate_strat_limits, validate_table_cell_enabled_or_not, set_table_input_field,
-    save_layout, get_common_keys, get_replaced_common_keys, get_table_headers,
-    save_nested_strat, get_widgets_by_flux_property, get_xpath_from_field_name,
+    save_layout, get_common_keys, get_replaced_common_keys, get_table_headers, get_select_box_value,
+    save_nested_strat, get_widgets_by_flux_property, get_xpath_from_field_name, update_schema_json,
     get_default_field_value, scroll_into_view, validate_property_that_it_contain_val_min_val_max_or_none,
     show_hidden_fields_in_tree_layout, count_fields_in_tree, validate_comma_separated_values,
     get_fld_name_colour_in_tree, get_unsaved_changes_discarded_key, click_on_okay_button_unsaved_changes_popup,
@@ -26,12 +29,18 @@ from tests.CodeGenProjects.addressbook.web_ui.utility_test_functions import (
     get_element_text_list_from_filter_popup, get_web_project_url, flux_fld_title_in_widgets,
     flux_fld_autocomplete_in_widgets, flux_fld_sequence_number_in_widget, flux_fld_ui_place_holder_in_widget,
     validate_unpressed_n_pressed_btn_txt, validate_hide_n_show_in_common_key, validate_flux_fld_val_max_in_widget,
-    validate_flux_fld_val_min_in_widget, validate_flux_fld_display_type_in_widget,
+    validate_flux_fld_val_min_in_widget, validate_flux_fld_display_type_in_widget, get_widget_type,
     validate_flux_fld_number_format_in_widget, validate_flux_flx_display_zero_in_widget,
     get_replaced_str_default_field_value, validate_val_min_n_default_fld_value_equal_or_not,
     validate_val_max_n_default_fld_value_equal_or_not, get_widget_web_element_by_name, show_nested_fld_in_tree_layout,
     get_val_min_n_val_max_of_fld, select_or_unselect_checkbox, get_replaced_str, get_commonkey_items, change_layout)
-from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import DriverType, Delay, Layout, WidgetType, SearchType
+from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
+                                                                          SearchType)
+from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import TopOfBookBaseModel, QuoteOptional
+from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
+    PairStratBaseModel)
+from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import \
+    StratExecutorServiceHttpClient
 
 # to parameterize all tests. to add support for other browsers, add the DriverType here
 # pytestmark = pytest.mark.parametrize("driver_type", [DriverType.CHROME])
@@ -1982,3 +1991,138 @@ def test_ui_coordinates(clean_and_set_limits, driver, driver_type, schema_dict, 
 
     for _ in ui_layout_list:
         strat_manager_service_native_web_client.delete_ui_layout_client(_.id)
+
+
+def test_view_layout(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
+    for widget_name, widget_schema in schema_dict.items():
+
+        if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
+            continue
+
+        widget: WebElement = driver.find_element(By.ID, widget_name)
+        button: WebElement = widget.find_element(By.NAME, "Layout")
+        ui_view_layout: str = button.get_attribute('aria-label').split(":")[-1].replace(" ", "")
+        default_view_layout = widget_schema["widget_ui_data_element"]["widget_ui_data"][0]["view_layout"]
+        assert default_view_layout == ui_view_layout
+
+
+def test_edit_layout(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
+    for widget_name, widget_schema in schema_dict.items():
+
+        if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
+            continue
+
+        widget_type: WidgetType | None = get_widget_type(widget_schema)
+        # currently edit not supports in REPEATED widgets
+        if widget_type == WidgetType.INDEPENDENT or widget_type == WidgetType.DEPENDENT:
+            if widget_name == "pair_strat_params":
+                widget: WebElement = driver.find_element(By.ID, widget_name)
+                click_button_with_name(driver.find_element(By.ID, "strat_collection"), "Edit")
+            else:
+                widget: WebElement = driver.find_element(By.ID, widget_name)
+                click_button_with_name(widget, "Edit")
+
+            button: WebElement = widget.find_element(By.NAME, "Layout")
+            ui_view_layout: str = button.get_attribute('aria-label').split(":")[-1].replace(" ", "")
+            default_layout = widget_schema["widget_ui_data_element"]["widget_ui_data"][0]
+            if default_layout.get("edit_layout") is None:
+                assert ui_view_layout == default_layout.get("view_layout")
+            else:
+                assert ui_view_layout == default_layout.get("edit_layout")
+
+        # else: Not required
+
+
+def test_coloum_orders(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
+
+    for widget_name, widget_schema in schema_dict.items():
+        i: int = 0
+        sequence_number: int = 0
+        previous_field_sequence_value: int = 0
+
+        if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
+            continue
+
+        widget_type: WidgetType | None = get_widget_type(widget_schema)
+        if widget_type == WidgetType.INDEPENDENT:
+            for field_name, field_properties in widget_schema["properties"].items():
+                i += 1
+                sequence_number += 1
+                widget: WebElement = driver.find_element(By.ID, widget_name)
+                scroll_into_view(driver=driver, element=widget)
+                time.sleep(Delay.SHORT.value)
+                switch_layout(widget=widget, layout=Layout.TABLE)
+                click_button_with_name(widget=widget, button_name="Settings")
+                if field_name == "kill_switch" or field_name == "strat_state" or field_name == "_id":
+                    previous_field_sequence_value = sequence_number
+                    driver.find_element(By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[1]').click()
+                    continue
+                field_sequence_value_element: WebElement = widget.find_element(
+                    By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]/li[{i}]/div[1]')
+
+                field_sequence_value: int = int(get_select_box_value(field_sequence_value_element))
+                if (field_sequence_value - previous_field_sequence_value) > 1:
+                    sequence_number += ((field_sequence_value - previous_field_sequence_value) - 1)
+                previous_field_sequence_value = field_sequence_value
+
+                assert sequence_number == field_sequence_value
+                dropdown_element = (widget.find_element
+                                    (By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]/li[{i}]/div[1]'))
+
+                dropdown_element.click()
+                a = driver.find_element(By.XPATH, '//*[@data-value="1"]')
+                a.click()
+                driver.find_element(By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[1]').click()
+                click_button_with_name(widget=widget, button_name="Edit")
+                table_header_list: List[str] = get_all_keys_from_table(widget)
+                assert field_name == table_header_list[0]
+                driver.refresh()
+                time.sleep(Delay.SHORT.value)
+
+
+def test_disable_ws_on_edit(clean_and_set_limits, web_project, driver, driver_type, schema_dict,
+                            set_disable_ws_on_edit_and_clean, top_of_book_list_):
+    # update_schema_json(schema_dict, "top_of_book", "widget_ui_data_element",
+    #                    "disable_ws_on_edit", True, "addressbook")
+    result = get_widgets_by_flux_property(schema_dict, WidgetType.REPEATED_INDEPENDENT, "elaborate_title")
+    assert result[0]
+
+    top_of_book: TopOfBookBaseModel = TopOfBookBaseModel()
+    top_of_book.id = 1
+    top_of_book.total_trading_security_size = 55
+    top_of_book.bid_quote = QuoteOptional()
+    top_of_book.bid_quote.px = 10
+    top_of_book.ask_quote = QuoteOptional()
+    top_of_book.ask_quote.px = 104
+    top_of_book.last_trade = QuoteOptional()
+    top_of_book.last_trade.px = 11
+    # top_of_book: Dict[str, any] = {
+    #     'id': 1,
+    #     'total_trading_security_size': 55,
+    #     'bid_quote': {'px': 10},
+    #     'ask_quote': {'px': 104},
+    #     'last_trade': {'px': 11}
+    # }
+
+    pair_strat: PairStratBaseModel = strat_manager_service_native_web_client.get_all_pair_strat_client()[-1]
+    while not pair_strat.is_executor_running:
+        pair_strat = strat_manager_service_native_web_client.get_all_pair_strat_client()[-1]
+
+    assert pair_strat.is_executor_running
+    executor_web_client: StratExecutorServiceHttpClient = StratExecutorServiceHttpClient(pair_strat.host,
+                                                                                         pair_strat.port)
+    assert executor_web_client.patch_top_of_book_client(jsonable_encoder(top_of_book, by_alias=True, exclude_none=True),
+                                                        True)
+    for widget_query in result[1]:
+        widget_name: str = widget_query.widget_name
+        if widget_name == "top_of_book":
+            widget: WebElement = driver.find_element(By.ID, widget_name)
+            scroll_into_view(driver=driver, element=widget)
+            common_key_value: Dict[str, any] = get_commonkey_items(widget)
+            for field_query in widget_query.fields:
+                field_name: str = field_query.field_name
+                if field_name == "px" or field_name == "total_trading_security_size":
+                    default_field: str = field_query.properties["parent_title"]
+                    default_field = default_field + "." + field_name
+                    value = common_key_value[default_field]
+                    assert value != top_of_book[field_query.properties["parent_title"]][field_name]

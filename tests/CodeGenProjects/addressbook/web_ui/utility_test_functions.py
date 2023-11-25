@@ -735,7 +735,7 @@ def get_commonkey_items(widget: WebElement) -> Dict[str, any]:
     # common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__hOXaW")
     common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__ny8Fj")
     # common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__QEVHl")
-    common_key_items: Dict[str] = {}
+    common_key_items: Dict[str, any] = {}
     for common_key_item_element in common_key_item_elements:
         common_key_item_txt = common_key_item_element.text.split(":")
         key = common_key_item_txt[0].replace(" ", "_")
@@ -1406,9 +1406,13 @@ def update_schema_json(schema_dict: Dict[str, any], update_widget_name: str, upd
     schema_path: PurePath = project_path / "web-ui" / "public" / "schema.json"
 
     for widget_name, widget_data in schema_dict.items():
+        update_field_name_properties = widget_data.get(update_field_name)
         widget_properties = widget_data.get("properties")
-        if widget_name == update_widget_name and widget_properties is not None:
+        if (widget_name == update_widget_name and widget_properties is not \
+                None and update_field_name_properties is None):
             widget_properties[update_field_name][extend_field_name] = value
+        elif widget_name == update_widget_name and update_field_name_properties is not None:
+            widget_data[update_field_name][extend_field_name] = value
 
     with open(str(schema_path), "w") as f:
         json.dump(schema_dict, f, indent=2)

@@ -1246,7 +1246,7 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
         executor_http_client.trade_simulator_reload_config_query_client()
 
         # Positive Check
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], avoid_order_trigger=True)
 
         # placing new non-systematic new_order
         px = 100
@@ -1424,63 +1424,10 @@ def test_strat_done_after_exhausted_buy_consumable_notional(
 
     # setting strat_limits for this test
     expected_strat_limits_.max_cb_notional = 18000
-    created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-    try:
-        # updating yaml_configs according to this test
-        for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 95
-        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-        # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
-
-        # Positive Check
-        # buy fills check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-        time.sleep(2)  # delay for order to get placed
-
-        buy_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
-                                                                                executor_http_client, assert_code=1)
-        order_snapshot = get_order_snapshot_from_order_id(buy_ack_order_journal.order.order_id, executor_http_client)
-        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
-                                                                        f"OrderStatusType.OE_ACKED received " \
-                                                                        f"{order_snapshot.order_status}"
-        time.sleep(residual_wait_sec)   # wait to get buy order residual
-
-        # Negative Check
-        # Next placed order must not get placed, instead it should find consumable_notional as exhausted for further
-        # orders and should come out of executor run and must set strat_state to StratState_DONE
-
-        # buy fills check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
-        time.sleep(2)  # delay for order to get placed
-        ack_order_journal = (
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol, executor_http_client,
-                                                            last_order_id=buy_ack_order_journal.order.order_id,
-                                                            expect_no_order=True, assert_code=3))
-        strat_status = executor_http_client.get_strat_status_client(created_pair_strat.id)
-        assert strat_status.strat_state == StratState.StratState_DONE, (
-            f"Mismatched strat_state, expected {StratState.StratState_DONE}, received {strat_status.strat_state}")
-
-    except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        print(f"Some Error Occurred: exception: {e}, "
-              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        raise Exception(e)
-    finally:
-        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+    strat_done_after_exhausted_consumable_notional(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+        market_depth_basemodel_list, top_of_book_list_, residual_wait_sec, Side.BUY)
 
 
 def test_strat_done_after_exhausted_sell_consumable_notional(
@@ -1497,64 +1444,10 @@ def test_strat_done_after_exhausted_sell_consumable_notional(
 
     # setting strat_limits for this test
     expected_strat_limits_.max_cb_notional = 18000
-    created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
-
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
-    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-    try:
-        # updating yaml_configs according to this test
-        for symbol in config_dict["symbol_configs"]:
-            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 95
-        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-        # updating simulator's configs
-        executor_http_client.trade_simulator_reload_config_query_client()
-
-        # Positive Check
-
-        # Sell fills check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
-        time.sleep(2)  # delay for order to get placed
-
-        sell_ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol,
-                                                                                 executor_http_client, assert_code=2)
-        order_snapshot = get_order_snapshot_from_order_id(sell_ack_order_journal.order.order_id, executor_http_client)
-        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
-                                                                        f"OrderStatusType.OE_ACKED received " \
-                                                                        f"{order_snapshot.order_status}"
-        time.sleep(residual_wait_sec)   # wait to get sell order residual
-
-        # Negative Check
-        # Next placed order must not get placed, instead it should find consumable_notional as exhausted for further
-        # orders and should come out of executor run and must set strat_state to StratState_DONE
-
-        # sell fills check
-        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
-        time.sleep(2)  # delay for order to get placed
-        ack_order_journal = (
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, sell_symbol, executor_http_client,
-                                                            last_order_id=sell_ack_order_journal.order.order_id,
-                                                            expect_no_order=True, assert_code=3))
-        strat_status = executor_http_client.get_strat_status_client(created_pair_strat.id)
-        assert strat_status.strat_state == StratState.StratState_DONE, (
-            f"Mismatched strat_state, expected {StratState.StratState_DONE}, received {strat_status.strat_state}")
-
-    except AssertionError as e:
-        raise AssertionError(e)
-    except Exception as e:
-        print(f"Some Error Occurred: exception: {e}, "
-              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-        raise Exception(e)
-    finally:
-        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+    strat_done_after_exhausted_consumable_notional(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+        market_depth_basemodel_list, top_of_book_list_, residual_wait_sec, Side.SELL)
 
 
 def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limits, buy_sell_symbol_list,
@@ -1943,14 +1836,8 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, buy_sell_symbol_li
     pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
-        if pair_strat.is_executor_running and pair_strat.port is not None and pair_strat.host is not None:
-            strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                 pair_strat.port)
-            strat_status = strat_executor_client.get_strat_status_client(pair_strat.id)
-
-            assert strat_status.strat_state == StratState.StratState_PAUSED, \
-                (f"Unexpected, strat_state must be paused, received {strat_status.strat_state}, "
-                 f"pair_strat: {pair_strat}, strat_status: {strat_status}")
+        assert pair_strat.strat_state == StratState.StratState_PAUSED, \
+            f"Unexpected, strat_state must be paused, received {pair_strat.strat_state}, pair_strat: {pair_strat}"
 
 
 def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
@@ -2012,14 +1899,9 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
     pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
-        if pair_strat.is_executor_running and pair_strat.port is not None and pair_strat.host is not None:
-            strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                 pair_strat.port)
-            strat_status = strat_executor_client.get_strat_status_client(pair_strat.id)
-
-            assert strat_status.strat_state == StratState.StratState_PAUSED, \
-                (f"Unexpected, strat_state must be paused, received {strat_status.strat_state}, "
-                 f"pair_strat: {pair_strat}, strat_status: {strat_status}")
+        assert pair_strat.strat_state == StratState.StratState_PAUSED, \
+            (f"Unexpected, strat_state must be paused, received {pair_strat.strat_state}, "
+             f"pair_strat: {pair_strat}")
 
 
 def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
@@ -2079,14 +1961,8 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
     pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
-        if pair_strat.is_executor_running and pair_strat.port is not None and pair_strat.host is not None:
-            strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                 pair_strat.port)
-            strat_status = strat_executor_client.get_strat_status_client(pair_strat.id)
-
-            assert strat_status.strat_state == StratState.StratState_PAUSED, \
-                (f"Unexpected, strat_state must be paused, received {strat_status.strat_state}, "
-                 f"pair_strat: {pair_strat}, strat_status: {strat_status}")
+        assert pair_strat.strat_state == StratState.StratState_PAUSED, \
+            f"Unexpected, strat_state must be paused, received {pair_strat.strat_state}, pair_strat: {pair_strat}"
 
 
 def test_all_strat_pause_for_max_gross_n_open_notional_breach(
@@ -2186,14 +2062,8 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
     pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
-        if pair_strat.is_executor_running and pair_strat.port is not None and pair_strat.host is not None:
-            strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                 pair_strat.port)
-            strat_status = strat_executor_client.get_strat_status_client(pair_strat.id)
-
-            assert strat_status.strat_state == StratState.StratState_PAUSED, \
-                (f"Unexpected, strat_state must be paused, received {strat_status.strat_state}, "
-                 f"pair_strat: {pair_strat}, strat_status: {strat_status}")
+        assert pair_strat.strat_state == StratState.StratState_PAUSED, \
+            f"Unexpected, strat_state must be paused, received {pair_strat.strat_state}, pair_strat: {pair_strat}"
 
 
 def all_strat_pause_test_for_max_reject_limit_breach(
@@ -2374,14 +2244,8 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
     pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
-        if pair_strat.is_executor_running and pair_strat.port is not None and pair_strat.host is not None:
-            strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                 pair_strat.port)
-            strat_status = strat_executor_client.get_strat_status_client(pair_strat.id)
-
-            assert strat_status.strat_state == StratState.StratState_PAUSED, \
-                (f"Unexpected, strat_state must be paused, received {strat_status.strat_state}, "
-                 f"pair_strat: {pair_strat}, strat_status: {strat_status}")
+        assert pair_strat.strat_state == StratState.StratState_PAUSED, \
+            f"Unexpected, strat_state must be paused, received {pair_strat.strat_state}, pair_strat: {pair_strat}"
 
 
 def test_all_strat_pause_for_max_reject_limit_breach(
@@ -2447,14 +2311,8 @@ def test_all_strat_pause_for_max_reject_limit_breach(
     pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
-        if pair_strat.is_executor_running and pair_strat.port is not None and pair_strat.host is not None:
-            strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                 pair_strat.port)
-            strat_status = strat_executor_client.get_strat_status_client(pair_strat.id)
-
-            assert strat_status.strat_state == StratState.StratState_PAUSED, \
-                (f"Unexpected, strat_state must be paused, received {strat_status.strat_state}, "
-                 f"pair_strat: {pair_strat}, strat_status: {strat_status}")
+        assert pair_strat.strat_state == StratState.StratState_PAUSED, \
+            f"Unexpected, strat_state must be paused, received {pair_strat.strat_state}, pair_strat: {pair_strat}"
 
 # TODO: Add test for missing strat_limits
 # > limit_up_down_volume_participation_rate

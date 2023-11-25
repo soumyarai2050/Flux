@@ -1417,10 +1417,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
                 else:
                     output_str += "                if (socket) socket.close();\n"
-                    output_str += "                delete socketDict.current[socketId];\n"
+                    output_str += "                delete socketDict.current[id];\n"
             else:
                 output_str += "                if (socket) socket.close();\n"
-                output_str += "                delete socketDict.current[socketId];\n"
+                output_str += "                delete socketDict.current[id];\n"
             output_str += "            }\n"
             output_str += "        }" + f" else if (active{dependent_message}List && !_.isEqual(active{dependent_message}List, " \
                           f"oldActive{dependent_message}List)) " + "{\n"
@@ -1446,6 +1446,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                         dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
                         output_str += f" && isWebSocketAlive({dep_msg_camel_cased}Socket)"
                     output_str += ") {\n"
+                else:
+                    output_str += "                    if (isWebSocketAlive(socket)) {\n"
+            else:
+                output_str += "                    if (isWebSocketAlive(socket)) {\n"
             output_str += "                        resolve();\n"
             output_str += "                    } else {\n"
             output_str += "                        socket = new WebSocket(`${API_ROOT_URL.replace('http', " \
@@ -1546,26 +1550,52 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += "    },"+(f" [active{dependent_message}List, oldActive{dependent_message}List, "
                                             f"disableWs])\n\n")
                 else:
-                    output_str += "                            /* close the websocket on cleanup */\n"
-                    output_str += "                            if (socket) socket.close();\n"
-                    output_str += "                            delete socketDict.current[id];\n"
-                    output_str += "                        }\n"
-                    output_str += "                    })\n"
-                    output_str += "                    runFlush.current = true;\n"
-                    output_str += "                }\n"
-                    output_str += "                createAllSockets();\n"
+                    output_str += "                        if (socket) socket.close();\n"
+                    output_str += "                        delete socketDict.current[id];\n"
+                    output_str += "                    }\n"
+                    output_str += "                })\n"
+                    output_str += "                const socketPromises = loadedIds.map(id => createSocket(id));\n"
+                    output_str += "                await Promise.all(socketPromises);\n"
+                    output_str += "                runFlush.current = true;\n"
+                    output_str += "            }\n"
+                    output_str += "            createAllSockets();\n"
+                    output_str += "        }\n"
+                    output_str += "        return () => {\n"
+                    output_str += (f"            if (_.isEqual(active{dependent_message}List, "
+                                   f"prevActive{dependent_message}List.current) "
+                                   f"&& _.isEqual(oldActive{dependent_message}List, "
+                                   f"prevOldActive{dependent_message}List)) " + "{\n")
+                    output_str += ("                // no dependency change (except disableWs which is acceptable case "
+                                   "for all sockets close)\n")
+                    output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
+                    output_str += "                    let socket = socketDict.current[id];\n"
+                    output_str += "                    if (isWebSocketAlive(socket)) socket.close();\n"
+                    output_str += "                })\n"
                     output_str += "            }\n"
                     output_str += "        }\n"
                     output_str += "    }" + f", [active{dependent_message}List, oldActive{dependent_message}List, disableWs])\n\n"
             else:
-                output_str += "                            /* close the websocket on cleanup */\n"
-                output_str += "                            if (socket) socket.close();\n"
-                output_str += "                            delete socketDict.current[id];\n"
-                output_str += "                        }\n"
-                output_str += "                    })\n"
-                output_str += "                    runFlush.current = true;\n"
-                output_str += "                }\n"
-                output_str += "                createAllSockets();\n"
+                output_str += "                        if (socket) socket.close();\n"
+                output_str += "                        delete socketDict.current[id];\n"
+                output_str += "                    }\n"
+                output_str += "                })\n"
+                output_str += "                const socketPromises = loadedIds.map(id => createSocket(id));\n"
+                output_str += "                await Promise.all(socketPromises);\n"
+                output_str += "                runFlush.current = true;\n"
+                output_str += "            }\n"
+                output_str += "            createAllSockets();\n"
+                output_str += "        }\n"
+                output_str += "        return () => {\n"
+                output_str += (f"            if (_.isEqual(active{dependent_message}List, "
+                               f"prevActive{dependent_message}List.current) "
+                               f"&& _.isEqual(oldActive{dependent_message}List, "
+                               f"prevOldActive{dependent_message}List)) " + "{\n")
+                output_str += ("                // no dependency change (except disableWs which is acceptable case "
+                               "for all sockets close)\n")
+                output_str += "                Object.keys(socketDict.current).forEach(id => {\n"
+                output_str += "                    let socket = socketDict.current[id];\n"
+                output_str += "                    if (isWebSocketAlive(socket)) socket.close();\n"
+                output_str += "                })\n"
                 output_str += "            }\n"
                 output_str += "        }\n"
                 output_str += "    }" + f", [active{dependent_message}List, oldActive{dependent_message}List, disableWs])\n\n"

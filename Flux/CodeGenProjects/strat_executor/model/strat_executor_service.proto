@@ -177,21 +177,7 @@ message StratStatus{
   option (FluxMsgJsonQuery) = {
     QueryName: "put_strat_to_snooze",
   };
-  option (FluxMsgJsonQuery) = {
-    QueryName: "put_strat_to_pause_if_active",
-  };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
-  required StratState strat_state = 2 [default = StratState_UNSPECIFIED, (FluxFldButton) = {
-    unpressed_caption: "Activate",
-    pressed_caption: "Pause",
-    disabled_captions: "StratState_DONE=Done",
-    button_type: BUTTON_TYPE_RECTANGLE,
-    button_size: BUTTON_SIZE_MEDIUM,
-    value_color_map: "StratState_READY=INFO,StratState_ACTIVE=SUCCESS,StratState_PAUSED=WARNING,StratState_ERROR=ERROR,StratState_DONE=DEBUG"
-    action: "flux_trigger_strat",
-    pressed_value_as_text: "StratState_ACTIVE"
-  }];
 
   optional int64 total_buy_qty = 3 [(FluxFldHelp) = "sum of all buy order qty in order brief of strat order snapshot"];
   optional int64 total_sell_qty = 4 [(FluxFldHelp) = "sum of all sell order qty in order brief of strat order snapshot"];
@@ -223,23 +209,14 @@ message StratStatus{
 
   // these are specific to CB-EQT strat - move to derived later
   optional float average_premium = 27 [(FluxFldNumberFormat) = "%"];
-  optional float market_premium = 28 [(FluxFldNumberFormat) = "%"];
-  optional Residual residual = 29;
-  optional float balance_notional = 30 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratLimits.max_cb_notional", (FluxFldProgressBar) = {
+  optional Residual residual = 28;
+  optional float balance_notional = 29 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratLimits.max_cb_notional", (FluxFldProgressBar) = {
     value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // order of condition matching -> left to right (select first match)
     hover_text_type: HoverTextType_VALUE,
     is_reverse: true
   }];
-  optional int64 strat_status_update_seq_num = 31 [(FluxFldHide) = "True"];
-  optional string last_update_date_time = 32 [(FluxFldValIsDateTime) = true];
-}
-
-message StratDetails{
-    option (FluxMsgJsonQuery) = {
-    QueryName: "is_strat_ongoing"
-  };
-  required bool is_ongoing = 1;
-  required StratState current_state = 2;
+  optional int64 strat_status_update_seq_num = 30 [(FluxFldHide) = "True"];
+  optional string last_update_date_time = 31 [(FluxFldValIsDateTime) = true];
 }
 
 message StratLimits{
@@ -451,6 +428,13 @@ message TradeSimulatorProcessFill{
 message TradeSimulatorReloadConfig{
   option (FluxMsgJsonQuery) = {
     QueryName: "trade_simulator_reload_config"
+  };
+  required bool resp = 1;
+}
+
+message HandleStratActivate{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_strat_activate"
   };
   required bool resp = 1;
 }

@@ -42,3 +42,27 @@ message RollingMaxOrderCount{
   required int32 max_rolling_tx_count = 1 [(FluxFldHelp) = "max new orders count allowed per period defined below"];
   optional int32 rolling_tx_count_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above count enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
 }
+
+enum StratState{
+  //set this state for strats just created by user
+  StratState_UNSPECIFIED = 0;
+  // set this state post required constraint validation of strat - such as system checked all required strat params are
+  // present and are as expected, do this for:
+  // 1. new strats before moving them to ready state upon user explicit save request
+  // 2. existing strats when loading them from store (if validation fails - raise alert and put them in ERROR state)
+  StratState_READY = 1;
+  // set StratStatus.ACTIVE state upon explicit user request, check:
+  // 1. all required strats and portfolio level limit checks are passing else reject user's request
+  // 2. strat is in StratStatus.READY state (user triggers a strat)
+  // 3. strat is in StratStatus.PAUSED state (resume paused strat)
+  StratState_ACTIVE = 2;
+  // set StratStatus.PAUSED state upon explicit user request, check strat is currently in StratStatus.READY state
+  StratState_PAUSED = 3;
+  // this is set in any exception scenario - dev/support/business involvement is needed to find the gap and bridge
+  // for future handling of similar scenario, day-1 block strat (only engine restart can allow strat to be restarted)
+  StratState_ERROR = 4;
+  // set StratStatus.PAUSED state when strat has completed its set target
+  StratState_DONE = 5;
+  // set StratState_SNOOZED state when strat is unloaded from collection
+  StratState_SNOOZED = 6;
+}

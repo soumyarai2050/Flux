@@ -177,6 +177,9 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         # else not required: passing None to clear pair_strat form cache is valid
         return self._pair_strat_update_date_time
 
+    def get_pair_strat_obj(self) -> PairStratBaseModel | PairStrat | None:
+        return self._pair_strat
+
     def get_symbol_side_snapshot_from_symbol(self, symbol: str, date_time: DateTime | None = None) -> \
             Tuple[SymbolSideSnapshot, DateTime] | None:
         symbol_side_snapshot_tuple = self.get_symbol_side_snapshot(date_time)

@@ -499,3 +499,15 @@ def ui_layout_list_(schema_dict):
     ui_layout.widget_ui_data_elements = widget_ui_data_elements
 
     yield ui_layout
+
+
+@pytest.fixture
+def set_disable_ws_on_edit_and_clean(schema_dict: Dict[str, any]):
+    update_schema_json(schema_dict=copy.deepcopy(schema_dict), project_name="addressbook",
+                       update_widget_name="top_of_book", update_field_name="widget_ui_data_element",
+                       extend_field_name="disable_ws_on_edit", value=True)
+    yield
+
+    schema_path: PurePath = code_gen_projects_dir_path / "addressbook" / "web-ui" / "public" / "schema.json"
+    with open(str(schema_path), "w") as file:
+        json.dump(schema_dict, file, indent=2)

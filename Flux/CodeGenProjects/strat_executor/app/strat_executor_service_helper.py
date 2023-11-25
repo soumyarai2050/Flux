@@ -189,9 +189,7 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
 
 
 def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
-    strat_state: StratState = StratState.StratState_READY
-    strat_status = StratStatus(strat_state=strat_state,
-                               fills_brief=[], open_orders_brief=[], total_buy_qty=0,
+    strat_status = StratStatus(fills_brief=[], open_orders_brief=[], total_buy_qty=0,
                                total_sell_qty=0, total_order_qty=0, total_open_buy_qty=0,
                                total_open_sell_qty=0, avg_open_buy_px=0.0, avg_open_sell_px=0.0,
                                total_open_buy_notional=0.0, total_open_sell_notional=0.0,
@@ -201,17 +199,10 @@ def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
                                total_fill_exposure=0.0, total_cxl_buy_qty=0.0,
                                total_cxl_sell_qty=0.0, avg_cxl_buy_px=0.0, avg_cxl_sell_px=0.0,
                                total_cxl_buy_notional=0.0, total_cxl_sell_notional=0.0,
-                               total_cxl_exposure=0.0, average_premium=0.0, market_premium=0,
+                               total_cxl_exposure=0.0, average_premium=0.0,
                                balance_notional=strat_limits_obj.max_cb_notional,
                                strat_status_update_seq_num=0)
     return strat_status
-
-
-def is_ongoing_strat(strat_status: StratStatus | StratStatusBaseModel) -> bool:
-    return strat_status.strat_state not in [StratState.StratState_UNSPECIFIED,
-                                            StratState.StratState_READY,
-                                            StratState.StratState_DONE,
-                                            StratState.StratState_SNOOZED]
 
 
 def create_stop_md_script(running_process_name: str, generation_stop_file_path: str):

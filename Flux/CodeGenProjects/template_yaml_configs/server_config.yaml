@@ -12,6 +12,9 @@ symbol_configs:
     # to simulate cxl-rej functionality
     simulate_cxl_rej_orders: False
 
+    # to avoid cxl ack after cxl req, if not True cxl req itself will trigger cxl ack
+    avoid_cxl_ack_after_cxl_req: False
+
     # to simulate unsolicited cxl functionality
     simulate_ack_unsolicited_cxl_orders: False
     simulate_new_unsolicited_cxl_orders: False

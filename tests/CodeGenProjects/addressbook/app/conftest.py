@@ -246,7 +246,6 @@ def symbol_overview_obj_list():
 @pytest.fixture()
 def expected_start_status_(pair_securities_with_sides_):
     yield StratStatusBaseModel(**{
-      "strat_state": "StratState_READY",
       "total_buy_qty": 0,
       "total_sell_qty": 0,
       "total_order_qty": 0,
@@ -272,7 +271,6 @@ def expected_start_status_(pair_securities_with_sides_):
       "total_cxl_sell_notional": 0,
       "total_cxl_exposure": 0,
       "average_premium": 0,
-      "market_premium": 0,
       "balance_notional": 300000,
       "strat_status_update_seq_num": 0
     })
@@ -370,7 +368,9 @@ def pair_strat_(pair_securities_with_sides_):
         "common_premium": 40,
         "hedge_ratio": 5
         },
-        "pair_strat_params_update_seq_num": 0
+        "pair_strat_params_update_seq_num": 0,
+        "strat_state": "StratState_READY",
+        "market_premium": 0
     })
 
 

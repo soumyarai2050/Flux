@@ -10,30 +10,6 @@ message Residual{
   required float residual_notional = 2 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "absolute of ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px) only if the value remains non 0 post residual_mark_seconds interval else 0 (in non 0 case mark the remaining non zero as residual and pull that qty form the market)"];
 }
 
-enum StratState{
-  //set this state for strats just created by user
-  StratState_UNSPECIFIED = 0;
-  // set this state post required constraint validation of strat - such as system checked all required strat params are
-  // present and are as expected, do this for:
-  // 1. new strats before moving them to ready state upon user explicit save request
-  // 2. existing strats when loading them from store (if validation fails - raise alert and put them in ERROR state)
-  StratState_READY = 1;
-  // set StratStatus.ACTIVE state upon explicit user request, check:
-  // 1. all required strats and portfolio level limit checks are passing else reject user's request
-  // 2. strat is in StratStatus.READY state (user triggers a strat)
-  // 3. strat is in StratStatus.PAUSED state (resume paused strat)
-  StratState_ACTIVE = 2;
-  // set StratStatus.PAUSED state upon explicit user request, check strat is currently in StratStatus.READY state
-  StratState_PAUSED = 3;
-  // this is set in any exception scenario - dev/support/business involvement is needed to find the gap and bridge
-  // for future handling of similar scenario, day-1 block strat (only engine restart can allow strat to be restarted)
-  StratState_ERROR = 4;
-  // set StratStatus.PAUSED state when strat has completed its set target
-  StratState_DONE = 5;
-  // set StratState_SNOOZED state when strat is unloaded from collection
-  StratState_SNOOZED = 6;
-}
-
 message MarketTradeVolumeParticipation{
     required float max_participation_rate = 1 [(FluxFldNumberFormat) = "%", (FluxFldValMax) = "30", (FluxFldHelp) = "max % participation size allowed of rolling trade volume within applicable_period_seconds"];
     optional int32 applicable_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above rate enforcement, unset value implies seconds from SOD till time of checking"];

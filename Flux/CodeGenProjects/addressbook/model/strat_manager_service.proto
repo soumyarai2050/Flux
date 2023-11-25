@@ -177,6 +177,9 @@ message PairStrat{
     QueryParams: "pair_strat_id",
     QueryParamsDataType: "int"
   };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "pause_all_active_strats"
+  };
   option (FluxMsgExecutorOptions) = {
       IsWebSocketModel: true,
       EnableNotifyAll: false,
@@ -201,6 +204,18 @@ message PairStrat{
     optional int64 port = 9 [(FluxFldHide) = "True"];
     optional bool is_executor_running = 10 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
     optional bool is_partially_running = 11 [default=false, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerRunningStatus) = true];
+    // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
+    required StratState strat_state = 12 [default = StratState_SNOOZED, (FluxFldButton) = {
+      unpressed_caption: "Activate",
+      pressed_caption: "Pause",
+      disabled_captions: "StratState_DONE=Done",
+      button_type: BUTTON_TYPE_RECTANGLE,
+      button_size: BUTTON_SIZE_MEDIUM,
+      value_color_map: "StratState_READY=INFO,StratState_ACTIVE=SUCCESS,StratState_PAUSED=WARNING,StratState_ERROR=ERROR,StratState_DONE=DEBUG"
+      action: "flux_trigger_strat",
+      pressed_value_as_text: "StratState_ACTIVE"
+    }];
+    optional float market_premium = 13 [(FluxFldNumberFormat) = "%"];
 }
 
 // Widget - 1
@@ -225,7 +240,7 @@ message StratCollection{
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
-  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:StratStatus.strat_state^Strat Notional:StratStatus.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:StratStatus.average_premium^Mkt Premium:StratStatus.market_premium", (FluxFldAlertBubbleSource) = "StratAlert.alerts", (FluxFldAlertBubbleColor) = "StratAlert.alerts.severity"];
+  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratStatus.balance_notional^Premium Limit:PairStrat.pair_strat_params.common_premium^Avg Premium:StratStatus.average_premium^Mkt Premium:PairStrat.market_premium", (FluxFldAlertBubbleSource) = "StratAlert.alerts", (FluxFldAlertBubbleColor) = "StratAlert.alerts.severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
   repeated string buffered_strat_keys = 3;

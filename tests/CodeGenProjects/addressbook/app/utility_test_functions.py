@@ -9,6 +9,7 @@ import pexpect
 from csv import writer
 import os
 import glob
+import traceback
 from datetime import timedelta
 os.environ["PORT"] = "8081"
 os.environ["DBType"] = "beanie"
@@ -1222,7 +1223,7 @@ def _update_tob(stored_obj: TopOfBookBaseModel, px: int | float, side: Side,
 
 
 def run_buy_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StratExecutorServiceHttpClient,
-                        tob_json_dict: Dict, is_non_systematic_run: bool | None = None):
+                        tob_json_dict: Dict, avoid_order_trigger: bool | None = None):
     buy_stored_tob: TopOfBookBaseModel | None = None
     sell_stored_tob: TopOfBookBaseModel | None = None
 
@@ -1237,7 +1238,7 @@ def run_buy_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: 
     sell_stored_tob.last_update_date_time = DateTime.utcnow() - timedelta(milliseconds=1)
     executor_web_client.patch_top_of_book_client(jsonable_encoder(sell_stored_tob, by_alias=True, exclude_none=True))
     _update_tob(buy_stored_tob, tob_json_dict.get("bid_quote").get("px") - 10, Side.BUY, executor_web_client)
-    if is_non_systematic_run:
+    if avoid_order_trigger:
         px = tob_json_dict.get("bid_quote").get("px") - 10
     else:
         # For place order trigger run
@@ -1250,7 +1251,7 @@ def run_buy_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: 
 
 
 def run_sell_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client: StratExecutorServiceHttpClient,
-                         tob_json_dict: Dict, is_non_systematic_run: bool | None = None):
+                         tob_json_dict: Dict, avoid_order_trigger: bool | None = None):
     buy_stored_tob: TopOfBookBaseModel | None = None
     sell_stored_tob: TopOfBookBaseModel | None = None
 
@@ -1266,7 +1267,7 @@ def run_sell_top_of_book(buy_symbol: str, sell_symbol: str, executor_web_client:
     executor_web_client.patch_top_of_book_client(jsonable_encoder(buy_stored_tob, by_alias=True, exclude_none=True))
     _update_tob(sell_stored_tob, sell_stored_tob.ask_quote.px - 10, Side.SELL, executor_web_client)
 
-    if is_non_systematic_run:
+    if avoid_order_trigger:
         px = tob_json_dict.get("ask_quote").get("px") - 10
 
     else:
@@ -1332,22 +1333,22 @@ def symbol_overview_list() -> List[SymbolOverviewBaseModel]:
     return symbol_overview_obj_list
 
 
-def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: PairStratBaseModel,
+def create_n_activate_strat(buy_symbol: str, sell_symbol: str, expected_pair_strat_obj: PairStratBaseModel,
                             expected_strat_limits: StratLimits,
                             expected_strat_status: StratStatus,
                             symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                             top_of_book_json_list: List[Dict],
                             market_depth_basemodel_list: List[MarketDepthBaseModel]
                             ) -> Tuple[PairStratBaseModel, StratExecutorServiceHttpClient]:
-    pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id = buy_symbol
-    pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id = sell_symbol
+    expected_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id = buy_symbol
+    expected_pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id = sell_symbol
     stored_pair_strat_basemodel = \
-        strat_manager_service_native_web_client.create_pair_strat_client(pair_strat_obj)
-    assert pair_strat_obj.frequency == stored_pair_strat_basemodel.frequency, \
-        f"Mismatch pair_strat_basemodel.frequency: expected {pair_strat_obj.frequency}, " \
+        strat_manager_service_native_web_client.create_pair_strat_client(expected_pair_strat_obj)
+    assert expected_pair_strat_obj.frequency == stored_pair_strat_basemodel.frequency, \
+        f"Mismatch pair_strat_basemodel.frequency: expected {expected_pair_strat_obj.frequency}, " \
         f"received {stored_pair_strat_basemodel.frequency}"
-    assert pair_strat_obj.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params, \
-        f"Mismatch pair_strat_obj.pair_strat_params: expected {pair_strat_obj.pair_strat_params}, " \
+    assert expected_pair_strat_obj.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params, \
+        f"Mismatch pair_strat_obj.pair_strat_params: expected {expected_pair_strat_obj.pair_strat_params}, " \
         f"received {stored_pair_strat_basemodel.pair_strat_params}"
     assert stored_pair_strat_basemodel.pair_strat_params_update_seq_num == 0, \
         f"Mismatch pair_strat.pair_strat_params_update_seq_num: expected 0 received " \
@@ -1396,7 +1397,6 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
         is_strat_status_present = False
 
         if len(strat_limits_list) == 1:
-            # Exception: StratLimits Mismatched: expected strat_limits id=2 max_open_orders_per_side=5 max_cb_notional=300000.0 max_open_cb_notional=30000.0 max_net_filled_notional=160000.0 max_concentration=10.0 limit_up_down_volume_participation_rate=1.0 cancel_rate=CancelRateOptional(max_cancel_rate=60, applicable_period_seconds=0, waived_min_orders=5) market_trade_volume_participation=MarketTradeVolumeParticipationOptional(max_participation_rate=40.0, applicable_period_seconds=180) market_depth=OpenInterestParticipationOptional(participation_rate=10.0, depth_levels=3) residual_restriction=ResidualRestrictionOptional(max_residual=100000.0, residual_mark_seconds=40) eligible_brokers=[BrokerOptional(id='651051253e48db5cda28d025', bkr_disable=False, sec_positions=[SecPositionOptional(id='651051253e48db5cda28d013', security=SecurityOptional(sec_id='CB_Sec_3', sec_type=<SecurityType.SEDOL: 'SEDOL'>), positions=[PositionOptional(id='651051253e48db5cda28d014', pos_disable=False, type=<PositionType.SOD: 'SOD'>, available_size=10000, allocated_size=10000, consumed_size=0, strat_consumed_size=None, acquire_cost=None, incurred_cost=None, carry_cost=None, priority=0, premium_percentage=2.0)])], broker='BKR', bkr_priority=10)] strat_limits_update_seq_num=None, received strat_limits: id=2 max_open_orders_per_side=5 max_cb_notional=300000.0 max_open_cb_notional=30000.0 max_net_filled_notional=160000.0 max_concentration=10.0 limit_up_down_volume_participation_rate=1.0 cancel_rate=CancelRateOptional(max_cancel_rate=60, applicable_period_seconds=0, waived_min_orders=5) market_trade_volume_participation=MarketTradeVolumeParticipationOptional(max_participation_rate=40.0, applicable_period_seconds=180) market_depth=OpenInterestParticipationOptional(participation_rate=10.0, depth_levels=3) residual_restriction=ResidualRestrictionOptional(max_residual=30000.0, residual_mark_seconds=4) eligible_brokers=[BrokerOptional(id='651051253e48db5cda28d025', bkr_disable=False, sec_positions=[SecPositionOptional(id='651051253e48db5cda28d013', security=SecurityOptional(sec_id='CB_Sec_3', sec_type=<SecurityType.SEDOL: 'SEDOL'>), positions=[PositionOptional(id='651051253e48db5cda28d014', pos_disable=False, type=<PositionType.SOD: 'SOD'>, available_size=10000, allocated_size=10000, consumed_size=0, strat_consumed_size=None, acquire_cost=None, incurred_cost=None, carry_cost=None, priority=0, premium_percentage=2.0)])], broker='BKR', bkr_priority=10)] strat_limits_update_seq_num=None
             strat_limits = strat_limits_list[0]
             expected_strat_limits.id = strat_limits.id
             expected_strat_limits.eligible_brokers = strat_limits.eligible_brokers
@@ -1439,22 +1439,19 @@ def create_n_activate_strat(buy_symbol: str, sell_symbol: str, pair_strat_obj: P
                        f"{executor_check_loop_counts} loops of {wait_time} sec each, "
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    # activating strat
-    strat_status = StratStatusBaseModel(_id=stored_pair_strat_basemodel.id, strat_state=StratState.StratState_ACTIVE)
-    activated_strat_status = executor_web_client.patch_strat_status_client(jsonable_encoder(strat_status, by_alias=True, exclude_none=True))
-    expected_strat_status.strat_state = activated_strat_status.strat_state
-    expected_strat_status.last_update_date_time = activated_strat_status.last_update_date_time
-    expected_strat_status.strat_status_update_seq_num = expected_strat_status.strat_status_update_seq_num + 1
-    assert activated_strat_status == expected_strat_status, \
-        (f"StratStatus Mismatched, expected StratStatus: {expected_strat_status}, "
-         f"received strat_status: {activated_strat_status}")
-    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
     # checking is_running_state of executor
     updated_pair_strat = strat_manager_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id)
     assert updated_pair_strat.is_executor_running, \
         f"is_executor_running state must be True, found false, pair_strat: {updated_pair_strat}"
     print(f"is_executor_running is True, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+    # activating strat
+    pair_strat = PairStratBaseModel(_id=stored_pair_strat_basemodel.id, strat_state=StratState.StratState_ACTIVE)
+    activated_pair_strat = strat_manager_service_native_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
+    assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
+        (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
+         f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
+    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     return updated_pair_strat, executor_web_client
 
@@ -1576,16 +1573,13 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
             logging.error(err_str_)
             raise Exception(err_str_)
 
-        strat_executor_http_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                  pair_strat.port)
-        strat_status = StratStatusBaseModel(_id=pair_strat.id, strat_state=StratState.StratState_DONE)
-        strat_executor_http_client.patch_strat_status_client(jsonable_encoder(strat_status, by_alias=True,
-                                                                              exclude_none=True))
-
+        pair_strat = PairStratBaseModel(_id=pair_strat.id, strat_state=StratState.StratState_DONE)
+        strat_manager_service_native_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True,
+                                                                        exclude_none=True))
         # removing today_activated_symbol_side_lock_file
         command_n_control_obj: CommandNControlBaseModel = CommandNControlBaseModel(command_type=CommandType.CLEAR_STRAT,
                                                                                    datetime=DateTime.utcnow())
-        strat_executor_http_client.create_command_n_control_client(command_n_control_obj)
+        strat_manager_service_native_web_client.create_command_n_control_client(command_n_control_obj)
 
         strat_manager_service_native_web_client.delete_pair_strat_client(pair_strat.id)
         time.sleep(2)
@@ -1802,7 +1796,6 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
         expected_pair_strat.pair_strat_params.strat_leg2.sec.sec_id = sell_symbol
 
         expected_strat_status = copy.deepcopy(expected_start_status_)
-        expected_strat_status.strat_state = StratState.StratState_ACTIVE
 
         expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
         expected_strat_brief_obj.pair_buy_side_trading_brief.security.sec_id = buy_symbol
@@ -1910,7 +1903,6 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
         expected_pair_strat.pair_strat_params.strat_leg2.sec.sec_id = sell_symbol
 
         expected_strat_status = copy.deepcopy(expected_start_status_)
-        expected_strat_status.strat_state = StratState.StratState_ACTIVE
 
         expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
         expected_strat_brief_obj.pair_buy_side_trading_brief.security.sec_id = buy_symbol
@@ -2338,7 +2330,7 @@ def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, 
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
     loop_count = 1
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], avoid_order_trigger=True)
     return buy_symbol, sell_symbol, activated_strat, executor_http_client
 
 
@@ -2404,7 +2396,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symb
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     loop_count = 1
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], avoid_order_trigger=True)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
@@ -2443,7 +2435,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
     loop_count = 1
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], is_non_systematic_run=True)
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], avoid_order_trigger=True)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
@@ -2575,6 +2567,78 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
                                                                    f"expected {partial_filled_qty}, received " \
                                                                    f"{latest_fill_journal.fill_px}"
     return last_order_id, partial_filled_qty
+
+
+def strat_done_after_exhausted_consumable_notional(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
+        top_of_book_list_, residual_wait_sec, side_to_check: Side):
+
+    created_pair_strat, executor_http_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 95
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.trade_simulator_reload_config_query_client()
+
+        # Positive Check
+        # buy fills check
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        if side_to_check == Side.BUY:
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+            check_symbol = buy_symbol
+        else:
+            run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
+            check_symbol = sell_symbol
+        time.sleep(2)  # delay for order to get placed
+
+        ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, check_symbol,
+                                                                                executor_http_client, assert_code=1)
+        order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
+        assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
+                                                                        f"OrderStatusType.OE_ACKED received " \
+                                                                        f"{order_snapshot.order_status}"
+        time.sleep(residual_wait_sec)  # wait to get buy order residual
+
+        # Negative Check
+        # Next placed order must not get placed, instead it should find consumable_notional as exhausted for further
+        # orders and should come out of executor run and must set strat_state to StratState_DONE
+
+        # buy fills check
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        if side_to_check == Side.BUY:
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+        else:
+            run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
+        time.sleep(2)  # delay for order to get placed
+        ack_order_journal = (
+            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, check_symbol, executor_http_client,
+                                                            last_order_id=ack_order_journal.order.order_id,
+                                                            expect_no_order=True, assert_code=3))
+        pair_strat = strat_manager_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
+        assert pair_strat.strat_state == StratState.StratState_DONE, (
+            f"Mismatched strat_state, expected {StratState.StratState_DONE}, received {pair_strat.strat_state}")
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
 def get_mongo_server_uri():

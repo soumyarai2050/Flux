@@ -16,7 +16,7 @@ from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_ser
     PairStratBaseModel
 from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import *
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    strat_manager_service_http_client)
+    strat_manager_service_http_client, is_ongoing_strat)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
     performance_benchmark_service_http_client, RawPerformanceDataBaseModel)
 
@@ -145,27 +145,6 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         strat_alert_handler_thread = Thread(target=self._handle_strat_alert_queue, daemon=True)
         portfolio_alert_handler_thread.start()
         strat_alert_handler_thread.start()
-
-    def _is_executor_service_up(self, strat_executor_http_client: StratExecutorServiceHttpClient,
-                                sec_id: str, side: Side) -> StratDetails | None:
-        try:
-            strat_details_list: List[StratDetails] = strat_executor_http_client.is_strat_ongoing_query_client()
-        except Exception as _e:
-            logging.exception("is_executor_service_up test failed - tried "
-                              "is_strat_ongoing_query_client ;;;"
-                              f"exception: {_e}", exc_info=True)
-            return None
-        else:
-            if len(strat_details_list) == 1:
-                strat_details = strat_details_list[0]
-                return strat_details
-            else:
-                err_str_ = ("Received unexpected length of strat_details list from from is_strat_ongoing_query_client "
-                            f"call of strat_executor for port {strat_executor_http_client.port}, expected 1, "
-                            f"likely bug in query implementation, symbol_side_key: "
-                            f"{get_symbol_side_key([(sec_id, side)])}")
-                logging.error(err_str_)
-                raise HTTPException(status_code=500, detail=err_str_)
 
     def _init_service(self) -> bool:
         if self.service_up:
@@ -321,33 +300,13 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                     if pair_strat_obj is None:
                         pass
                     else:
-                        if pair_strat_obj.is_executor_running:
-                            executor_web_client = self._get_executor_http_client_from_pair_strat(pair_strat_obj.port,
-                                                                                                 pair_strat_obj.host)
-                            try:
-                                strat_details_list: List[StratDetails] = (
-                                    executor_web_client.is_strat_ongoing_query_client())
-                            except Exception as e:
-                                err_str_ = ("Something went wrong in is_strat_ongoing_query_client call, "
-                                            f"symbol_side_key: {get_symbol_side_key([(symbol, side)])}, exception: {e}")
-                                raise Exception(err_str_)
-                            else:
-                                if len(strat_details_list) == 1:
-                                    strat_details = strat_details_list[0]
-                                    if not strat_details.is_ongoing:
-                                        raise Exception(f"Strat Executor for symbol & side: {symbol} & {side} is not "
-                                                        f"in ongoing state while creating strat_alert, pair_strat: "
-                                                        f"{pair_strat_obj}")
-                                else:
-                                    err_str_ = (
-                                        "Received unexpected length of strat_details list from "
-                                        "is_strat_ongoing_query_client call of strat_executor for port "
-                                        f"{executor_web_client.port}, expected 1, likely bug in "
-                                        f"query implementation, symbol_side_key: "
-                                        f"{get_symbol_side_key([(symbol, side)])}")
-                                    raise Exception(err_str_)
-                        else:
+                        if not pair_strat_obj.is_executor_running:
                             raise Exception(f"StartExecutor Server not running for pair_strat: {pair_strat_obj}")
+
+                        if not is_ongoing_strat(pair_strat_obj):
+                            raise Exception(f"Strat Executor for symbol & side: {symbol} & {side} is not "
+                                            f"in ongoing state while creating strat_alert, pair_strat: "
+                                            f"{pair_strat_obj}")
 
                         strat_id = pair_strat_obj.id
                         run_coro = PairStratEngineLogAnalyzer.underlying_read_strat_alert_by_id_http(strat_id)

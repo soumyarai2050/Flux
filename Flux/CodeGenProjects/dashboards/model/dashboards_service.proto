@@ -268,3 +268,11 @@ message DashFiltersList {
 message DashCollectionList {
   repeated DashCollection dash_collection = 1;
 }
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+  optional ButtonType temp = 1;
+  optional DummyEnumDMS temp2 = 2;
+  optional DummyEnumDP temp3 = 3;
+  optional Severity temp4 = 4;
+}

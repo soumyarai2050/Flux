@@ -28,7 +28,7 @@ from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper impor
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    create_md_shell_script, MDShellEnvData)
+    create_md_shell_script, MDShellEnvData, strat_manager_service_http_client)
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore
 from Flux.CodeGenProjects.post_trade_engine.generated.Pydentic.post_trade_engine_service_model_imports import (
     IsPortfolioLimitsBreached)
@@ -39,9 +39,7 @@ from Flux.CodeGenProjects.post_trade_engine.app.post_trade_engine_service_helper
 class StratExecutor:
     # Query Callables
     underlying_get_aggressive_market_depths_query_http: Callable[..., Any] | None = None
-    underlying_get_market_depth_from_index_fields_http: Callable[..., Any] | None = None
-    underlying_partial_update_strat_status_http: Callable[..., Any] | None = None
-    underlying_update_residuals_query_http: Callable[..., Any] | None = None
+    underlying_handle_strat_activate_query_http: Callable[..., Any] | None = None
 
     trading_link: ClassVar[TradingLinkBase] = get_trading_link()
     asyncio_loop: asyncio.AbstractEventLoop
@@ -49,12 +47,9 @@ class StratExecutor:
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
-            underlying_get_market_depth_from_index_fields_http, underlying_partial_update_strat_status_http,
-            underlying_update_residuals_query_http, underlying_get_market_depths_query_http)
+            underlying_get_market_depths_query_http, underlying_handle_strat_activate_query_http)
         cls.underlying_get_aggressive_market_depths_query_http = underlying_get_market_depths_query_http
-        cls.underlying_get_market_depth_from_index_fields_http = underlying_get_market_depth_from_index_fields_http
-        cls.underlying_partial_update_strat_status_http = underlying_partial_update_strat_status_http
-        cls.underlying_update_residuals_query_http = underlying_update_residuals_query_http
+        cls.underlying_handle_strat_activate_query_http = underlying_handle_strat_activate_query_http
 
     @staticmethod
     def executor_trigger(trading_data_manager_: TradingDataManager, strat_cache: StratCache):
@@ -340,13 +335,12 @@ class StratExecutor:
                                                                                       account, exchange, err_dict,
                                                                                       check_mask)):
                 # check and block order if strat not in activ state [second fail-safe-check]
-                strat_status_tuple = self.strat_cache.get_strat_status()
-                if strat_status_tuple is not None:
-                    strat_status, strat_status_update_date_time = strat_status_tuple
-                    # If strat status not active, don't act, just return [check MD state and take action if required]
-                    if strat_status.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
-                        logging.error("Secondary Block place order - strat not in activ state or outside market hours")
-                        return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+                # If pair_strat is not active, don't act, just return [check MD state and take action if required]
+                pair_strat = self._get_latest_pair_strat()
+                if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
+                    logging.error("Secondary Block place order - strat not in activ state or outside market hours")
+                    return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
+
                 # set unack for subsequent orders - this symbol to be blocked until this order goes through
                 self.set_unack(system_symbol, True)
                 if not self.trading_link_place_new_order(px, qty, side, trading_symbol, system_symbol, account,
@@ -674,38 +668,25 @@ class StratExecutor:
         os.chmod(generation_start_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{generation_start_file_path}"])
 
-    def _update_strat_state(self, strat_status_basemodel: StratStatusBaseModel):
-        # coro needs public method
-        run_coro = StratExecutor.underlying_partial_update_strat_status_http(
-            jsonable_encoder(strat_status_basemodel, by_alias=True, exclude_none=True))
-        future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
-
-        # block for task to finish
-        try:
-            future.result()
-        except Exception as e:
-            logging.exception(f"underlying_partial_update_strat_status_http failed "
-                              f"with exception: {e}")
-
     def _mark_strat_state_as_error(self, pair_strat: PairStratBaseModel):
-        strat_status_basemodel = StratStatusBaseModel(_id=pair_strat.id)
-        strat_status_basemodel.strat_state = StratState.StratState_ERROR
+        pair_strat_basemodel = PairStratBaseModel(_id=pair_strat.id)
+        pair_strat_basemodel.strat_state = StratState.StratState_ERROR
         alert_str: str = \
             (f"Marking strat_state to ERROR for strat: {self.pair_strat_executor_id} "
              f"{get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
         logging.info(alert_str)
-
-        self._update_strat_state(strat_status_basemodel)
+        strat_manager_service_http_client.patch_pair_strat_client(
+            jsonable_encoder(pair_strat_basemodel, by_alias=True, exclude_none=True))
 
     def _mark_strat_state_as_done(self, pair_strat: PairStratBaseModel):
-        strat_status_basemodel = StratStatusBaseModel(_id=pair_strat.id)
-        strat_status_basemodel.strat_state = StratState.StratState_DONE
+        pair_strat_basemodel = PairStratBaseModel(_id=pair_strat.id)
+        pair_strat_basemodel.strat_state = StratState.StratState_DONE
         alert_str: str = \
             (f"graceful shut down processing for strat: {self.pair_strat_executor_id} "
              f"{get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
         logging.info(alert_str)
-
-        self._update_strat_state(strat_status_basemodel)
+        strat_manager_service_http_client.patch_pair_strat_client(
+            jsonable_encoder(pair_strat_basemodel, by_alias=True, exclude_none=True))
 
     def check_n_pause_strat_before_run_if_portfolio_limit_breached(self):
         # Checking if portfolio_limits are still not breached
@@ -719,9 +700,10 @@ class StratExecutor:
                 pair_strat_tuple = self.strat_cache.get_pair_strat()
                 if pair_strat_tuple is not None:
                     pair_strat, _ = pair_strat_tuple
-                    strat_status_basemodel = StratStatusBaseModel(_id=pair_strat.id)
-                    strat_status_basemodel.strat_state = StratState.StratState_PAUSED
-                    self._update_strat_state(strat_status_basemodel)
+                    pair_strat_basemodel = PairStratBaseModel(_id=pair_strat.id)
+                    pair_strat_basemodel.strat_state = StratState.StratState_PAUSED
+                    strat_manager_service_http_client.patch_pair_strat_client(
+                        jsonable_encoder(pair_strat_basemodel, by_alias=True, exclude_none=True))
                     logging.error("Putting Activated Strat to PAUSE, found portfolio_limits breached already, "
                                   f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
                 else:
@@ -738,6 +720,20 @@ class StratExecutor:
 
     def run(self):
         ret_val: int = -5000
+
+        # Getting pre-requisites ready before strat active runs
+        run_coro = StratExecutor.underlying_handle_strat_activate_query_http()
+        future = asyncio.run_coroutine_threadsafe(run_coro, StratExecutor.asyncio_loop)
+
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e_:
+            logging.exception(
+                f"underlying_handle_strat_activate_query_http failed: Exiting executor run trigger, "
+                f"exception: {e_}")
+            return -5001
+
         max_retry_count: Final[int] = 10
         retry_count: int = 0
         pair_strat_tuple: Tuple[PairStratBaseModel, DateTime] | None = None
@@ -787,23 +783,17 @@ class StratExecutor:
                         logging.error(f"Error: Run returned, code: {ret_val} - sending again")
                     else:
                         pair_strat, _ = self.strat_cache.get_pair_strat()
-                        strat_status_tuple = self.strat_cache.get_strat_status()
-                        if strat_status_tuple is not None:
-                            strat_status_, strat_status_update_date_time = strat_status_tuple
-                            if strat_status_.strat_state != StratState.StratState_DONE:
-                                self._mark_strat_state_as_done(pair_strat)
-                                logging.debug(f"StratStatus with id: {self.pair_strat_executor_id} Marked Done, "
-                                              f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
-                                ret_val = 0
-                            else:
-                                logging.error(f"unexpected, pair_strat: {self.pair_strat_executor_id} "
-                                              f"was already Marked Done, pair_strat_key: "
-                                              f"{get_pair_strat_log_key(pair_strat)}")
-                                ret_val = -4000  # helps find the error location
-                            break
+                        if pair_strat.strat_state != StratState.StratState_DONE:
+                            self._mark_strat_state_as_done(pair_strat)
+                            logging.debug(f"StratStatus with id: {self.pair_strat_executor_id} Marked Done, "
+                                          f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
+                            ret_val = 0
                         else:
-                            logging.error(f"strat_limits_tuple is None for: [ {self.strat_cache} ], "
-                                          f"symbol_side_key: {get_pair_strat_log_key(pair_strat)}")
+                            logging.error(f"unexpected, pair_strat: {self.pair_strat_executor_id} "
+                                          f"was already Marked Done, pair_strat_key: "
+                                          f"{get_pair_strat_log_key(pair_strat)}")
+                            ret_val = -4000  # helps find the error location
+                        break
         except Exception as e:
             logging.exception(f"Some Error occurred in run method of executor, exception: {e}")
             ret_val = -4001
@@ -872,11 +862,10 @@ class StratExecutor:
                      order_limits: OrderLimitsBaseModel, quote: QuoteOptional, tob: TopOfBookBaseModel) -> float:
         """returns float posted notional of the order sent"""
         # fail-safe
-        strat_status_tuple = self.strat_cache.get_strat_status()
-        if strat_status_tuple is not None:
-            strat_status, strat_status_update_date_time = strat_status_tuple
-            # If strat status not active, don't act, just return [check MD state and take action if required]
-            if strat_status.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
+        pair_strat = self.strat_cache.get_pair_strat_obj()
+        if pair_strat is not None:
+            # If pair_strat not active, don't act, just return [check MD state and take action if required]
+            if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
                 logging.error("Blocked place order - strat not in activ state")
                 return 0  # no order sent = no posted notional
         if not (quote.qty == 0 or math.isclose(quote.px, 0)):
@@ -1148,12 +1137,14 @@ class StratExecutor:
         while 1:
             self.strat_limit = None
             try:
-                if self.strat_cache.stopped:
-                    self.strat_cache.set_pair_strat(None)
-                    return 1  # indicates explicit shutdown requested from server
                 self.strat_cache.notify_semaphore.acquire()
                 # remove all unprocessed signals from semaphore, logic handles all new updates in single iteration
                 clear_semaphore(self.strat_cache.notify_semaphore)
+
+                # 0. Checking if strat_cache stopped (happens most likely when strat is not ongoing anymore)
+                if self.strat_cache.stopped:
+                    self.strat_cache.set_pair_strat(None)
+                    return 1  # indicates explicit shutdown requested from server
 
                 # 1. check if portfolio status has updated since we last checked
                 portfolio_status: PortfolioStatusBaseModel | None = self._get_latest_portfolio_status()
@@ -1165,18 +1156,12 @@ class StratExecutor:
                 if pair_strat is None:
                     return -1
 
-                strat_status_tuple = self.strat_cache.get_strat_status()
-                if strat_status_tuple is not None:
-                    strat_status, strat_status_update_date_time = strat_status_tuple
-                    # If strat status not active, don't act, just return [check MD state and take action if required]
-                    if strat_status.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
-                        continue
-                    else:
-                        strat_limits_tuple = self.strat_cache.get_strat_limits()
-                        self.strat_limit, strat_limits_update_date_time = strat_limits_tuple
+                # If pair_strat is not active, don't act, just return [check MD state and take action if required]
+                if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
+                    continue
                 else:
-                    logging.error(f"strat_status_tuple is None for: {self.strat_cache}")
-                    return -1
+                    strat_limits_tuple = self.strat_cache.get_strat_limits()
+                    self.strat_limit, strat_limits_update_date_time = strat_limits_tuple
 
                 # 3. check if any cxl order is requested and send out
                 if self.process_cxl_request():

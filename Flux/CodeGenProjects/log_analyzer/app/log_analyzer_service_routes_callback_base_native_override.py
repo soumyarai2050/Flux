@@ -31,8 +31,8 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
         background_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
     }
     datetime_str: str = datetime.now().strftime("%Y%m%d")
-    underlying_read_portfolio_alert_http: Callable[[Any], Any] | None = None
-    underlying_create_portfolio_alert_http: Callable[[Any], Any] | None = None
+    underlying_read_portfolio_alert_http: Callable[..., Any] | None = None
+    underlying_create_portfolio_alert_http: Callable[..., Any] | None = None
 
     def __init__(self):
         super().__init__()

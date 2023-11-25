@@ -15,14 +15,9 @@ from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_
     PostTradeEngineServiceRoutesCallback)
 from Flux.CodeGenProjects.post_trade_engine.app.post_trade_engine_service_helper import *
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    strat_manager_service_http_client)
+    strat_manager_service_http_client, PairStratBaseModel, StratState)
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
-from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
-    StratExecutorServiceHttpClient)
-from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import (
-    StratState, StratStatusBaseModel)
-from Flux.CodeGenProjects.strat_executor.app.aggregate import (get_last_n_sec_orders_by_event,
-                                                               get_order_snapshot_order_id_filter_json)
+from Flux.CodeGenProjects.strat_executor.app.aggregate import (get_last_n_sec_orders_by_event)
 from Flux.CodeGenProjects.post_trade_engine.app.aggregate import get_open_order_counts
 
 
@@ -462,7 +457,6 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 # Sell side check
                 total_sell_open_notional += strat_brief.pair_sell_side_trading_brief.open_notional
 
-            logging.info(f">>>B>>> {portfolio_limits.max_open_notional_per_side} - {total_buy_open_notional}")
             if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
                 logging.error(f"max_open_notional_per_side breached for BUY side, "
                               f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
@@ -470,7 +464,6 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                               f" - initiating all strat pause")
                 pause_all_strats = True
 
-            logging.info(f">>>S>>> {portfolio_limits.max_open_notional_per_side} - {total_buy_open_notional}")
             if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
                 logging.error(f"max_open_notional_per_side breached for SELL side, "
                               f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
@@ -528,11 +521,10 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 logging.exception(f"check_all_portfolio_limits failed, exception: {e}")
                 return None
             if pause_all_strats:
-                self.pause_all_strats()
+                strat_manager_service_http_client.pause_all_active_strats_query_client()
 
     async def is_portfolio_limits_breached_query_pre(
             self, is_portfolio_limits_breached_class_type: Type[IsPortfolioLimitsBreached]):
-        logging.info(">>>> Query Call")
         pause_all_strats = await self.check_all_portfolio_limits()
         return [IsPortfolioLimitsBreached(is_portfolio_limits_breached=pause_all_strats)]
 
@@ -550,19 +542,6 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                                                               payload_dict)
             # Does db operations and checks portfolio_limits and raises all-strat pause if any limit breaches
             self._portfolio_limit_check_queue_handler(strat_id_list, strat_id_to_container_obj_dict)
-
-    def pause_all_strats(self):
-        pair_strat_list = strat_manager_service_http_client.get_all_pair_strat_client()
-
-        for pair_strat in pair_strat_list:
-            if pair_strat.is_executor_running and pair_strat.port is not None and pair_strat.host is not None:
-                strat_executor_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                     pair_strat.port)
-                strat_executor_client.put_strat_to_pause_if_active_query_client()
-
-    async def pause_all_strats_query_pre(self, pause_all_strats_class_type: Type[PauseAllStrats]):
-        self.pause_all_strats()
-        return []
 
     async def reload_cache_query_pre(self, reload_cache_class_type: Type[ReloadCache]):
         # clearing cache dict

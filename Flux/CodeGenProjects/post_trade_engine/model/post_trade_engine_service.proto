@@ -22,13 +22,6 @@ message CheckPortfolioLimits{
   required bool check_result = 1;
 }
 
-message PauseAllStrats{
-  option (FluxMsgJsonQuery) = {
-      QueryName: "pause_all_strats"
-  };
-  required bool result = 1;
-}
-
 message ReloadCache{
   option (FluxMsgJsonQuery) = {
     QueryName: "reload_cache"

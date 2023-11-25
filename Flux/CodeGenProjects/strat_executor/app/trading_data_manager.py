@@ -1,24 +1,19 @@
-import logging
 from threading import Thread
-from typing import Callable
 
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.strat_executor.app.trading_cache import *
 from Flux.CodeGenProjects.strat_executor.app.strat_cache import StratCache
-from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_models_log_keys import get_pair_strat_log_key
-from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import get_symbol_side_key, \
-    get_strat_brief_log_key, get_fills_journal_log_key, get_order_journal_log_key, is_ongoing_strat
+from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import (
+    get_symbol_side_key, get_fills_journal_log_key, get_order_journal_log_key)
+from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import is_ongoing_strat
 from Flux.CodeGenProjects.strat_executor.app.trading_link import TradingLinkBase, get_trading_link, is_test_run
 from Flux.CodeGenProjects.pair_strat_engine.generated.StratExecutor.strat_manager_service_ws_data_manager import \
     StratManagerServiceDataManager
 from Flux.CodeGenProjects.strat_executor.generated.StratExecutor.strat_executor_service_ws_data_manager import (
     StratExecutorServiceDataManager)
-from Flux.CodeGenProjects.pair_strat_engine.generated.StratExecutor.strat_manager_service_key_handler import \
-    StratManagerServiceKeyHandler
-from Flux.CodeGenProjects.strat_executor.generated.StratExecutor.strat_executor_service_key_handler import (
-    StratExecutorServiceKeyHandler)
 from Flux.CodeGenProjects.strat_executor.app.get_pair_strat_n_executor_client import *
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
+from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import StratExecutorServiceHttpClient
 
 trading_link: TradingLinkBase = get_trading_link()
 port = os.environ.get("PORT")
@@ -96,36 +91,34 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
             err_str_ = "Received portfolio_status object from caller as None"
             logging.exception(err_str_)
 
-    def handle_strat_status_get_all_ws(self, strat_status_: StratStatusBaseModel | StratStatus, **kwargs):
-        if is_ongoing_strat(strat_status_):
+    def handle_pair_strat_get_by_id_ws(self, pair_strat_: PairStratBaseModel, **kwargs):
+        if is_ongoing_strat(pair_strat_):
             with self.strat_cache.re_ent_lock:
-                strat_status_tuple = self.strat_cache.get_strat_status()
-                cached_strat_status = None
-                if strat_status_tuple is not None:
-                    cached_strat_status, _ = strat_status_tuple
-                if cached_strat_status is None:
+                pair_strat_tuple = self.strat_cache.get_pair_strat()
+                cached_pair_strat = None
+                if pair_strat_tuple is not None:
+                    cached_pair_strat, _ = pair_strat_tuple
+                if self.strat_executor is None:
                     # this is a new pair strat for processing, start its own thread with new strat executor object
-                    self.strat_cache.set_strat_status(strat_status_)
                     self.strat_cache.stopped = False
                     self.strat_executor, self.strat_executor_thread = (
                         self.executor_trigger_method(self, self.strat_cache))
                     # update strat key to python processing thread
-                else:
-                    self.strat_cache.set_strat_status(strat_status_)
+                self.strat_cache.set_pair_strat(pair_strat_)
             if self.strat_status_ws_get_all_cont.notify:
                 self.strat_cache.notify_semaphore.release()
-            logging.debug(f"Updated strat_status;;; strat_status: {strat_status_}")
+            logging.debug(f"Updated pair_strat;;; pair_strat: {pair_strat_}")
         else:
             if not self.strat_cache.stopped:
                 # strat_cache is not ongoing but is still running should be stopped
                 with self.strat_cache.re_ent_lock:
                     # demon thread will tear down itself if strat_cache.stopped is True, it will also invoke
                     # set_pair_strat(None) on cache, enabling future reactivation + stops any processing until then
-                    self.strat_cache.set_strat_status(strat_status_)
+                    self.strat_cache.set_pair_strat(pair_strat_)
                     self.strat_cache.stopped = True
                     self.strat_cache.notify_semaphore.release()
-                logging.warning(f"handle_strat_status_get_all_ws: removed cache entry of non ongoing strat;;;"
-                                f"strat_status: {strat_status_}")
+                logging.warning(f"handle_pair_strat_get_by_id_ws: removed cache entry of non ongoing strat;;;"
+                                f"pair_strat: {pair_strat_}")
             # else not required: fine if strat cache is non-ongoing and is not running(stopped is True)
 
     def handle_strat_brief_get_all_ws(self, strat_brief_: StratBriefBaseModel | StratBrief, **kwargs):
