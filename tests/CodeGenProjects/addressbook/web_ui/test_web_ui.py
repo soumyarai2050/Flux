@@ -9,8 +9,6 @@ from selenium.common import NoSuchElementException
 from fastapi.encoders import jsonable_encoder
 
 # third party imports
-from selenium.webdriver import ActionChains, Keys
-from selenium.webdriver.support.ui import Select
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
@@ -33,7 +31,8 @@ from tests.CodeGenProjects.addressbook.web_ui.utility_test_functions import (
     validate_flux_fld_number_format_in_widget, validate_flux_flx_display_zero_in_widget,
     get_replaced_str_default_field_value, validate_val_min_n_default_fld_value_equal_or_not,
     validate_val_max_n_default_fld_value_equal_or_not, get_widget_web_element_by_name, show_nested_fld_in_tree_layout,
-    get_val_min_n_val_max_of_fld, select_or_unselect_checkbox, get_replaced_str, get_commonkey_items, change_layout)
+    get_val_min_n_val_max_of_fld, select_or_unselect_checkbox, get_replaced_str, get_commonkey_items, change_layout,
+    double_click, hover_over_on_element, get_progress_bar_level, get_str_value)
 from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
                                                                           SearchType)
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import TopOfBookBaseModel, QuoteOptional
@@ -90,6 +89,7 @@ def test_update_pair_strat_n_create_n_activate_strat_limits_using_tree_view(clea
     switch_layout(widget=strat_limits_widget, layout=Layout.TREE)
 
     create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.TREE)
+
     click_button_with_name(strat_limits_widget, "Save")
     time.sleep(Delay.SHORT.value)
     confirm_save(driver=driver)
@@ -114,106 +114,106 @@ def test_update_strat_limits_n_activate_using_table_view(clean_and_set_limits, d
     # max_open_per_orders_side
     xpath = "max_open_orders_per_side"
     value = strat_limits["max_open_orders_per_side"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # max_cb_notional
     xpath = "max_cb_notional"
     value = strat_limits["max_cb_notional"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # max_open_cb_notional
     xpath = "max_open_cb_notional"
     value = strat_limits["max_open_cb_notional"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # max_net_filled_notional
     xpath = "max_net_filled_notional"
     value = strat_limits["max_net_filled_notional"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # max_concentration
     xpath = "max_concentration"
     value = strat_limits["max_concentration"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # limit_up_down_volume_participation_rate
     xpath = "limit_up_down_volume_participation_rate"
     value = strat_limits["limit_up_down_volume_participation_rate"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # max_cancel_rate
     xpath = "cancel_rate.max_cancel_rate"
     value = strat_limits["cancel_rate"]["max_cancel_rate"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # applicable_period_seconds
     xpath = "cancel_rate.applicable_period_seconds"
     value = strat_limits["cancel_rate"]["applicable_period_seconds"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # waived_min_orders
     xpath = "cancel_rate.waived_min_orders"
     value = strat_limits["cancel_rate"]["waived_min_orders"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # max_participation_rate
     xpath = "market_trade_volume_participation.max_participation_rate"
     value = strat_limits["market_trade_volume_participation"]["max_participation_rate"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # applicable_period_seconds
     xpath = "market_trade_volume_participation.applicable_period_seconds"
     value = strat_limits["market_trade_volume_participation"]["applicable_period_seconds"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # participation_rate
     xpath = "market_depth.participation_rate"
     value = strat_limits["market_depth"]["participation_rate"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # depth_levels
     xpath = "market_depth.depth_levels"
     value = strat_limits["market_depth"]["depth_levels"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # max_residual
     xpath = "residual_restriction.max_residual"
     value = strat_limits["residual_restriction"]["max_residual"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     # residual_mark_seconds
     xpath = "residual_restriction.residual_mark_seconds"
     value = strat_limits["residual_restriction"]["residual_mark_seconds"]
-    enabled_or_not = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
-    if enabled_or_not:
+    is_enabled = validate_table_cell_enabled_or_not(widget=strat_limits_widget, xpath=xpath)
+    if is_enabled:
         set_table_input_field(widget=strat_limits_widget, xpath=xpath, value=value)
 
     click_button_with_name(widget=strat_limits_widget, button_name="Save")
@@ -288,10 +288,9 @@ def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, we
     click_button_with_name(widget=strat_collection_widget, button_name="Edit")
 
     pair_strat_td_elements = pair_strat_params_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
-    enabled_or_not = validate_table_cell_enabled_or_not
-    if enabled_or_not:
-        actions = ActionChains(driver)
-        actions.double_click(pair_strat_td_elements[4]).perform()
+    is_enabled = validate_table_cell_enabled_or_not
+    if is_enabled:
+        double_click(driver=driver, element=pair_strat_td_elements[4])
 
     nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
     # update_value_in_nested_tree_layout
@@ -312,30 +311,35 @@ def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, we
     # open nested tree layout in strat limit
     click_button_with_name(widget=strat_limits_widget, button_name="Edit")
     strat_limits_td_elements = strat_limits_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
-    enabled_or_not = validate_table_cell_enabled_or_not
-    if enabled_or_not:
-        actions = ActionChains(driver)
-        actions.double_click(strat_limits_td_elements[0]).perform()
+    is_enabled = validate_table_cell_enabled_or_not
+    if is_enabled:
+        double_click(driver=driver, element=strat_limits_td_elements[0])
 
     create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.NESTED)
     save_nested_strat(driver=driver)
 
-    actions = ActionChains(driver)
-    actions.double_click(strat_limits_td_elements[0]).perform()
+    double_click(driver=driver, element=strat_limits_td_elements[0])
     validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
 
 
 def test_widget_type(driver_type, schema_dict: Dict[str, any]):
-    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
-                                          flux_property="display_type")
+    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="val_min")
     print(result)
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        print(widget_name)
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            print(field_name)
-            val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
+    assert result[0]
+    # # print(result)
+    # for widget_query in result[1]:
+    #     widget_name = widget_query.widget_name
+    #     # print("widget name:- ",widget_name)
+    #
+    #     for field_query in widget_query.fields:
+    #         field_name: str = field_query.field_name
+    #         print("field_name is:-", field_name)
+    #         # field_name: str = field_query.field_name
+    #         xpath: str = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict),
+    #                                            widget_type=WidgetType.INDEPENDENT,
+    #                                            widget_name=widget_name, field_name=field_name)
+    #         print("xpath is:-", xpath)
+
 
 
 
@@ -347,8 +351,7 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
     print(result)
 
     # order_limits_n_portfolio_limits_table_layout_val_max_for_valid_scenario
-    field_name_list: List[str] = []
-    xpath_lst: List[str] = []
+    xpath_n_field_names: Dict[str] = {}
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         # in strat_status balance notional fld contain progress bar
@@ -360,28 +363,26 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
 
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
+            xpath = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
 
-            field_name_list.append(field_name)
-            xpath_lst.append(xpath)
+            xpath_n_field_names[field_name] = xpath
             val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1])
 
             default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TABLE, xpath=xpath)
             if default_field_value:
                 replaced_default_field_value: int = get_replaced_str(default_field_value=default_field_value)
-                equal: bool = validate_val_max_n_default_fld_value_equal_or_not(
+                is_equal: bool = validate_val_max_n_default_fld_value_equal_or_not(
                     val_max=val_max,replaced_default_field_value=replaced_default_field_value)
-            if equal:
+            if is_equal:
                 val_max = val_max - 1
             set_table_input_field(widget=widget, xpath=xpath, value=str(val_max))
-        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, field_name_list=field_name_list, input_type="valid", xpath_lst=xpath_lst)
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, widget_name=widget_name, input_type="valid",
+                                            xpath_n_field_names=xpath_n_field_names)
 
 
 
     # order_limits_n_portfolio_limits_tree_layout_val_max_for_valid_scenario
-    field_name_list: List[str] = []
-    xpath_lst: List[str] = []
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         if widget_name == "strat_status":
@@ -392,27 +393,25 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
 
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+            xpath: str = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
-            field_name_list.append(field_name)
-            xpath_lst.append(xpath)
+
+            xpath_n_field_names[field_name] = xpath
             val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1])
             default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TREE, xpath=xpath)
             if default_field_value:
                 replaced_default_field_value: int = get_replaced_str(default_field_value=default_field_value)
-                equal: bool = validate_val_max_n_default_fld_value_equal_or_not(
+                is_equal: bool = validate_val_max_n_default_fld_value_equal_or_not(
                     val_max=val_max, replaced_default_field_value=replaced_default_field_value)
-            if equal:
+            if is_equal:
                 val_max = val_max - 1
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_max))
-        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, field_name_list=field_name_list, input_type= "valid", xpath_lst=xpath_lst)
-
-
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget,widget_name=widget_name, input_type="valid",
+                                                xpath_n_field_names=xpath_n_field_names)
 
 
     # order_limits_n_portfolio_limits_table_layout_above_val_max_for_invalid_scenario
-    field_name_list: List[str] = []
-    xpath_lst: List[str] = []
+    xpath_n_field_names: Dict[str] = {}
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         if widget_name == "strat_status":
@@ -424,25 +423,21 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
             switch_layout(widget=widget, layout=Layout.TABLE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+            xpath: str = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
-            field_name_list.append(field_name)
-            xpath_lst.append(xpath)
-            # val_max: int = int(field_query.properties['val_max']) + 1
+            xpath_n_field_names[field_name] = xpath
             val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1]) + 1
             # enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
             # if enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=str(val_max))
             # else:
             #     continue
-        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, field_name_list=field_name_list, input_type="invalid", xpath_lst=xpath_lst)
-
-
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget,widget_name=widget_name, input_type="invalid",
+                                            xpath_n_field_names=xpath_n_field_names)
 
 
     # order_limits_n_portfolio_limits_tree_layout_above_val_max_for_invalid_scenario
-    field_name_list: List[str] = []
-    xpath_lst: List[str] = []
+    xpath_n_field_names: Dict[str] = {}
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         if widget_name == "strat_status":
@@ -452,14 +447,13 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
         switch_layout(widget=widget, layout=Layout.TREE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-                                                   widget_name=widget_name, field_name=field_name)
-            field_name_list.append(field_name)
-            xpath_lst.append(xpath)
-            # val_max: int = int(field_query.properties['val_max']) + 1
+            xpath: str = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+                                                    widget_name=widget_name, field_name=field_name)
+            xpath_n_field_names[field_name] = xpath
             val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1]) + 1
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_max))
-        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, field_name_list=field_name_list, input_type= "invalid", xpath_lst=xpath_lst)
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, input_type="invalid",widget_name=widget_name,
+                                            xpath_n_field_names=xpath_n_field_names)
 
 
 
@@ -500,15 +494,15 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
             switch_layout(widget=widget, layout=Layout.TABLE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
+            xpath = get_xpath_from_field_name(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
             # balance notional field contain "0.0" that's why can parse directly into int
             val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0])
             default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TABLE, xpath=xpath)
 
             replaced_default_field_value: int = get_replaced_str_default_field_value(default_field_value=default_field_value)
-            equal: bool = validate_val_min_n_default_fld_value_equal_or_not(val_min=val_min, replaced_default_field_value=replaced_default_field_value)
-            if equal:
+            is_equal: bool = validate_val_min_n_default_fld_value_equal_or_not(val_min=val_min, replaced_default_field_value=replaced_default_field_value)
+            if is_equal:
                 val_min = val_min - 1
             #enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
             #if enabled:
@@ -529,15 +523,15 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
         switch_layout(widget=widget, layout=Layout.TREE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
+            xpath = get_xpath_from_field_name(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
             val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0])
             default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TREE, xpath=xpath)
             replaced_default_field_value: int = get_replaced_str_default_field_value(
                 default_field_value=default_field_value)
-            equal: bool = validate_val_min_n_default_fld_value_equal_or_not(
+            is_equal: bool = validate_val_min_n_default_fld_value_equal_or_not(
                 val_min=val_min, replaced_default_field_value=replaced_default_field_value)
-            if equal:
+            if is_equal:
                 val_min = val_min - 1
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_min))
 
@@ -556,7 +550,7 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
             field_name: str = field_query.field_name
             xpath = get_xpath_from_field_name(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0])
+            val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0]) - 1
 
             #enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
             #if enabled:
@@ -574,9 +568,9 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
         switch_layout(widget=widget, layout=Layout.TREE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
-                                              field_name=field_name)
-            val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0])
+            xpath = get_xpath_from_field_name(
+                copy.deepcopy(schema_dict),widget_type=WidgetType.INDEPENDENT,widget_name=widget_name,field_name=field_name)
+            val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0]) - 1
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_min))
         validate_flux_fld_val_min_in_widget(widget=widget, field_name=field_name)
 
@@ -609,38 +603,43 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
 
     # order_limits_n_portfolio_limits_table_layout_help_for_valid_scenario
     for widget_query in result[1]:
-        driver.refresh()
-        time.sleep(Delay.DEFAULT.value)
+        # driver.refresh()
+        # time.sleep(Delay.DEFAULT.value)
         widget_name = widget_query.widget_name
-        widget = driver.find_element(By.ID, widget_name)
-        scroll_into_view(driver=driver, element=widget)
-        time.sleep(Delay.SHORT.value)
-        click_button_with_name(widget=widget, button_name="Settings")
+        if widget_name == "strat_limits":
+            continue
+        # widget = driver.find_element(By.ID, widget_name)
+        # time.sleep(Delay.SHORT.value)
+        # click_button_with_name(widget=widget, button_name="Settings")
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
             help_txt: str = field_query.properties['help']
-            # widget = driver.find_element(By.ID, widget_name)
-            # click_button_with_name(widget=widget, button_name="Settings")
-            if field_name == "max_rolling_tx_count" or field_name == "rolling_tx_count_period_seconds":
+            widget = driver.find_element(By.ID, widget_name)
+            scroll_into_view(driver=driver, element=widget)
+            click_button_with_name(widget=widget, button_name="Settings")
+
+            if (field_name == "sec_id" or field_name == "max_rolling_tx_count" or
+                    field_name == "rolling_tx_count_period_seconds" or field_name == "sec_type"):
+                driver.refresh()
+                time.sleep(Delay.DEFAULT.value)
                 continue
 
             setting_dropdown = widget.find_element(By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]')
             time.sleep(Delay.SHORT.value)
             contains_element = setting_dropdown.find_element(By.XPATH, f"//button[@aria-label='{help_txt}']")
-            actions = ActionChains(driver)
-            actions.move_to_element(contains_element).perform()
+            hover_over_on_element(driver=driver,element=contains_element)
 
 
             tooltip_element = driver.find_element(By.CSS_SELECTOR, "div[class^='MuiTooltip-popper']")
             hovered_element_text = tooltip_element.text
             assert help_txt == hovered_element_text
             contains_element.click()
-            # driver.refresh()
+            driver.refresh()
             time.sleep(Delay.DEFAULT.value)
 
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT, flux_property="help")
     print(result)
-    assert not result[0]
+    assert result[0]
 
     # WidgetType: REPEATED_INDEPENDENT
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.REPEATED_INDEPENDENT,
@@ -659,15 +658,15 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
             field_name: str = field_query.field_name
             help_txt: str = field_query.properties['help']
             # click_button_with_name(widget=widget, button_name="Settings")
-            if field_name == "max_rolling_tx_count" or field_name == "rolling_tx_count_period_seconds":
+            if (field_name == "sec_id" or field_name == "max_rolling_tx_count" or
+                    field_name == "rolling_tx_count_period_seconds" or field_name == "sec_type"):
                 continue
 
             setting_dropdown = widget.find_element(By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]')
             time.sleep(Delay.SHORT.value)
             contains_element = setting_dropdown.find_element(By.XPATH, f"//button[@aria-label='{help_txt}']")
-            actions = ActionChains(driver)
+            hover_over_on_element(driver=driver, element=contains_element)
 
-            actions.move_to_element(contains_element).perform()
             tooltip_element = driver.find_element(By.CSS_SELECTOR, "div[class^='MuiTooltip-popper']")
             hovered_element_text = tooltip_element.text
             assert help_txt == hovered_element_text
@@ -705,8 +704,8 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
             xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
             # in strat status resudial notional fld is disabled
-            enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-            if enabled_or_not:
+            is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            if is_enabled:
                 set_table_input_field(widget=widget, xpath=xpath, value=str(value))
             else:
                 continue
@@ -714,26 +713,27 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
         validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name=field_name, layout=Layout.TABLE)
 
     # tree_layout
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        widget = driver.find_element(By.ID, widget_name)
-        scroll_into_view(driver=driver, element=widget)
-        time.sleep(Delay.SHORT.value)
-        click_button_with_name(widget=widget, button_name="Edit")
-        switch_layout(widget=widget, layout=Layout.TREE)
-        if widget_name == "strat_status":
-            show_nested_fld_in_tree_layout(widget=widget)
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
-            display_type: str = field_query.properties['display_type']
-            value = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max, val_min=val_min)
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-                                                   widget_name=widget_name, field_name=field_name)
-            set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(value))
-        # in strat status widget nested sec id fld is not showing any dropdown list for selecting security
-        validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name=field_name, layout=Layout.TREE)
-
+    # for widget_query in result[1]:
+    #     widget_name = widget_query.widget_name
+    #     widget = driver.find_element(By.ID, widget_name)
+    #     scroll_into_view(driver=driver, element=widget)
+    #     time.sleep(Delay.SHORT.value)
+    #     click_button_with_name(widget=widget, button_name="Edit")
+    #     switch_layout(widget=widget, layout=Layout.TREE)
+    #     # if widget_name == "strat_status":
+    #     #     show_nested_fld_in_tree_layout(widget=widget)
+    #     for field_query in widget_query.fields:
+    #         field_name: str = field_query.field_name
+    #         val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
+    #         display_type: str = field_query.properties['display_type']
+    #         value = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max, val_min=val_min)
+    #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+    #                                                widget_name=widget_name, field_name=field_name)
+    #         set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(value))
+    #     # in strat status widget nested sec id fld is not showing any dropdown list for selecting security
+    #     # in strat status widget residual_notional is not working
+    #     validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name=field_name, layout=Layout.TREE)
+    #
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
                                           flux_property="display_type")
     print(result)
@@ -781,7 +781,7 @@ def test_flux_fld_number_format_in_independent_widget(clean_and_set_limits, driv
         scroll_into_view(driver=driver, element=widget)
         time.sleep(Delay.SHORT.value)
         switch_layout(widget=widget, layout=Layout.TREE)
-        time.sleep(2)
+        time.sleep(Delay.SHORT.value)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
             number_format_txt: str = field_query.properties['number_format']
@@ -808,10 +808,10 @@ def test_flux_fld_number_format_in_dependent_widget(clean_and_set_limits, driver
         time.sleep(Delay.SHORT.value)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            number_format_txt: str = field_query.properties['number_format']
+            number_format: str = field_query.properties['number_format']
             xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            validate_flux_fld_number_format_in_widget(widget=widget, xpath=xpath, number_format_txt=number_format_txt,
+            validate_flux_fld_number_format_in_widget(widget=widget, xpath=xpath, number_format_txt=number_format,
                                                       layout=Layout.TABLE)
 
 
@@ -833,7 +833,7 @@ def test_flux_flx_display_zero_in_widget(clean_and_set_limits, driver_type, web_
         switch_layout(widget=widget, layout=Layout.TREE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
+            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
             value: str = "0"
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=value)
@@ -875,8 +875,8 @@ def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, w
             field_name: str = field_query.field_name
             xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            enabled_or_not: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-            assert not enabled_or_not
+            is_enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            assert not is_enabled
 
     # tree_layout
     for widget_query in result[1]:
@@ -920,8 +920,8 @@ def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, w
                 continue
             xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            enabled_or_not: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-            assert not enabled_or_not
+            is_enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            assert not is_enabled
 
     # tree_layout
     for widget_query in result[1]:
@@ -1060,7 +1060,7 @@ def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, w
         time.sleep(Delay.SHORT.value)
         switch_layout(widget=widget, layout=Layout.TREE)
         click_button_with_name(widget=widget, button_name="Edit")
-        # in starat status sec id fld is none but it should be filled
+        # in strat status sec id fld is none, but it should be filled
         if widget_name == "strat_status":
             show_nested_fld_in_tree_layout(widget=widget)
             continue
@@ -1167,41 +1167,38 @@ def test_flux_fld_progress_bar_in_widget(clean_and_set_limits, driver_type, web_
     # can't automate for table layout bcz it does not contains progressbar
     # tree_layout
     # for_val_min
-    # get_val_max: str = ""
-    # xpath: str = ""
-    # field_name: str = ""
-    # for widget_query in result[1]:
-    #     widget_name = widget_query.widget_name
-    #     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
-    #     widget = driver.find_element(By.ID, widget_name)
-    #     edit_btn = strat_collection_widget.find_element(By.NAME, "Edit")
-    #     edit_btn.click()
-    #     driver.execute_script('arguments[0].scrollIntoView(true)', widget)
-    #     time.sleep(Delay.SHORT.value)
-    #     switch_layout(widget=widget, layout=Layout.TREE)
-    #     for field_query in widget_query.fields:
-    #         field_name: str = field_query.field_name
-    #         val_min: str = field_query.properties['val_min']
-    #         val_max = field_query.properties['val_max']
-    #         get_val_max: str = get_str_value(value=val_max, driver=driver, widget_type=WidgetType.DEPENDENT,
-    #                                          layout=Layout.TREE)
-    #
-    #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT,
-    #                                                widget_name=widget_name, field_name=field_name)
-    #         set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=val_min)
-    #     strat_collection_widget.find_element(By.NAME, "Save").click()
-    #     confirm_save(driver=driver)
-    #     progress_level = get_progress_bar_level(widget=widget)
-    #     assert progress_level == "100"
-    #
-    #     # for_val_max
-    #     edit_btn = strat_collection_widget.find_element(By.NAME, "Edit")
-    #     edit_btn.click()
-    #     set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=get_val_max)
-    #     strat_collection_widget.find_element(By.NAME, "Save").click()
-    #     confirm_save(driver=driver)
-    #     progress_level = get_progress_bar_level(widget=widget)
-    #     assert progress_level == "0"
+    get_val_max: str = ""
+    xpath: str = ""
+    field_name: str = ""
+    for widget_query in result[1]:
+        widget_name = widget_query.widget_name
+        strat_collection_widget = driver.find_element(By.ID, "strat_collection")
+        widget = driver.find_element(By.ID, widget_name)
+        click_button_with_name(widget=strat_collection_widget, button_name="Edit")
+        scroll_into_view(driver=driver, element=widget)
+        time.sleep(Delay.SHORT.value)
+        switch_layout(widget=widget, layout=Layout.TREE)
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
+            get_val_max: str = get_str_value(value=val_max, driver=driver, widget_type=WidgetType.DEPENDENT,
+                                             layout=Layout.TREE)
+
+            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT,
+                                                   widget_name=widget_name, field_name=field_name)
+            set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=val_min)
+        click_button_with_name(widget=strat_collection_widget, button_name="Save")
+        confirm_save(driver=driver)
+        progress_level = get_progress_bar_level(widget=widget)
+        assert progress_level == "100"
+
+        # for_val_max
+        click_button_with_name(widget=strat_collection_widget, button_name="Edit")
+        set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=get_val_max)
+        click_button_with_name(widget=strat_collection_widget, button_name="Save")
+        confirm_save(driver=driver)
+        progress_level = get_progress_bar_level(widget=widget)
+        assert progress_level == "0"
 
 
 class TestMultiTab:
@@ -1227,8 +1224,8 @@ class TestMultiTab:
 
         xpath: str = "max_basis_points"
         value: str = "750"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         # open_1st_tab
@@ -1238,20 +1235,20 @@ class TestMultiTab:
         click_button_with_name(widget=widget, button_name="Edit")
         xpath: str = "max_basis_points"
         value: str = "400"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_px_deviation"
         value: str = "1"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "min_order_notional"
         value: str = "10000"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
         click_button_with_name(widget=widget, button_name="Save")
         confirm_save(driver=driver)
@@ -1273,8 +1270,8 @@ class TestMultiTab:
 
         xpath: str = "max_basis_points"
         value: str = "75"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         # open_2nd_tab
@@ -1284,20 +1281,20 @@ class TestMultiTab:
 
         xpath: str = "max_basis_points"
         value: str = "40"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_px_deviation"
         value: str = "1"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "min_order_notional"
         value: str = "1200"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
         click_button_with_name(widget=widget, button_name="Save")
         confirm_save(driver=driver)
@@ -1324,8 +1321,8 @@ class TestMultiTab:
 
         xpath: str = "max_open_orders_per_side"
         value: str = "4"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         # open_1st_tab
@@ -1339,32 +1336,32 @@ class TestMultiTab:
 
         xpath: str = "max_open_orders_per_side"
         value: str = "3"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_cb_notional"
         value: str = "555"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_open_cb_notional"
         value: str = "2"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "cancel_rate.max_cancel_rate"
         value: str = "10"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "market_trade_volume_participation.max_participation_rate"
         value: str = "20"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         click_button_with_name(widget=widget, button_name="Save")
@@ -1388,8 +1385,8 @@ class TestMultiTab:
         # widget.find_element(By.NAME, "Edit").click()
         xpath: str = "max_open_orders_per_side"
         value: str = "2"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         self.switch_tab(driver=driver, switch_tab_no=1)
@@ -1398,14 +1395,14 @@ class TestMultiTab:
 
         xpath: str = "max_open_orders_per_side"
         value: str = "1"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_cb_notional"
         value: str = "100"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_table_input_field(widget=widget, xpath=xpath, value=value)
 
         xpath: str = "max_open_cb_notional"
@@ -1471,8 +1468,8 @@ class TestMultiTab:
 
         xpath: str = "eligible_brokers[0].sec_positions[0].security.sec_id"
         value: str = "EQT_Sec_1"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_autocomplete_field(widget=widget, xpath=xpath, name="sec_id", search_type=SearchType.NAME, value=value)
             # set_table_input_field(widget=widget, xpath=xpath, value=value)
 
@@ -1490,8 +1487,8 @@ class TestMultiTab:
         xpath: str = "eligible_brokers[0].broker"
         value: str = "AAPL"
         name: str = "broker"
-        enabled_or_not = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-        if enabled_or_not:
+        is_enabled = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        if is_enabled:
             set_tree_input_field(widget=widget, xpath=xpath, name=name, value=value)
 
         click_button_with_name(widget=widget, button_name="Save")

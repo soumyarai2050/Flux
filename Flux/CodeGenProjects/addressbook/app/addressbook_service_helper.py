@@ -198,7 +198,7 @@ async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tupl
 async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Side) -> PairStrat | None:
     match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
     if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
-        logging.error(f"error: No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+        logging.info(f"No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
         return
     else:
         pair_strat: PairStrat | None = None

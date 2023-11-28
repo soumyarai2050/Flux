@@ -505,11 +505,9 @@ def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits
                                               market_depth_basemodel_list, expected_order_limits_,
                                               expected_portfolio_limits_, max_loop_count_per_side,
                                               buy_sell_symbol_list, residual_wait_sec):
-    symbol_pair_counter = 0
-    max_loop_count_per_side = int(len(buy_sell_symbol_list)/2)
-    for buy_symbol, sell_symbol in buy_sell_symbol_list[:max_loop_count_per_side]:
-        symbol_pair_counter += 1
-        handle_test_buy_sell_order(buy_symbol, sell_symbol, max_loop_count_per_side, symbol_pair_counter,
+    buy_sell_symbol_list = buy_sell_symbol_list[:int(len(buy_sell_symbol_list)/2)]
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        handle_test_buy_sell_order(buy_symbol, sell_symbol, max_loop_count_per_side,
                                    residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
                                    sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
                                    expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
@@ -532,10 +530,42 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             market_depth_basemodel_list, expected_order_limits_,
                                             expected_portfolio_limits_, max_loop_count_per_side,
                                             buy_sell_symbol_list, residual_wait_sec):
-    symbol_pair_counter = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_order, buy_symbol, sell_symbol, max_loop_count_per_side,
-                                   symbol_pair_counter, residual_wait_sec, copy.deepcopy(buy_order_),
+                                   residual_wait_sec, copy.deepcopy(buy_order_),
+                                   copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
+                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
+                                   copy.deepcopy(expected_sell_order_snapshot_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), copy.deepcopy(pair_strat_),
+                                   copy.deepcopy(expected_strat_limits_),
+                                   copy.deepcopy(expected_start_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_portfolio_status_), copy.deepcopy(top_of_book_list_),
+                                   copy.deepcopy(last_trade_fixture_list), copy.deepcopy(symbol_overview_obj_list),
+                                   copy.deepcopy(market_depth_basemodel_list), False)
+                   for buy_symbol, sell_symbol in buy_sell_symbol_list]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+
+    expected_portfolio_status = copy.deepcopy(expected_portfolio_status_)
+    total_symbol_pairs = len(buy_sell_symbol_list)
+    verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
+
+
+def test_sell_buy_order_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
+                                            buy_order_, sell_order_, buy_fill_journal_,
+                                            sell_fill_journal_, expected_buy_order_snapshot_,
+                                            expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
+                                            pair_strat_, expected_strat_limits_, expected_start_status_,
+                                            expected_strat_brief_, expected_portfolio_status_, top_of_book_list_,
+                                            last_trade_fixture_list, symbol_overview_obj_list,
+                                            market_depth_basemodel_list, expected_order_limits_,
+                                            expected_portfolio_limits_, max_loop_count_per_side,
+                                            buy_sell_symbol_list, residual_wait_sec):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
+        results = [executor.submit(handle_test_sell_buy_order, buy_symbol, sell_symbol, max_loop_count_per_side,
+                                   residual_wait_sec, copy.deepcopy(buy_order_),
                                    copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
                                    copy.deepcopy(expected_sell_order_snapshot_),
@@ -570,11 +600,9 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean
                                                              market_depth_basemodel_list, expected_order_limits_,
                                                              expected_portfolio_limits_, max_loop_count_per_side,
                                                              buy_sell_symbol_list, residual_wait_sec):
-    symbol_pair_counter = 0
-    max_loop_count_per_side = int(len(buy_sell_symbol_list)/2)
-    for buy_symbol, sell_symbol in buy_sell_symbol_list[:max_loop_count_per_side]:
-        symbol_pair_counter += 1
-        handle_test_buy_sell_order(buy_symbol, sell_symbol, max_loop_count_per_side, symbol_pair_counter,
+    buy_sell_symbol_list = buy_sell_symbol_list[:int(len(buy_sell_symbol_list)/2)]
+    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+        handle_test_buy_sell_order(buy_symbol, sell_symbol, max_loop_count_per_side,
                                    residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
                                    sell_fill_journal_,
                                    expected_buy_order_snapshot_, expected_sell_order_snapshot_,
@@ -601,10 +629,9 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_a
                                                            market_depth_basemodel_list, expected_order_limits_,
                                                            expected_portfolio_limits_, max_loop_count_per_side,
                                                            buy_sell_symbol_list, residual_wait_sec):
-    symbol_pair_counter = 1
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_order, buy_symbol, sell_symbol, max_loop_count_per_side,
-                                   symbol_pair_counter, residual_wait_sec, copy.deepcopy(buy_order_),
+                                   residual_wait_sec, copy.deepcopy(buy_order_),
                                    copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
                                    copy.deepcopy(expected_sell_order_snapshot_),
@@ -622,6 +649,33 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_a
 
     expected_portfolio_status = copy.deepcopy(expected_portfolio_status_)
     total_symbol_pairs = len(buy_sell_symbol_list)
+    verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
+
+
+def test_buy_sell_pair_order(
+        static_data_, clean_and_set_limits, pair_securities_with_sides_,
+        buy_order_, sell_order_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_order_snapshot_,
+        expected_sell_order_snapshot_, expected_symbol_side_snapshot_,
+        pair_strat_, expected_strat_limits_, expected_start_status_,
+        expected_strat_brief_, expected_portfolio_status_, top_of_book_list_,
+        last_trade_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list, expected_order_limits_,
+        expected_portfolio_limits_, max_loop_count_per_side,
+        buy_sell_symbol_list, residual_wait_sec):
+
+    buy_symbol, sell_symbol = buy_sell_symbol_list[0]
+    handle_test_buy_sell_pair_order(
+        buy_symbol, sell_symbol, max_loop_count_per_side,
+        residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
+        sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
+        expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
+        expected_start_status_, expected_strat_brief_, expected_portfolio_status_,
+        top_of_book_list_, last_trade_fixture_list, symbol_overview_obj_list,
+        market_depth_basemodel_list)
+
+    expected_portfolio_status = copy.deepcopy(expected_portfolio_status_)
+    total_symbol_pairs = 1
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
@@ -643,6 +697,15 @@ def test_validate_kill_switch_systematic(static_data_, clean_and_set_limits, buy
             jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
         assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
                                                      "expected to be True"
+
+        time.sleep(5)
+        check_str = "Triggering portfolio_status Kill_SWITCH"
+        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+        for alert in portfolio_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                break
+        else:
+            assert False, f"Can't find portfolio alert saying '{check_str}'"
 
         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
         # internally checking buy order
@@ -676,6 +739,15 @@ def test_validate_kill_switch_non_systematic(static_data_, clean_and_set_limits,
             jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
         assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
                                                      "expected to be True"
+
+        time.sleep(5)
+        check_str = "Triggering portfolio_status Kill_SWITCH"
+        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+        for alert in portfolio_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                break
+        else:
+            assert False, f"Can't find portfolio alert saying '{check_str}'"
 
         # placing buy order
         place_new_order(buy_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
@@ -2375,7 +2447,7 @@ def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_
                                                         last_trade_fixture_list, market_depth_basemodel_list,
                                                         top_of_book_list_):
     """
-    This test case contains check of update aggregate feature available in beanie port, put and patch http calls.
+    This test case contains check of update aggregate feature available in beanie part, put and patch http calls.
     Note: since post, put and patch all uses same method call for this feature and currently only
           underlying_create_market_depth_http contains this call, testing it to assume this feature is working
     """
@@ -2426,6 +2498,10 @@ def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_
             assert expected_cum_avg_px == created_market_depth_obj.cumulative_avg_px, \
                 f"Cumulative avg px Mismatched: expected {expected_cum_avg_px}, " \
                 f"received {created_market_depth_obj.cumulative_avg_px}"
+
+        pair_strat = PairStratBaseModel(_id=active_pair_strat.id, strat_state=StratState.StratState_DONE)
+        updated_pair_strat = strat_manager_service_native_web_client.patch_pair_strat_client(
+            jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
 
 
 # @@@@ deprecated test: No use case for projection in strat_executor or addressbook
@@ -2802,7 +2878,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, buy_sel
             strat_brief_after_fill = strat_brief_list[0]
 
             if symbol == buy_symbol:
-                update_expected_strat_brief_for_buy(1, order_snapshot_after_fill,
+                update_expected_strat_brief_for_buy(1, 0, order_snapshot_after_fill,
                                                     symbol_side_snapshot_after_fill,
                                                     expected_strat_limits_, expected_strat_brief_,
                                                     order_snapshot_after_fill.last_update_date_time)
@@ -3264,6 +3340,38 @@ def test_unload_reload_strat_from_collection(
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+def test_sequenced_active_strats_with_same_symbol_side_block(
+        static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    created_pair_strat, executor_http_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    # First created strat is already active, checking if next strat, if tries to get activated with same symbol-side
+    # gets exception
+
+    try:
+        created_pair_strat, executor_http_client = (
+            create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_start_status_, symbol_overview_obj_list,
+                                               last_trade_fixture_list,
+                                               market_depth_basemodel_list, top_of_book_list_))
+    except Exception as e:
+        err_str_ = ("Ongoing strat already exists with same symbol-side pair legs - can't activate this "
+                    "strat till other strat is ongoing")
+        assert err_str_ in str(e), \
+            (f"Strat tring to be activated with same symbol-side must raise exception with description: "
+             f"{err_str_} but can't find this description, exception: {e}")
+    else:
+        assert False, ("Strat with same symbol-side must raise exception while another strat is already ongoing, "
+                       "but got activated likely because of some bug")
+
+
 def test_sequenced_fully_consume_same_symbol_strats(
         static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
@@ -3286,6 +3394,40 @@ def test_sequenced_fully_consume_same_symbol_strats(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
         residual_wait_sec, Side.BUY)
+
+
+def test_sequenced_fully_consume_opp_symbol_strats(
+        static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
+
+    # updating order_limits
+    expected_order_limits_.min_order_notional = 15000
+    expected_order_limits_.id = 1
+    strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+
+    expected_strat_limits_.max_cb_notional = 18000
+    strat_done_after_exhausted_consumable_notional(
+        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        residual_wait_sec, Side.BUY)
+
+    try:
+        strat_done_after_exhausted_consumable_notional(
+            sell_symbol, buy_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+            symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+            residual_wait_sec, Side.BUY)
+    except Exception as e:
+        err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
+                    "can't activate this strat today")
+        assert err_str_ in str(e), \
+            (f"Strat created with opposite symbol-side must raise exception with description: {err_str_} but "
+             f"can't find this description, exception: {e}")
+    else:
+        assert False, ("Strat with opposite symbol-side must raise exception while activating in same day of "
+                       "other strat activated, but got activated likely because of some bug")
 
 
 def test_sequenced_fully_consume_diff_symbol_strats(

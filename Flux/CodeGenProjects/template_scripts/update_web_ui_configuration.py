@@ -13,31 +13,47 @@ class UpdateWebUIConfiguration:
     def __init__(self):
         self.project_dir: PurePath = PurePath(__file__).parent.parent
         self.root_dir: PurePath = self.project_dir.parent
+        self.proxy_project_dir: PurePath = self.root_dir / "ws_mux_demux_proxy"
         self.project_name: str = str(self.project_dir).split("/")[-1]
         self.project_config_file_path: PurePath = self.project_dir / "data" / "config.yaml"
+        self.proxy_config_file_path: PurePath = self.proxy_project_dir / "data" / "config.yaml"
         self.web_ui_path: PurePath = self.project_dir / "web-ui"
         self.project_constants_path: PurePath = self.web_ui_path / "src" / "constants.js"
+        self.project_package_json_path: PurePath = self.web_ui_path / "package.json"
         self.project_schema_path: PurePath = self.web_ui_path / "public" / "schema.json"
 
         self.project_config_yaml_dict: Dict = (YAMLConfigurationManager.load_yaml_configurations
                                                (str(self.project_config_file_path)))
+        self.proxy_config_yaml_dict: Dict = (YAMLConfigurationManager.load_yaml_configurations
+                                             (str(self.proxy_config_file_path)))
 
         self.server_host: str = self.project_config_yaml_dict.get("server_host")
+        self.proxy_server_host: str = self.proxy_config_yaml_dict.get("server_host")
+        self.proxy_server_port: str = self.proxy_config_yaml_dict.get("server_port")
+        self.is_proxy_server: str = str(self.project_config_yaml_dict.get("is_proxy_server")).lower()
         self.main_server_beanie_port: str = self.project_config_yaml_dict.get("main_server_beanie_port")
         self.main_server_cache_port: str = self.project_config_yaml_dict.get("main_server_cache_port")
         self.ui_port: str = self.project_config_yaml_dict.get("ui_port")
 
         self._update_constants_js()
         self._update_schema_json()
+        self._update_package_json()
 
     def _update_constants_js(self):
         with open(self.project_constants_path, 'r') as f:
             content = f.read()
 
+        content = re.sub(r'export const PROXY_SERVER = [^;]+;',
+                         f'export const PROXY_SERVER = {self.is_proxy_server};', content)
+
+        content = re.sub(r'export const PROXY_SERVER_URL = [^;]+;',
+                         f"export const PROXY_SERVER_URL = "
+                         f"'http://{self.proxy_server_host}:{self.proxy_server_port}/ui_proxy';", content)
+
         content = re.sub(
             r'export const API_ROOT_URL = [^;]+;',
-            f'export const API_ROOT_URL = \'http://{self.server_host}:{self.main_server_beanie_port}/'
-            f'{self.project_name}\';', content)
+            f'export const API_ROOT_URL = PROXY_SERVER ? PROXY_SERVER_URL : '
+            f'\'http://{self.server_host}:{self.main_server_beanie_port}/{self.project_name}\';', content)
 
         content = re.sub(
             r'export const API_ROOT_CACHE_URL = [^;]+;',
@@ -47,6 +63,7 @@ class UpdateWebUIConfiguration:
         content = re.sub(
             r'export const API_PUBLIC_URL = [^;]+;',
             f'export const API_PUBLIC_URL = \'http://{self.server_host}:{self.ui_port}/\';', content)
+
 
         with open(self.project_constants_path, 'w') as f:
             f.write(content)
@@ -74,11 +91,24 @@ class UpdateWebUIConfiguration:
 
     def __get_host_and_port_from_specific_project_config(self, project_name: str) -> Tuple[str, int]:
         project_dir: PurePath = self.root_dir / project_name
-        config_path: PurePath = project_dir / "Data" / "config.yaml"
+        config_path: PurePath = project_dir / "data" / "config.yaml"
         config_yaml_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_path))
         host: str = config_yaml_dict.get("server_host")
         beanie_port: int = int(config_yaml_dict.get("main_server_beanie_port"))
         return host, beanie_port
+
+    def _update_package_json(self):
+        with open(str(self.project_package_json_path), 'r') as file:
+            package_json = json.load(file)
+
+        # Update the "start" script with the new port
+        package_json['scripts']['start'] = f'cross-env PORT={self.ui_port} react-scripts start'
+
+        # Write the updated package.json back to the file
+        with open(str(self.project_package_json_path), 'w', encoding='utf-8') as file:
+            json.dump(package_json, file, indent=2)
+
+        print(f'"start" script updated with port {self.ui_port}')
 
 
 if __name__ == "__main__":

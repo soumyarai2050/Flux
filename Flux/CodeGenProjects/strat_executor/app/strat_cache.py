@@ -116,7 +116,11 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         else:
             # Providing the second argument None prevents the KeyError exception
             self._order_id_to_open_order_snapshot_dict.pop(order_snapshot.order_brief.order_id, None)
-        pass  # ignore - helps with debug
+        return _order_snapshots_update_date_time    # ignore - helps with debug
+
+    def get_open_order_snapshots(self) -> List[OrderSnapshot]:
+        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
+        return list(self._order_id_to_open_order_snapshot_dict.values())
 
     def get_open_order_count_from_cache(self) -> int:
         """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""

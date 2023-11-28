@@ -157,6 +157,8 @@ class StratExecutorPlugin(BaseProtoPlugin):
             content_str += f"\t\t\t\t{message_name_snake_cased}, _ = {message_name_snake_cased}_tuple\n"
         content_str += f"\t\t\t\tif {message_name_snake_cased}.id == {message_name_snake_cased}_.id:\n"
         content_str += f"\t\t\t\t\tself.trading_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
+        content_str += "\t\t\t\t\tkwargs = {'" + f"{message_name_snake_cased}_" + "': " + f"{message_name_snake_cased}_" + "}\n"
+        content_str += f"\t\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
         content_str += f"\t\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
         content_str += f"\t\t\t\t\t\tself.strat_cache.notify_all()\n"
         content_str += '\t\t\t\t\tlogging.debug(f"updated ' + f'{message_name_snake_cased}' + \

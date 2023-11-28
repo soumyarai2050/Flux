@@ -48,6 +48,9 @@ def test_min_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
 
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
+
         # Negative check
         # placing new non-systematic new_order
         px = 1
@@ -74,7 +77,7 @@ def test_max_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_
                                    expected_start_status_, symbol_overview_obj_list,
                                    last_trade_fixture_list, market_depth_basemodel_list,
                                    top_of_book_list_, buy_order_, sell_order_,
-                                   max_loop_count_per_side):
+                                   max_loop_count_per_side, residual_wait_sec):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -100,6 +103,9 @@ def test_max_order_notional_breach(static_data_, clean_and_set_limits, buy_sell_
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         # placing new non-systematic new_order
@@ -127,7 +133,7 @@ def test_max_order_qty_breach(static_data_, clean_and_set_limits, buy_sell_symbo
                               expected_start_status_, symbol_overview_obj_list,
                               last_trade_fixture_list, market_depth_basemodel_list,
                               top_of_book_list_, buy_order_, sell_order_,
-                              max_loop_count_per_side):
+                              max_loop_count_per_side, residual_wait_sec):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -154,6 +160,9 @@ def test_max_order_qty_breach(static_data_, clean_and_set_limits, buy_sell_symbo
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         # placing new non-systematic new_order
@@ -180,7 +189,7 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
                                             expected_start_status_, symbol_overview_obj_list,
                                             last_trade_fixture_list, market_depth_basemodel_list,
                                             top_of_book_list_, buy_order_, sell_order_,
-                                            max_loop_count_per_side):
+                                            max_loop_count_per_side, residual_wait_sec):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -207,6 +216,9 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         tob_list = executor_http_client.get_all_top_of_book_client()
@@ -263,7 +275,7 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
                                                    expected_start_status_, symbol_overview_obj_list,
                                                    last_trade_fixture_list, market_depth_basemodel_list,
                                                    top_of_book_list_, buy_order_, sell_order_,
-                                                   max_loop_count_per_side):
+                                                   max_loop_count_per_side, residual_wait_sec):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -289,6 +301,9 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         # placing new non-systematic new_order
@@ -526,7 +541,7 @@ def test_breach_threshold_px_for_max_basis_points(static_data_, clean_and_set_li
                                                   expected_start_status_, symbol_overview_obj_list,
                                                   last_trade_fixture_list, market_depth_basemodel_list,
                                                   top_of_book_list_, buy_order_, sell_order_,
-                                                  max_loop_count_per_side):
+                                                  max_loop_count_per_side, residual_wait_sec):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -554,6 +569,9 @@ def test_breach_threshold_px_for_max_basis_points(static_data_, clean_and_set_li
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         tob_list = executor_http_client.get_all_top_of_book_client()
@@ -686,7 +704,7 @@ def test_breach_threshold_px_for_max_px_by_deviation(static_data_, clean_and_set
                                                      expected_start_status_, symbol_overview_obj_list,
                                                      last_trade_fixture_list, market_depth_basemodel_list,
                                                      top_of_book_list_, buy_order_, sell_order_,
-                                                     max_loop_count_per_side):
+                                                     max_loop_count_per_side, residual_wait_sec):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -714,6 +732,9 @@ def test_breach_threshold_px_for_max_px_by_deviation(static_data_, clean_and_set
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         tob_list = executor_http_client.get_all_top_of_book_client()
@@ -884,7 +905,7 @@ def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_
                                                     expected_start_status_, symbol_overview_obj_list,
                                                     last_trade_fixture_list, market_depth_basemodel_list,
                                                     top_of_book_list_, buy_order_, sell_order_,
-                                                    max_loop_count_per_side):
+                                                    max_loop_count_per_side, residual_wait_sec):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -912,6 +933,9 @@ def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         strat_brief_list = executor_http_client.get_all_strat_brief_client()
@@ -1035,7 +1059,7 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
                                                          expected_start_status_, symbol_overview_obj_list,
                                                          last_trade_fixture_list, market_depth_basemodel_list,
                                                          top_of_book_list_, buy_order_, sell_order_,
-                                                         max_loop_count_per_side):
+                                                         max_loop_count_per_side, residual_wait_sec):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -1063,6 +1087,9 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
 
@@ -1156,7 +1183,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
                                                           expected_start_status_, symbol_overview_obj_list,
                                                           last_trade_fixture_list, market_depth_basemodel_list,
                                                           top_of_book_list_, buy_order_, sell_order_,
-                                                          max_loop_count_per_side):
+                                                          max_loop_count_per_side, residual_wait_sec):
 
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
@@ -1184,6 +1211,9 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative Check
         # placing new non-systematic new_order
@@ -1548,7 +1578,7 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
                                                       expected_start_status_, symbol_overview_obj_list,
                                                       last_trade_fixture_list, market_depth_basemodel_list,
                                                       top_of_book_list_, buy_order_, sell_order_,
-                                                      max_loop_count_per_side):
+                                                      max_loop_count_per_side, residual_wait_sec):
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -1575,6 +1605,9 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client)
+
+        if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
+            time.sleep(residual_wait_sec)
 
         # Negative check
         strat_brief_list = executor_http_client.get_all_strat_brief_client()

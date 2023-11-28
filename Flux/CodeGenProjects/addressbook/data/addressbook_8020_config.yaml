@@ -1,0 +1,97 @@
+beanie_port: '8020'
+cache_port: '8010'
+log_mongo_uri: True
+log_level: "debug"
+custom_logger_lvls:
+  - TIMING: 15
+  - JUNK: 5
+
+# below 2 configs are used to check types of override files to be initialized by fastapi launch script
+# supported values: "native" or "bare"
+beanie_override_type: "native"
+cache_override_type: "bare"
+
+symbol_configs:
+  ^CB_Sec_[1,3-5]$:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1
+
+  ^CB_Sec_2$:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 2
+
+  ^EQT_Sec_1$:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 2
+
+  ^EQT_Sec_[2-5]$:
+    simulate_reverse_path: False
+    fill_percent: 100
+    total_fill_count: 1
+    ack_percent: 100
+
+    # to simulate rej functionality
+    simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
+    simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
+
+    # to simulate cxl-rej functionality
+    simulate_cxl_rej_orders: False
+
+    # to simulate unsolicited cxl functionality
+    simulate_ack_unsolicited_cxl_orders: False
+    simulate_new_unsolicited_cxl_orders: False
+
+    # used in continuous checks, like, rej and unsol cxl, continuous normal orders following continuous special orders
+    continues_order_count: 3
+    continues_special_order_count: 1

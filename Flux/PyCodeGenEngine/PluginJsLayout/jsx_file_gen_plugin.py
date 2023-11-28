@@ -1992,8 +1992,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "        let newItem = getNewItem(dependentWidgetCollectionsDict['" \
                           f"{abbreviated_dependent_msg_snake_cased}'], abbreviated);\n"
             output_str += f"        let modifiedObj = cloneDeep(modified{message_name});\n"
-            output_str += "        _.get(modifiedObj, loadListFieldAttrs.key).push(newItem);\n"
-            output_str += f"        dispatch(setModified{message_name}(modifiedObj));\n"
+            output_str += "        if (!_.get(modifiedObj, loadListFieldAttrs.key).includes(newItem)) {\n"
+            output_str += "            _.get(modifiedObj, loadListFieldAttrs.key).push(newItem);\n"
+            output_str += f"            dispatch(setModified{message_name}(modifiedObj));\n"
+            output_str += "        }\n"
             output_str += "    }\n\n"
             output_str += "    const onConfirmSave = () => {\n"
             output_str += f"        let modifiedObj = clearxpath(cloneDeep(modified{dependent_message}));\n"

@@ -86,6 +86,7 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
         if portfolio_status_ is not None:
             # handle kill switch here (in portfolio status handler directly)
             if portfolio_status_.kill_switch:
+                logging.critical("Triggering portfolio_status Kill_SWITCH")
                 trading_link.trigger_kill_switch()
         else:
             err_str_ = "Received portfolio_status object from caller as None"

@@ -283,8 +283,10 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "            let newObjectKey = abbreviated.split('-').map(xpath => _.get(newObject, " \
                               "xpath.substring(xpath.indexOf('.') + 1)));\n"
                 output_str += "            newObjectKey = newObjectKey.join('-');\n"
-                output_str += "            _.get(updatedData, loadedKeyName).push(newObjectKey);\n"
-                output_str += f"            dispatch(update{dependent_message_name}("+"updatedData));\n"
+                output_str += "            if (!_.get(updatedData, loadedKeyName)) {\n"
+                output_str += "                _.get(updatedData, loadedKeyName).push(newObjectKey);\n"
+                output_str += f"                dispatch(update{dependent_message_name}("+"updatedData));\n"
+                output_str += "            }\n"
                 output_str += "            return res.data;\n"
                 output_str += "        })\n"
                 output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"

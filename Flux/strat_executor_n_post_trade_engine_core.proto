@@ -106,11 +106,6 @@ message OrderSnapshot{
     depends_on_other_model_for_dynamic_url: true
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "trigger_residual_check",
-      QueryParams: "order_status_list",
-      QueryParamsDataType: "List[str]"
-  };
-  option (FluxMsgJsonQuery) = {
       QueryName: "filtered_notify_order_snapshot_update",
       QueryParams: "symbols",
       QueryParamsDataType: "List[str]",

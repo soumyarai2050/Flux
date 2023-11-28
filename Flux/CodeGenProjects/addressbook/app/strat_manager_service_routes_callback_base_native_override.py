@@ -1,5 +1,6 @@
 # python imports
 import copy
+import glob
 import logging
 import subprocess
 import stat
@@ -45,6 +46,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     underlying_read_pair_strat_by_id_http: Callable[..., Any] | None = None
     underlying_partial_update_all_pair_strat_http: Callable[..., Any] | None = None
     underlying_read_strat_collection_by_id_http: Callable[..., Any] | None = None
+    underlying_get_pair_strat_from_symbol_side_query_http: Callable[..., Any] | None = None
 
     Fx_SO_FilePath = CURRENT_PROJECT_SCRIPTS_DIR / f"fx_so.sh"
 
@@ -59,7 +61,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             underlying_create_strat_collection_http, underlying_update_strat_collection_http,
             underlying_partial_update_pair_strat_http, underlying_update_pair_strat_to_non_running_state_query_http,
             underlying_read_pair_strat_by_id_http, underlying_partial_update_all_pair_strat_http,
-            underlying_read_strat_collection_by_id_http)
+            underlying_read_strat_collection_by_id_http, underlying_get_pair_strat_from_symbol_side_query_http)
         cls.underlying_read_portfolio_status_http = underlying_read_portfolio_status_http
         cls.underlying_create_portfolio_status_http = underlying_create_portfolio_status_http
         cls.underlying_read_order_limits_http = underlying_read_order_limits_http
@@ -78,6 +80,8 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         cls.underlying_read_pair_strat_by_id_http = underlying_read_pair_strat_by_id_http
         cls.underlying_partial_update_all_pair_strat_http = underlying_partial_update_all_pair_strat_http
         cls.underlying_read_strat_collection_by_id_http = underlying_read_strat_collection_by_id_http
+        cls.underlying_get_pair_strat_from_symbol_side_query_http = (
+            underlying_get_pair_strat_from_symbol_side_query_http)
 
     def __init__(self):
         self.asyncio_loop = None
@@ -287,8 +291,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             future.result()
         except Exception as e:
             logging.exception(f"start executor server failed with exception: {e}")
-        else:
-            logging.debug("executor server started")
 
     async def read_all_ui_layout_pre(self):
         # Setting asyncio_loop in ui_layout_pre since it called to check current service up
@@ -466,11 +468,68 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 err_str_: str = "Unexpected: Found Multiple StratCollections"
                 logging.error(err_str_)
 
-    def _apply_checks_n_log_error(self) -> bool:
+    @staticmethod
+    async def _apply_checks_n_log_error(pair_strat: PairStrat):
         """
         implement any strat management checks here (create / update strats)
         """
-        return True
+        # First Checking if any ongoing strat exists with same symbol_side pairs in same legs of param pair_strat,
+        # that means if one strat is ongoing with s1-sd1 and s2-sd2 symbol-side pair legs then param pair_strat
+        # must not have same symbol-side pair legs else HTTP exception is raised
+        ongoing_pair_strats: List[PairStrat] = \
+            await (StratManagerServiceRoutesCallbackBaseNativeOverride.
+                   underlying_get_pair_strat_from_symbol_side_query_http(
+                    pair_strat.pair_strat_params.strat_leg1.sec.sec_id, pair_strat.pair_strat_params.strat_leg1.side))
+
+        leg1_symbol, leg1_side = (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
+                                  pair_strat.pair_strat_params.strat_leg1.side)
+        leg2_symbol, leg2_side = (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
+                                  pair_strat.pair_strat_params.strat_leg2.side)
+        if ongoing_pair_strats:
+            # raising exception only if ongoing pair_strat's leg1's symbol-side are same as
+            # param pair_strat's leg1's symbol-side and same for leg2
+            ongoing_pair_strat = ongoing_pair_strats[0]
+            if (((leg1_symbol == ongoing_pair_strat.pair_strat_params.strat_leg1.sec.sec_id) and
+                 (leg2_symbol == ongoing_pair_strat.pair_strat_params.strat_leg2.sec.sec_id)) and
+                    (leg1_side == ongoing_pair_strat.pair_strat_params.strat_leg1.side) and
+                    (leg2_side == ongoing_pair_strat.pair_strat_params.strat_leg2.side)):
+                err_str_ = ("Ongoing strat already exists with same symbol-side pair legs - can't activate this "
+                            f"strat till other strat is ongoing;;; ongoing_pair_strat: {ongoing_pair_strat}")
+                logging.error(err_str_)
+                raise HTTPException(status_code=400, detail=err_str_)
+
+        # Checking if any strat exists with opp symbol and side of param pair_strat that activated today,
+        # for instance if s1-sd1 and s2-sd2 are symbol-side pairs in param pair_strat's legs then checking there must
+        # not be any strat activated today with s1-sd2 and s2-sd1 symbol-side pair legs, if it is found then this
+        # strat can't be activated
+
+        first_matched_strat_lock_file_path_list: List[str] = (
+            glob.glob(str(CURRENT_PROJECT_DATA_DIR /
+                          f"{leg1_symbol}_{leg2_side}_*_{DateTime.date(DateTime.utcnow())}.json.lock")))
+
+        sec_matched_strat_lock_file_path_list: List[str] = (
+            glob.glob(str(CURRENT_PROJECT_DATA_DIR /
+                          f"{leg2_symbol}_{leg1_side}_*_{DateTime.date(DateTime.utcnow())}.json.lock")))
+
+        # checking both legs - If first_matched_strat_lock_file_path_list and sec_matched_strat_lock_file_path_list
+        # have file names having same pair_strat_id with today's date along with required symbol-side pair
+        for matched_strat_file_path in first_matched_strat_lock_file_path_list:
+            suffix_pattern = matched_strat_file_path[(matched_strat_file_path.index(leg2_side) + len(leg2_side)):]
+            for sec_matched_strat_lock_file_path in sec_matched_strat_lock_file_path_list:
+                if sec_matched_strat_lock_file_path.endswith(suffix_pattern):
+                    err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides"
+                                " - can't activate this strat today")
+                    logging.error(err_str_)
+                    raise HTTPException(status_code=400, detail=err_str_)
+
+    @staticmethod
+    def get_lock_file_names_from_pair_strat(pair_strat: PairStrat) -> Tuple[PurePath, PurePath]:
+        return ((CURRENT_PROJECT_DATA_DIR / f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}_"
+                                            f"{pair_strat.pair_strat_params.strat_leg1.side}_{pair_strat.id}_"
+                                            f"{DateTime.date(DateTime.utcnow())}.json.lock"),
+                (CURRENT_PROJECT_DATA_DIR / f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}_"
+                                            f"{pair_strat.pair_strat_params.strat_leg2.side}_{pair_strat.id}_"
+                                            f"{DateTime.date(DateTime.utcnow())}.json.lock"))
 
     async def _update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat,
                                      updated_pair_strat_obj: PairStrat) -> bool | None:
@@ -480,24 +539,16 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         check_passed = True
         if stored_pair_strat_obj.strat_state != StratState.StratState_ACTIVE and \
                 updated_pair_strat_obj.strat_state == StratState.StratState_ACTIVE:
-            check_passed = self._apply_checks_n_log_error()
-            if not check_passed:
-                # some check is violated, move strat to error
-                updated_pair_strat_obj.strat_state = StratState.StratState_ERROR
-            else:
-                # create strat lock file only if moving the strat state from StratState_READY to StratState_ACTIVE
-                if stored_pair_strat_obj.strat_state == StratState.StratState_READY:
-                    for symbol, side in [(updated_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id,
-                                          updated_pair_strat_obj.pair_strat_params.strat_leg1.side),
-                                         (updated_pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id,
-                                          updated_pair_strat_obj.pair_strat_params.strat_leg2.side)]:
-                        strat_lock_file_name: str = f"{symbol}_{side}_{updated_pair_strat_obj.id}_" \
-                                                    f"{DateTime.date(DateTime.utcnow())}.json.lock"
-                        lock_file_path = CURRENT_PROJECT_DATA_DIR / strat_lock_file_name
-                        with open(lock_file_path, "w") as fl:
-                            pass
-                # else not required
-            # else not required: lock files are generated only if we activate a new strat
+            await self._apply_checks_n_log_error(stored_pair_strat_obj)  # raises HTTPException internally
+            if stored_pair_strat_obj.strat_state == StratState.StratState_READY:
+                leg1_lock_file_path, leg2_lock_file_path = (
+                    self.get_lock_file_names_from_pair_strat(updated_pair_strat_obj))
+                with open(leg1_lock_file_path, "w") as fl:  # creating empty file
+                    pass
+                with open(leg2_lock_file_path, "w") as fl:  # creating empty file
+                    pass
+            # else not required: create strat lock file only if moving the strat state from
+            # StratState_READY to StratState_ACTIVE
         return check_passed
 
     def _update_port_to_executor_http_client_dict_from_updated_pair_strat(self, updated_pair_strat_obj: PairStrat):

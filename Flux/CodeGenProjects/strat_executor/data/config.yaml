@@ -7,7 +7,7 @@ ui_port: "3050"
 server_host: "127.0.0.1"
 main_server_beanie_port: "8040"
 main_server_cache_port: "8035"
-min_refresh_interval: 20
+min_refresh_interval: 5
 custom_logger_lvls:
   - TIMING: 15
   - JUNK: 5

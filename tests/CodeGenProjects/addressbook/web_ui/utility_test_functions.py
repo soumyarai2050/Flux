@@ -2,6 +2,7 @@ import json
 from typing import Optional
 
 from selenium import webdriver
+from selenium.webdriver import ActionChains
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.common import NoSuchElementException, ElementNotInteractableException
@@ -12,6 +13,7 @@ from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import *
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
 from tests.CodeGenProjects.addressbook.app.utility_test_functions import test_config_file_path, \
     strat_manager_service_native_web_client, create_tob
+
 
 
 SIMPLE_DATA_TYPE_LIST: Final[List[DataType]] = \
@@ -1284,18 +1286,20 @@ def validate_hide_n_show_in_common_key(widget: WebElement, field_name: str, key_
             f"{field_name} field is visible in common keys, expected to be hidden"
 
 
-def validate_flux_fld_val_max_in_widget(driver: WebDriver, widget: WebElement, input_type: str, xpath_lst: List[str]):
+def validate_flux_fld_val_max_in_widget(driver: WebDriver, widget: WebElement, widget_name: str, input_type: str, xpath_n_field_names: Dict):
     click_button_with_name(widget=widget, button_name="Save")
     expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
     object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
-    # object_keys.pop()
-    for xpath in xpath_lst:
-        assert xpath in object_keys
+    for field_name, xpath in xpath_n_field_names.items():
+        if widget_name == "strat_limits" and input_type == "invalid":
+            assert xpath in object_keys
+        else:
+            assert field_name in object_keys
     if input_type == "valid":
         confirm_save(driver=driver)
     else:
         discard_changes(widget=widget)
-    xpath_lst.clear()
+    xpath_n_field_names.clear()
 
 
 def validate_flux_fld_val_min_in_widget(widget: WebElement, field_name: str):
@@ -1445,3 +1449,12 @@ def change_layout(driver: WebDriver, layout_name: str) -> None:
 
     driver.find_element(By.XPATH, "/html/body/div[2]/div[3]/div/div[2]/button[2]").click()
     time.sleep(Delay.SHORT.value)
+
+
+def double_click(driver: WebDriver, element: WebElement):
+    actions = ActionChains(driver)
+    actions.double_click(element).perform()
+
+def hover_over_on_element(driver: WebDriver, element: WebElement):
+    actions = ActionChains(driver)
+    actions.move_to_element(element).perform()
