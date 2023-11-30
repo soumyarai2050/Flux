@@ -30,7 +30,11 @@ class UpdateWebUIConfiguration:
         self.server_host: str = self.project_config_yaml_dict.get("server_host")
         self.proxy_server_host: str = self.proxy_config_yaml_dict.get("server_host")
         self.proxy_server_port: str = self.proxy_config_yaml_dict.get("server_port")
-        self.is_proxy_server: str = str(self.project_config_yaml_dict.get("is_proxy_server")).lower()
+        self.is_proxy_server: str = self.project_config_yaml_dict.get("is_proxy_server")
+        if self.is_proxy_server is None:
+            self.is_proxy_server = str(False).lower()
+        else:
+            self.is_proxy_server = str(self.is_proxy_server).lower()
         self.main_server_beanie_port: str = self.project_config_yaml_dict.get("main_server_beanie_port")
         self.main_server_cache_port: str = self.project_config_yaml_dict.get("main_server_cache_port")
         self.ui_port: str = self.project_config_yaml_dict.get("ui_port")
@@ -101,14 +105,14 @@ class UpdateWebUIConfiguration:
         with open(str(self.project_package_json_path), 'r') as file:
             package_json = json.load(file)
 
-        # Update the "start" script with the new port
+        # Update UI_PORT in package.json
         package_json['scripts']['start'] = f'cross-env PORT={self.ui_port} react-scripts start'
 
         # Write the updated package.json back to the file
         with open(str(self.project_package_json_path), 'w', encoding='utf-8') as file:
             json.dump(package_json, file, indent=2)
 
-        print(f'"start" script updated with port {self.ui_port}')
+        print(f'"package.json" updated with port {self.ui_port}')
 
 
 if __name__ == "__main__":

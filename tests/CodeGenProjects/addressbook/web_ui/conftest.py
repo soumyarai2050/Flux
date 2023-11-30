@@ -375,7 +375,7 @@ def web_project(driver, pair_strat, expected_order_limits_, expected_portfolio_l
     time.sleep(5)
     wait(driver).until(EC.presence_of_element_located((By.ID, "portfolio_status")))
     portfolio_status_widget = driver.find_element(By.ID, "portfolio_status")
-    driver.execute_script('arguments[0].scrollIntoView(true)', portfolio_status_widget)
+    scroll_into_view(driver=driver, element=portfolio_status_widget)
     wait(driver).until(EC.presence_of_element_located((By.NAME, "kill_switch")))
     kill_switch_btn = portfolio_status_widget.find_element(By.NAME, "kill_switch")
     assert kill_switch_btn.is_displayed(), "failed to load web project, kill switch button not found"

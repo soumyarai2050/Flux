@@ -932,8 +932,14 @@ class StratExecutor:
                                         top_of_books: List[TopOfBookBaseModel]) -> int:
         buy_top_of_book: TopOfBookBaseModel | None = None
         sell_top_of_book: TopOfBookBaseModel | None = None
-        buy_symbol_prefix = "CB_Sec"
-        sell_symbol_prefix = "EQT_Sec"
+
+        if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
+            buy_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+            sell_symbol = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+        else:
+            buy_symbol = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+            sell_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+
         order_placed: int = OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
         top_of_book_and_date_tuple = self.strat_cache.get_top_of_book(self._top_of_books_update_date_time)
@@ -946,10 +952,10 @@ class StratExecutor:
                     latest_update_date_time: DateTime | None = None
                     for top_of_book in top_of_books:
                         if latest_update_date_time is None:
-                            if top_of_book.symbol.startswith(buy_symbol_prefix):
+                            if top_of_book.symbol == buy_symbol:
                                 buy_top_of_book = top_of_book
                                 sell_top_of_book = None
-                            elif top_of_book.symbol.startswith(sell_symbol_prefix):
+                            elif top_of_book.symbol == sell_symbol:
                                 sell_top_of_book = top_of_book
                                 buy_top_of_book = None
                             else:
@@ -960,10 +966,10 @@ class StratExecutor:
                             latest_update_date_time = top_of_book.last_update_date_time
                         else:
                             if top_of_book.last_update_date_time > latest_update_date_time:
-                                if top_of_book.symbol.startswith(buy_symbol_prefix):
+                                if top_of_book.symbol == buy_symbol:
                                     buy_top_of_book = top_of_book
                                     sell_top_of_book = None
-                                elif top_of_book.symbol.startswith(sell_symbol_prefix):
+                                elif top_of_book.symbol == sell_symbol:
                                     sell_top_of_book = top_of_book
                                     buy_top_of_book = None
                                 else:

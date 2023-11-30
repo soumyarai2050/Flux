@@ -53,9 +53,7 @@ def get_web_project_url():
 def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     strat_collection_widget = driver.find_element(By.ID, "strat_collection")
     scroll_into_view(driver=driver, element=strat_collection_widget)
-    time.sleep(Delay.SHORT.value)
     click_button_with_name(widget=strat_collection_widget, button_name="Create")
-    time.sleep(Delay.SHORT.value)
 
     pair_strat_params_widget = driver.find_element(By.ID, "pair_strat_params")
     xpath: str
@@ -64,38 +62,37 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     # select strat_leg1.sec.sec_id
     xpath = "pair_strat_params.strat_leg1.sec.sec_id"
     value = pair_strat["pair_strat_params"]["strat_leg1"]["sec"]["sec_id"]
-    set_autocomplete_field(widget=pair_strat_params_widget, xpath=xpath, name="sec_id", search_type=SearchType.NAME,
+    name = "sec_id"
+    set_autocomplete_field(widget=pair_strat_params_widget, xpath=xpath, name=name, search_type=SearchType.NAME,
                            value=value)
 
     # select strat_leg1.side
     xpath = "pair_strat_params.strat_leg1.side"
     value = pair_strat["pair_strat_params"]["strat_leg1"]["side"]
-    set_dropdown_field(widget=pair_strat_params_widget, xpath=xpath, name="side", value=value)
+    name = "side"
+    set_dropdown_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
 
     show_nested_fld_in_tree_layout(widget=pair_strat_params_widget)
 
     # select strat_leg2.sec.sec_id
     xpath = "pair_strat_params.strat_leg2.sec.sec_id"
     value = pair_strat["pair_strat_params"]["strat_leg2"]["sec"]["sec_id"]
-    set_autocomplete_field(widget=pair_strat_params_widget, xpath=xpath, name="sec_id", search_type=SearchType.NAME,
+    name = "sec_id"
+    set_autocomplete_field(widget=pair_strat_params_widget, xpath=xpath, name=name, search_type=SearchType.NAME,
                            value=value)
 
     strat_status_widget = driver.find_element(By.ID, "strat_status")
-    driver.execute_script('arguments[0].scrollIntoView(true)', strat_status_widget)
-    time.sleep(Delay.SHORT.value)
+    scroll_into_view(driver=driver, element=strat_status_widget)
 
     # select pair_strat_params.common_premium
     xpath = "pair_strat_params.common_premium"
     value = pair_strat["pair_strat_params"]["common_premium"]
-    set_tree_input_field(widget=pair_strat_params_widget, xpath=xpath, name="common_premium", value=value,
-                         search_type=SearchType.ID)
+    name = "common_premium"
+    set_tree_input_field(widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
 
     # save strat collection
-    save_btn = strat_collection_widget.find_element(By.NAME, "Save")
-    save_btn.click()
-    time.sleep(Delay.SHORT.value)
-    confirm_save(driver=driver)
-    # verify pair strat
+    click_button_with_name(widget=strat_collection_widget, button_name="Save")
+    confirm_save(driver)
     validate_pair_strat_params(widget=pair_strat_params_widget, pair_strat=pair_strat)
 
     # wait for host and port to be populated in pair strat - is_partially_running - add 5 sec sleep
@@ -218,7 +215,6 @@ def validate_pair_strat_params(widget: WebElement, pair_strat: Dict) -> None:
     strat_common_prem = value_of_strat_common_prem.find_element(By.NAME, 'common_premium') \
         .get_attribute('value')
 
-    # verifying the values of pair_strat
     pair_strat_params = pair_strat["pair_strat_params"]
     assert stratleg1_sec == pair_strat_params["strat_leg1"]["sec"]["sec_id"]
     assert strat_side == pair_strat_params["strat_leg1"]["side"]
@@ -294,8 +290,7 @@ def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, l
         strats_limits_widget = driver.find_element(By.ID, "strat_limits")
         input_residual_mark_second_element = strats_limits_widget.find_element(By.ID, "residual_mark_seconds")
 
-    driver.execute_script('arguments[0].scrollIntoView(true)', input_residual_mark_second_element)
-    time.sleep(Delay.SHORT.value)
+    scroll_into_view(driver=driver, element=input_residual_mark_second_element)
 
     # strat_limits.cancel_rate.waived_min_orders
     xpath = "cancel_rate.waived_min_orders"
@@ -383,7 +378,6 @@ def validate_strat_limits(widget: WebElement, strat_limits: Dict,  layout: Layou
     # max_concentration
     xpath = "max_concentration"
     value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-    print(type(value))
     assert value == str(strat_limits["max_concentration"])
 
     # limit_up_down_volume_participation_rate
@@ -436,7 +430,6 @@ def validate_strat_limits(widget: WebElement, strat_limits: Dict,  layout: Layou
     xpath = "residual_restriction.residual_mark_seconds"
     value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
     assert value == str(strat_limits["residual_restriction"]["residual_mark_seconds"])
-    time.sleep(Delay.SHORT.value)
 
 
 def get_widget_type(widget_schema: Dict) -> WidgetType | None:
@@ -598,39 +591,32 @@ def switch_layout(widget: WebElement, layout: Layout) -> None:
     elif layout == Layout.TABLE:
         btn_name = "UI_TABLE"
     try:
-        layout_btn = widget.find_element(By.NAME, "Layout")
-        layout_btn.click()
+        widget.find_element(By.NAME, "Layout").click()
         time.sleep(Delay.SHORT.value)
-        btn_name_element = widget.find_element(By.NAME, btn_name)
-        btn_name_element.click()
+        widget.find_element(By.NAME, btn_name).click()
+        time.sleep(Delay.SHORT.value)
     except NoSuchElementException as e:
         raise Exception(f"failed to switch to layout: {layout};;; exception: {e}")
 
-
 def activate_strat(widget: WebElement, driver: WebDriver) -> None:
     # Find the button with the name 'strat_state'
-    activate_btn = widget.find_element(By.NAME, "strat_state")
+    activate_btn_element = widget.find_element(By.NAME, "strat_state")
 
     # Get the button text
-    button_text = activate_btn.text
+    button_text = activate_btn_element.text
 
     # Check if the button text is ACTIVATE, ERROR, or PAUSED
     assert button_text in ["ACTIVATE", "ERROR", "PAUSE"], "Unknown button state."
 
     if button_text == "ACTIVATE":
         # Activate the strat
-        activate_btn.click()
+        activate_btn_element.click()
         time.sleep(Delay.SHORT.value)
-
-        # Confirm the activation
         confirm_save(driver=driver)
-        time.sleep(Delay.SHORT.value)
 
         # Verify if the strat is in active state
-        pause_strat = widget.find_element(By.XPATH, '//*[@id="strat_collection"]/h6/div/div/button[1]')
-
-        btn_text = pause_strat.text
-        assert btn_text == "PAUSE", "Failed to activate strat."
+        btn_caption = widget.find_element(By.XPATH, '//*[@id="strat_collection"]/h6/div/div/button[1]').text
+        assert btn_caption == "PAUSE", "Failed to activate strat."
 
     elif button_text in ["ERROR", "PAUSE"]:
         print(f"Strat is in {button_text} state. Cannot activate.")
@@ -670,24 +656,11 @@ def get_default_field_value(widget: WebElement, layout: Layout, xpath: str) -> s
         get_field_value = input_div_element.find_element(By.TAG_NAME, "input").get_attribute('value')
     return get_field_value
 
-
-def verify_popup_type_n_save_or_discard_changes(widget: WebElement, driver: WebDriver) -> None:
-    dialog_element = widget.find_element(By.XPATH, "//div[@role='dialog']")
-    text_element = dialog_element.find_element(By.TAG_NAME, "p")
-    dialog_text = text_element.text
-    if dialog_text == "Review changes:":
-        confirm_save(driver=driver)
-    elif dialog_text == "Form validation failed due to following errors:":
-        discard_changes(widget=widget)
-
-
 def show_hidden_fields_in_tree_layout(widget: WebElement, driver: WebDriver) -> None:
     click_button_with_name(widget=widget, button_name="Show")
     list_element = driver.find_element(By.XPATH, "//ul[@role='listbox']")
     li_elements = list_element.find_elements(By.TAG_NAME, "li")
     li_elements[0].click()
-
-
 
 def show_hidden_field_in_review_changes_popup(driver: WebDriver) -> None:
     review_changes_widget = driver.find_element(By.CLASS_NAME, "MuiDialogContent-root")
@@ -700,8 +673,6 @@ def validate_property_that_it_contain_val_min_val_max_or_none(val_max: str, val_
     try:
         if val_min:
             val_min = float(val_min) + 1.55
-            # print(val_min)
-            # print(type(val_min))
             return str(val_min)
         elif val_max:
             val_max = float(val_max) - 1.55
@@ -710,7 +681,10 @@ def validate_property_that_it_contain_val_min_val_max_or_none(val_max: str, val_
         print("Invalid input: must be a numeric value or empty.")
     return str(1000.5)
 
+
+
 def validate_table_cell_enabled_or_not(widget: WebElement, xpath: str) -> bool:
+    # TODO: fix this method
     try:
         input_td_xpath: str = get_table_input_field_xpath(xpath=xpath)
         input_td_element = widget.find_element(By.XPATH, input_td_xpath)
@@ -759,20 +733,12 @@ def get_flux_fld_number_format(widget: WebElement, xpath: str, layout: Layout) -
     # get only % from str
     return number_format[-1]
 
-
-def get_pressed_n_unpressed_btn_txt(widget: WebElement) -> str:
-    button_widget = widget.find_element(By.CLASS_NAME, "MuiButtonBase-root")
-    button_text = button_widget.text
-    return button_text
-
-
 def get_table_layout_field_name(widget: WebElement):
     thead_elements = widget.find_elements(By.CLASS_NAME, "MuiTableCell-root")
     field_name_texts = []
     for thead_element in thead_elements:
         field_name_texts.append(thead_element.text)
     return field_name_texts
-
 
 
 def validate_comma_separated_values(driver: WebDriver, widget: WebElement, layout: Layout, field_name_n_input_value: dict):
@@ -799,11 +765,6 @@ def get_fld_name_colour_in_tree(widget: WebElement, xpath: str):
     span_element = div_xpath_element.find_element(By.CLASS_NAME, "Node_error__Vi-Uc")
     color = span_element.value_of_css_property("color")
     return color
-
-
-def get_fld_name_colour_in_table(widget: WebElement, xpath: str):
-    common_keys = get_common_keys(widget=widget)
-
 
 def get_progress_bar_level(widget: WebElement) -> str:
     box_root_element = widget.find_element(By.CLASS_NAME, "MuiBox-root")
@@ -861,13 +822,6 @@ def get_object_keys_from_dialog_box(widget: WebElement) -> List[str]:
     for form_validation_element in form_validation_elements:
         object_keys.append(form_validation_element.text[1:-1])
     return object_keys
-
-
-def click_on_continue_editing_btn(widget: WebElement) -> None:
-    form_validation_dialog = widget.find_element(By.XPATH, "//div[@role='dialog']")
-    continue_editing_btn = form_validation_dialog.find_element(
-        By.XPATH, "//button[normalize-space()='Continue Editing']")
-    continue_editing_btn.click()
 
 
 def get_common_keys(widget: WebElement) -> List[str]:
@@ -932,28 +886,6 @@ def get_widget_name_frm_schema(schema_dict, widget_type: WidgetType, flux_proper
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         name_lst.append(widget_name)
-    return name_lst
-
-
-def get_fld_name_frm_schema(schema_dict, widget_type: WidgetType, flux_property: str) -> List[str]:
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type, flux_property=flux_property)
-    assert result[0]
-    name_lst: List[str] = []
-    for widget_query in result[1]:
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            name_lst.append(field_name)
-    return name_lst
-
-
-def get_property_value_frm_schema(schema_dict, widget_type: WidgetType, flux_property: str):
-    result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type, flux_property=flux_property)
-    assert result[0]
-    name_lst: List[str] = []
-    for widget_query in result[1]:
-        for field_query in widget_query.fields:
-            val_max = field_query.properties['val_max']
-            name_lst.append(val_max)
     return name_lst
 
 
@@ -1116,7 +1048,6 @@ def get_select_box_value(select_box: WebElement) -> str:
 
         # Get the text content of the div element
         selected_value = value_div.text
-
         return selected_value
 
     except Exception as e:
@@ -1212,7 +1143,6 @@ def get_element_text_list_from_filter_popup(driver: WebDriver) -> List[str]:
 
     # Get the text of each element and store in a list
     element_texts: List[str] = [element.text.replace(" ", "_") for element in elements]
-
     return element_texts
 
 
@@ -1357,12 +1287,6 @@ def validate_val_max_n_default_fld_value_equal_or_not(val_max: int, replaced_def
         return True
     return False
 
-
-def get_widget_web_element_by_name(driver: WebDriver, widget_name: str) -> WebElement:
-    widget = driver.find_element(By.ID, widget_name)
-    return widget
-
-
 def show_nested_fld_in_tree_layout(widget: WebElement):
     try:
         options_btn = widget.find_element(By.XPATH, "//button[@aria-label='options']")
@@ -1458,3 +1382,111 @@ def double_click(driver: WebDriver, element: WebElement):
 def hover_over_on_element(driver: WebDriver, element: WebElement):
     actions = ActionChains(driver)
     actions.move_to_element(element).perform()
+
+
+def verify_dialog_type_n_save_or_discard_changes(widget: WebElement, driver: WebDriver) -> None:
+    dialog_element = widget.find_element(By.XPATH, "//div[@role='dialog']")
+    text_element = dialog_element.find_element(By.TAG_NAME, "p")
+    dialog_text = text_element.text
+    if dialog_text == "Review changes:":
+        confirm_save(driver=driver)
+    elif dialog_text == "Form validation failed due to following errors:":
+        discard_changes(widget)
+
+def get_pressed_n_unpressed_btn_txt(widget: WebElement) -> str:
+    button_widget = widget.find_element(By.CLASS_NAME, "MuiButtonBase-root")
+    button_text = button_widget.text
+    return button_text
+
+
+def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, schema_dict: Dict[str, any]):
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+                                          flux_property="val_max")
+    assert result[0]
+
+    xpath_n_field_names: Dict[str] = {}
+    for widget_query in result[1]:
+        widget_name = widget_query.widget_name
+        # in strat_status balance notional fld contain progress bar
+        if widget_name == "strat_status":
+            continue
+        widget = driver.find_element(By.ID, widget_name)
+        click_button_with_name(widget=widget, button_name="Edit")
+        if layout == Layout.TABLE:
+            switch_layout(widget=widget, layout=Layout.TABLE)
+        else:
+            switch_layout(widget=widget, layout=Layout.TREE)
+        if widget_name == "order_limits" and layout == Layout.TABLE:
+            switch_layout(widget=widget, layout=Layout.TABLE)
+
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            xpath = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict),widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,field_name=field_name)
+
+            xpath_n_field_names[field_name] = xpath
+            if input_type == "valid":
+                val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1])
+            else:
+                # val_max += 1
+                val_max: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[1]) + 1
+            if layout == Layout.TABLE:
+                default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TABLE, xpath=xpath)
+            else:
+                default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TREE, xpath=xpath)
+            if default_field_value:
+                replaced_default_field_value: int = get_replaced_str(default_field_value=default_field_value)
+                is_equal: bool = validate_val_max_n_default_fld_value_equal_or_not(
+                    val_max=val_max,replaced_default_field_value=replaced_default_field_value)
+            if is_equal:
+                val_max = val_max - 1
+            if layout == Layout.TABLE:
+                set_table_input_field(widget=widget, xpath=xpath, value=str(val_max))
+            elif layout == Layout.TREE:
+                set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_max))
+        validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, widget_name=widget_name,input_type=input_type,
+                                                xpath_n_field_names=xpath_n_field_names)
+
+def set_val_min_input_fld(driver: WebDriver, layout: Layout, input_type: str, schema_dict: Dict[str, any]):
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+                                          flux_property="val_min")
+
+    field_name: str = ''
+    for widget_query in result[1]:
+        widget_name = widget_query.widget_name
+        # TODO: REMOVE (CONTINUE) LATER, IN STRAT STATUS BALANCE NOTIONAL FLD CONTAIN PROGRESS BAR
+        if widget_name == "strat_status":
+            continue
+        widget = driver.find_element(By.ID, widget_name)
+        click_button_with_name(widget=widget, button_name="Edit")
+        if layout == Layout.TABLE:
+            switch_layout(widget=widget, layout=Layout.TABLE)
+        else:
+            switch_layout(widget=widget, layout=Layout.TREE)
+        if widget_name == "order_limits" and layout == Layout.TABLE:
+            switch_layout(widget=widget, layout=Layout.TABLE)
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            xpath = get_xpath_from_field_name(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
+                                              field_name=field_name)
+            # balance notional field contain "0.0" that's why can parse directly into int
+            if input_type  == "valid":
+                val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0])
+            else:
+                val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0]) - 1
+            if layout == Layout.TABLE:
+                default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TABLE, xpath=xpath)
+            else:
+                default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TREE, xpath=xpath)
+            replaced_default_field_value: int = get_replaced_str_default_field_value(default_field_value=default_field_value)
+            is_equal: bool = validate_val_min_n_default_fld_value_equal_or_not(val_min=val_min, replaced_default_field_value=replaced_default_field_value)
+            if is_equal:
+                val_min = val_min - 1
+            #enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            #if enabled:
+            if layout == Layout.TABLE:
+                set_table_input_field(widget=widget, xpath=xpath, value=str(val_min))
+            else:
+                set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_min))
+            #else:
+                #continue
+        validate_flux_fld_val_min_in_widget(widget=widget, field_name=field_name)

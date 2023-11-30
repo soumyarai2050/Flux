@@ -199,13 +199,13 @@ message StratStatus{
   optional float total_fill_sell_notional = 18 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill sell notional from StratOrderSnapshot"];
   optional float total_fill_exposure = 19 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_fill_buy_notional - total_fill_sell_notional"];
 
-  optional int64 total_cxl_buy_qty = 20 [(FluxFldHelp) = "sum of all fill buy order qty from StratOrderSnapshot"];
-  optional int64 total_cxl_sell_qty = 21 [(FluxFldHelp) = "sum of all fill sell order qty from StratOrderSnapshot"];
-  optional float avg_cxl_buy_px = 22 [(FluxFldHelp) = "total_fill_buy_notional / total_fill_buy_qty"];
-  optional float avg_cxl_sell_px = 23 [(FluxFldHelp) = "total_fill_sell_notional / total_fill_sell_qty"];
-  optional float total_cxl_buy_notional = 24 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill buy notional from StratOrderSnapshot"];
-  optional float total_cxl_sell_notional = 25 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill sell notional from StratOrderSnapshot"];
-  optional float total_cxl_exposure = 26 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_fill_buy_notional - total_fill_sell_notional"];
+  optional int64 total_cxl_buy_qty = 20 [(FluxFldHelp) = "sum of all cxl buy order qty from StratOrderSnapshot"];
+  optional int64 total_cxl_sell_qty = 21 [(FluxFldHelp) = "sum of all cxl sell order qty from StratOrderSnapshot"];
+  optional float avg_cxl_buy_px = 22 [(FluxFldHelp) = "total_cxl_buy_notional / total_cxl_buy_qty"];
+  optional float avg_cxl_sell_px = 23 [(FluxFldHelp) = "total_cxl_sell_notional / total_cxl_sell_qty"];
+  optional float total_cxl_buy_notional = 24 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all cxl buy notional from StratOrderSnapshot"];
+  optional float total_cxl_sell_notional = 25 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all cxl sell notional from StratOrderSnapshot"];
+  optional float total_cxl_exposure = 26 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_cxl_buy_notional - total_cxl_sell_notional"];
 
   // these are specific to CB-EQT strat - move to derived later
   optional float average_premium = 27 [(FluxFldNumberFormat) = "%"];

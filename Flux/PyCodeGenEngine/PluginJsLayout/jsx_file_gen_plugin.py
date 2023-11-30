@@ -2028,8 +2028,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }\n\n"
             output_str += "    const onLoad = () => {\n"
             output_str += f"        let updatedData = cloneDeep({message_name_camel_cased});\n"
-            output_str += f"        let index = _.get({message_name_camel_cased}, bufferListFieldAttrs.key).indexOf(" \
-                          f"searchValue);\n"
+            output_str += "        let index = _.get(updatedData, bufferListFieldAttrs.key).indexOf(" \
+                          "searchValue);\n"
             output_str += "        _.get(updatedData, bufferListFieldAttrs.key).splice(index, 1);\n"
             output_str += "        _.get(updatedData, loadListFieldAttrs.key).push(searchValue);\n"
             output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
@@ -2042,28 +2042,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    }\n\n"
             output_str += "    const onUnload = (id) => {\n"
             output_str += f"        let updatedData = cloneDeep({message_name_camel_cased});\n"
-            output_str += f"        let abbreviatedKey = getAbbreviatedKeyFromId(_.get({message_name_camel_cased}, " \
-                          f"loadListFieldAttrs.key), abbreviated, id);\n"
-            output_str += f"        let index = _.get({message_name_camel_cased}, " \
+            output_str += "        let abbreviatedKey = getAbbreviatedKeyFromId(_.get(updatedData, " \
+                          "loadListFieldAttrs.key), abbreviated, id);\n"
+            output_str += "        let index = _.get(updatedData, " \
                           "loadListFieldAttrs.key).indexOf(abbreviatedKey);\n"
-            output_str += f"        let socket = socketDict.current[id];\n"
-            output_str += "        if (socket) {\n"
-            output_str += f"            socket.close();\n"
-            output_str += "        }\n"
             output_str += f"        _.get(updatedData, loadListFieldAttrs.key).splice(index, 1);\n"
             output_str += f"        _.get(updatedData, bufferListFieldAttrs.key).push(abbreviatedKey);\n"
             output_str += f"        dispatch(setModified{message_name}(updatedData));\n"
             output_str += "        dispatch(update" + f"{message_name}(updatedData));\n"
-            output_str += (f"        const updatedArray = {abbreviated_dependent_msg_camel_cased}Array.filter(obj "
-                           f"=> obj[DB_ID] !== id);\n")
-            output_str += f"        dispatch(set{self.abbreviated_dependent_message_name}Array(updatedArray));\n"
-            dependent_msg_list_from_another_proto = self._get_abbreviated_msg_dependent_msg_from_other_proto_file()
-            if dependent_msg_list_from_another_proto:
-                for dep_msg_name in dependent_msg_list_from_another_proto:
-                    dep_msg_camel_cased = convert_to_camel_case(dep_msg_name)
-                    output_str += f"        const updated{dep_msg_name}Array = {dep_msg_camel_cased}Array.filter(" \
-                                  "obj => obj[DB_ID] !== id);\n"
-                    output_str += f"        dispatch(set{dep_msg_name}Array(updated{dep_msg_name}Array));\n"
             output_str += "    }\n\n"
             output_str += "    const onDiscard = () => {\n"
             output_str += "        onReload();\n"

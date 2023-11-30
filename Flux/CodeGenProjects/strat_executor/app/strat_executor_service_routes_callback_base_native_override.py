@@ -510,19 +510,17 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         else:
             return strat_limits_tuple[0]
 
-    async def _remove_strat_limits(self) -> bool:
+    async def _remove_strat_limits(self):
         strat_limits_tuple = self.strat_cache.get_strat_limits()
 
         if strat_limits_tuple is not None:
             strat_limits, _ = strat_limits_tuple
             await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_limits_http(
                 strat_limits.id)
-            return True
         else:
-            err_str_ = ("Can't find any strat_limits in cache to delete, ignoring delete call, symbol_side_key: "
+            err_str_ = ("Can't find any strat_limits in cache to delete, while unloading strat, symbol_side_key: "
                         f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
             logging.error(err_str_)
-            return False
 
     def _check_n_create_or_update_strat_status(self, strat_limits: StratLimits):
         strat_status_tuple: Tuple[StratStatus, DateTime] = self.strat_cache.get_strat_status()
@@ -550,7 +548,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             existing_strat_status, _ = strat_status_tuple
             return existing_strat_status
 
-    async def _remove_strat_status(self) -> bool:
+    async def _remove_strat_status(self):
         async with StratStatus.reentrant_lock:
             strat_status_tuple = self.strat_cache.get_strat_status()
 
@@ -558,12 +556,11 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 strat_status, _ = strat_status_tuple
                 await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_status_http(
                     strat_status.id)
-                return True
             else:
-                err_str_ = ("Can't find any strat_status in strat_cache to delete strat_status, symbol_side_key: "
+                err_str_ = ("Can't find any strat_status in strat_cache to delete, while unloading strat, "
+                            "symbol_side_key: "
                             f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
-                logging.error(err_str_)
-                return False
+                logging.warning(err_str_)
 
     def get_consumable_concentration_from_source(self, symbol: str, strat_limits: StratLimits):
         security_float: float | None = self.static_data.get_security_float_from_ticker(symbol)
@@ -2779,16 +2776,10 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
     async def put_strat_to_snooze_query_pre(self, strat_status_class_type: Type[StratStatus]):
         # removing current strat_status
-        res = await self._remove_strat_status()
-        if not res:
-            err_str_ = "Some Error occurred while updating strat_status in snoozing strat process"
-            raise HTTPException(detail=err_str_, status_code=500)
+        await self._remove_strat_status()
 
         # removing current strat limits
-        res = await self._remove_strat_limits()
-        if not res:
-            err_str_ = "Some Error occurred while removing strat_limits in snoozing strat process"
-            raise HTTPException(detail=err_str_, status_code=500)
+        await self._remove_strat_limits()
 
         # If strat_cache stopped means strat is not ongoing anymore or was never ongoing
         # - removing related models that would have created if strat got activated

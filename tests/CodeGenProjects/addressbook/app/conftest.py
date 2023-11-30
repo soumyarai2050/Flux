@@ -27,7 +27,7 @@ def max_loop_count_per_side():
 
 
 @pytest.fixture()
-def buy_sell_symbol_list():
+def leg1_leg2_symbol_list():
     return [
         ("CB_Sec_1", "EQT_Sec_1"),
         ("CB_Sec_2", "EQT_Sec_2"),
@@ -48,13 +48,13 @@ def residual_wait_sec() -> int:
 
 
 @pytest.fixture
-def db_names_list(buy_sell_symbol_list):
+def db_names_list(leg1_leg2_symbol_list):
     db_names_list = [
         f"addressbook_{PAIR_STRAT_BEANIE_PORT}",
         f"log_analyzer_{LOG_ANALYZER_BEANIE_PORT}",
     ]
 
-    for i in range(len(buy_sell_symbol_list)):
+    for i in range(len(leg1_leg2_symbol_list)):
         db_names_list.append(f"strat_executor_{8040 + i + 1}")
     return db_names_list
 
@@ -314,9 +314,9 @@ def expected_order_limits_():
 
 
 @pytest.fixture()
-def expected_brokers_(buy_sell_symbol_list) -> List[Broker]:
+def expected_brokers_(leg1_leg2_symbol_list) -> List[Broker]:
     sec_positions: List[SecPosition] = []
-    for buy_symbol, sell_symbol in buy_sell_symbol_list:
+    for buy_symbol, sell_symbol in leg1_leg2_symbol_list:
         cb_sec_position: SecPosition = SecPosition(security=Security(sec_id=buy_symbol, sec_type=SecurityType.SEDOL))
         cb_positions: List[Position] = [Position(type=PositionType.SOD, priority=0, available_size=10_000,
                                                  allocated_size=10_000, consumed_size=0)]
@@ -369,7 +369,6 @@ def pair_strat_(pair_securities_with_sides_):
         "hedge_ratio": 5
         },
         "pair_strat_params_update_seq_num": 0,
-        "strat_state": "StratState_READY",
         "market_premium": 0
     })
 
@@ -631,7 +630,7 @@ def sample_alert():
 
 
 @pytest.fixture()
-def cb_eqt_security_records_(buy_sell_symbol_list) -> List[List[any]] | None:
+def cb_eqt_security_records_(leg1_leg2_symbol_list) -> List[List[any]] | None:
     yield
 
 
