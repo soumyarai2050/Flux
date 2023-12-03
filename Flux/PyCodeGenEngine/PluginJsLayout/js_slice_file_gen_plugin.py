@@ -192,44 +192,26 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     def handle_get_all_export_out_str(self, message: protogen.Message, message_name_camel_cased: str) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        if message_name not in self.dependent_to_abbreviated_relation_msg_name_dict.values():
-            output_str = "/* CRUD async actions */\n"
-            output_str += f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
-                          " async (payload, { rejectWithValue }) => " + "{\n"
-            if (not self.current_message_is_dependent and
-                    self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
-                output_str += "    const { url } = payload;\n"
-                output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
-                output_str += "    return axios.get(`${serverUrl}/" + f"get-all-{message_name_snake_cased}`)\n"
-            else:
-                output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
+        output_str = "/* CRUD async actions */\n"
+        output_str += f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/getAll'," \
+                      " async (payload, { rejectWithValue }) => " + "{\n"
+        if (not self.current_message_is_dependent and
+                self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
+            output_str += "    const { url } = payload;\n"
+            output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+            output_str += "    return axios.get(`${serverUrl}/" + f"get-all-{message_name_snake_cased}`)\n"
+        else:
+            output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
+        output_str += "        .then(res => res.data)\n"
+        output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
+        output_str += "})\n\n"
+        if message_name in self.dependent_to_abbreviated_relation_msg_name_dict:
+            output_str += (f"export const getAll{message_name}Background = createAsyncThunk("
+                           f"'{message_name_camel_cased}/getAllBackground', async (payload, "
+                           "{ rejectWithValue }) => {\n")
+            output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
             output_str += "        .then(res => res.data)\n"
             output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
-            output_str += "})\n\n"
-            if message_name in self.dependent_to_abbreviated_relation_msg_name_dict:
-                output_str += (f"export const getAll{message_name}Background = createAsyncThunk("
-                               f"'{message_name_camel_cased}/getAllBackground', async (payload, "
-                               "{ rejectWithValue }) => {\n")
-                output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
-                output_str += "        .then(res => res.data)\n"
-                output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
-                output_str += "})\n\n"
-        else:
-            output_str = "/* CRUD async actions */\n"
-            output_str += f"export const getAll{message_name} = createAsyncThunk('{message_name_camel_cased}/" \
-                         "getAll', async (payload, { dispatch, getState, rejectWithValue }) => " + "{\n"
-            output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
-            output_str += "        .then(res => {\n"
-            output_str += "            if (res.data.length === 0) {\n"
-            output_str += "                let state = getState();\n"
-            output_str += "                let schema = state.schema.schema;\n"
-            output_str += f"                let currentSchema = _.get(schema, '{message_name_snake_cased}');\n"
-            output_str += f"                let updatedData = generateObjectFromSchema(schema, currentSchema);\n"
-            output_str += f"                dispatch(create{message_name}(updatedData));\n"
-            output_str += "            }\n"
-            output_str += "            return res.data;\n"
-            output_str += "        })\n"
-            output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)))\n"
             output_str += "})\n\n"
         return output_str
 

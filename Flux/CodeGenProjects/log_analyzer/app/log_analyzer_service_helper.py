@@ -3,8 +3,6 @@ from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager, get_symbol_side_key)
 from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_client import (
     LogAnalyzerServiceHttpClient)
-from Flux.CodeGenProjects.pair_strat_engine.generated.FastApi.strat_manager_service_http_client import (
-    StratManagerServiceHttpClient)
 
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent
 CURRENT_PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'

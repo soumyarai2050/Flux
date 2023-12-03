@@ -50,6 +50,7 @@ class Layout(StrEnum):
     TABLE = auto()
     TREE = auto()
     NESTED = auto()
+    CHART = auto()
 
 
 class WidgetType(StrEnum):

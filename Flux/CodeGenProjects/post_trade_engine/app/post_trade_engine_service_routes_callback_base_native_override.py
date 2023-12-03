@@ -15,7 +15,7 @@ from Flux.CodeGenProjects.post_trade_engine.generated.FastApi.post_trade_engine_
     PostTradeEngineServiceRoutesCallback)
 from Flux.CodeGenProjects.post_trade_engine.app.post_trade_engine_service_helper import *
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    strat_manager_service_http_client, PairStratBaseModel, StratState)
+    strat_manager_service_http_client, PairStratBaseModel, StratState, guaranteed_call_pair_strat_client)
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
 from Flux.CodeGenProjects.strat_executor.app.aggregate import (get_last_n_sec_orders_by_event)
 from Flux.CodeGenProjects.post_trade_engine.app.aggregate import get_open_order_counts
@@ -25,6 +25,7 @@ class ContainerObject(BaseModel):
     order_journals: List[OrderJournal]
     order_snapshots: List[OrderSnapshot]
     strat_brief: StratBrief | None = None
+    portfolio_status_updates: List[PortfolioStatusUpdatesContainer]
 
 
 class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServiceRoutesCallback):
@@ -66,10 +67,10 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
         self.portfolio_limit_check_queue: Queue = Queue()
+        self.update_portfolio_status_queue: Queue = Queue()
         self.container_model: Type = ContainerObject
         self.order_id_to_order_snapshot_cache_dict: Dict[str, OrderSnapshot] = {}
         self.strat_id_to_strat_brief_cache_dict: Dict[int, StratBrief] = {}
-        self.portfolio_limit_check_lock: AsyncRLock = AsyncRLock()
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -90,12 +91,13 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                 # validate essential services are up, if so, set service ready state to true
                 if self.service_up:
                     if not self.service_ready:
-                        # Running portfolio_limit_check_queue_handler
-                        Thread(target=self.portfolio_limit_check_queue_handler, daemon=True).start()
-
                         # Updating order_snapshot cache and strat_brief cache
                         self.load_existing_order_snapshot()
                         self.load_existing_strat_brief()
+
+                        # Running portfolio_limit_check_queue_handler
+                        Thread(target=self.portfolio_limit_check_queue_handler, daemon=True).start()
+                        Thread(target=self._update_portfolio_status_n_check_portfolio_limits, daemon=True).start()
                     self.service_ready = True
                     print(f"INFO: service is ready: {datetime.datetime.now().time()}")
 
@@ -270,6 +272,12 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             strat_brief = StratBrief(**strat_brief_dict)
         return strat_brief
 
+    def _get_portfolio_status_updates_from_payload(self, payload_dict: Dict[str, Any]):
+        portfolio_status_updates: PortfolioStatusUpdatesContainer | None = None
+        if (portfolio_status_updates_dict := payload_dict.get("portfolio_status_updates")) is not None:
+            portfolio_status_updates = PortfolioStatusUpdatesContainer(**portfolio_status_updates_dict)
+        return portfolio_status_updates
+
     def update_strat_id_list_n_dict_from_payload(self, strat_id_list: List[int],
                                                  strat_id_to_container_obj_dict: Dict[int, ContainerObject],
                                                  payload_dict: Dict[str, Any]):
@@ -297,6 +305,8 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             return None
 
         strat_brief: StratBrief | None = self._get_strat_brief_from_payload(payload_dict)
+        portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
+            self._get_portfolio_status_updates_from_payload(payload_dict))
 
         container_obj: ContainerObject = strat_id_to_container_obj_dict.get(strat_id)
         if container_obj is not None:
@@ -305,13 +315,19 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             container_obj.order_snapshots.append(order_snapshot)
             if strat_brief is not None:
                 container_obj.strat_brief = strat_brief
+            if portfolio_status_updates is not None:
+                container_obj.portfolio_status_updates.append(portfolio_status_updates)
         else:
             order_journal_list = []
+            portfolio_status_updates_list = []
             if order_journal is not None:
                 order_journal_list.append(order_journal)
+            if portfolio_status_updates is not None:
+                portfolio_status_updates_list.append(portfolio_status_updates)
             container_obj = self.container_model(order_journals=order_journal_list,
                                                  order_snapshots=[order_snapshot],
-                                                 strat_brief=strat_brief)
+                                                 strat_brief=strat_brief,
+                                                 portfolio_status_updates=portfolio_status_updates_list)
             strat_id_to_container_obj_dict[strat_id] = container_obj
 
     def add_order_journals(self, order_journal_list: List[OrderJournal]):
@@ -438,65 +454,65 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         return pause_all_strats
 
     async def check_all_portfolio_limits(self) -> bool:
-        async with self.portfolio_limit_check_lock:
-            portfolio_limits = strat_manager_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
+        portfolio_limits = strat_manager_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
 
-            pause_all_strats = False
+        pause_all_strats = False
 
-            # Checking portfolio_limits.max_open_baskets
-            max_open_baskets_breached = await self.check_max_open_baskets(portfolio_limits.max_open_baskets)
-            if max_open_baskets_breached:
-                pause_all_strats = True
+        # Checking portfolio_limits.max_open_baskets
+        max_open_baskets_breached = await self.check_max_open_baskets(portfolio_limits.max_open_baskets)
+        if max_open_baskets_breached:
+            pause_all_strats = True
 
-            # block for task to finish
-            total_buy_open_notional = 0
-            total_sell_open_notional = 0
+        # block for task to finish
+        total_buy_open_notional = 0
+        total_sell_open_notional = 0
+        async with StratBrief.reentrant_lock:
             for strat_brief in self.strat_id_to_strat_brief_cache_dict.values():
                 # Buy side check
                 total_buy_open_notional += strat_brief.pair_buy_side_trading_brief.open_notional
                 # Sell side check
                 total_sell_open_notional += strat_brief.pair_sell_side_trading_brief.open_notional
 
-            if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
-                logging.error(f"max_open_notional_per_side breached for BUY side, "
-                              f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                              f"current total_buy_open_notional {total_buy_open_notional}"
-                              f" - initiating all strat pause")
-                pause_all_strats = True
+        if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
+            logging.error(f"max_open_notional_per_side breached for BUY side, "
+                          f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                          f"current total_buy_open_notional {total_buy_open_notional}"
+                          f" - initiating all strat pause")
+            pause_all_strats = True
 
-            if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
-                logging.error(f"max_open_notional_per_side breached for SELL side, "
-                              f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
-                              f"current total_sell_open_notional {total_sell_open_notional}"
-                              f" - initiating all strat pause")
-                pause_all_strats = True
+        if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
+            logging.error(f"max_open_notional_per_side breached for SELL side, "
+                          f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                          f"current total_sell_open_notional {total_sell_open_notional}"
+                          f" - initiating all strat pause")
+            pause_all_strats = True
 
-            # Checking portfolio_limits.max_gross_n_open_notional
-            portfolio_status = strat_manager_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
-            total_open_notional = total_buy_open_notional + total_sell_open_notional
-            total_gross_n_open_notional = (total_open_notional + portfolio_status.overall_buy_fill_notional +
-                                           portfolio_status.overall_sell_fill_notional)
-            if portfolio_limits.max_gross_n_open_notional < total_gross_n_open_notional:
-                logging.error(f"max_gross_n_open_notional breached, "
-                              f"allowed max_gross_n_open_notional: {portfolio_limits.max_gross_n_open_notional}, "
-                              f"current total_gross_n_open_notional {total_gross_n_open_notional}"
-                              f" - initiating all strat pause")
-                pause_all_strats = True
+        # Checking portfolio_limits.max_gross_n_open_notional
+        portfolio_status = strat_manager_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
+        total_open_notional = total_buy_open_notional + total_sell_open_notional
+        total_gross_n_open_notional = (total_open_notional + portfolio_status.overall_buy_fill_notional +
+                                       portfolio_status.overall_sell_fill_notional)
+        if portfolio_limits.max_gross_n_open_notional < total_gross_n_open_notional:
+            logging.error(f"max_gross_n_open_notional breached, "
+                          f"allowed max_gross_n_open_notional: {portfolio_limits.max_gross_n_open_notional}, "
+                          f"current total_gross_n_open_notional {total_gross_n_open_notional}"
+                          f" - initiating all strat pause")
+            pause_all_strats = True
 
-            # Checking portfolio_limits.rolling_max_order_count
-            rolling_max_order_count_breached: bool = await self.check_rolling_max_order_count(
-                    portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds,
-                    portfolio_limits.rolling_max_order_count.max_rolling_tx_count)
-            if rolling_max_order_count_breached:
-                pause_all_strats = True
+        # Checking portfolio_limits.rolling_max_order_count
+        rolling_max_order_count_breached: bool = await self.check_rolling_max_order_count(
+                portfolio_limits.rolling_max_order_count.rolling_tx_count_period_seconds,
+                portfolio_limits.rolling_max_order_count.max_rolling_tx_count)
+        if rolling_max_order_count_breached:
+            pause_all_strats = True
 
-            # checking portfolio_limits.rolling_max_reject_count
-            rolling_max_rej_count_breached: bool = await self.check_rolling_max_rej_count(
-                    portfolio_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
-                    portfolio_limits.rolling_max_reject_count.max_rolling_tx_count)
-            if rolling_max_rej_count_breached:
-                pause_all_strats = True
-            return pause_all_strats
+        # checking portfolio_limits.rolling_max_reject_count
+        rolling_max_rej_count_breached: bool = await self.check_rolling_max_rej_count(
+                portfolio_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
+                portfolio_limits.rolling_max_reject_count.max_rolling_tx_count)
+        if rolling_max_rej_count_breached:
+            pause_all_strats = True
+        return pause_all_strats
 
     def _portfolio_limit_check_queue_handler(self, strat_id_list: List[int],
                                              strat_id_to_container_obj_dict: Dict[int, ContainerObject]):
@@ -506,22 +522,76 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             order_journal_list = container_object.order_journals
             order_snapshot_list = container_object.order_snapshots
             strat_brief = container_object.strat_brief
+            portfolio_status_updates_list = container_object.portfolio_status_updates
 
             # Updating db
             self.update_db(order_journal_list, order_snapshot_list, strat_brief)
 
-            # Checking Portfolio limits and Pausing ALL Strats if limit found breached
-            run_coro = self.check_all_portfolio_limits()
-            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+            # updating update_portfolio_status_queue - handler gets data and constantly tries
+            #                                          to update until gets success
+            for portfolio_status_updates in portfolio_status_updates_list:
+                self.update_portfolio_status_queue.put(portfolio_status_updates)
 
-            # block for task to finish
-            try:
-                pause_all_strats: bool = future.result()
-            except Exception as e:
-                logging.exception(f"check_all_portfolio_limits failed, exception: {e}")
-                return None
+    @staticmethod
+    def check_connection_or_service_not_ready_error(exception: Exception) -> bool:
+        if "Failed to establish a new connection: [Errno 111] Connection refused" in str(exception):
+            logging.exception("Connection Error in pair_strat_engine server call, likely server is "
+                              "down, retrying client call ...")
+        elif "service is not initialized yet" in str(exception):
+            logging.exception("pair_strat_engine service not up yet, likely server restarted, but is "
+                              "not ready yet, retrying client call ...")
+        else:
+            return False
+        return True
+
+    def _update_portfolio_status_n_check_portfolio_limits(self):
+        while 1:
+            portfolio_status_updates: PortfolioStatusUpdatesContainer = self.update_portfolio_status_queue.get()
+
+            while 1:
+                try:
+                    strat_manager_service_http_client.update_portfolio_status_by_order_or_fill_data_query_client(
+                        overall_buy_notional=portfolio_status_updates.buy_notional_update,
+                        overall_sell_notional=portfolio_status_updates.sell_notional_update,
+                        overall_buy_fill_notional=portfolio_status_updates.buy_fill_notional_update,
+                        overall_sell_fill_notional=portfolio_status_updates.sell_fill_notional_update)
+                except Exception as e:
+                    res = self.check_connection_or_service_not_ready_error(e)
+                    if not res:
+                        logging.exception(
+                            f"update_portfolio_status_by_order_or_fill_data_query_client failed with exception: {e}")
+                        break
+                else:
+                    break
+
+            while 1:
+                # Checking Portfolio limits and Pausing ALL Strats if limit found breached
+                run_coro = self.check_all_portfolio_limits()
+                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+
+                # block for task to finish
+                try:
+                    pause_all_strats: bool = future.result()
+                except Exception as e:
+                    res = self.check_connection_or_service_not_ready_error(e)   # True if connection or service up error
+                    if not res:
+                        logging.exception(f"check_all_portfolio_limits failed, exception: {e}")
+                        return None
+                else:
+                    break
+
             if pause_all_strats:
-                strat_manager_service_http_client.pause_all_active_strats_query_client()
+                while 1:
+                    try:
+                        strat_manager_service_http_client.pause_all_active_strats_query_client()
+                    except Exception as e:
+                        res = self.check_connection_or_service_not_ready_error(e)
+                        if not res:
+                            logging.exception(
+                                f"pause_all_active_strats_query_client failed with exception {e}")
+                            break
+                    else:
+                        break
 
     async def is_portfolio_limits_breached_query_pre(
             self, is_portfolio_limits_breached_class_type: Type[IsPortfolioLimitsBreached]):

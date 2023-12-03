@@ -1,3 +1,4 @@
+import logging
 import sys
 from threading import Lock
 
@@ -88,45 +89,6 @@ def is_ongoing_strat(pair_strat: PairStrat | PairStratBaseModel) -> bool:
                                           StratState.StratState_READY,
                                           StratState.StratState_DONE,
                                           StratState.StratState_SNOOZED]
-
-
-@except_n_log_alert()
-def create_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> PortfolioLimitsBaseModel:
-    portfolio_limits_obj: PortfolioLimits = get_new_portfolio_limits(eligible_brokers)
-    portfolio_limits_base_model_obj: PortfolioLimitsBaseModel = \
-        PortfolioLimitsBaseModel(**jsonable_encoder(portfolio_limits_obj, by_alias=True, exclude_none=True))
-    created_portfolio_limits: PortfolioLimitsBaseModel = \
-        strat_manager_service_http_client.create_portfolio_limits_client(portfolio_limits_base_model_obj)
-    logging.info(f"created portfolio_limits;;;{created_portfolio_limits}")
-    return created_portfolio_limits
-
-
-@except_n_log_alert()
-def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
-    portfolio_limits_list: List[PortfolioLimitsBaseModel] = \
-        strat_manager_service_http_client.get_all_portfolio_limits_client()
-    if 0 == len(portfolio_limits_list):
-        return None
-    elif 1 < len(portfolio_limits_list):
-        err_str_ = f"multiple: {len(portfolio_limits_list)} portfolio_limits entries not supported at this time! " \
-                   f"use swagger UI to delete redundant entries: {portfolio_limits_list} from DB and retry"
-        raise Exception(err_str_)
-    else:
-        return portfolio_limits_list[0]
-
-
-@except_n_log_alert()
-def get_order_limits() -> OrderLimitsBaseModel | None:
-    order_limits_list: List[OrderLimitsBaseModel] = \
-        strat_manager_service_http_client.get_all_order_limits_client()
-    if 0 == len(order_limits_list):
-        return None
-    elif 1 < len(order_limits_list):
-        err_str_ = f"multiple: {len(order_limits_list)} order_limits entries not supported at this time! " \
-                   f"use swagger UI to delete redundant entries: {order_limits_list} from DB and retry"
-        raise Exception(err_str_)
-    else:
-        return order_limits_list[0]
 
 
 def get_new_portfolio_status() -> PortfolioStatus:
@@ -225,6 +187,64 @@ def get_strat_key_from_pair_strat(pair_strat: PairStrat | PairStratBaseModel):
                 f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}-" \
                 f"{pair_strat.pair_strat_params.strat_leg1.side}-{pair_strat.id}"
     return strat_key
+
+
+def get_id_from_strat_key(unloaded_strat_key: str) -> int:
+    parts: List[str] = (unloaded_strat_key.split("-"))
+    return parse_to_int(parts[-1])
+
+
+def log_pair_strat_client_call(pydantic_basemodel_type: Type | None, client_callable: Callable, **kwargs):
+    fld_sep: str = "~~"
+    val_sep: str = "^^"
+    log_str = f"^^^{pydantic_basemodel_type.__name__}{fld_sep}{client_callable.__name__}{fld_sep}"
+    for k, v in kwargs:
+        log_str += f"{k}{val_sep}{v}"
+        if k != list(kwargs)[-1]:
+            log_str += fld_sep
+    logging.info(log_str)
+
+
+def guaranteed_call_pair_strat_client(pydantic_basemodel_type: Type | None, client_callable: Callable,
+                                      **kwargs):
+    """
+    Call addressbook client call but if call fails for connection error or server not ready error logs it
+    with specific pattern which is matched by pair_strat_log_analyzer and the call is call from there in loop till
+    it is successfully done
+    :param pydantic_basemodel_type: BaseModel of Document type need to update/create,
+                                    pass None if callable is query method
+    :param client_callable: client callable to be called
+    :param kwargs: params to be set in passed pydantic_basemodel_type to pass in `client_callable` or directly
+                   passed to `client_callable` in case client_callable is query type
+    :return:
+    """
+    try:
+        if pydantic_basemodel_type is not None:
+            # Handling for DB operations: create/update/partial_update
+
+            pydantic_basemodel_type_obj = pydantic_basemodel_type(**kwargs)
+
+            if str(client_callable.__name__).startswith("patch_"):
+                client_callable(jsonable_encoder(pydantic_basemodel_type_obj, by_alias=True, exclude_none=True))
+            else:
+                client_callable(pydantic_basemodel_type_obj)
+        else:
+            # Handling for query operations - queries doesn't take pydantic_obj as param
+            client_callable(**kwargs)
+    except Exception as e:
+        if "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
+            logging.exception("Connection Error in addressbook server call, likely server is "
+                              "down, putting pair_strat client call as log for pair_strat_log "
+                              "analyzer handling")
+            log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
+        elif "service is not initialized yet" in str(e):
+            # Check is server up
+            logging.exception("addressbook service not up yet, likely server restarted, but is "
+                              "not ready yet, putting pair_strat client call as log for pair_strat_log "
+                              "analyzer handling")
+            log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
+        else:
+            raise Exception(f"guaranteed_call_pair_strat_client failed with exception: {e}")
 
 
 class MDShellEnvData(BaseModel):

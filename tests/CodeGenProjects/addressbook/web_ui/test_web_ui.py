@@ -1,14 +1,16 @@
 import json
+import os
 from typing import Dict, List
 import random
 import time
 import copy
 
 import pytest
-from selenium.common import NoSuchElementException
 from fastapi.encoders import jsonable_encoder
 
 # third party imports
+from selenium.webdriver import Keys
+from selenium.common import NoSuchElementException
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
@@ -33,12 +35,12 @@ from tests.CodeGenProjects.addressbook.web_ui.utility_test_functions import (
     validate_val_max_n_default_fld_value_equal_or_not, show_nested_fld_in_tree_layout,
     get_val_min_n_val_max_of_fld, select_or_unselect_checkbox, get_replaced_str, get_commonkey_items, change_layout,
     double_click, hover_over_on_element, get_progress_bar_level, get_str_value, set_val_max_input_fld,
-    set_val_min_input_fld)
+    set_val_min_input_fld, get_server_populate_fld, set_input_value_for_comma_seperated)
 from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
                                                                           SearchType)
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import TopOfBookBaseModel, QuoteOptional
 from Flux.CodeGenProjects.addressbook.generated.FastApi.strat_manager_service_http_routes import (
-    PairStratBaseModel)
+    PairStratBaseModel, StratState, UILayoutBaseModel, WidgetUIDataElementOptional)
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import \
     StratExecutorServiceHttpClient
 
@@ -333,7 +335,6 @@ def test_widget_type(driver_type, schema_dict: Dict[str, any]):
     #                                            widget_type=WidgetType.INDEPENDENT,
     #                                            widget_name=widget_name, field_name=field_name)
     #         print("xpath is:-", xpath)
-
 
 
 
@@ -676,78 +677,23 @@ def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, w
         copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="server_populate")
     print(result)
     assert result[0]
-    # table_layout
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        widget = driver.find_element(By.ID, widget_name)
-        scroll_into_view(driver=driver, element=widget)
-        click_button_with_name(widget=widget, button_name="Show")
-        click_button_with_name(widget=widget, button_name="Edit")
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
-                                              field_name=field_name)
-            is_enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-            assert not is_enabled
 
-    # tree_layout
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        widget = driver.find_element(By.ID, widget_name)
-        scroll_into_view(driver=driver, element=widget)
-        switch_layout(widget=widget, layout=Layout.TREE)
-        show_hidden_fields_in_tree_layout(widget=widget, driver=driver)
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            field_names: List[str] = count_fields_in_tree(widget=widget)
-            # validate that server populates field name does not present in tree layout after clicking on edit btn
-            assert field_name not in field_names
+    # TABLE LAYOUT
+    get_server_populate_fld(driver=driver,  schema_dict=copy.deepcopy(schema_dict), layout=Layout.TABLE, widget_type=WidgetType.INDEPENDENT)
+
+    # TREE LAYOUT
+    get_server_populate_fld(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TREE,  widget_type=WidgetType.INDEPENDENT)
 
     driver.refresh()
     time.sleep(Delay.SHORT.value)
 
-    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
-                                          flux_property="server_populate")
-    print(result)
-    assert result[0]
+    # TABLE LAYOUT
+    get_server_populate_fld(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TABLE,
+                            widget_type=WidgetType.DEPENDENT)
 
-    # table_layout
-    # TODO: exch_id field is not present in common_key in pair strat params widget
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        widget = driver.find_element(By.ID, widget_name)
-        strat_collection_widget = driver.find_element(By.ID, "strat_collection")
-        scroll_into_view(driver=driver, element=widget)
-        switch_layout(widget=widget, layout=Layout.TABLE)
-        click_button_with_name(widget=widget, button_name="Show")
-        if widget_name == "pair_strat_params":
-            click_button_with_name(widget=strat_collection_widget, button_name="Edit")
-        else:
-            continue
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            if field_name == "exch_id":
-                continue
-            xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT, widget_name=widget_name,
-                                              field_name=field_name)
-            is_enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-            assert not is_enabled
-
-    # tree_layout
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        widget = driver.find_element(By.ID, widget_name)
-        scroll_into_view(driver=driver, element=widget)
-        switch_layout(widget=widget, layout=Layout.TREE)
-        show_hidden_fields_in_tree_layout(widget=widget, driver=driver)
-
-        # clicked on edit btn in table layout already so server populate field will disappear from tree layout
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            field_names: List[str] = count_fields_in_tree(widget=widget)
-            # validate that server populates field name does not present in tree layout after clicking on edit btn
-            assert field_name not in field_names
-
+    # TABLE LAYOUT
+    get_server_populate_fld(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TREE,
+                            widget_type=WidgetType.DEPENDENT)
 
     # WidgetType: REPEATED_INDEPENDENT
     # Note: Currently repeated type is not supported `Edit` mode and only in `id` field is present
@@ -825,66 +771,69 @@ def test_flux_fld_orm_no_update_in_widget(clean_and_set_limits, driver_type, web
 
 def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                             schema_dict, pair_strat: Dict):
-    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
-                                          flux_property="display_type")
-    print(result)
-    assert result[0]
+    # result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+    #                                       flux_property="display_type")
+    # print(result)
+    # assert result[0]
+    #
+    # # table_layout
+    # field_name_n_input_value: Dict[str] = {}
+    # for widget_query in result[1]:
+    #     widget_name = widget_query.widget_name
+    #     widget = driver.find_element(By.ID, widget_name)
+    #     scroll_into_view(driver=driver, element=widget)
+    #     click_button_with_name(widget=widget, button_name="Edit")
+    #     if widget_name == "order_limits":
+    #         switch_layout(widget=widget, layout=Layout.TABLE)
+    #     for field_query in widget_query.fields:
+    #         field_name: str = field_query.field_name
+    #         # in strat status widget residual notional and balance notional fld disabled in table layout only
+    #         if field_name == "residual_notional" or field_name == "balance_notional":
+    #             continue
+    #         val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
+    #         input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max, val_min=val_min)
+    #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+    #                                                widget_name=widget_name, field_name=field_name)
+    #         # enabled_or_not: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+    #         # if enabled_or_not:
+    #         set_table_input_field(widget=widget, xpath=xpath, value=str(input_value))
+    #         # Add key-value pair
+    #         field_name_n_input_value[field_name] = input_value
+    #         # else:
+    #         #     continue
+    set_input_value_for_comma_seperated(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TABLE)
+    # validate_comma_separated_values(driver=driver, widget=widget,
+    #                                    layout=Layout.TABLE, field_name_n_input_value=field_name_n_input_value)
+    #
+    # # tree_layout
+    # field_name_n_input_value: Dict[str] = {}
+    # for widget_query in result[1]:
+    #     widget_name = widget_query.widget_name
+    #     widget = driver.find_element(By.ID, widget_name)
+    #     scroll_into_view(driver=driver, element=widget)
+    #     switch_layout(widget=widget, layout=Layout.TREE)
+    #     click_button_with_name(widget=widget, button_name="Edit")
+    #     # in strat status sec id fld is none, but it should be filled
+    #     if widget_name == "strat_status":
+    #         show_nested_fld_in_tree_layout(widget=widget)
+    #         continue
+    #     for field_query in widget_query.fields:
+    #         field_name: str = field_query.field_name
+    #         val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
+    #         input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max, val_min=val_min)
+    #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+    #                                                widget_name=widget_name, field_name=field_name)
+    #         # xpath = "residual.security.sec_id"
+    #         # input_value = "100"
+    #         # field_name = "sec_id"
+    #         set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=input_value)
+    #         # Add key-value pair
+    #         field_name_n_input_value[xpath] = input_value
+    #
+    #     validate_comma_separated_values(driver=driver, widget=widget,
+    #                                         layout=Layout.TREE, field_name_n_input_value=field_name_n_input_value)
 
-    # table_layout
-    field_name_n_input_value: Dict[str] = {}
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        widget = driver.find_element(By.ID, widget_name)
-        scroll_into_view(driver=driver, element=widget)
-        click_button_with_name(widget=widget, button_name="Edit")
-        if widget_name == "order_limits":
-            switch_layout(widget=widget, layout=Layout.TABLE)
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            # in strat status widget residual notional and balance notional fld disabled in table layout only
-            if field_name == "residual_notional" or field_name == "balance_notional":
-                continue
-            val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
-            input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max, val_min=val_min)
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-                                                   widget_name=widget_name, field_name=field_name)
-            # enabled_or_not: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-            # if enabled_or_not:
-            set_table_input_field(widget=widget, xpath=xpath, value=str(input_value))
-            # Add key-value pair
-            field_name_n_input_value[field_name] = input_value
-            # else:
-            #     continue
-        validate_comma_separated_values(driver=driver, widget=widget,
-                                        layout=Layout.TABLE, field_name_n_input_value=field_name_n_input_value)
-
-    # tree_layout
-    field_name_n_input_value: Dict[str] = {}
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        widget = driver.find_element(By.ID, widget_name)
-        scroll_into_view(driver=driver, element=widget)
-        switch_layout(widget=widget, layout=Layout.TREE)
-        click_button_with_name(widget=widget, button_name="Edit")
-        # in strat status sec id fld is none, but it should be filled
-        if widget_name == "strat_status":
-            show_nested_fld_in_tree_layout(widget=widget)
-            continue
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
-            input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max, val_min=val_min)
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-                                                   widget_name=widget_name, field_name=field_name)
-            # xpath = "residual.security.sec_id"
-            # input_value = "100"
-            # field_name = "sec_id"
-            set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=input_value)
-            # Add key-value pair
-            field_name_n_input_value[xpath] = input_value
-
-        validate_comma_separated_values(driver=driver, widget=widget,
-                                            layout=Layout.TREE, field_name_n_input_value=field_name_n_input_value)
+    set_input_value_for_comma_seperated(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TREE)
 
     # WidgetType: DEPENDENT
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
@@ -1913,3 +1862,140 @@ def test_disable_ws_on_edit(clean_and_set_limits, web_project, driver, driver_ty
                     default_field = default_field + "." + field_name
                     value = common_key_value[default_field]
                     assert value != top_of_book[field_query.properties["parent_title"]][field_name]
+
+
+def test_strat_load_and_unload(clean_and_set_limits, web_project, driver, driver_type):
+    pair_strat_from_web_client: PairStratBaseModel = (
+        strat_manager_service_native_web_client.get_all_pair_strat_client())[-1]
+
+    strat_state = StratState.StratState_READY
+    pair_strat: PairStratBaseModel = PairStratBaseModel(id=pair_strat_from_web_client.id, strat_state=strat_state)
+    strat_manager_service_native_web_client.patch_pair_strat_client(jsonable_encoder(
+        pair_strat, by_alias=True, exclude_none=True))
+
+    widget: WebElement = driver.find_element(By.ID, "strat_collection")
+    widget.find_element(
+        By.XPATH, '//*[@id="strat_collection"]/div[2]/div[3]/table/tbody/tr/td[2]/button').click()
+
+    input_element = widget.find_element(
+        By.XPATH, '//*[@id="strat_collection"]/div/div[1]/div/div/div/input')
+    input_element.click()
+    input_element.send_keys(Keys.ARROW_DOWN + Keys.ENTER)
+
+    widget.find_element(By.XPATH, '//*[@id="strat_collection"]/div/div[1]/button').click()
+
+    strat_state = StratState.StratState_SNOOZED
+    pair_strat_from_web_client = strat_manager_service_native_web_client.get_all_pair_strat_client()[-1]
+
+    assert strat_state == pair_strat_from_web_client.strat_state
+
+
+def test_download_button_in_widgets(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
+    download_path: str = "C:/Users/pc/Downloads"
+
+    for widget_name, widget_query in schema_dict.items():
+        if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element", "pair_strat_params"]:
+            continue
+
+        widget: WebElement = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        time.sleep(Delay.SHORT.value)
+        widget.find_element(By.NAME, "Export").click()
+        time.sleep(Delay.DEFAULT.value)
+        file_name: str = widget_name + ".xlsx"
+        file_name_list_in_download_dir: List[str] = os.listdir(download_path)
+        file_name_list: List[str] = []
+        assert file_name in file_name_list_in_download_dir
+        file_name_list.append(file_name)
+
+    for file in file_name_list:
+        os.remove(os.path.join(download_path, file))
+
+
+def test_ui_chart_in_market_depth_widget(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
+    for widget_name, widget_query in schema_dict.items():
+        if widget_name == "market_depth":
+            widget: WebElement = driver.find_element(By.ID, widget_name)
+            scroll_into_view(driver=driver, element=widget)
+            switch_layout(widget=widget, layout=Layout.CHART)
+            click_button_with_name(widget=widget, button_name="Create")
+            nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
+            input_fields = nested_tree_dialog.find_element(By.CLASS_NAME, "infinity-menu-container")
+
+            # use dict to store expected chart data
+            chart_n_layout_name: str = "test"
+
+            # use already existing methods to set input, dropdown or autocomplete fields
+            # if not already exists, create one
+            input_fields.find_element(By.ID, "chart_name").send_keys(chart_n_layout_name)
+            # never use entire xpath to access an element for this project
+            driver.find_element(
+                By.XPATH, "/html/body/div[2]/div[3]/div/div/div/div/ul/div[3]/div[2]/button").click()
+            driver.find_element(By.XPATH, "/html/body/div[2]/div[3]/div/div/div/div/ul/div[3]/div[2]").click()
+            input_fields.find_element(By.ID, "partition_fld").click()
+            input_fields.find_element(By.ID, "partition_fld").send_keys(Keys.ARROW_DOWN + Keys.ENTER)
+            input_fields.find_element(By.ID, "type").send_keys(Keys.ARROW_DOWN + Keys.ARROW_DOWN + Keys.ENTER)
+            input_fields.find_element(By.ID, "x").send_keys("px" + Keys.ARROW_DOWN + Keys.ENTER)
+            input_fields.find_element(By.ID, "y").send_keys("qty" + Keys.ARROW_DOWN + Keys.ENTER)
+            nested_tree_dialog.find_element(By.NAME, "Save").click()
+            time.sleep(Delay.DEFAULT.value)
+
+            save_layout(driver=driver, layout_name=chart_n_layout_name)
+            change_layout(driver=driver, layout_name=chart_n_layout_name)
+
+            chart_widget = widget.find_element(By.CLASS_NAME, "MuiListItem-root")
+            text_element = chart_widget.find_element(By.CLASS_NAME, "MuiTypography-body1")
+            text = text_element.text
+            assert chart_n_layout_name == text
+
+            ui_layout: UILayoutBaseModel = (
+                strat_manager_service_native_web_client.
+                get_ui_layout_from_index_client(profile_id=chart_n_layout_name)[-1])
+
+            print(f"ui_layout: {ui_layout}")
+            assert ui_layout.profile_id == chart_n_layout_name
+
+            widget_ui_data_elements: List[WidgetUIDataElementOptional] = ui_layout.widget_ui_data_elements
+
+            for widget_ui_data_element in widget_ui_data_elements:
+                if widget_ui_data_element.i == "market_depth":
+                    assert widget_ui_data_element.i == "market_depth"
+                    # use the expected chart data dict to verify
+                    assert widget_ui_data_element.chart_data[-1].chart_name == chart_n_layout_name
+                    assert widget_ui_data_element.chart_data[-1].partition_fld == "symbol"
+                    assert widget_ui_data_element.chart_data[-1].series[-1].type == "bar"
+
+            # Edit the chart
+            click_button_with_name(widget=widget, button_name="Edit")
+            nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
+            input_fields = nested_tree_dialog.find_element(By.CLASS_NAME, "infinity-menu-container")
+
+            input_fields.find_element(By.ID, "type").send_keys(
+                Keys.ARROW_DOWN + Keys.ARROW_DOWN + Keys.ARROW_DOWN + Keys.ENTER)
+            nested_tree_dialog.find_element(By.NAME, "Save").click()
+            time.sleep(Delay.DEFAULT.value)
+
+            save_layout(driver=driver, layout_name=chart_n_layout_name)
+
+            ui_layout: UILayoutBaseModel = (
+                strat_manager_service_native_web_client.
+                get_ui_layout_from_index_client(profile_id=chart_n_layout_name)[-1])
+
+            print(f"ui_layout: {ui_layout}")
+            assert ui_layout.profile_id == chart_n_layout_name
+
+            widget_ui_data_elements: List[WidgetUIDataElementOptional] = ui_layout.widget_ui_data_elements
+
+            for widget_ui_data_element in widget_ui_data_elements:
+                if widget_ui_data_element.i == "market_depth":
+                    assert widget_ui_data_element.i == "market_depth"
+                    assert widget_ui_data_element.chart_data[-1].chart_name == chart_n_layout_name
+                    assert widget_ui_data_element.chart_data[-1].partition_fld == "symbol"
+                    assert widget_ui_data_element.chart_data[-1].series[-1].type == "scatter"
+
+            # delete the chart and layout
+            chart_widget.find_element(By.CLASS_NAME, "MuiButtonBase-root").click()
+            # verify the chart is removed from ui
+            # scenario: chart with the same name is created again
+            # expected it would override the existing chart with same name
+            strat_manager_service_native_web_client.delete_ui_layout_client(ui_layout.id)

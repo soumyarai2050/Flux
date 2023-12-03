@@ -2,10 +2,14 @@
 import copy
 import glob
 import logging
+import os
+import signal
 import subprocess
 import stat
 import time
 import threading
+import requests
+import psutil
 
 # third-party package imports
 from pymongo import MongoClient
@@ -20,12 +24,13 @@ from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import (
     YAMLConfigurationManager, strat_executor_config_yaml_dict, ps_port,
     CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_portfolio_status,
     get_new_portfolio_limits, get_new_order_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_strat,
-    get_strat_key_from_pair_strat)
+    get_strat_key_from_pair_strat, get_id_from_strat_key)
 from Flux.CodeGenProjects.addressbook.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
     StratExecutorServiceHttpClient)
+from FluxPythonUtils.scripts.utility_functions import get_pid_from_port, is_process_running
 
 
 class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRoutesCallback):
@@ -88,7 +93,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         self.service_up: bool = False
         self.service_ready: bool = False
         self.static_data: SecurityRecordManager | None = None
-        self.pair_strat_id_to_executor_process_dict: Dict[int, subprocess.Popen] = {}
+        self.pair_strat_id_to_executor_process_id_dict: Dict[int, int] = {}
         self.port_to_executor_http_client_dict: Dict[int, StratExecutorServiceHttpClient] = {}
 
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
@@ -128,10 +133,27 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     portfolio_limits)
 
     @staticmethod
-    async def _check_and_create_portfolio_status_and_order_n_portfolio_limits() -> None:
-        await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_status()
-        await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_order_limits()
-        await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_limits()
+    async def _check_n_create_strat_collection():
+        async with StratCollection.reentrant_lock:
+            strat_collection_list: List[StratCollection] = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_collection_http())
+            if len(strat_collection_list) == 0:
+                created_strat_collection = StratCollection(_id=1, loaded_strat_keys=[], buffered_strat_keys=[])
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_collection_http(
+                    created_strat_collection)
+
+    @staticmethod
+    async def _check_and_create_start_up_models() -> bool:
+        try:
+            await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_status()
+            await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_order_limits()
+            await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_limits()
+            await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_strat_collection()
+        except Exception as e:
+            logging.exception(f"_check_and_create_start_up_models failed, exception: {e}")
+            return False
+        else:
+            return True
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -154,21 +176,20 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     if not self.service_ready:
                         # running all existing executor
                         self.service_ready = True
-                        self.run_existing_executors()
+                        self.recover_existing_executors()
                     self.service_ready = True
-                    print(f"INFO: service is ready: {datetime.datetime.now().time()}")
+                    print(f"INFO: addressbook service is ready: {datetime.datetime.now().time()}")
                 else:
                     logging.warning(f"_app_launch_pre_thread_func: service not ready yet;;;service_up : "
                                     f"{self.service_up}")
                 if not self.service_up:
                     try:
                         if is_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
-                            run_coro = self._check_and_create_portfolio_status_and_order_n_portfolio_limits()
+                            run_coro = self._check_and_create_start_up_models()
                             future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
                             try:
                                 # block for task to finish
-                                future.result()
-                                self.service_up = True
+                                self.service_up = future.result()
                                 should_sleep = False
                             except Exception as e:
                                 err_str_ = (f"_check_and_create_portfolio_status_and_order_n_portfolio_limits "
@@ -207,9 +228,9 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     async def async_run_crashed_executors(self) -> None:
         pending_strats: List[PairStrat] = []
         pending_strats_id_list: List[int] = []
-        for pair_strat_id, executor_process in self.pair_strat_id_to_executor_process_dict.items():
-            if executor_process.poll() is not None:
-                logging.info(f"Subprocess for pair_strat with id: {pair_strat_id} found killed, "
+        for pair_strat_id, executor_process_id in self.pair_strat_id_to_executor_process_id_dict.items():
+            if not is_process_running(executor_process_id):
+                logging.info(f"process for pair_strat with id: {pair_strat_id} found killed, "
                              f"restarting again ...")
                 pending_strats_id_list.append(pair_strat_id)
 
@@ -219,7 +240,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 pending_strats.append(pair_strat)
 
         for pair_strat_id in pending_strats_id_list:
-            del self.pair_strat_id_to_executor_process_dict[pair_strat_id]
+            del self.pair_strat_id_to_executor_process_id_dict[pair_strat_id]
 
         if pending_strats:
             await self._async_start_executor_server_by_task_submit(pending_strats, is_crash_recovery=True)
@@ -246,8 +267,9 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     completed_task.result()
                 except Exception as e:
                     idx = int(completed_task.get_name())
-                    logging.exception(f"start_executor_server failed;;; exception: {e}, pair_strat: "
-                                      f"{pending_strats[idx]}")
+                    logging.exception(f"start_executor_server failed for pair_strat_id: {pending_strats[idx]} - "
+                                      f"can't recover executor server for it;;; exception: {e}, "
+                                      f"pair_strat: {pending_strats[idx]}")
             if pending_tasks:
                 tasks = [*pending_tasks, ]
             else:
@@ -269,23 +291,79 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         os.chmod(run_fx_symbol_overview_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{run_fx_symbol_overview_file_path}"])
 
-    async def async_run_existing_executors(self) -> None:
-        existing_pair_strats = \
+    async def async_recover_existing_executors(self) -> None:
+        loaded_pair_strats: List[PairStrat] = \
             await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http()
-        pending_strats = []
-        for pair_strat in existing_pair_strats:
-            if is_ongoing_strat(pair_strat):
-                pending_strats.append(pair_strat)
-            # else not required: not starting if existing executor is not ongoing
+        strat_collection_list: List[StratCollection] =  \
+            await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_collection_http()
 
-        if pending_strats:
-            # If some strat is ongoing at the time of restart, that means it is crashed strat which needs recovery
-            await self._async_start_executor_server_by_task_submit(pending_strats, is_crash_recovery=True)
+        if strat_collection_list:
+            if len(strat_collection_list) == 1:
+                strat_collection = strat_collection_list[0]
+                loaded_strat_keys: List[str] = strat_collection.loaded_strat_keys
 
-    def run_existing_executors(self) -> None:
+                loaded_pair_strat_id_list: List[int] = []
+                for loaded_strat_key in loaded_strat_keys:
+                    loaded_pair_strat_id_list.append(get_id_from_strat_key(loaded_strat_key))
+
+                crashed_strats: List[PairStrat] = []
+                for pair_strat in loaded_pair_strats:
+                    if pair_strat.id in loaded_pair_strat_id_list:
+                        if pair_strat.port is not None:
+                            strat_executor_http_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(
+                                pair_strat.host, pair_strat.port)
+                            try:
+                                # Checking if get-request works
+                                strat_executor_http_client.get_all_ui_layout_client()
+                            except requests.exceptions.Timeout:
+                                # If timeout error occurs it is most probably that executor server got hung/stuck
+                                # logging and killing this executor
+                                logging.exception(f"Found executor with port: {pair_strat.port} in hung state, killing "
+                                                  f"the executor process;;; pair_strat: {pair_strat}")
+                                pid = get_pid_from_port(pair_strat.port)
+                                os.kill(pid, signal.SIGKILL)
+
+                                # Updating pair_strat
+                                await (StratManagerServiceRoutesCallbackBaseNativeOverride.
+                                       underlying_partial_update_pair_strat_http(jsonable_encoder(
+                                           PairStrat(_id=pair_strat.id, strat_state=StratState.StratState_ERROR,
+                                                     port=None, is_partially_running=False,
+                                                     is_executor_running=False), by_alias=True, exclude_none=True)))
+
+                            except Exception as e:
+                                if "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
+                                    logging.error(f"PairStrat found to have port set to {pair_strat.port} but executor "
+                                                  f"server is down, recovering executor for pair_strat_id: "
+                                                  f"{pair_strat.id};;; pair_strat: {pair_strat}")
+                                    crashed_strats.append(pair_strat)
+                                else:
+                                    logging.exception("Something went wrong while checking is_service_up of executor "
+                                                      f"with port: {pair_strat.port} in pair_strat strat_up recovery "
+                                                      f"check - force kill this executor if is running, "
+                                                      f"exception: {e};;; pair_strat: {pair_strat}")
+                            else:
+                                # If executor server is still up and is in healthy state - Finding and adding
+                                # process_id to pair_strat_id_to_executor_process_dicts
+                                pid = get_pid_from_port(pair_strat.port)
+                                self.pair_strat_id_to_executor_process_id_dict[pair_strat.id] = pid
+                        else:
+                            crashed_strats.append(pair_strat)
+                    # else not required: avoiding if pair_strat is not in loaded_strats
+
+                # Restart crashed executors
+                if crashed_strats:
+                    await self._async_start_executor_server_by_task_submit(crashed_strats, is_crash_recovery=True)
+            else:
+                err_str_ = "Unexpected: Found more than 1 strat_collection objects - Ignoring any executor recovery"
+                logging.error(err_str_)
+        else:
+            err_str_ = "No strat_collection model exists yet - no executor to recover"
+            logging.debug(err_str_)
+
+    def recover_existing_executors(self) -> None:
         if self.asyncio_loop:
             # coro needs public method
-            run_existing_executors_coro = self.async_run_existing_executors()
+            run_existing_executors_coro = self.async_recover_existing_executors()
             future = asyncio.run_coroutine_threadsafe(run_existing_executors_coro, self.asyncio_loop)
         else:
             raise Exception("run_existing_executors failed - self.asyncio_loop found None")
@@ -452,24 +530,16 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     @except_n_log_alert()
     async def create_pair_strat_post(self, pair_strat_obj: PairStrat):
+        # @@@ Warning: Below handling of state collection is handled from ui also - see where can code be remove
+        # to avoid duplicate
         async with StratCollection.reentrant_lock:
-            strat_collection_obj_list = (
-                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_collection_http())
-
+            strat_collection_obj: StratCollection = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.
+                underlying_read_strat_collection_by_id_http(1))
             strat_key = get_strat_key_from_pair_strat(pair_strat_obj)
-            if len(strat_collection_obj_list) == 0:
-                created_strat_collection = StratCollection(_id=1, loaded_strat_keys=[strat_key], buffered_strat_keys=[])
-                created_strat_collection = (
-                    await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_collection_http(
-                        created_strat_collection))
-            elif len(strat_collection_obj_list) == 1:
-                strat_collection_obj = strat_collection_obj_list[0]
-                strat_collection_obj.loaded_strat_keys.append(strat_key)
-                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
-                    strat_collection_obj)
-            else:
-                err_str_: str = "Unexpected: Found Multiple StratCollections"
-                logging.error(err_str_)
+            strat_collection_obj.loaded_strat_keys.append(strat_key)
+            await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
+                strat_collection_obj)
 
     @staticmethod
     async def _apply_checks_n_log_error(pair_strat: PairStrat):
@@ -553,6 +623,10 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     pass
             # else not required: create strat lock file only if moving the strat state from
             # StratState_READY to StratState_ACTIVE
+        if updated_pair_strat_obj.strat_state == StratState.StratState_DONE:
+            # warning and above log level is required
+            logging.warning(f"ResetLogAnalyzerCache;;;pair_strat_log_key: "
+                            f"{get_pair_strat_log_key(updated_pair_strat_obj)}")
         return check_passed
 
     def _update_port_to_executor_http_client_dict_from_updated_pair_strat(self, updated_pair_strat_obj: PairStrat):
@@ -565,6 +639,8 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     async def update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
+            # @@@ IMPORTANT: below error string is used to catch this specific exception, please update
+            # all catch handling too if error msg is changed
             err_str_ = "update_pair_strat_pre not ready - service is not initialized yet, " \
                        f"pair_strat_key: {get_pair_strat_log_key(updated_pair_strat_obj)}"
             logging.error(err_str_)
@@ -593,6 +669,8 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     async def partial_update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj_dict: Dict):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
+            # @@@ IMPORTANT: below error string is used to catch this specific exception, please update
+            # all catch handling too if error msg is changed
             err_str_ = "partial_update_pair_strat_pre not ready - service is not initialized yet, " \
                        f"pair_strat_key: {get_pair_strat_log_key(stored_pair_strat_obj)}"
             logging.error(err_str_)
@@ -668,13 +746,16 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', "1", '&'])
         else:
             executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', '&'])
-        self.pair_strat_id_to_executor_process_dict[pair_strat.id] = executor
+
+        logging.info(f"Launched {executor_path} ...")
+        self.pair_strat_id_to_executor_process_id_dict[pair_strat.id] = executor.pid
 
     def _close_executor_server(self, pair_strat_id: int) -> None:
-        process = self.pair_strat_id_to_executor_process_dict[pair_strat_id]
-        process.terminate()
+        process_id = self.pair_strat_id_to_executor_process_id_dict.get(pair_strat_id)
+        # process.terminate()
+        os.kill(process_id, signal.SIGINT)
 
-        del self.pair_strat_id_to_executor_process_dict[pair_strat_id]
+        del self.pair_strat_id_to_executor_process_id_dict[pair_strat_id]
 
     async def get_ongoing_strats_symbol_n_exch_query_pre(self,
                                                          ongoing_strat_symbols_class_type: Type[
@@ -706,10 +787,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 before_len += 1
         return [ongoing_strat_symbols_n_exchange]
 
-    @staticmethod
-    def get_id_from_strat_key(unloaded_strat_key: str) -> int:
-        parts: List[str] = (unloaded_strat_key.split("-"))
-        return parse_to_int(parts[-1])
 
     def _drop_executor_db_for_deleting_pair_strat(self, mongo_server_uri: str, pair_strat_id: int,
                                                   sec_id: str, side: Side):
@@ -828,7 +905,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             unloaded_strat_key: str
             for unloaded_strat_key in unloaded_strat_keys_frozenset:
                 if unloaded_strat_key in updated_strat_collection_obj.buffered_strat_keys:  # unloaded not deleted
-                    pair_strat_id: int = self.get_id_from_strat_key(unloaded_strat_key)
+                    pair_strat_id: int = get_id_from_strat_key(unloaded_strat_key)
                     pair_strat = \
                         await (StratManagerServiceRoutesCallbackBaseNativeOverride.
                                underlying_read_pair_strat_by_id_http(pair_strat_id))
@@ -893,7 +970,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             reloaded_strat_key: str
             for reloaded_strat_key in reloaded_strat_keys_frozenset:
                 if reloaded_strat_key in updated_strat_collection_obj.loaded_strat_keys:  # loaded not deleted
-                    pair_strat_id: int = self.get_id_from_strat_key(reloaded_strat_key)
+                    pair_strat_id: int = get_id_from_strat_key(reloaded_strat_key)
                     pair_strat = \
                         await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_by_id_http(
                             pair_strat_id)

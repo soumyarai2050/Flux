@@ -1,4 +1,3 @@
-import json
 from typing import Optional
 
 from selenium import webdriver
@@ -590,6 +589,8 @@ def switch_layout(widget: WebElement, layout: Layout) -> None:
         btn_name = "UI_TREE"
     elif layout == Layout.TABLE:
         btn_name = "UI_TABLE"
+    elif layout == Layout.CHART:
+        btn_name = "UI_CHART"
     try:
         widget.find_element(By.NAME, "Layout").click()
         time.sleep(Delay.SHORT.value)
@@ -1398,6 +1399,15 @@ def get_pressed_n_unpressed_btn_txt(widget: WebElement) -> str:
     button_text = button_widget.text
     return button_text
 
+def validate_server_populate_fld(widget: WebElement, xpath: str, field_name: str, layout: Layout):
+    if layout == Layout.TABLE:
+        is_enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+        assert not is_enabled
+    else:
+        field_names: List[str] = count_fields_in_tree(widget=widget)
+        # validate that server populates field name does not present in tree layout after clicking on edit btn
+        assert field_name not in field_names
+
 
 def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, schema_dict: Dict[str, any]):
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
@@ -1444,7 +1454,7 @@ def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, sc
             elif layout == Layout.TREE:
                 set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(val_max))
         validate_flux_fld_val_max_in_widget(driver=driver, widget=widget, widget_name=widget_name,input_type=input_type,
-                                                xpath_n_field_names=xpath_n_field_names)
+          xpath_n_field_names=xpath_n_field_names)
 
 def set_val_min_input_fld(driver: WebDriver, layout: Layout, input_type: str, schema_dict: Dict[str, any]):
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
@@ -1490,3 +1500,153 @@ def set_val_min_input_fld(driver: WebDriver, layout: Layout, input_type: str, sc
             #else:
                 #continue
         validate_flux_fld_val_min_in_widget(widget=widget, field_name=field_name)
+
+
+
+def get_server_populate_fld(driver: WebDriver, schema_dict, layout: Layout, widget_type: WidgetType):
+
+    result = get_widgets_by_flux_property(
+        copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="server_populate")
+    assert result[0]
+
+    # table layout and tree
+    if widget_type == WidgetType.INDEPENDENT:
+        for widget_query in result[1]:
+            widget_name = widget_query.widget_name
+            widget = driver.find_element(By.ID, widget_name)
+            scroll_into_view(driver=driver, element=widget)
+            if layout == Layout.TABLE:
+                click_button_with_name(widget=widget, button_name="Show")
+                click_button_with_name(widget=widget, button_name="Edit")
+            else:
+                switch_layout(widget=widget, layout=Layout.TREE)
+                show_hidden_fields_in_tree_layout(widget=widget, driver=driver)
+
+            for field_query in widget_query.fields:
+                field_name: str = field_query.field_name
+                xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+                                                  widget_name=widget_name,
+                                                  field_name=field_name)
+                if layout == Layout.TABLE:
+                    validate_server_populate_fld(widget=widget, xpath=xpath, field_name=field_name, layout=Layout.TABLE)
+                else:
+                    validate_server_populate_fld(widget=widget, xpath=xpath, field_name=field_name, layout=Layout.TREE)
+
+
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
+                                          flux_property="server_populate")
+    print(result)
+    assert result[0]
+
+    # table_layout and tree
+    # TODO: exch_id field is not present in common_key in pair strat params widget
+    if widget_type == WidgetType.DEPENDENT:
+        for widget_query in result[1]:
+            widget_name = widget_query.widget_name
+            widget = driver.find_element(By.ID, widget_name)
+            scroll_into_view(driver=driver, element=widget)
+            if layout == Layout.TABLE:
+                switch_layout(widget=widget, layout=Layout.TABLE)
+                click_button_with_name(widget=widget, button_name="Show")
+                if widget_name == "pair_strat_params":
+                    strat_collection_widget = driver.find_element(By.ID, "strat_collection")
+                    click_button_with_name(widget=strat_collection_widget, button_name="Edit")
+                else:
+                    continue
+            else:
+                switch_layout(widget=widget, layout=Layout.TREE)
+                show_hidden_fields_in_tree_layout(widget=widget, driver=driver)
+            for field_query in widget_query.fields:
+                field_name: str = field_query.field_name
+                if field_name == "exch_id":
+                    continue
+                xpath = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT,
+                                                  widget_name=widget_name,
+                                                  field_name=field_name)
+                if layout == Layout.TABLE:
+                    validate_server_populate_fld(widget=widget, xpath=xpath, field_name=field_name, layout=Layout.TABLE)
+                else:
+                    validate_server_populate_fld(widget=widget, xpath=xpath, field_name=field_name, layout=Layout.TREE)
+
+def set_input_value_for_comma_seperated(driver: WebDriver, schema_dict, layout: Layout):
+    result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+                                          flux_property="display_type")
+    print(result)
+    assert result[0]
+
+    # table Layout
+    field_name_n_input_value: Dict[str] = {}
+    for widget_query in result[1]:
+        widget_name = widget_query.widget_name
+        widget = driver.find_element(By.ID, widget_name)
+        scroll_into_view(driver=driver, element=widget)
+        click_button_with_name(widget=widget, button_name="Edit")
+        if widget_name == "order_limits" and layout == Layout.TABLE:
+            switch_layout(widget=widget, layout=Layout.TABLE)
+        if layout == Layout.TREE and widget_name == "order_limits":
+                pass
+        elif layout == Layout.TREE:
+            switch_layout(widget=widget, layout=Layout.TREE)
+            if widget_name == "strat_status":
+                show_nested_fld_in_tree_layout(widget=widget)
+                # continue
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            # in strat status widget residual notional and balance notional fld disabled in table layout only
+            if field_name == "residual_notional" or field_name == "balance_notional" and layout == Layout.TABLE:
+                continue
+            val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
+            input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max,
+                                                                                         val_min=val_min)
+            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+                                                   widget_name=widget_name, field_name=field_name)
+            # is_enabled: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
+            # if is_enabled:
+            # Add key-value pair
+            field_name_n_input_value[field_name] = input_value
+            # else:
+            #     continue
+            if layout == Layout.TABLE:
+                set_table_input_field(widget=widget, xpath=xpath, value=str(input_value))
+            else:
+                set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=input_value)
+        if layout == Layout.TABLE:
+            validate_comma_separated_values(driver=driver, widget=widget,
+                                        layout=Layout.TABLE, field_name_n_input_value=field_name_n_input_value)
+        else:
+            # remove save later
+            if widget_name == "strat_status":
+                click_button_with_name(widget=widget, button_name="Save")
+            validate_comma_separated_values(driver=driver, widget=widget,
+                                            layout=Layout.TREE, field_name_n_input_value=field_name_n_input_value)
+
+
+
+    # # tree_layout
+    # field_name_n_input_value: Dict[str] = {}
+    # for widget_query in result[1]:
+    #     widget_name = widget_query.widget_name
+    #     widget = driver.find_element(By.ID, widget_name)
+    #     scroll_into_view(driver=driver, element=widget)
+    #     switch_layout(widget=widget, layout=Layout.TREE)
+    #     click_button_with_name(widget=widget, button_name="Edit")
+    #     # in strat status sec id fld is none, but it should be filled
+    #     if widget_name == "strat_status":
+    #         show_nested_fld_in_tree_layout(widget=widget)
+    #         continue
+    #     for field_query in widget_query.fields:
+    #         field_name: str = field_query.field_name
+    #         val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
+    #         input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max,
+    #                                                                                      val_min=val_min)
+    #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
+    #                                                widget_name=widget_name, field_name=field_name)
+    #         # xpath = "residual.security.sec_id"
+    #         # input_value = "100"
+    #         # field_name = "sec_id"
+    #         set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=input_value)
+    #         # Add key-value pair
+    #         field_name_n_input_value[xpath] = input_value
+    #
+    #     validate_comma_separated_values(driver=driver, widget=widget,
+    #                                     layout=Layout.TREE, field_name_n_input_value=field_name_n_input_value)

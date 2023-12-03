@@ -87,8 +87,11 @@ def clean_all_collections_ignoring_ui_layout(db_names_list: List[str]) -> None:
                                     ignore_collections=["UILayout", "PortfolioAlert",
                                                         "RawPerformanceData", "ProcessedPerformanceAnalysis"])
         elif "addressbook" == db_name or "post_trade_engine" == db_name:
+            ignore_collections = ["UILayout"]
+            if db_name == "addressbook":
+                ignore_collections.append("StratCollection")
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
-                                    ignore_collections=["UILayout"])
+                                    ignore_collections=ignore_collections)
         elif "strat_executor_" in db_name:
             drop_mongo_database(mongo_server_uri=mongo_server_uri, database_name=db_name)
 
@@ -2356,6 +2359,14 @@ def renew_portfolio_alert():
                                                   alert_update_seq_num=0)
     log_analyzer_web_client.put_portfolio_alert_client(portfolio_alert_obj)
 
+def renew_strat_collection():
+    strat_collection_list: List[StratCollectionBaseModel] = (
+        strat_manager_service_native_web_client.get_all_strat_collection_client())
+    if strat_collection_list:
+        strat_collection = strat_collection_list[0]
+        strat_collection.loaded_strat_keys.clear()
+        strat_collection.buffered_strat_keys.clear()
+        strat_manager_service_native_web_client.put_strat_collection_client(strat_collection)
 
 def clean_executors_and_today_activated_symbol_side_lock_file():
     existing_pair_strat = strat_manager_service_native_web_client.get_all_pair_strat_client()

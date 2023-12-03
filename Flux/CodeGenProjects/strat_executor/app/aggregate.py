@@ -450,6 +450,49 @@ def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
                 }
             },
             {
+                "$setWindowFields": {
+                    "partitionBy": {"symbol": "$symbol", "side": "$side"},
+                    "sortBy": {
+                        "position": 1.0
+                    },
+                    "output": {
+                        "cumulative_notional": {
+                            "$sum": {
+                                "$multiply": [
+                                    "$px",
+                                    "$qty"
+                                ]
+                            },
+                            "window": {
+                                "documents": [
+                                    "unbounded",
+                                    "current"
+                                ]
+                            }
+                        },
+                        "cumulative_qty": {
+                            "$sum": "$qty",
+                            "window": {
+                                "documents": [
+                                    "unbounded",
+                                    "current"
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "$addFields": {
+                    "cumulative_avg_px": {
+                        "$divide": [
+                            "$cumulative_notional",
+                            "$cumulative_qty"
+                        ]
+                    }
+                }
+            },
+            {
                 '$sort': {
                     'px': -1
                 }
@@ -484,47 +527,47 @@ def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
 
 # Market Depth cumulative average
 cum_px_qty_aggregate_query = {"aggregate": [
-    {
-        "$setWindowFields": {
-            "partitionBy": {"symbol": "$symbol", "side": "$side"},
-            "sortBy": {
-                "position": 1.0
-            },
-            "output": {
-                "cumulative_notional": {
-                    "$sum": {
-                        "$multiply": [
-                            "$px",
-                            "$qty"
-                        ]
-                    },
-                    "window": {
-                        "documents": [
-                            "unbounded",
-                            "current"
-                        ]
-                    }
-                },
-                "cumulative_qty": {
-                    "$sum": "$qty",
-                    "window": {
-                        "documents": [
-                            "unbounded",
-                            "current"
-                        ]
-                    }
-                }
-            }
-        }
-    },
-    {
-        "$addFields": {
-            "cumulative_avg_px": {
-                "$divide": [
-                    "$cumulative_notional",
-                    "$cumulative_qty"
-                ]
-            }
-        }
-    }
+    # {
+    #     "$setWindowFields": {
+    #         "partitionBy": {"symbol": "$symbol", "side": "$side"},
+    #         "sortBy": {
+    #             "position": 1.0
+    #         },
+    #         "output": {
+    #             "cumulative_notional": {
+    #                 "$sum": {
+    #                     "$multiply": [
+    #                         "$px",
+    #                         "$qty"
+    #                     ]
+    #                 },
+    #                 "window": {
+    #                     "documents": [
+    #                         "unbounded",
+    #                         "current"
+    #                     ]
+    #                 }
+    #             },
+    #             "cumulative_qty": {
+    #                 "$sum": "$qty",
+    #                 "window": {
+    #                     "documents": [
+    #                         "unbounded",
+    #                         "current"
+    #                     ]
+    #                 }
+    #             }
+    #         }
+    #     }
+    # },
+    # {
+    #     "$addFields": {
+    #         "cumulative_avg_px": {
+    #             "$divide": [
+    #                 "$cumulative_notional",
+    #                 "$cumulative_qty"
+    #             ]
+    #         }
+    #     }
+    # }
 ]}

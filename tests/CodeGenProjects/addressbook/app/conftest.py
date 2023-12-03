@@ -14,7 +14,7 @@ from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_v
     create_n_verify_portfolio_status, create_fx_symbol_overview, clean_all_collections_ignoring_ui_layout, \
     test_config_file_path, clean_today_activated_ticker_dict, clear_cache_in_model, \
     ps_config_yaml_dict, PAIR_STRAT_BEANIE_PORT, LOG_ANALYZER_BEANIE_PORT, log_analyzer_web_client, \
-    strat_manager_service_native_web_client, renew_portfolio_alert, \
+    strat_manager_service_native_web_client, renew_portfolio_alert, renew_strat_collection, \
     clean_executors_and_today_activated_symbol_side_lock_file
 # from CodeGenProjects.strat_executor.app.trading_link_base import TradingLinkBase, executor_config_yaml_path
 # from CodeGenProjects.strat_executor.app.trade_simulator import TradeSimulator
@@ -71,6 +71,9 @@ def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, exp
 
     # updating portfolio_alert
     renew_portfolio_alert()
+
+    # updating strat_collection
+    renew_strat_collection()
 
     # setting limits
     set_n_verify_limits(expected_order_limits_, expected_portfolio_limits_)

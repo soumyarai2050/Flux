@@ -28,7 +28,7 @@ from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper impor
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    create_md_shell_script, MDShellEnvData, strat_manager_service_http_client)
+    create_md_shell_script, MDShellEnvData, strat_manager_service_http_client, guaranteed_call_pair_strat_client)
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore
 from Flux.CodeGenProjects.post_trade_engine.generated.Pydentic.post_trade_engine_service_model_imports import (
     IsPortfolioLimitsBreached)
@@ -669,24 +669,22 @@ class StratExecutor:
         subprocess.Popen([f"{generation_start_file_path}"])
 
     def _mark_strat_state_as_error(self, pair_strat: PairStratBaseModel):
-        pair_strat_basemodel = PairStratBaseModel(_id=pair_strat.id)
-        pair_strat_basemodel.strat_state = StratState.StratState_ERROR
         alert_str: str = \
             (f"Marking strat_state to ERROR for strat: {self.pair_strat_executor_id} "
              f"{get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
         logging.info(alert_str)
-        strat_manager_service_http_client.patch_pair_strat_client(
-            jsonable_encoder(pair_strat_basemodel, by_alias=True, exclude_none=True))
+        guaranteed_call_pair_strat_client(
+            PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
+            _id=pair_strat.id, strat_state=StratState.StratState_ERROR)
 
     def _mark_strat_state_as_done(self, pair_strat: PairStratBaseModel):
-        pair_strat_basemodel = PairStratBaseModel(_id=pair_strat.id)
-        pair_strat_basemodel.strat_state = StratState.StratState_DONE
         alert_str: str = \
             (f"graceful shut down processing for strat: {self.pair_strat_executor_id} "
              f"{get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
         logging.info(alert_str)
-        strat_manager_service_http_client.patch_pair_strat_client(
-            jsonable_encoder(pair_strat_basemodel, by_alias=True, exclude_none=True))
+        guaranteed_call_pair_strat_client(
+            PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
+            _id=pair_strat.id, strat_state=StratState.StratState_DONE)
 
     def check_n_pause_strat_before_run_if_portfolio_limit_breached(self):
         # Checking if portfolio_limits are still not breached
@@ -700,12 +698,11 @@ class StratExecutor:
                 pair_strat_tuple = self.strat_cache.get_pair_strat()
                 if pair_strat_tuple is not None:
                     pair_strat, _ = pair_strat_tuple
-                    pair_strat_basemodel = PairStratBaseModel(_id=pair_strat.id)
-                    pair_strat_basemodel.strat_state = StratState.StratState_PAUSED
-                    strat_manager_service_http_client.patch_pair_strat_client(
-                        jsonable_encoder(pair_strat_basemodel, by_alias=True, exclude_none=True))
                     logging.error("Putting Activated Strat to PAUSE, found portfolio_limits breached already, "
                                   f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
+                    guaranteed_call_pair_strat_client(
+                        PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
+                        _id=pair_strat.id, strat_state=StratState.StratState_PAUSED)
                 else:
                     logging.error(f"Can't find pair_strat in strat_cache, found portfolio_limits "
                                   f"breached but couldn't update strat_status: strat_cache: {str(self.strat_cache)}")

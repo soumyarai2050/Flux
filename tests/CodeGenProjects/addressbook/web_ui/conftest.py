@@ -1,5 +1,5 @@
-import json
-
+import random
+import datetime
 import pytest
 
 from selenium.webdriver.support import expected_conditions as EC  # noqa
@@ -17,8 +17,11 @@ from tests.CodeGenProjects.addressbook.app.utility_test_functions import fx_symb
 @pytest.fixture()
 def market_depth_basemodel_list():
     input_data = []
-
+    start_date = datetime.datetime(2023, 1, 1)
+    end_date = datetime.datetime(2023, 12, 31)
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
+        random_date = start_date + datetime.timedelta(seconds=random.randint(0, int((end_date - start_date).total_seconds())))
+        formatted_date = random_date.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
         for side, px, qty, dev in [("BID", 100, 90, -1), ("ASK", 110, 70, 1)]:
             for position in range(1, 6):
                 id_value = len(input_data) + 1  # Using the length of input_data as id
@@ -27,11 +30,11 @@ def market_depth_basemodel_list():
                     {
                         "id": id_value,
                         "symbol": symbol,
-                        "exch_time": "2023-02-13T20:30:30.165Z",
-                        "arrival_time": "2023-02-13T20:30:30.165Z",
+                        "exch_time": formatted_date,
+                        "arrival_time": formatted_date,
                         "side": side,
-                        "px": px + (dev * position),
-                        "qty": qty + (10 if position % 2 == 1 else -20),
+                        "px": random.uniform(10.0, 10000.0),
+                        "qty": random.randint(10, 1000),
                         "position": position,
                         "market_maker": "string",
                         "is_smart_depth": False

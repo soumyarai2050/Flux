@@ -79,8 +79,15 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
         self.executor_trigger_method = executor_trigger_method
         self.ws_thread = Thread(target=WSReader.start, daemon=True).start()
 
-    # define callbacks for types you expect from ws as updates
+    def ws_reader_handler(self):
+        while 1:
+            try:
+                WSReader.start()
+            except Exception as e:
+                logging.error(f"WSReader failed - reconnecting ,exception: {e}")
+                raise Exception(e)
 
+    # define callbacks for types you expect from ws as updates
     def underlying_handle_portfolio_status_ws(self, **kwargs):
         portfolio_status_ = kwargs.get("portfolio_status_")
         if portfolio_status_ is not None:

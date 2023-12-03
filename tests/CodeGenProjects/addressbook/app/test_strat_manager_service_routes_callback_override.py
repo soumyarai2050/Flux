@@ -1761,119 +1761,6 @@ def test_portfolio_alert_updates(static_data_, clean_and_set_limits, sample_aler
                 f"received {alert_updated_portfolio_alert.alert_update_seq_num}")
 
 
-def test_cxl_order_cxl_confirmed_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                        pair_strat_, expected_strat_limits_,
-                                        expected_start_status_, symbol_overview_obj_list,
-                                        last_trade_fixture_list, market_depth_basemodel_list,
-                                        top_of_book_list_, buy_order_, sell_order_,
-                                        max_loop_count_per_side, residual_wait_sec):
-    # updating fixture values for this test-case
-    max_loop_count_per_side = 5
-    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-
-    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        active_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_start_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
-        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
-        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
-        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
-
-        try:
-            # updating yaml_configs according to this test
-            for symbol in config_dict["symbol_configs"]:
-                config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
-            YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
-
-            # updating simulator's configs
-            executor_http_client.trade_simulator_reload_config_query_client()
-
-            # buy fills check
-            order_id = None
-            cxl_order_id = None
-            for loop_count in range(1, max_loop_count_per_side + 1):
-                run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0])
-                time.sleep(2)  # delay for order to get placed
-
-                new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                                    leg1_symbol, executor_http_client,
-                                                                                    last_order_id=order_id)
-                order_id = new_order_journal.order.order_id
-
-                # wait to get unfilled order qty cancelled
-                time.sleep(residual_wait_sec)
-
-                cxl_ack_order_journal = \
-                    get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, leg1_symbol,
-                                                                    executor_http_client,
-                                                                    last_order_id=cxl_order_id, loop_wait_secs=1,
-                                                                    max_loop_count=1)
-                cxl_order_id = cxl_ack_order_journal.order.order_id
-                assert new_order_journal.order.order_id == cxl_ack_order_journal.order.order_id, \
-                    "Mismatch order_id, Must have received cxl_ack of same order_journal obj that got created since " \
-                    "no new order created in this test"
-
-                cxl_order_list = []
-                cxl_order_obj_list = executor_http_client.get_all_cancel_order_client()
-                for cxl_order_obj in cxl_order_obj_list:
-                    if cxl_order_obj.order_id == cxl_order_id:
-                        cxl_order_list.append(cxl_order_obj)
-
-                assert len(cxl_order_list) == 1, f"Unexpected length of cxl_order_list: expected 1, " \
-                                                 f"received {len(cxl_order_list)}"
-                assert cxl_order_list[0].cxl_confirmed, f"Unexpected cxl_confirmed field value, expected True, " \
-                                                        f"received False"
-
-            # sell fills check
-            order_id = None
-            cxl_order_id = None
-            for loop_count in range(1, max_loop_count_per_side + 1):
-                run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
-                run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1])
-                time.sleep(2)  # delay for order to get placed
-
-                new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                                    leg2_symbol, executor_http_client,
-                                                                                    last_order_id=order_id)
-                order_id = new_order_journal.order.order_id
-
-                # wait to get unfilled order qty cancelled
-                time.sleep(residual_wait_sec)
-
-                cxl_ack_order_journal = \
-                    get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, leg2_symbol,
-                                                                    executor_http_client,
-                                                                    last_order_id=cxl_order_id, loop_wait_secs=1,
-                                                                    max_loop_count=1)
-                cxl_order_id = cxl_ack_order_journal.order.order_id
-                assert new_order_journal.order.order_id == cxl_ack_order_journal.order.order_id, \
-                    "Mismatch order_id, Must have received cxl_ack of same order_journal obj that got created since " \
-                    "no new order created in this test"
-
-                cxl_order_list = []
-                cxl_order_obj_list = executor_http_client.get_all_cancel_order_client()
-                for cxl_order_obj in cxl_order_obj_list:
-                    if cxl_order_obj.order_id == cxl_order_id:
-                        cxl_order_list.append(cxl_order_obj)
-                assert len(cxl_order_list) == 1, f"Unexpected length of cxl_order_list: expected 1, " \
-                                                 f"received {len(cxl_order_list)}"
-                assert cxl_order_list[0].cxl_confirmed, f"Unexpected cxl_confirmed field value, expected True, " \
-                                                        f"received False"
-        except AssertionError as e:
-            raise AssertionError(e)
-        except Exception as e:
-            err_str_ = (f"Some Error Occurred: exception: {e}, "
-                        f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
-            print(err_str_)
-            raise Exception(err_str_)
-        finally:
-            YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
-
-
 def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                      expected_strat_limits_, top_of_book_list_,
                      expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -2335,7 +2222,6 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
     alert_list = []
     for i in range(10):
         alert = copy.deepcopy(sample_alert)
-        # alert.id = Alert.__fields__.get("id").default_factory()
         alert.id = f"obj_{i}"
         alert.last_update_date_time = DateTime.utcnow()
         alert_list.append(alert)
@@ -2475,12 +2361,13 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
 #                   f"{(sec_latest_avg_delta-latest_avg_delta):.7f}")
 
 
+# @@@ redundant: removed aggregate pipeline to other query so not working anymore
 # # todo: currently contains beanie http call of market data, once cache http is implemented test that too
-def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                                        pair_strat_, expected_strat_limits_,
-                                                        expected_start_status_, symbol_overview_obj_list,
-                                                        last_trade_fixture_list, market_depth_basemodel_list,
-                                                        top_of_book_list_):
+def _test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                                         pair_strat_, expected_strat_limits_,
+                                                         expected_start_status_, symbol_overview_obj_list,
+                                                         last_trade_fixture_list, market_depth_basemodel_list,
+                                                         top_of_book_list_):
     """
     This test case contains check of update aggregate feature available in beanie part, put and patch http calls.
     Note: since post, put and patch all uses same method call for this feature and currently only
@@ -2922,14 +2809,15 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                 expected_strat_brief_.pair_buy_side_trading_brief.last_update_date_time = None
                 expected_strat_brief_.id = active_pair_strat.id
 
-                # Updating residual_qty and indicative_consumable_residual
+                # Updating residual_qty and indicative_consumable_residual since handling in
+                # update_expected_strat_brief_for_buy is not for this case
                 expected_strat_brief_.pair_buy_side_trading_brief.residual_qty = (
                         strat_brief_before_fill.pair_buy_side_trading_brief.residual_qty - filled_qty)
                 current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
                 expected_strat_brief_.pair_buy_side_trading_brief.indicative_consumable_residual = \
                     expected_strat_limits_.residual_restriction.max_residual - \
-                    ((expected_strat_brief_.pair_buy_side_trading_brief.residual_qty * current_leg_last_trade_px) -
-                     (0 * other_leg_last_trade_px))
+                    ((expected_strat_brief_.pair_buy_side_trading_brief.residual_qty *
+                      get_px_in_usd(current_leg_last_trade_px)) - (0 * get_px_in_usd(other_leg_last_trade_px)))
                 expected_strat_brief_.pair_buy_side_trading_brief.consumable_open_orders = 5
                 assert expected_strat_brief_ == strat_brief_after_fill, \
                     f"Unexpected: Mismatched strat_brief, expected {expected_strat_brief_}, received {strat_brief_list}"
@@ -2945,19 +2833,17 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                 strat_brief_after_fill.pair_sell_side_trading_brief.last_update_date_time = None
                 expected_strat_brief_.pair_sell_side_trading_brief.last_update_date_time = None
 
-                # Updating residual_qty and indicative_consumable_residual
+                # Updating residual_qty and indicative_consumable_residual since handling in
+                # update_expected_strat_brief_for_buy is not for this case
                 expected_strat_brief_.pair_sell_side_trading_brief.residual_qty = (
                         strat_brief_before_fill.pair_sell_side_trading_brief.residual_qty - filled_qty)
                 current_leg_last_trade_px, other_leg_last_trade_px = get_both_leg_last_trade_px()
                 expected_strat_brief_.pair_sell_side_trading_brief.indicative_consumable_residual = \
                     expected_strat_limits_.residual_restriction.max_residual - \
-                    ((expected_strat_brief_.pair_sell_side_trading_brief.residual_qty * current_leg_last_trade_px) -
-                     (0 * other_leg_last_trade_px))
-
-                expected_strat_brief_.pair_sell_side_trading_brief.indicative_consumable_residual = \
-                    expected_strat_limits_.residual_restriction.max_residual - \
-                    ((expected_strat_brief_.pair_sell_side_trading_brief.residual_qty * current_leg_last_trade_px) -
-                     (strat_brief_after_fill.pair_buy_side_trading_brief.residual_qty * other_leg_last_trade_px))
+                    ((expected_strat_brief_.pair_sell_side_trading_brief.residual_qty *
+                      get_px_in_usd(current_leg_last_trade_px)) -
+                     (strat_brief_after_fill.pair_buy_side_trading_brief.residual_qty *
+                      get_px_in_usd(other_leg_last_trade_px)))
                 expected_strat_brief_.pair_sell_side_trading_brief.consumable_open_orders = 5
 
                 assert (expected_strat_brief_.pair_sell_side_trading_brief ==

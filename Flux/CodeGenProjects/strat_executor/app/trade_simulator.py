@@ -7,6 +7,8 @@ from fastapi.encoders import jsonable_encoder
 
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
     Security, Side, PortfolioStatusBaseModel, SecurityType
+from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
+    guaranteed_call_pair_strat_client)
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import \
     OrderBrief, OrderJournalBaseModel, OrderEventType, FillsJournalBaseModel, OrderJournal, FillsJournal
 from Flux.CodeGenProjects.strat_executor.app.trading_link_base import TradingLinkBase, add_to_texts
@@ -294,10 +296,9 @@ class TradeSimulator(TradingLinkBase):
             TradeSimulator.pair_strat_web_client.get_portfolio_status_client(portfolio_status_id)
 
         if not portfolio_status.kill_switch:
-            portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1)
-            portfolio_status_basemodel.kill_switch = True
-            TradeSimulator.pair_strat_web_client.patch_portfolio_status_client(
-                jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
+            guaranteed_call_pair_strat_client(
+                PortfolioStatusBaseModel, TradeSimulator.pair_strat_web_client.patch_portfolio_status_client,
+                _id=1, kill_switch=True)
             logging.debug("Portfolio_status - Kill Switch turned to True")
             return True
         else:
@@ -311,10 +312,9 @@ class TradeSimulator(TradingLinkBase):
             TradeSimulator.pair_strat_web_client.get_portfolio_status_client(portfolio_status_id)
 
         if portfolio_status.kill_switch:
-            portfolio_status_basemodel = PortfolioStatusBaseModel(_id=1)
-            portfolio_status_basemodel.kill_switch = False
-            TradeSimulator.pair_strat_web_client.patch_portfolio_status_client(
-                jsonable_encoder(portfolio_status_basemodel, by_alias=True, exclude_none=True))
+            guaranteed_call_pair_strat_client(
+                PortfolioStatusBaseModel, TradeSimulator.pair_strat_web_client.patch_portfolio_status_client,
+                _id=1, kill_switch=False)
             logging.debug("Portfolio_status - Kill Switch turned to False")
             return True
         else:

@@ -34,6 +34,12 @@ strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("strat_alert_config")))
 
 
+class PairStratDbUpdateDataContainer(BaseModel):
+    method_name: str
+    pydantic_basemodel_type: str
+    kwargs: Dict[str, Any]
+
+
 class PairStratEngineLogAnalyzer(AppLogAnalyzer):
     underlying_partial_update_all_portfolio_alert_http: Callable[..., Any] | None = None
     underlying_partial_update_all_strat_alert_http: Callable[..., Any] | None = None
@@ -69,6 +75,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         self.service_up: bool = False
         self.portfolio_alert_queue: Queue = Queue()
         self.strat_alert_queue: Queue = Queue()
+        self.pair_strat_db_update_queue: Queue = Queue()
         self.port_to_executor_web_client: Dict[int, StratExecutorServiceHttpClient] = {}
         if self.simulation_mode:
             print("CRITICAL: PairStrat log analyzer running in simulation mode...")
@@ -81,6 +88,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
             logging.error(err_str_)
             raise Exception(err_str_)
 
+        Thread(target=self._pair_strat_db_update_queue_handler, daemon=True).start()
         self.run_queue_handler()
         self.run()
 
@@ -285,11 +293,19 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
             for arg in args.split(","):
                 key, value = [x.strip() for x in arg.split("=")]
                 symbol_side_set.add(value)
-                break
 
             if len(symbol_side_set) == 0:
                 raise Exception("no symbol-side pair found while creating strat alert, ")
             else:
+                # adding log analyzer event handler to be triggered from log pattern in log pattern
+                if "ResetLogAnalyzerCache" in log_message:
+                    # update strat_id_by_symbol_side_dict cache if strat is DONE, this prevents alert for new strat
+                    # created with already existing symbol_side to be created in the correct strat_alerts
+                    symbol_side: str
+                    for symbol_side in symbol_side_set:
+                        self.strat_id_by_symbol_side_dict.pop(symbol_side, None)
+                    return
+
                 symbol_side: str = list(symbol_side_set)[0]
                 symbol, side = symbol_side.split("-")
                 strat_id: int | None = self.strat_id_by_symbol_side_dict.get(symbol_side)
@@ -334,6 +350,72 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                 self._send_strat_alerts(strat_id, severity, alert_brief, alert_details)
         except Exception as e:
             alert_brief: str = f"_process_strat_alert_message failed in log analyzer"
+            alert_details: str = f"message: {message}, exception: {e}"
+            logging.exception(f"{alert_brief};;; {alert_details}")
+            self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
+                              alert_details=alert_details)
+
+    def _pair_strat_db_update_queue_handler(self):
+        while 1:
+            pair_strat_db_update_data: PairStratDbUpdateDataContainer = self.pair_strat_db_update_queue.get()
+            try:
+                method_name = pair_strat_db_update_data.method_name
+                pydantic_basemodel_type = pair_strat_db_update_data.pydantic_basemodel_type
+                kwargs = pair_strat_db_update_data.kwargs
+                callback_method: Callable = getattr(strat_manager_service_http_client, method_name)
+
+                while 1:
+                    try:
+                        if pydantic_basemodel_type != "None":
+                            pydantic_basemodel_class_type: Type = eval(pydantic_basemodel_type)
+                            pydantic_object = pydantic_basemodel_class_type(**kwargs)
+                            callback_method(pydantic_object)
+                        else:
+                            callback_method(**kwargs)
+                        break
+                    except Exception as e:
+                        if "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
+                            logging.exception("Connection Error in pair_strat_engine server call, likely server is "
+                                              "down, retrying call ...")
+                            time.sleep(1)
+                        elif "service is not initialized yet" in str(e):
+                            # Check is server up
+                            logging.exception("pair_strat_engine service not up yet, likely server restarted but is "
+                                              "not ready yet, retrying call ...")
+                            time.sleep(1)
+                        else:
+                            alert_brief: str = f"{method_name} failed in pair_strat log analyzer"
+                            alert_details: str = f"pydantic_class_type: {pydantic_basemodel_type}, exception: {e}"
+                            logging.exception(f"{alert_brief};;; {alert_details}")
+                            self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
+                                              alert_details=alert_details)
+                            break
+            except Exception as e:
+                logging.exception(f"_pair_strat_db_update_queue_handler failed with exception: {e}")
+
+    def _process_pair_strat_db_updates(self, message: str):
+        try:
+            # remove ^^^ from beginning of message
+            message: str = message[3:]
+            args: List[str] = message.split("~~")
+            pydantic_basemodel_type: str = args.pop(0)
+            method_name: str = args.pop(0)
+
+            kwargs: Dict[str, str] = dict()
+            # get method kwargs separated by "^^" if any
+            for arg in args:
+                key, value = arg.split("^^")
+                kwargs[key] = value
+
+            pair_strat_db_update_data = PairStratDbUpdateDataContainer(
+                method_name=method_name,
+                pydantic_basemodel_type=pydantic_basemodel_type,
+                kwargs=kwargs
+            )
+            self.pair_strat_db_update_queue.put(pair_strat_db_update_data)
+
+        except Exception as e:
+            alert_brief: str = f"_process_trade_simulator_message failed in log analyzer"
             alert_details: str = f"message: {message}, exception: {e}"
             logging.exception(f"{alert_brief};;; {alert_details}")
             self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
@@ -423,6 +505,11 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
             # handle strat alert message
             logging.info(f"Strat alert message: {log_message}")
             self._process_strat_alert_message(log_prefix, log_message)
+            return
+
+        if log_message.startswith("^^^"):
+            # handle pair_strat db updates
+            self._process_pair_strat_db_updates(log_message)
             return
 
         logging.debug(f"Processing log line: {log_message[:200]}...")
