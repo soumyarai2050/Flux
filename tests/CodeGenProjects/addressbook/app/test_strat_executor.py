@@ -956,7 +956,7 @@ def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_
         qty = 90
         check_str = "blocked generated BUY order, not enough consumable_open_orders"
         assert_fail_message = "Could not find any alert containing message to block " \
-                              "orders due to 0 consumable open orders"
+                              "BUY order due to 0 consumable open orders"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client,
@@ -976,6 +976,8 @@ def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_
         px = 70
         qty = 90
         check_str = "blocked generated SELL order, not enough consumable_open_orders"
+        assert_fail_message = "Could not find any alert containing message to block " \
+                              "SELL order due to 0 consumable open orders"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client)

@@ -30,6 +30,7 @@ from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManag
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
     StratExecutorServiceHttpClient)
+from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import log_pattern_to_restart_tail_process
 from FluxPythonUtils.scripts.utility_functions import get_pid_from_port, is_process_running
 
 
@@ -786,7 +787,6 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 ongoing_strat_symbols_n_exchange.symbol_n_exchange.append(leg2_symbol_n_exch)
                 before_len += 1
         return [ongoing_strat_symbols_n_exchange]
-
 
     def _drop_executor_db_for_deleting_pair_strat(self, mongo_server_uri: str, pair_strat_id: int,
                                                   sec_id: str, side: Side):

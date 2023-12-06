@@ -34,6 +34,11 @@ strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("strat_alert_config")))
 
 
+# Updating LogDetail to have strat_id_finder_callable
+class StratLogDetail(LogDetail):
+    strat_id_find_callable: Callable[[str], int] | None
+
+
 class PairStratDbUpdateDataContainer(BaseModel):
     method_name: str
     pydantic_basemodel_type: str
@@ -271,32 +276,53 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
             self.port_to_executor_web_client[port_] = executor_web_client
         return executor_web_client
 
-    def _process_strat_alert_message(self, prefix: str, message: str) -> None:
+    def _update_strat_alert_cache(self, strat_id: int) -> None:
+        run_coro = PairStratEngineLogAnalyzer.underlying_read_strat_alert_by_id_http(strat_id)
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
         try:
-            pattern: re.Pattern = re.compile("%%.*%%")
-            match = pattern.search(message)
-            if not match:
-                raise Exception("unexpected error in _process_strat_alert_message. strat alert pattern not matched")
+            # block for task to finish
+            strat_alert: StratAlert = future.result()
+        except HTTPException as http_e:
+            err_str_ = f"underlying_read_strat_alert_by_id_http failed with http_exception: {http_e}"
+            logging.error(err_str_)
+            raise Exception(err_str_)
+        except Exception as e:
+            err_str_ = f"underlying_read_strat_alert_by_id_http failed with exception: {e}"
+            logging.error(err_str_)
+            raise Exception(err_str_)
 
-            matched_text = match[0]
-            log_message: str = message.replace("%%", "")
-            error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=prefix, log_message=log_message)
+        if strat_alert.alerts is not None:
+            self.strat_alert_cache_by_strat_id_dict[strat_id] = strat_alert.alerts
+        else:
+            self.strat_alert_cache_by_strat_id_dict[strat_id] = list()
 
-            # if error pattern does not match, ignore creating alert
-            if error_dict is None:
-                return
+    def _process_strat_alert_message(self, prefix: str, message: str, pair_strat_id: int | None = None) -> None:
+        try:
+            if pair_strat_id is None:
+                pattern: re.Pattern = re.compile("%%(.*?)%%")
+                match = pattern.search(message)
+                if not match:
+                    raise Exception("unexpected error in _process_strat_alert_message. strat alert pattern not matched")
 
-            args: str = matched_text.replace("%%", "").strip()
-            symbol_side_set: Set = set()
+                matched_text = match[0]
+                log_message: str = message.replace("%%", "")
+                error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=prefix, log_message=log_message)
 
-            # kwargs separated by "," if any
-            for arg in args.split(","):
-                key, value = [x.strip() for x in arg.split("=")]
-                symbol_side_set.add(value)
+                # if error pattern does not match, ignore creating alert
+                if error_dict is None:
+                    return
 
-            if len(symbol_side_set) == 0:
-                raise Exception("no symbol-side pair found while creating strat alert, ")
-            else:
+                args: str = matched_text.replace("%%", "").strip()
+                symbol_side_set: Set = set()
+
+                # kwargs separated by "," if any
+                for arg in args.split(","):
+                    key, value = [x.strip() for x in arg.split("=")]
+                    symbol_side_set.add(value)
+
+                if len(symbol_side_set) == 0:
+                    raise Exception("no symbol-side pair found while creating strat alert, ")
+
                 # adding log analyzer event handler to be triggered from log pattern in log pattern
                 if "ResetLogAnalyzerCache" in log_message:
                     # update strat_id_by_symbol_side_dict cache if strat is DONE, this prevents alert for new strat
@@ -309,48 +335,48 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                 symbol_side: str = list(symbol_side_set)[0]
                 symbol, side = symbol_side.split("-")
                 strat_id: int | None = self.strat_id_by_symbol_side_dict.get(symbol_side)
+
                 if strat_id is None or self.strat_alert_cache_by_strat_id_dict.get(strat_id) is None:
 
                     pair_strat_obj: PairStratBaseModel = self._get_pair_strat_obj_from_symbol_side(symbol, side)
+                    strat_id = pair_strat_obj.id
 
                     if pair_strat_obj is None:
-                        pass
-                    else:
-                        if not pair_strat_obj.is_executor_running:
-                            raise Exception(f"StartExecutor Server not running for pair_strat: {pair_strat_obj}")
+                        raise Exception(f"No ongoing pair strat found for symbol_side: {symbol_side}")
+                    if not pair_strat_obj.is_executor_running:
+                        raise Exception(f"StartExecutor Server not running for pair_strat: {pair_strat_obj}")
 
-                        if not is_ongoing_strat(pair_strat_obj):
-                            raise Exception(f"Strat Executor for symbol & side: {symbol} & {side} is not "
-                                            f"in ongoing state while creating strat_alert, pair_strat: "
-                                            f"{pair_strat_obj}")
-
-                        strat_id = pair_strat_obj.id
-                        run_coro = PairStratEngineLogAnalyzer.underlying_read_strat_alert_by_id_http(strat_id)
-                        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-                        try:
-                            # block for task to finish
-                            strat_alert: StratAlert = future.result()
-                        except HTTPException as http_e:
-                            err_str_ = f"underlying_read_strat_alert_by_id_http failed with http_exception: {http_e}"
-                            logging.error(err_str_)
-                            raise Exception(err_str_)
-                        except Exception as e:
-                            err_str_ = f"underlying_read_strat_alert_by_id_http failed with exception: {e}"
-                            logging.error(err_str_)
-                            raise Exception(err_str_)
-
-                        if strat_alert.alerts is not None:
-                            self.strat_alert_cache_by_strat_id_dict[strat_id] = strat_alert.alerts
-                        else:
-                            self.strat_alert_cache_by_strat_id_dict[strat_id] = list()
-                        self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
+                    self._update_strat_alert_cache(strat_id)
+                    self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
                 # else not required: alert cache exists
 
-                severity, alert_brief, alert_details = self._create_alert(error_dict=error_dict)
-                self._send_strat_alerts(strat_id, severity, alert_brief, alert_details)
+            else:
+                error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=prefix, log_message=message)
+
+                # if error pattern does not match, ignore creating alert
+                if error_dict is None:
+                    return
+
+                strat_id = pair_strat_id
+                if self.strat_alert_cache_by_strat_id_dict.get(strat_id) is None:
+                    try:
+                        pair_strat: PairStratBaseModel = strat_manager_service_http_client.get_pair_strat_client(strat_id)
+                    except Exception as e:
+                        raise Exception(f"get_pair_strat_client failed: Can't find pair_start with id: {strat_id}")
+                    else:
+                        if not is_ongoing_strat(pair_strat):
+                            raise Exception(f"pair_strat of id: {strat_id} is not in ongoing state while updating "
+                                            f"strat_alert cache, pair_strat: {pair_strat}")
+
+                        self._update_strat_alert_cache(strat_id)
+                        symbol_side = f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}-{pair_strat.pair_strat_params.strat_leg1.side}"
+                        self.strat_id_by_symbol_side_dict[symbol_side] = strat_id
+
+            severity, alert_brief, alert_details = self._create_alert(error_dict=error_dict)
+            self._send_strat_alerts(strat_id, severity, alert_brief, alert_details)
         except Exception as e:
-            alert_brief: str = f"_process_strat_alert_message failed in log analyzer"
-            alert_details: str = f"message: {message}, exception: {e}"
+            alert_brief: str = f"_process_strat_alert_message failed - {message}"
+            alert_details: str = f"exception: {e}"
             logging.exception(f"{alert_brief};;; {alert_details}")
             self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
                               alert_details=alert_details)
@@ -369,7 +395,11 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                         if pydantic_basemodel_type != "None":
                             pydantic_basemodel_class_type: Type = eval(pydantic_basemodel_type)
                             pydantic_object = pydantic_basemodel_class_type(**kwargs)
-                            callback_method(pydantic_object)
+
+                            if "patch" or "underlying_partial_update" in method_name:
+                                callback_method(jsonable_encoder(pydantic_object, by_alias=True, exclude_none=True))
+                            else:
+                                callback_method(pydantic_object)
                         else:
                             callback_method(**kwargs)
                         break
@@ -382,6 +412,10 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                             # Check is server up
                             logging.exception("pair_strat_engine service not up yet, likely server restarted but is "
                                               "not ready yet, retrying call ...")
+                            time.sleep(1)
+                        elif "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))" in str(e):
+                            logging.exception(
+                                "pair_strat_engine service connection error, retrying call ...")
                             time.sleep(1)
                         else:
                             alert_brief: str = f"{method_name} failed in pair_strat log analyzer"
@@ -415,7 +449,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
             self.pair_strat_db_update_queue.put(pair_strat_db_update_data)
 
         except Exception as e:
-            alert_brief: str = f"_process_trade_simulator_message failed in log analyzer"
+            alert_brief: str = f"_process_pair_strat_db_updates failed in log analyzer"
             alert_details: str = f"message: {message}, exception: {e}"
             logging.exception(f"{alert_brief};;; {alert_details}")
             self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
@@ -425,8 +459,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
     def _send_alerts(self, severity: str, alert_brief: str, alert_details: str) -> None:
         logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
                       f"alert_details: {alert_details}")
-        created: bool = False
-        while self.run_mode and not created:
+        while True:
             try:
                 if not self.service_up:
                     service_ready: bool = self._init_service()
@@ -444,7 +477,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                     PortfolioAlertBaseModel(_id=1, alerts=[alert_obj])
                 self.portfolio_alert_queue.put(jsonable_encoder(updated_portfolio_alert,
                                                                 by_alias=True, exclude_none=True))
-                created = True
+                break
             except Exception as e:
                 logging.exception(f"_send_alerts failed;;;exception: {e}")
                 self.service_up = False
@@ -454,8 +487,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
     def _send_strat_alerts(self, strat_id: int, severity: str, alert_brief: str, alert_details: str) -> None:
         logging.debug(f"sending strat alert with strat_id: {strat_id} severity: {severity}, alert_brief: "
                       f"{alert_brief}, alert_details: {alert_details}")
-        created: bool = False
-        while self.run_mode and not created:
+        while True:
             try:
                 if not self.service_up:
                     raise Exception("service up check failed. waiting for the service to start...")
@@ -469,7 +501,7 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                 updated_strat_alert: StratAlertBaseModel = StratAlertBaseModel(_id=strat_id, alerts=[alert_obj])
                 self.strat_alert_queue.put(jsonable_encoder(updated_strat_alert,
                                                             by_alias=True, exclude_none=True))
-                created = True
+                break
             except Exception as e:
                 logging.exception(f"_send_strat_alerts failed;;;exception: {e}")
                 time.sleep(30)
@@ -499,7 +531,36 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
         self._send_alerts(severity=self._get_severity("warning"), alert_brief=brief_msg_str,
                           alert_details=detail_msg_str)
 
-    def handle_pair_strat_matched_log_message(self, log_prefix: str, log_message: str):
+    def handle_log_analyzer_cmd_log_message(self, log_prefix: str, log_message: str,
+                                            log_detail: StratLogDetail):
+        try:
+            if log_message.startswith("---"):
+                log_message = log_message[3:]  # removing starting chars
+                args: List[str] = log_message.split("~~")
+                log_file_path = args.pop(0)
+                if len(args):
+                    timestamp = args.pop(0)
+                else:
+                    timestamp = None
+
+                log_detail_to_restart = self.log_file_path_to_log_detail_dict.get(log_file_path)
+
+                # updating tail_details for this log_file to restart it from logged timestamp
+                log_detail_to_restart.processed_timestamp = timestamp
+                log_detail_to_restart.is_running = False
+                log_detail_to_restart.poll_timeout = 0.5
+        except Exception as e:
+            logging.exception(f"handle_log_analyzer_cmd_log_message failed with exception: {e}")
+
+    def handle_pair_strat_matched_log_message(self, log_prefix: str, log_message: str,
+                                              log_detail: StratLogDetail):
+        if hasattr(log_detail, "strat_id_find_callable") and log_detail.strat_id_find_callable is not None:
+            # handle strat alert message
+            logging.info(f"Strat alert message from strat_id based log: {log_message}")
+            pair_strat_id = log_detail.strat_id_find_callable(log_detail.log_file_path)
+            self._process_strat_alert_message(log_prefix, log_message, pair_strat_id)
+            return
+
         # put in method
         if re.compile(r"%%.*%%").search(log_message):
             # handle strat alert message
@@ -509,9 +570,11 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
 
         if log_message.startswith("^^^"):
             # handle pair_strat db updates
+            logging.info(f"pair_strat_engine update found: {log_message}")
             self._process_pair_strat_db_updates(log_message)
             return
 
+        # Sending ERROR/WARNING type log to portfolio_alerts
         logging.debug(f"Processing log line: {log_message[:200]}...")
         error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=log_prefix, log_message=log_message)
         if error_dict is not None:

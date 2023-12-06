@@ -27,6 +27,9 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
     log_prefix_regex_pattern_to_callable_name_dict = {
         pair_strat_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
     }
+    log_cmd_prefix_regex_pattern_to_callable_name_dict = {
+        pair_strat_log_prefix_regex_pattern: "handle_log_analyzer_cmd_log_message"
+    }
     background_log_prefix_regex_pattern_to_callable_name_dict = {
         background_log_prefix_regex_pattern: "handle_pair_strat_matched_log_message"
     }
@@ -42,6 +45,8 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
         self.service_ready = False
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
+        create_logger("log_analyzer_cmd_log", logging.DEBUG, str(CURRENT_PROJECT_LOG_DIR),
+                      log_analyzer_cmd_log)
 
     def initialize_underlying_http_callables(self):
         from Flux.CodeGenProjects.log_analyzer.generated.FastApi.log_analyzer_service_http_routes import (
@@ -144,35 +149,49 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
             LogAnalyzerServiceRoutesCallbackBaseNativeOverride.log_prefix_regex_pattern_to_callable_name_dict)
         background_log_prefix_regex_pattern_to_callable_name_dict = (
             LogAnalyzerServiceRoutesCallbackBaseNativeOverride.background_log_prefix_regex_pattern_to_callable_name_dict)
-        log_details: List[LogDetail] = [
-            LogDetail(service="pair_strat_engine_beanie_fastapi",
-                      log_file_path=str(
-                          pair_strat_engine_log_dir / f"pair_strat_engine_logs_{datetime_str}.log"),
-                      critical=True,
-                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
-                      log_file_path_is_regex=False),
-            LogDetail(service="pair_strat_engine_background_debug",
-                      log_file_path=str(
-                          pair_strat_engine_log_dir / f"pair_strat_engine_background_logs.log"),
-                      critical=True,
-                      log_prefix_regex_pattern_to_callable_name_dict=background_log_prefix_regex_pattern_to_callable_name_dict,
-                      log_file_path_is_regex=False),
-            LogDetail(service="pair_strat_engine_background",
-                      log_file_path=str(
-                          pair_strat_engine_log_dir / f"pair_strat_engine_background_logs_{datetime_str}.log"),
-                      critical=True,
-                      log_prefix_regex_pattern_to_callable_name_dict=background_log_prefix_regex_pattern_to_callable_name_dict,
-                      log_file_path_is_regex=False),
-            LogDetail(service="strat_executor",
-                      log_file_path=str(strat_executor_log_dir / f"strat_executor_*_logs_{datetime_str}.log"),
-                      critical=True,
-                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
-                      log_file_path_is_regex=True),
-            LogDetail(service="post_trade_engine",
-                      log_file_path=str(portfolio_monitor_log_dir / f"post_trade_engine_*_{datetime_str}.log"),
-                      critical=True,
-                      log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
-                      log_file_path_is_regex=True)
+        log_details: List[StratLogDetail] = [
+            StratLogDetail(
+                service="pair_strat_engine_beanie_fastapi",
+                log_file_path=str(
+                    pair_strat_engine_log_dir / f"pair_strat_engine_logs_{datetime_str}.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=False),
+            StratLogDetail(
+                service="pair_strat_engine_background_debug",
+                log_file_path=str(
+                    pair_strat_engine_log_dir / f"pair_strat_engine_background_logs.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=
+                background_log_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=False),
+            StratLogDetail(
+                service="pair_strat_engine_background",
+                log_file_path=str(
+                    pair_strat_engine_log_dir / f"pair_strat_engine_background_logs_{datetime_str}.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=background_log_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=False),
+            StratLogDetail(
+                service="strat_executor",
+                log_file_path=str(strat_executor_log_dir / f"strat_executor_*_logs_{datetime_str}.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=True,
+                strat_id_find_callable=strat_id_from_executor_log_file),
+            StratLogDetail(
+                service="post_trade_engine",
+                log_file_path=str(portfolio_monitor_log_dir / f"post_trade_engine_*_{datetime_str}.log"),
+                critical=True,
+                log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=True),
+            StratLogDetail(
+                service="log_analyzer_cmd_log",
+                log_file_path=str(CURRENT_PROJECT_LOG_DIR / log_analyzer_cmd_log),
+                critical=False,
+                log_prefix_regex_pattern_to_callable_name_dict=
+                LogAnalyzerServiceRoutesCallbackBaseNativeOverride.log_cmd_prefix_regex_pattern_to_callable_name_dict,
+                log_file_path_is_regex=False),
         ]
         suppress_alert_regex_file: PurePath = LOG_ANALYZER_DATA_DIR / "suppress_alert_regex.txt"
 
@@ -183,8 +202,6 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
                                                         "log_details": log_details,
                                                         "simulation_mode": simulation_mode}, daemon=True)
         pair_strat_log_analyzer_thread.start()
-        # PairStratEngineLogAnalyzer(regex_file=str(suppress_alert_regex_file), log_details=log_details,
-        #                            simulation_mode=simulation_mode)
 
     async def read_all_ui_layout_pre(self):
         # Setting asyncio_loop in ui_layout_pre since it called to check current service up
@@ -259,3 +276,21 @@ class LogAnalyzerServiceRoutesCallbackBaseNativeOverride(LogAnalyzerServiceRoute
             stored_strat_alert_obj.alert_update_seq_num = 0
         updated_strat_alert_obj_json["alert_update_seq_num"] = stored_strat_alert_obj.alert_update_seq_num + 1
         return updated_strat_alert_obj_json
+
+    async def log_analyzer_restart_tail_query_pre(
+            self, log_analyzer_restart_tail_class_type: Type[LogAnalyzerRestartTail], log_file_name: str,
+            start_timestamp: str | None = None):
+        log_pattern_to_restart_tail_process(log_file_name, start_timestamp)
+        return []
+
+
+def strat_id_from_executor_log_file(file_name: str) -> int | None:
+    # Using regex to extract the number
+    number_pattern = re.compile(r'strat_executor_(\d+)_logs_\d{8}\.log')
+
+    match = number_pattern.search(file_name)
+
+    if match:
+        extracted_number = match.group(1)
+        return parse_to_int(extracted_number)
+    return None

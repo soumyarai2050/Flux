@@ -686,6 +686,19 @@ class StratExecutor:
             PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
             _id=pair_strat.id, strat_state=StratState.StratState_DONE)
 
+    def _set_strat_pause_when_portfolio_limit_check_fails(self):
+        pair_strat_tuple = self.strat_cache.get_pair_strat()
+        if pair_strat_tuple is not None:
+            pair_strat, _ = pair_strat_tuple
+            logging.error("Putting Activated Strat to PAUSE, found portfolio_limits breached already, "
+                          f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
+            guaranteed_call_pair_strat_client(
+                PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
+                _id=pair_strat.id, strat_state=StratState.StratState_PAUSED)
+        else:
+            logging.error(f"Can't find pair_strat in strat_cache, found portfolio_limits "
+                          f"breached but couldn't update strat_status: strat_cache: {str(self.strat_cache)}")
+
     def check_n_pause_strat_before_run_if_portfolio_limit_breached(self):
         # Checking if portfolio_limits are still not breached
         is_portfolio_limits_breached_model_list: List[IsPortfolioLimitsBreached] = (
@@ -695,18 +708,12 @@ class StratExecutor:
             is_portfolio_limits_breached: bool = (
                 is_portfolio_limits_breached_model_list[0].is_portfolio_limits_breached)
             if is_portfolio_limits_breached:
-                pair_strat_tuple = self.strat_cache.get_pair_strat()
-                if pair_strat_tuple is not None:
-                    pair_strat, _ = pair_strat_tuple
-                    logging.error("Putting Activated Strat to PAUSE, found portfolio_limits breached already, "
-                                  f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; pair_strat: {pair_strat}")
-                    guaranteed_call_pair_strat_client(
-                        PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
-                        _id=pair_strat.id, strat_state=StratState.StratState_PAUSED)
-                else:
-                    logging.error(f"Can't find pair_strat in strat_cache, found portfolio_limits "
-                                  f"breached but couldn't update strat_status: strat_cache: {str(self.strat_cache)}")
+                self._set_strat_pause_when_portfolio_limit_check_fails()
             # else not required: if portfolio_limits are fine then ignore
+        elif len(is_portfolio_limits_breached_model_list) == 0:
+            logging.error("PairStrat service seems down, can't check portfolio_limits before current strat "
+                          "activation - putting strat to pause")
+            self._set_strat_pause_when_portfolio_limit_check_fails()
         else:
             err_str_ = ("is_portfolio_limits_breached_query_client must return list of exact one "
                         f"IsPortfolioLimitsBreached model, but found length: "

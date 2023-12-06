@@ -526,7 +526,7 @@ def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
 
 
 # Market Depth cumulative average
-cum_px_qty_aggregate_query = {"aggregate": [
+cum_px_qty_aggregate_pipeline = {"aggregate": [
     # {
     #     "$setWindowFields": {
     #         "partitionBy": {"symbol": "$symbol", "side": "$side"},

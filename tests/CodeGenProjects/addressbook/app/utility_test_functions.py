@@ -2368,6 +2368,7 @@ def renew_strat_collection():
         strat_collection.buffered_strat_keys.clear()
         strat_manager_service_native_web_client.put_strat_collection_client(strat_collection)
 
+
 def clean_executors_and_today_activated_symbol_side_lock_file():
     existing_pair_strat = strat_manager_service_native_web_client.get_all_pair_strat_client()
     for pair_strat in existing_pair_strat:
@@ -4172,7 +4173,8 @@ def handle_test_sell_buy_pair_order(leg1_symbol: str, leg2_symbol: str, total_lo
 
 def place_sanity_orders_for_executor(
         buy_symbol: str, sell_symbol: str, total_order_count_for_each_side, last_trade_fixture_list,
-        top_of_book_list_, residual_wait_sec, executor_web_client, place_after_recovery: bool = False):
+        top_of_book_list_, residual_wait_sec, executor_web_client, place_after_recovery: bool = False,
+        expect_no_order: bool = False):
 
     # Placing buy orders
     buy_ack_order_id = None
@@ -4191,7 +4193,8 @@ def place_sanity_orders_for_executor(
 
         ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                             buy_symbol, executor_web_client,
-                                                                            last_order_id=buy_ack_order_id)
+                                                                            last_order_id=buy_ack_order_id,
+                                                                            expect_no_order=expect_no_order)
         buy_ack_order_id = ack_order_journal.order.order_id
 
         if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
@@ -4205,7 +4208,8 @@ def place_sanity_orders_for_executor(
 
         ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
                                                                             sell_symbol, executor_web_client,
-                                                                            last_order_id=sell_ack_order_id)
+                                                                            last_order_id=sell_ack_order_id,
+                                                                            expect_no_order=expect_no_order)
         sell_ack_order_id = ack_order_journal.order.order_id
 
         if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):

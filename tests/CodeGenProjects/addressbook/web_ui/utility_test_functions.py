@@ -1,6 +1,8 @@
 from typing import Optional
 
 from selenium import webdriver
+from selenium.webdriver import ChromeOptions, EdgeOptions, FirefoxOptions
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver import ActionChains
 from selenium.webdriver.remote.webdriver import WebDriver, WebElement
 from selenium.webdriver.support.wait import WebDriverWait
@@ -26,12 +28,19 @@ def get_driver(config_dict: Dict, driver_type: DriverType) -> WebDriver:
     driver: Optional[WebDriver] = None
     match driver_type:
         case DriverType.CHROME:
-            driver: webdriver.Chrome = webdriver.Chrome(driver_path)
+            options = ChromeOptions()
+            options.add_argument("--headless=new")  # Runs browser in headless mode.
+            driver: webdriver.Chrome = webdriver.Chrome(driver_path, chrome_options=options)
         case DriverType.EDGE:
-            driver: webdriver.Edge = webdriver.Edge(driver_path)
+            options = EdgeOptions()
+            options.add_argument("--headless=new")  # Runs browser in headless mode.
+            driver: webdriver.Edge = webdriver.Edge(driver_path, options=options)
         case DriverType.FIREFOX:
+            options = FirefoxOptions()
+            options.add_argument("--headless=new")  # Runs browser in headless mode.
             driver: webdriver.Firefox = webdriver.Firefox(driver_path)
         case DriverType.SAFARI:
+            # SAFARI browser not supports headless mode
             driver: webdriver.Safari = webdriver.Safari(driver_path)
     assert driver is not None, f"failed to initialize webdriver for driver_type: {driver_type}"
     return driver
@@ -708,10 +717,13 @@ def count_fields_in_tree(widget: WebElement) -> List[str]:
 
 def get_commonkey_items(widget: WebElement) -> Dict[str, any]:
 
-    common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
+
     # common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__hOXaW")
-    common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__ny8Fj")
     # common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__QEVHl")
+
+    common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
+    common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__ny8Fj")
+
     common_key_items: Dict[str, any] = {}
     for common_key_item_element in common_key_item_elements:
         common_key_item_txt = common_key_item_element.text.split(":")
@@ -742,7 +754,7 @@ def get_table_layout_field_name(widget: WebElement):
     return field_name_texts
 
 
-def validate_comma_separated_values(driver: WebDriver, widget: WebElement, layout: Layout, field_name_n_input_value: dict):
+def validate_comma_separated_values(driver: WebDriver, widget: WebElement, layout: Layout, field_name_n_input_value: dict, widget_name: str):
     click_button_with_name(widget=widget, button_name="Save")
     input_value: str
     if layout == Layout.TABLE:
@@ -753,6 +765,9 @@ def validate_comma_separated_values(driver: WebDriver, widget: WebElement, layou
             # getting common key value without comma and dot to validate, if value= "1,230.0" get "1230" only
             assert value_from_ui.replace(",", "") == input_value.split(".")[0].replace(",", "")
     elif layout == Layout.TREE:
+        # remove save later
+        if widget_name == "strat_status":
+            confirm_save(driver)
         switch_layout(widget=widget, layout=Layout.TREE)
         for xpath, input_value in field_name_n_input_value.items():
             value_from_ui: str = get_value_from_input_field(widget=widget, xpath=xpath, layout=Layout.TREE)
@@ -774,26 +789,24 @@ def get_progress_bar_level(widget: WebElement) -> str:
     return progress_level
 
 
-def get_str_value(value: str, driver: WebDriver, widget_type: WidgetType, layout: Layout):
+def get_val_max_from_input_fld(val_max: str, driver: WebDriver, widget_type: WidgetType, layout: Layout):
     widget: WebElement
     xpath: str = ""
     widget_name: str = ""
-    if isinstance(value, str):
-        splitted_list = value.split(".")
-        if widget_type.DEPENDENT:
-            xpath = splitted_list[0] + '.' + splitted_list[1]
+    field_value : str = ""
+    if isinstance(val_max, str):
+        splitted_list = val_max.split(".")
+        if widget_type == widget_type.INDEPENDENT:
+            xpath = splitted_list[1]
             widget_name = splitted_list[0]
-        elif widget_type.INDEPENDENT:
-            xpath = splitted_list[0] + '.' + splitted_list[1] + '.' + splitted_list[2]
+        if widget_type == widget_type.DEPENDENT:
+            xpath = splitted_list[1]
             widget_name = splitted_list[0]
-        widget = driver.find_element(By.ID, widget_name)
-        if layout.TREE:
-            switch_layout(widget=widget, layout=Layout.TREE)
-    div_xpath: str = get_tree_input_field_xpath(xpath=xpath)
-    div_element_xpath = widget.find_element(By.XPATH, div_xpath)
-    input_element = div_element_xpath.find_element(By.TAG_NAME, "input")
-    field_value = input_element.get_attribute('value')
-    return field_value
+    widget = driver.find_element(By.ID, widget_name)
+    if layout == layout.TREE:
+        switch_layout(widget=widget, layout=Layout.TREE)
+        field_value = get_value_from_input_field(widget=widget, xpath=xpath, layout=Layout.TREE)
+    return field_value, widget_name
 
 
 def get_unsaved_changes_discarded_key(driver: WebDriver) -> str:
@@ -1408,6 +1421,19 @@ def validate_server_populate_fld(widget: WebElement, xpath: str, field_name: str
         # validate that server populates field name does not present in tree layout after clicking on edit btn
         assert field_name not in field_names
 
+def input_n_validate_progress_bar(driver: WebDriver, widget: WebElement, field_name: str, value: str, input_value_type: str):
+    switch_layout(widget=widget, layout=Layout.TREE)
+    click_button_with_name(widget=widget, button_name="Edit")
+    set_tree_input_field(widget=widget, xpath="balance_notional", name=field_name, value=value)
+    click_button_with_name(widget=widget, button_name="Save")
+    confirm_save(driver)
+    progress_level: str = get_progress_bar_level(widget)
+    if input_value_type == "val_min":
+        # if input value is 0 then progress level should be 100
+        assert progress_level == "100"
+    else:
+        # for val max
+        assert progress_level == "0"
 
 def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, schema_dict: Dict[str, any]):
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
@@ -1417,7 +1443,7 @@ def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, sc
     xpath_n_field_names: Dict[str] = {}
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
-        # in strat_status balance notional fld contain progress bar
+        # in strat_status balance notional fld contain progress bar in table layout
         if widget_name == "strat_status":
             continue
         widget = driver.find_element(By.ID, widget_name)
@@ -1463,7 +1489,7 @@ def set_val_min_input_fld(driver: WebDriver, layout: Layout, input_type: str, sc
     field_name: str = ''
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
-        # TODO: REMOVE (CONTINUE) LATER, IN STRAT STATUS BALANCE NOTIONAL FLD CONTAIN PROGRESS BAR
+        # REMOVE (CONTINUE) LATER, IN STRAT STATUS BALANCE NOTIONAL FLD CONTAIN PROGRESS BAR
         if widget_name == "strat_status":
             continue
         widget = driver.find_element(By.ID, widget_name)
@@ -1538,7 +1564,7 @@ def get_server_populate_fld(driver: WebDriver, schema_dict, layout: Layout, widg
     print(result)
     assert result[0]
 
-    # table_layout and tree
+    # table layout and tree
     # TODO: exch_id field is not present in common_key in pair strat params widget
     if widget_type == WidgetType.DEPENDENT:
         for widget_query in result[1]:
@@ -1587,9 +1613,6 @@ def set_input_value_for_comma_seperated(driver: WebDriver, schema_dict, layout: 
                 pass
         elif layout == Layout.TREE:
             switch_layout(widget=widget, layout=Layout.TREE)
-            if widget_name == "strat_status":
-                show_nested_fld_in_tree_layout(widget=widget)
-                # continue
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
             # in strat status widget residual notional and balance notional fld disabled in table layout only
@@ -1612,41 +1635,9 @@ def set_input_value_for_comma_seperated(driver: WebDriver, schema_dict, layout: 
                 set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=input_value)
         if layout == Layout.TABLE:
             validate_comma_separated_values(driver=driver, widget=widget,
-                                        layout=Layout.TABLE, field_name_n_input_value=field_name_n_input_value)
+                                        layout=Layout.TABLE, field_name_n_input_value=field_name_n_input_value,
+                                            widget_name=widget_name)
         else:
-            # remove save later
-            if widget_name == "strat_status":
-                click_button_with_name(widget=widget, button_name="Save")
             validate_comma_separated_values(driver=driver, widget=widget,
-                                            layout=Layout.TREE, field_name_n_input_value=field_name_n_input_value)
-
-
-
-    # # tree_layout
-    # field_name_n_input_value: Dict[str] = {}
-    # for widget_query in result[1]:
-    #     widget_name = widget_query.widget_name
-    #     widget = driver.find_element(By.ID, widget_name)
-    #     scroll_into_view(driver=driver, element=widget)
-    #     switch_layout(widget=widget, layout=Layout.TREE)
-    #     click_button_with_name(widget=widget, button_name="Edit")
-    #     # in strat status sec id fld is none, but it should be filled
-    #     if widget_name == "strat_status":
-    #         show_nested_fld_in_tree_layout(widget=widget)
-    #         continue
-    #     for field_query in widget_query.fields:
-    #         field_name: str = field_query.field_name
-    #         val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
-    #         input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max,
-    #                                                                                      val_min=val_min)
-    #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-    #                                                widget_name=widget_name, field_name=field_name)
-    #         # xpath = "residual.security.sec_id"
-    #         # input_value = "100"
-    #         # field_name = "sec_id"
-    #         set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=input_value)
-    #         # Add key-value pair
-    #         field_name_n_input_value[xpath] = input_value
-    #
-    #     validate_comma_separated_values(driver=driver, widget=widget,
-    #                                     layout=Layout.TREE, field_name_n_input_value=field_name_n_input_value)
+                                            layout=Layout.TREE, field_name_n_input_value=field_name_n_input_value,
+                                            widget_name=widget_name)

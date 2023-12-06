@@ -63,6 +63,17 @@ message StratAlert{
   optional int64 alert_update_seq_num = 3 [(FluxFldHide) = "True"];
 }
 
+message LogAnalyzerRestartTail{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "log_analyzer_restart_tail"
+      QueryParams: "log_file_name"
+      QueryParamsDataType: "str"
+      QueryParams: "start_timestamp"
+      QueryParamsDataType: "str | None = None"
+  };
+  optional bool temp = 1;
+}
+
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage{
   optional ButtonType temp = 1;

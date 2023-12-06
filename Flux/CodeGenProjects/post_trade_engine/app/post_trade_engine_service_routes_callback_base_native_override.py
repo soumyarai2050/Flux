@@ -536,10 +536,12 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
     def check_connection_or_service_not_ready_error(exception: Exception) -> bool:
         if "Failed to establish a new connection: [Errno 111] Connection refused" in str(exception):
             logging.exception("Connection Error in pair_strat_engine server call, likely server is "
-                              "down, retrying client call ...")
+                              "down")
         elif "service is not initialized yet" in str(exception):
             logging.exception("pair_strat_engine service not up yet, likely server restarted, but is "
-                              "not ready yet, retrying client call ...")
+                              "not ready yet")
+        elif "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))" in str(exception):
+            logging.exception("pair_strat_engine service connection error")
         else:
             return False
         return True
@@ -556,11 +558,14 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                         overall_buy_fill_notional=portfolio_status_updates.buy_fill_notional_update,
                         overall_sell_fill_notional=portfolio_status_updates.sell_fill_notional_update)
                 except Exception as e:
-                    res = self.check_connection_or_service_not_ready_error(e)
+                    res = self.check_connection_or_service_not_ready_error(e)   # True if connection or service up error
                     if not res:
                         logging.exception(
                             f"update_portfolio_status_by_order_or_fill_data_query_client failed with exception: {e}")
                         break
+                    else:
+                        logging.info("Retrying update_portfolio_status_by_order_or_fill_data_query_client in 1 sec")
+                        time.sleep(1)
                 else:
                     break
 
@@ -577,6 +582,9 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                     if not res:
                         logging.exception(f"check_all_portfolio_limits failed, exception: {e}")
                         return None
+                    else:
+                        logging.info("Retrying check_all_portfolio_limits in 1 sec")
+                        time.sleep(1)
                 else:
                     break
 
@@ -585,18 +593,34 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                     try:
                         strat_manager_service_http_client.pause_all_active_strats_query_client()
                     except Exception as e:
+                        # True if connection or service up error
                         res = self.check_connection_or_service_not_ready_error(e)
                         if not res:
                             logging.exception(
                                 f"pause_all_active_strats_query_client failed with exception {e}")
                             break
+                        else:
+                            logging.info("Retrying pause_all_active_strats_query_client in 1 sec")
+                            time.sleep(1)
                     else:
                         break
 
     async def is_portfolio_limits_breached_query_pre(
             self, is_portfolio_limits_breached_class_type: Type[IsPortfolioLimitsBreached]):
-        pause_all_strats = await self.check_all_portfolio_limits()
-        return [IsPortfolioLimitsBreached(is_portfolio_limits_breached=pause_all_strats)]
+        """
+        :return: returns empty list if exception occurs
+        """
+        try:
+            pause_all_strats = await self.check_all_portfolio_limits()
+        except Exception as e:
+            # True if connection or service up error
+            res = self.check_connection_or_service_not_ready_error(e)
+            if res:
+                logging.exception("pair_strat_engine seems down, returning empty list from "
+                                  "is_portfolio_limits_breached_query_pre")
+                return []
+        else:
+            return [IsPortfolioLimitsBreached(is_portfolio_limits_breached=pause_all_strats)]
 
     def portfolio_limit_check_queue_handler(self):
         while 1:

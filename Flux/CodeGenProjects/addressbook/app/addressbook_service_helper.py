@@ -1,6 +1,4 @@
-import logging
-import sys
-from threading import Lock
+import inspect
 
 from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
@@ -198,7 +196,7 @@ def log_pair_strat_client_call(pydantic_basemodel_type: Type | None, client_call
     fld_sep: str = "~~"
     val_sep: str = "^^"
     log_str = f"^^^{pydantic_basemodel_type.__name__}{fld_sep}{client_callable.__name__}{fld_sep}"
-    for k, v in kwargs:
+    for k, v in kwargs.items():
         log_str += f"{k}{val_sep}{v}"
         if k != list(kwargs)[-1]:
             log_str += fld_sep
@@ -232,19 +230,25 @@ def guaranteed_call_pair_strat_client(pydantic_basemodel_type: Type | None, clie
             # Handling for query operations - queries doesn't take pydantic_obj as param
             client_callable(**kwargs)
     except Exception as e:
+        curframe = inspect.currentframe()
+        calframe = inspect.getouterframes(curframe, 2)
         if "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
             logging.exception("Connection Error in addressbook server call, likely server is "
                               "down, putting pair_strat client call as log for pair_strat_log "
-                              "analyzer handling")
+                              f"analyzer handling - caller: {calframe[1][3]}")
             log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
         elif "service is not initialized yet" in str(e):
-            # Check is server up
             logging.exception("addressbook service not up yet, likely server restarted, but is "
                               "not ready yet, putting pair_strat client call as log for pair_strat_log "
-                              "analyzer handling")
+                              f"analyzer handling - caller: {calframe[1][3]}")
+            log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
+        elif "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))" in str(e):
+            logging.exception("addressbook service connection error, putting pair_strat client call "
+                              f"as log for pair_strat_log analyzer handling - caller: {calframe[1][3]}")
             log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
         else:
-            raise Exception(f"guaranteed_call_pair_strat_client failed with exception: {e}")
+            raise Exception(f"guaranteed_call_pair_strat_client called from {calframe[1][3]} failed "
+                            f"with exception: {e}")
 
 
 class MDShellEnvData(BaseModel):

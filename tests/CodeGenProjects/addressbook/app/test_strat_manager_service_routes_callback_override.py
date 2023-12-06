@@ -2514,6 +2514,27 @@ def test_get_market_depths_query(
 
         pair_strat_n_http_client_tuple_list.append((activated_pair_start, executor_http_client))
 
+    bid_pos_to_market_depth_dict = {}
+    ask_pos_to_market_depth_dict = {}
+    for market_depth_ in market_depth_basemodel_list:
+        if market_depth_.side == TickType.BID:
+            bid_pos_to_market_depth_dict[market_depth_.position] = market_depth_
+        else:
+            ask_pos_to_market_depth_dict[market_depth_.position] = market_depth_
+
+    for market_depth_dict in [bid_pos_to_market_depth_dict, ask_pos_to_market_depth_dict]:
+        cum_qty = 0
+        cum_notional = 0
+        cum_avg_px = 0
+        for pos, market_depth_ in market_depth_dict.items():
+            cum_qty += market_depth_.qty
+            market_depth_.cumulative_qty = cum_qty
+
+            cum_notional += (market_depth_.px * market_depth_.qty)
+            market_depth_.cumulative_notional = cum_notional
+
+            market_depth_.cumulative_avg_px = cum_notional / cum_qty
+
     for pair_strat_n_http_client_tuple in pair_strat_n_http_client_tuple_list:
         pair_strat, executor_http_client = pair_strat_n_http_client_tuple
 
@@ -2541,6 +2562,22 @@ def test_get_market_depths_query(
                 assert last_px > market_depth_obj.px, \
                     (f"Unexpected: market_depth_list must be sorted in terms of decreasing px, "
                      f"market_depth_list: {market_depth_list}")
+
+            # checking cumulative fields
+            if market_depth_obj.side == TickType.BID:
+                expected_market_depth = bid_pos_to_market_depth_dict.get(market_depth_obj.position)
+            else:
+                expected_market_depth = ask_pos_to_market_depth_dict.get(market_depth_obj.position)
+
+            assert expected_market_depth.cumulative_qty == market_depth_obj.cumulative_qty, \
+                (f"Mismatched cumulative_qty: expected: {expected_market_depth.cumulative_qty} "
+                 f"received: {market_depth_obj.cumulative_qty}")
+            assert expected_market_depth.cumulative_notional == market_depth_obj.cumulative_notional, \
+                (f"Mismatched cumulative_notional: expected: {expected_market_depth.cumulative_notional} "
+                 f"received: {market_depth_obj.cumulative_notional}")
+            assert expected_market_depth.cumulative_avg_px == market_depth_obj.cumulative_avg_px, \
+                (f"Mismatched cumulative_avg_px: expected: {expected_market_depth.cumulative_avg_px} "
+                 f"received: {market_depth_obj.cumulative_avg_px}")
 
 
 def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
@@ -3315,3 +3352,4 @@ def _test_clean_all_logs():
 #
 #     portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(portfolio_status_id)
 #     assert not portfolio_status.kill_switch
+

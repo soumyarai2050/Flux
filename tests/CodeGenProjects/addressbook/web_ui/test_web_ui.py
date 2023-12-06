@@ -23,7 +23,7 @@ from tests.CodeGenProjects.addressbook.web_ui.utility_test_functions import (
     save_layout, get_common_keys, get_replaced_common_keys, get_table_headers, get_select_box_value,
     save_nested_strat, get_widgets_by_flux_property, get_xpath_from_field_name, update_schema_json,
     get_default_field_value, scroll_into_view, validate_property_that_it_contain_val_min_val_max_or_none,
-    show_hidden_fields_in_tree_layout, count_fields_in_tree, validate_comma_separated_values,
+    show_hidden_fields_in_tree_layout, count_fields_in_tree,
     get_fld_name_colour_in_tree, get_unsaved_changes_discarded_key, click_on_okay_button_unsaved_changes_popup,
     set_autocomplete_field, strat_manager_service_native_web_client, flux_fld_default_widget, get_all_keys_from_table,
     get_element_text_list_from_filter_popup, get_web_project_url, flux_fld_title_in_widgets,
@@ -33,9 +33,10 @@ from tests.CodeGenProjects.addressbook.web_ui.utility_test_functions import (
     validate_flux_fld_number_format_in_widget, validate_flux_flx_display_zero_in_widget,
     get_replaced_str_default_field_value, validate_val_min_n_default_fld_value_equal_or_not,
     validate_val_max_n_default_fld_value_equal_or_not, show_nested_fld_in_tree_layout,
-    get_val_min_n_val_max_of_fld, select_or_unselect_checkbox, get_replaced_str, get_commonkey_items, change_layout,
-    double_click, hover_over_on_element, get_progress_bar_level, get_str_value, set_val_max_input_fld,
-    set_val_min_input_fld, get_server_populate_fld, set_input_value_for_comma_seperated)
+    get_val_min_n_val_max_of_fld, select_or_unselect_checkbox, get_commonkey_items, change_layout,
+    double_click, hover_over_on_element, set_val_max_input_fld,
+    set_val_min_input_fld, get_server_populate_fld, set_input_value_for_comma_seperated,
+    get_val_max_from_input_fld, input_n_validate_progress_bar)
 from tests.CodeGenProjects.addressbook.web_ui.web_ui_models import (DriverType, Delay, Layout, WidgetType,
                                                                           SearchType)
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import TopOfBookBaseModel, QuoteOptional
@@ -319,7 +320,7 @@ def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, we
 
 
 def test_widget_type(driver_type, schema_dict: Dict[str, any]):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="val_min")
+    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="progress_bar")
     print(result)
     assert result[0]
     # # print(result)
@@ -771,68 +772,11 @@ def test_flux_fld_orm_no_update_in_widget(clean_and_set_limits, driver_type, web
 
 def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                             schema_dict, pair_strat: Dict):
-    # result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
-    #                                       flux_property="display_type")
-    # print(result)
-    # assert result[0]
-    #
-    # # table_layout
-    # field_name_n_input_value: Dict[str] = {}
-    # for widget_query in result[1]:
-    #     widget_name = widget_query.widget_name
-    #     widget = driver.find_element(By.ID, widget_name)
-    #     scroll_into_view(driver=driver, element=widget)
-    #     click_button_with_name(widget=widget, button_name="Edit")
-    #     if widget_name == "order_limits":
-    #         switch_layout(widget=widget, layout=Layout.TABLE)
-    #     for field_query in widget_query.fields:
-    #         field_name: str = field_query.field_name
-    #         # in strat status widget residual notional and balance notional fld disabled in table layout only
-    #         if field_name == "residual_notional" or field_name == "balance_notional":
-    #             continue
-    #         val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
-    #         input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max, val_min=val_min)
-    #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-    #                                                widget_name=widget_name, field_name=field_name)
-    #         # enabled_or_not: bool = validate_table_cell_enabled_or_not(widget=widget, xpath=xpath)
-    #         # if enabled_or_not:
-    #         set_table_input_field(widget=widget, xpath=xpath, value=str(input_value))
-    #         # Add key-value pair
-    #         field_name_n_input_value[field_name] = input_value
-    #         # else:
-    #         #     continue
-    set_input_value_for_comma_seperated(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TABLE)
-    # validate_comma_separated_values(driver=driver, widget=widget,
-    #                                    layout=Layout.TABLE, field_name_n_input_value=field_name_n_input_value)
-    #
-    # # tree_layout
-    # field_name_n_input_value: Dict[str] = {}
-    # for widget_query in result[1]:
-    #     widget_name = widget_query.widget_name
-    #     widget = driver.find_element(By.ID, widget_name)
-    #     scroll_into_view(driver=driver, element=widget)
-    #     switch_layout(widget=widget, layout=Layout.TREE)
-    #     click_button_with_name(widget=widget, button_name="Edit")
-    #     # in strat status sec id fld is none, but it should be filled
-    #     if widget_name == "strat_status":
-    #         show_nested_fld_in_tree_layout(widget=widget)
-    #         continue
-    #     for field_query in widget_query.fields:
-    #         field_name: str = field_query.field_name
-    #         val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
-    #         input_value: str = validate_property_that_it_contain_val_min_val_max_or_none(val_max=val_max, val_min=val_min)
-    #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
-    #                                                widget_name=widget_name, field_name=field_name)
-    #         # xpath = "residual.security.sec_id"
-    #         # input_value = "100"
-    #         # field_name = "sec_id"
-    #         set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=input_value)
-    #         # Add key-value pair
-    #         field_name_n_input_value[xpath] = input_value
-    #
-    #     validate_comma_separated_values(driver=driver, widget=widget,
-    #                                         layout=Layout.TREE, field_name_n_input_value=field_name_n_input_value)
 
+    # table layout
+    set_input_value_for_comma_seperated(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TABLE)
+
+    # tree layout
     set_input_value_for_comma_seperated(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TREE)
 
     # WidgetType: DEPENDENT
@@ -897,10 +841,34 @@ def test_flux_fld_name_color_in_independent_widget(clean_and_set_limits, driver_
 
 def test_flux_fld_progress_bar_in_widget(clean_and_set_limits, driver_type, web_project, driver,
                                          schema_dict, pair_strat: Dict):
-    # TODO: progress bar property is not used yet in independent widget
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="progress_bar")
+
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+                                           flux_property="progress_bar")
     print(result)
     assert result[0]
+
+    # can't automate for table layout bcz it does not contains progressbar
+    # tree layout
+    for widget_query in result[1]:
+        widget_name = widget_query.widget_name
+        widget = driver.find_element(By.ID, widget_name)
+        for field_query in widget_query.fields:
+            field_name: str = field_query.field_name
+            val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
+            get_val_max, widget_name = get_val_max_from_input_fld(val_max=val_max, driver=driver,
+                                                                  widget_type=WidgetType.INDEPENDENT,layout=Layout.TREE)
+            # FIXME: NOT GETTING ANY XPATH
+            xpath: str = get_xpath_from_field_name( schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+                                                   widget_name=widget_name, field_name=field_name)
+
+            scroll_into_view(driver=driver, element=widget)
+            input_n_validate_progress_bar(driver=driver, widget=widget, field_name=field_name, value=val_min,
+                                          input_value_type="val_min")
+
+            # for val max
+            input_n_validate_progress_bar(driver=driver, widget=widget, field_name=field_name, value=get_val_max,
+                                         input_value_type="val_max")
+
 
     # TODO: progress bar property is not used yet in dependent widget
     result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="progress_bar")
@@ -916,41 +884,6 @@ def test_flux_fld_progress_bar_in_widget(clean_and_set_limits, driver_type, web_
                                           flux_property="progress_bar")
     print(result)
     assert not result[0]
-
-    # can't automate for table layout bcz it does not contains progressbar
-    # tree_layout
-    # for_val_min
-    get_val_max: str = ""
-    xpath: str = ""
-    field_name: str = ""
-    for widget_query in result[1]:
-        widget_name = widget_query.widget_name
-        strat_collection_widget = driver.find_element(By.ID, "strat_collection")
-        widget = driver.find_element(By.ID, widget_name)
-        click_button_with_name(widget=strat_collection_widget, button_name="Edit")
-        scroll_into_view(driver=driver, element=widget)
-        switch_layout(widget=widget, layout=Layout.TREE)
-        for field_query in widget_query.fields:
-            field_name: str = field_query.field_name
-            val_min, val_max = get_val_min_n_val_max_of_fld(field_query=field_query)
-            get_val_max: str = get_str_value(value=val_max, driver=driver, widget_type=WidgetType.DEPENDENT,
-                                             layout=Layout.TREE)
-
-            xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.DEPENDENT,
-                                                   widget_name=widget_name, field_name=field_name)
-            set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=val_min)
-        click_button_with_name(widget=strat_collection_widget, button_name="Save")
-        confirm_save(driver=driver)
-        progress_level = get_progress_bar_level(widget=widget)
-        assert progress_level == "100"
-
-        # for_val_max
-        click_button_with_name(widget=strat_collection_widget, button_name="Edit")
-        set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=get_val_max)
-        click_button_with_name(widget=strat_collection_widget, button_name="Save")
-        confirm_save(driver=driver)
-        progress_level = get_progress_bar_level(widget=widget)
-        assert progress_level == "0"
 
 
 class TestMultiTab:

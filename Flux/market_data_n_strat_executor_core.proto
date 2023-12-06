@@ -97,7 +97,7 @@ message MarketDepth {
     QueryParamsDataType: "List[Tuple[str, TickType]]",
     QueryRouteType: PATCH
   };
-  option (FluxMsgAggregateQueryVarName) = "cum_px_qty_aggregate_query";
+  option (FluxMsgAggregateQueryVarName) = "cum_px_qty_aggregate_pipeline";
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   required string exch_time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];

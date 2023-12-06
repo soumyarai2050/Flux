@@ -192,8 +192,7 @@ class LogSimulatorLogAnalyzer(AppLogAnalyzer):
     def _send_alerts(self, severity: str, alert_brief: str, alert_details: str) -> None:
         logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
                       f"alert_details: {alert_details}")
-        created: bool = False
-        while self.run_mode and not created:
+        while True:
             try:
                 if not self.service_up:
                     service_ready: bool = self._init_service()
@@ -211,7 +210,7 @@ class LogSimulatorLogAnalyzer(AppLogAnalyzer):
                     PortfolioAlertBaseModel(_id=1, alerts=[alert_obj])
                 self.portfolio_alert_queue.put(jsonable_encoder(updated_portfolio_alert,
                                                                 by_alias=True, exclude_none=True))
-                created = True
+                break
             except Exception as e:
                 logging.exception(f"_send_alerts failed;;;exception: {e}")
                 self.service_up = False
@@ -242,7 +241,7 @@ class LogSimulatorLogAnalyzer(AppLogAnalyzer):
         self._send_alerts(severity=self._get_severity("warning"), alert_brief=brief_msg_str,
                           alert_details=detail_msg_str)
 
-    def handle_log_simulator_matched_log_message(self, log_prefix: str, log_message: str):
+    def handle_log_simulator_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail):
         # put in method
         if log_message.startswith("$$$"):
             # handle trade simulator message
