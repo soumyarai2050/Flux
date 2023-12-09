@@ -289,34 +289,16 @@ class TradeSimulator(TradingLinkBase):
                 await cls.process_cxl_ack(order_brief)
 
     @classmethod
-    def trigger_kill_switch(cls) -> bool:
-        portfolio_status_id = 1
-
-        portfolio_status = \
-            TradeSimulator.pair_strat_web_client.get_portfolio_status_client(portfolio_status_id)
-
-        if not portfolio_status.kill_switch:
-            guaranteed_call_pair_strat_client(
-                PortfolioStatusBaseModel, TradeSimulator.pair_strat_web_client.patch_portfolio_status_client,
-                _id=1, kill_switch=True)
-            logging.debug("Portfolio_status - Kill Switch turned to True")
-            return True
-        else:
-            logging.error("Portfolio_status - Kill Switch is already True")
-            return False
+    async def is_kill_switch_enabled(cls) -> bool:
+        logging.info("Called TradingLink.is_kill_switch_enabled from TradeSimulator")
+        return False
 
     @classmethod
-    def revoke_kill_switch_n_resume_trading(cls) -> bool:
-        portfolio_status_id = 1
-        portfolio_status = \
-            TradeSimulator.pair_strat_web_client.get_portfolio_status_client(portfolio_status_id)
+    async def trigger_kill_switch(cls) -> bool:
+        logging.critical("Called TradingLink.trigger_kill_switch from TradeSimulator")
+        return True
 
-        if portfolio_status.kill_switch:
-            guaranteed_call_pair_strat_client(
-                PortfolioStatusBaseModel, TradeSimulator.pair_strat_web_client.patch_portfolio_status_client,
-                _id=1, kill_switch=False)
-            logging.debug("Portfolio_status - Kill Switch turned to False")
-            return True
-        else:
-            logging.error("Portfolio_status - Kill Switch is already False")
-            return False
+    @classmethod
+    async def revoke_kill_switch_n_resume_trading(cls) -> bool:
+        logging.critical("Called TradingLink.revoke_kill_switch_n_resume_trading from TradeSimulator")
+        return True

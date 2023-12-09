@@ -411,7 +411,7 @@ def check_placed_buy_order_computes_before_all_sells(loop_count: int, total_orde
     Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after order is triggered
     """
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client()
+    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
     assert buy_placed_order_journal in order_journal_obj_list, \
         f"Couldn't find {buy_placed_order_journal} in {order_journal_obj_list}"
 
@@ -429,7 +429,7 @@ def check_placed_buy_order_computes_before_all_sells(loop_count: int, total_orde
     expected_order_snapshot_obj.create_date_time = buy_placed_order_journal.order_event_date_time
     expected_order_snapshot_obj.order_brief.text.extend(buy_placed_order_journal.order.text)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -595,7 +595,7 @@ def check_placed_buy_order_computes_after_sells(loop_count: int, total_order_cou
     Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after order is triggered
     """
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client()
+    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
     assert buy_placed_order_journal in order_journal_obj_list, \
         f"Couldn't find {buy_placed_order_journal} in {order_journal_obj_list}"
 
@@ -615,7 +615,7 @@ def check_placed_buy_order_computes_after_sells(loop_count: int, total_order_cou
     expected_order_snapshot_obj.create_date_time = buy_placed_order_journal.order_event_date_time
     expected_order_snapshot_obj.order_brief.text.extend(buy_placed_order_journal.order.text)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -775,7 +775,7 @@ def placed_buy_order_ack_receive(loop_count: int, expected_order_id: str, buy_or
                                  expected_order_snapshot_obj: OrderSnapshotBaseModel,
                                  executor_web_client: StratExecutorServiceHttpClient):
     """Checking after order's ACK status is received"""
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client()
+    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
 
     assert expected_order_journal in order_journal_obj_list, f"Couldn't find {expected_order_journal} in list " \
                                                              f"{order_journal_obj_list}"
@@ -792,7 +792,7 @@ def placed_buy_order_ack_receive(loop_count: int, expected_order_id: str, buy_or
     expected_order_snapshot_obj.last_update_date_time = expected_order_journal.order_event_date_time
     expected_order_snapshot_obj.create_date_time = buy_order_placed_date_time
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -818,7 +818,7 @@ def check_fill_receive_for_placed_buy_order_before_sells(loop_count: int, total_
     Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after fill is received
     """
-    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client()
+    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
 
     single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
@@ -839,7 +839,7 @@ def check_fill_receive_for_placed_buy_order_before_sells(loop_count: int, total_
     expected_order_snapshot_obj.create_date_time = buy_order_placed_date_time
     expected_order_snapshot_obj.order_status = "OE_ACKED"
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # removing below field from received_order_snapshot_list for comparison
     for symbol_side_snapshot in order_snapshot_list:
         symbol_side_snapshot.id = None
@@ -1002,7 +1002,7 @@ def check_fill_receive_for_placed_buy_order_after_all_sells(loop_count: int, tot
     Checking resulted changes in OrderJournal, OrderSnapshot, SymbolSideSnapshot, PairStrat,
     StratBrief and PortfolioStatus after fill is received
     """
-    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client()
+    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
 
     single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
@@ -1025,7 +1025,7 @@ def check_fill_receive_for_placed_buy_order_after_all_sells(loop_count: int, tot
     expected_order_snapshot_obj.create_date_time = buy_order_placed_date_time
     expected_order_snapshot_obj.order_status = "OE_ACKED"
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # removing below field from received_order_snapshot_list for comparison
     for symbol_side_snapshot in order_snapshot_list:
         symbol_side_snapshot.id = None
@@ -1181,7 +1181,7 @@ def check_placed_sell_order_computes_before_buys(loop_count: int, total_loop_cou
                                                  expected_strat_brief_obj: StratBriefBaseModel,
                                                  executor_web_client: StratExecutorServiceHttpClient,
                                                  is_buy_sell_pair: bool = False):
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client()
+    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
 
     assert sell_placed_order_journal in order_journal_obj_list, f"Couldn't find {sell_placed_order_journal} in " \
                                                                 f"{order_journal_obj_list}"
@@ -1202,7 +1202,7 @@ def check_placed_sell_order_computes_before_buys(loop_count: int, total_loop_cou
     expected_order_snapshot_obj.create_date_time = sell_placed_order_journal.order_event_date_time
     expected_order_snapshot_obj.order_brief.text.extend(sell_placed_order_journal.order.text)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -1369,7 +1369,7 @@ def check_placed_sell_order_computes_after_all_buys(loop_count: int, total_loop_
                                                     expected_strat_brief_obj: StratBriefBaseModel,
                                                     expected_portfolio_status: PortfolioStatusBaseModel,
                                                     executor_web_client: StratExecutorServiceHttpClient):
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client()
+    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
 
     assert sell_placed_order_journal in order_journal_obj_list, f"Couldn't find {sell_placed_order_journal} in " \
                                                                 f"{order_journal_obj_list}"
@@ -1390,7 +1390,7 @@ def check_placed_sell_order_computes_after_all_buys(loop_count: int, total_loop_
     expected_order_snapshot_obj.create_date_time = sell_placed_order_journal.order_event_date_time
     expected_order_snapshot_obj.order_brief.text.extend(sell_placed_order_journal.order.text)
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -1540,7 +1540,7 @@ def placed_sell_order_ack_receive(loop_count: int, expected_order_id: str, sell_
                                   expected_order_snapshot_obj: OrderSnapshotBaseModel,
                                   executor_web_client: StratExecutorServiceHttpClient):
     """Checking after order's ACK status is received"""
-    order_journal_obj_list = executor_web_client.get_all_order_journal_client()
+    order_journal_obj_list = executor_web_client.get_all_order_journal_client(-100)
 
     assert expected_order_journal in order_journal_obj_list, f"Couldn't find {expected_order_journal} in " \
                                                              f"{order_journal_obj_list}"
@@ -1557,7 +1557,7 @@ def placed_sell_order_ack_receive(loop_count: int, expected_order_id: str, sell_
     expected_order_snapshot_obj.last_update_date_time = expected_order_journal.order_event_date_time
     expected_order_snapshot_obj.create_date_time = sell_order_placed_date_time
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # updating below field from received_order_snapshot_list for comparison
     for order_snapshot in order_snapshot_list:
         order_snapshot.id = None
@@ -1573,7 +1573,7 @@ def check_fill_receive_for_placed_sell_order_before_buys(
         expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
         expected_strat_brief_obj: StratBriefBaseModel, expected_portfolio_status: PortfolioStatusBaseModel,
         executor_web_client: StratExecutorServiceHttpClient, is_buy_sell_pair: bool = False):
-    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client()
+    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
 
     single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
@@ -1596,7 +1596,7 @@ def check_fill_receive_for_placed_sell_order_before_buys(
     expected_order_snapshot_obj.create_date_time = sell_order_placed_date_time
     expected_order_snapshot_obj.order_status = "OE_ACKED"
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # removing below field from received_order_snapshot_list for comparison
     for symbol_side_snapshot in order_snapshot_list:
         symbol_side_snapshot.id = None
@@ -1761,7 +1761,7 @@ def check_fill_receive_for_placed_sell_order_after_all_buys(
         expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
         expected_strat_brief_obj: StratBriefBaseModel, expected_portfolio_status: PortfolioStatusBaseModel,
         executor_web_client: StratExecutorServiceHttpClient):
-    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client()
+    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
 
     single_buy_order_px, single_buy_order_qty, single_buy_filled_px, single_buy_filled_qty, \
@@ -1784,7 +1784,7 @@ def check_fill_receive_for_placed_sell_order_after_all_buys(
     expected_order_snapshot_obj.create_date_time = sell_order_placed_date_time
     expected_order_snapshot_obj.order_status = "OE_ACKED"
 
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     # removing below field from received_order_snapshot_list for comparison
     for symbol_side_snapshot in order_snapshot_list:
         symbol_side_snapshot.id = None
@@ -2450,7 +2450,7 @@ def get_latest_order_journal_with_status_and_symbol(expected_order_event, expect
         loop_wait_secs = 2
 
     for loop_count in range(max_loop_count):
-        stored_order_journal_list = executor_web_client.get_all_order_journal_client()
+        stored_order_journal_list = executor_web_client.get_all_order_journal_client(-100)
         for stored_order_journal in stored_order_journal_list:
             if stored_order_journal.order_event == expected_order_event and \
                     stored_order_journal.order.security.sec_id == expected_symbol:
@@ -2486,7 +2486,7 @@ def get_latest_fill_journal_from_order_id(expected_order_id: str,
                                           executor_web_client: StratExecutorServiceHttpClient):
     found_fill_journal = None
 
-    stored_fill_journals = executor_web_client.get_all_fills_journal_client()
+    stored_fill_journals = executor_web_client.get_all_fills_journal_client(-100)
     for stored_fill_journal in stored_fill_journals:
         if stored_fill_journal.order_id == expected_order_id:
             # since fills_journal is having option to sort in descending, first occurrence will be latest
@@ -2500,7 +2500,7 @@ def get_fill_journals_for_order_id(expected_order_id: str,
                                    executor_web_client: StratExecutorServiceHttpClient):
     found_fill_journals = []
 
-    stored_fill_journals = executor_web_client.get_all_fills_journal_client()
+    stored_fill_journals = executor_web_client.get_all_fills_journal_client(-100)
     for stored_fill_journal in stored_fill_journals:
         if stored_fill_journal.order_id == expected_order_id:
             found_fill_journals.append(stored_fill_journal)
@@ -3055,7 +3055,7 @@ def get_pair_strat_from_symbol(symbol: str):
 
 def get_order_snapshot_from_order_id(order_id, executor_web_client: StratExecutorServiceHttpClient
                                      ) -> OrderSnapshotBaseModel | None:
-    order_snapshot_list = executor_web_client.get_all_order_snapshot_client()
+    order_snapshot_list = executor_web_client.get_all_order_snapshot_client(-100)
     expected_order_snapshot: OrderSnapshotBaseModel | None = None
     for order_snapshot in order_snapshot_list:
         if order_snapshot.order_brief.order_id == order_id:
@@ -3594,14 +3594,27 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
 
 
 def strat_done_after_exhausted_consumable_notional(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, residual_wait_sec, side_to_check: Side):
+        top_of_book_list_, residual_wait_sec, side_to_check: Side, leg_1_side: Side | None = None,
+        leg_2_side: Side | None = None):
+
+    if leg_1_side is None or leg_2_side is None:
+        leg_1_side = Side.BUY
+        leg_2_side = Side.SELL
 
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_order_test_requirements(leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           market_depth_basemodel_list, top_of_book_list_, leg1_side=leg_1_side,
+                                           leg2_side=leg_2_side))
+
+    if leg_1_side == Side.BUY:
+        buy_symbol = leg_1_symbol
+        sell_symbol = leg_2_symbol
+    else:
+        buy_symbol = leg_2_symbol
+        sell_symbol = leg_1_symbol
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
@@ -4180,7 +4193,7 @@ def place_sanity_orders_for_executor(
     buy_ack_order_id = None
 
     if place_after_recovery:
-        order_journals = executor_web_client.get_all_order_journal_client()
+        order_journals = executor_web_client.get_all_order_journal_client(-100)
         max_id = 0
         for order_journal in order_journals:
             if order_journal.order.security.sec_id == buy_symbol and order_journal.order_event == OrderEventType.OE_ACK:

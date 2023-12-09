@@ -5,11 +5,12 @@ import {
     DialogActions, Button, Select, MenuItem, Checkbox, FormControlLabel, Dialog, TablePagination,
     Snackbar, Alert, TextField, Popover, Box
 } from '@mui/material';
+import axios from 'axios';
 import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp, Help } from '@mui/icons-material';
 import { utils, writeFileXLSX } from 'xlsx';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, stableSort, getComparator, getTableRowsFromData, sortColumns } from '../utils';
-import { DataTypes, DB_ID, Modes } from '../constants';
+import { API_ROOT_URL, DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
 import TableHead from './TableHead';
@@ -309,8 +310,11 @@ const TableWidget = (props) => {
         }
     }, [flux_toggle, flux_trigger_strat, props.onButtonToggle])
 
-    const exportToExcel = useCallback(() => {
-        let originalRows = getTableRowsFromData(props.collections, props.originalData, props.xpath);
+    const exportToExcel = useCallback(async () => {
+        // let originalRows = getTableRowsFromData(props.collections, props.originalData, props.xpath);
+        const url = props.url ? props.url : API_ROOT_URL;
+        const storedData = await axios.get(`${url}/get-all-${props.name}`);
+        let originalRows = getTableRowsFromData(props.collections, storedData, props.xpath);
         originalRows.forEach(row => {
             delete row['data-id'];
         })
@@ -318,7 +322,7 @@ const TableWidget = (props) => {
         const wb = utils.book_new();
         utils.book_append_sheet(wb, ws, "Sheet1");
         writeFileXLSX(wb, `${props.name}.xlsx`);
-    }, [props.collections, props.originalData, props.xpath])
+    }, [props.collections, props.name, props.xpath])
 
     const copyColumnHandler = useCallback((xpath) => {
         let columnName = xpath.split('.').pop();

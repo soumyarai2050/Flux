@@ -259,8 +259,11 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
         return None
 
     def set_top_of_book(self, top_of_book: TopOfBookBaseModel | TopOfBook) -> DateTime | None:
+        if self._pair_strat is None:
+            logging.error(f"Unexpected: strat_cache has no pair strat for tob update of: {top_of_book.symbol}")
+            return None
         if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
-            if top_of_book.last_update_date_time > self._tob_leg1_update_date_time:
+            if self._top_of_books[0] is None or top_of_book.last_update_date_time > self._tob_leg1_update_date_time:
                 self._top_of_books[0] = top_of_book
                 self._tob_leg1_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
@@ -270,6 +273,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                 self._top_of_books[0].last_trade = top_of_book.last_trade
                 # artificially update TOB datetime for next pickup by app
                 self._tob_leg1_update_date_time += timedelta(milliseconds=1)
+                return self._tob_leg1_update_date_time
             else:
                 delta = self._tob_leg1_update_date_time - top_of_book.last_update_date_time
                 logging.debug(f"leg1 set_top_of_book called for: {top_of_book.symbol} with update_date_time older by: "
@@ -278,7 +282,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                 return None
             # else not needed - common log outside handles this
         elif top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
-            if top_of_book.last_update_date_time > self._tob_leg2_update_date_time:
+            if self._top_of_books[1] is None or top_of_book.last_update_date_time > self._tob_leg2_update_date_time:
                 self._top_of_books[1] = top_of_book
                 self._tob_leg2_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
@@ -288,6 +292,7 @@ class StratCache(StratManagerServiceBaseStratCache, StratExecutorServiceBaseStra
                 self._top_of_books[1].last_trade = top_of_book.last_trade
                 # artificially update TOB datetime for next pickup by app
                 self._tob_leg2_update_date_time += timedelta(milliseconds=1)
+                return self._tob_leg2_update_date_time
             else:
                 delta = self._tob_leg2_update_date_time - top_of_book.last_update_date_time
                 logging.debug(f"leg2 set_top_of_book called for: {top_of_book.symbol} with update_date_time older by: "

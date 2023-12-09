@@ -18,8 +18,11 @@ from FluxPythonUtils.scripts.utility_functions import log_n_except, http_respons
 
 
 @log_n_except
-def generic_http_get_all_client(url: str, pydantic_type):
-    response: requests.Response = requests.get(url, timeout=60)     # TIMEOUT for get-all set to 60 sec
+def generic_http_get_all_client(url: str, pydantic_type, limit_obj_count: int | None = None):
+    params = None
+    if limit_obj_count:
+        params = {"limit_obj_count": limit_obj_count}
+    response: requests.Response = requests.get(url, timeout=60, params=params)     # TIMEOUT for get-all set to 60 sec
     return http_response_as_class_type(url, response, 200, pydantic_type, HTTPRequestType.GET)
 
 

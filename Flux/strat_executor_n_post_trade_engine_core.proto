@@ -28,12 +28,12 @@ enum OrderStatusType{
 
 message OrderJournal{
   option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_FilterAggregate,
-    CreateAllOp: AggregateType_FilterAggregate,
-    ReadOp: AggregateType_FilterAggregate,
-    PatchOp: AggregateType_FilterAggregate,
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_FilterAggregate
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -64,7 +64,6 @@ message OrderJournal{
   };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
     EnableNotifyAll: false,
@@ -83,14 +82,14 @@ message OrderJournal{
 
 message OrderSnapshot{
   option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_FilterAggregate,
-    CreateAllOp: AggregateType_FilterAggregate,
-    ReadOp: AggregateType_FilterAggregate,
-    UpdateOp: AggregateType_FilterAggregate,
-    UpdateAllOp: AggregateType_FilterAggregate,
-    PatchOp: AggregateType_FilterAggregate,
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_FilterAggregate
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -123,7 +122,6 @@ message OrderSnapshot{
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional OrderStatusType order_status = 2 [(FluxFldNoCommonKey) = true];

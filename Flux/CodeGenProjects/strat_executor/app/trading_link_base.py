@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from abc import abstractmethod, ABC
-from typing import List, ClassVar, final, Dict, Callable
+from typing import List, ClassVar, final, Dict, Final
 from pendulum import DateTime
 import os
 
@@ -31,10 +31,18 @@ class TradingLinkBase(ABC):
     executor_host = host
     pair_strat_config_dict = pair_strat_config_yaml_dict
     pair_strat_web_client: ClassVar[StratManagerServiceHttpClient] = strat_manager_service_http_client
+    portfolio_config_path: Final[PurePath] = (PurePath(__file__).parent.parent / "data" /
+                                              "kill_switch_simulate_config.yaml")
+    portfolio_config_dict: ClassVar[Dict | None] = load_configs(str(portfolio_config_path))
 
     def subscribe(self, listener_id: str, asyncio_loop: asyncio.AbstractEventLoop,
                   ric_filters: List[str] | None, sedol_filters: List[str] | None):
         logging.warning("Warning: TradingLinkBase subscribe invoked - subscribe call has no effect")
+
+    @classmethod
+    def reload_portfolio_configs(cls):
+        # reloading executor configs
+        cls.portfolio_config_dict = load_configs(str(cls.portfolio_config_path))
 
     @classmethod
     @final
@@ -43,7 +51,15 @@ class TradingLinkBase(ABC):
 
     @classmethod
     @abstractmethod
-    def trigger_kill_switch(cls) -> bool:
+    async def is_kill_switch_enabled(cls) -> bool:
+        """
+        derived to implement connector to underlying link provider
+        Raise Exception if send to underlying provider fails
+        """
+
+    @classmethod
+    @abstractmethod
+    async def trigger_kill_switch(cls) -> bool:
         """
         derived to implement connector to underlying link provider
         return false for any synchronous error (including if send to underlying provider fails)
@@ -51,7 +67,7 @@ class TradingLinkBase(ABC):
 
     @classmethod
     @abstractmethod
-    def revoke_kill_switch_n_resume_trading(cls) -> bool:
+    async def revoke_kill_switch_n_resume_trading(cls) -> bool:
         """
         derived to implement connector to underlying link provider
         return false for any synchronous error (including if send to underlying provider fails)

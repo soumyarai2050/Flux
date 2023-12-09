@@ -1,5 +1,8 @@
+# standard imports
 import logging
 from typing import List
+
+# project imports
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import Side
 from Flux.CodeGenProjects.strat_executor.app.trading_link_base import TradingLinkBase
 
@@ -14,15 +17,33 @@ class LogTradeSimulator(TradingLinkBase):
     Class to log trading link events that needs to be simulated by underlying true simulator
     This helps improve simulator by aligning the process more closely with async trading links
     """
-    @classmethod
-    def trigger_kill_switch(cls) -> bool:
-        log_simulate_logger.info("$$$trigger_kill_switch")
-        return True
 
     @classmethod
-    def revoke_kill_switch_n_resume_trading(cls) -> bool:
-        log_simulate_logger.info("$$$revoke_kill_switch_n_resume_trading")
-        return True
+    async def is_kill_switch_enabled(cls) -> bool:
+        logging.info("Called TradingLink.is_kill_switch_enabled from LogTradeSimulator")
+        is_kill_switch_enabled = cls.portfolio_config_dict.get("is_kill_switch_enabled")
+        if is_kill_switch_enabled is None:
+            return False
+        else:
+            return is_kill_switch_enabled
+
+    @classmethod
+    async def trigger_kill_switch(cls) -> bool:
+        logging.critical("Called TradingLink.trigger_kill_switch from LogTradeSimulator")
+        trigger_kill_switch = cls.portfolio_config_dict.get("trigger_kill_switch")
+        if trigger_kill_switch is None:
+            return True
+        else:
+            return trigger_kill_switch
+
+    @classmethod
+    async def revoke_kill_switch_n_resume_trading(cls) -> bool:
+        logging.critical("Called TradingLink.revoke_kill_switch_n_resume_trading from LogTradeSimulator")
+        revoke_kill_switch_n_resume_trading = cls.portfolio_config_dict.get("revoke_kill_switch_n_resume_trading")
+        if revoke_kill_switch_n_resume_trading is None:
+            return True
+        else:
+            return revoke_kill_switch_n_resume_trading
 
     @classmethod
     async def place_new_order(cls, px: float, qty: int, side: Side, trading_sec_id: str, system_sec_id: str,

@@ -1029,10 +1029,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = self.handle_underlying_GET_ALL_gen(message, aggregation_type, shared_lock_list)
         output_str += "\n"
-        output_str += f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}' + \
-                      f'", response_model=List[{message.proto.name}], status_code=200)\n'
-        output_str += f"async def read_{message_name_snake_cased}_http() -> List[{message.proto.name}]:\n"
-        output_str += f"    return await underlying_read_{message_name_snake_cased}_http()\n\n\n"
+        output_str += (f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}'
+                       f'", response_model=List[{message.proto.name}], status_code=200)\n')
+        output_str += (f"async def read_{message_name_snake_cased}_http(limit_obj_count: int | None = None"
+                       f") -> List[{message.proto.name}]:\n")
+        output_str += f"    limit_filter_agg: Dict[str, Any] | None = None\n"
+        output_str += f"    if limit_obj_count is not None:\n"
+        output_str += "        limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
+        output_str += f"    return await underlying_read_{message_name_snake_cased}_http(limit_filter_agg)\n\n\n"
         return output_str
 
     def _check_agg_info_availability(self, aggregation_type: str, crud_option_field_name: str,

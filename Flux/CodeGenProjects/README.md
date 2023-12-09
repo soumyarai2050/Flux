@@ -17,7 +17,7 @@ in dir where mongo-dir exists, `mongod --logpath=mongo-dir/logs/mongo.log --dbpa
     `sudo ln -s /usr/bin/pyhton3.x /usr/bin/python`
 5. Clone FluxCodeGenEngine and PythonCore parallely.
 6. If you are in windows you need to run below commands in your
-FluxCodeGenEngine/Flux dir, <br>
+FluxCodeGenEngine/Flux and PythonCore/FluxPythonUtils dir, <br>
     `find . -name "*.py" | xargs dos2unix` <br>
     `find . -name "*.sh" | xargs dos2unix` <br>
 Note: If dos2unix is not installed, use `sudo apt install dos2unix` 

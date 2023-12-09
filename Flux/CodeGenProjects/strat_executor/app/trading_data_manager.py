@@ -6,7 +6,7 @@ from Flux.CodeGenProjects.strat_executor.app.strat_cache import StratCache
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import (
     get_symbol_side_key, get_fills_journal_log_key, get_order_journal_log_key)
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import is_ongoing_strat
-from Flux.CodeGenProjects.strat_executor.app.trading_link import TradingLinkBase, get_trading_link, is_test_run
+from Flux.CodeGenProjects.strat_executor.app.trading_link import is_test_run
 from Flux.CodeGenProjects.pair_strat_engine.generated.StratExecutor.strat_manager_service_ws_data_manager import \
     StratManagerServiceDataManager
 from Flux.CodeGenProjects.strat_executor.generated.StratExecutor.strat_executor_service_ws_data_manager import (
@@ -15,7 +15,6 @@ from Flux.CodeGenProjects.strat_executor.app.get_pair_strat_n_executor_client im
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import StratExecutorServiceHttpClient
 
-trading_link: TradingLinkBase = get_trading_link()
 port = os.environ.get("PORT")
 if port is None or len(port) == 0:
     err_str = f"Env var 'PORT' received as {port}"
@@ -88,16 +87,16 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
                 raise Exception(e)
 
     # define callbacks for types you expect from ws as updates
-    def underlying_handle_portfolio_status_ws(self, **kwargs):
-        portfolio_status_ = kwargs.get("portfolio_status_")
-        if portfolio_status_ is not None:
-            # handle kill switch here (in portfolio status handler directly)
-            if portfolio_status_.kill_switch:
-                logging.critical("Triggering portfolio_status Kill_SWITCH")
-                trading_link.trigger_kill_switch()
-        else:
-            err_str_ = "Received portfolio_status object from caller as None"
-            logging.exception(err_str_)
+    # def underlying_handle_portfolio_status_ws(self, **kwargs):
+    #     portfolio_status_ = kwargs.get("portfolio_status_")
+    #     if portfolio_status_ is not None:
+    #         # handle kill switch here (in portfolio status handler directly)
+    #         if portfolio_status_.kill_switch:
+    #             logging.critical("Triggering portfolio_status Kill_SWITCH")
+    #             trading_link.trigger_kill_switch()
+    #     else:
+    #         err_str_ = "Received portfolio_status object from caller as None"
+    #         logging.exception(err_str_)
 
     def handle_pair_strat_get_by_id_ws(self, pair_strat_: PairStratBaseModel, **kwargs):
         if is_ongoing_strat(pair_strat_):

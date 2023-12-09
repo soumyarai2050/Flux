@@ -32,6 +32,7 @@ from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_servic
     StratExecutorServiceHttpClient)
 from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import log_pattern_to_restart_tail_process
 from FluxPythonUtils.scripts.utility_functions import get_pid_from_port, is_process_running
+from Flux.CodeGenProjects.strat_executor.app.trading_link import get_trading_link
 
 
 class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRoutesCallback):
@@ -55,6 +56,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     underlying_get_pair_strat_from_symbol_side_query_http: Callable[..., Any] | None = None
 
     Fx_SO_FilePath = CURRENT_PROJECT_SCRIPTS_DIR / f"fx_so.sh"
+    RecoveredKillSwitchUpdate: bool = False
 
     @classmethod
     def initialize_underlying_http_routes(cls):
@@ -100,6 +102,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
+        self.trading_link = get_trading_link()
 
         super().__init__()
 
@@ -177,6 +180,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     if not self.service_ready:
                         # running all existing executor
                         self.service_ready = True
+                        self.recover_kill_switch_state()
                         self.recover_existing_executors()
                     self.service_ready = True
                     print(f"INFO: addressbook service is ready: {datetime.datetime.now().time()}")
@@ -275,6 +279,40 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 tasks = [*pending_tasks, ]
             else:
                 break
+
+    def recover_kill_switch_state(self):
+        # if db true and trading is false - trigger_kill_switch and not update db
+        run_coro = self._recover_kill_switch_state()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        try:
+            # block for task to finish
+            future.result()
+        except Exception as e:
+            err_str_ = f"_recover_kill_switch_state failed - check and handle kill state manually, exception: {e}"
+            logging.exception(err_str_)
+        finally:
+            StratManagerServiceRoutesCallbackBaseNativeOverride.RecoveredKillSwitchUpdate = False  # reverting state
+
+    async def _recover_kill_switch_state(self) -> None:
+        kill_switch_state = await self.trading_link.is_kill_switch_enabled()
+
+        async with PortfolioStatus.reentrant_lock:
+            portfolio_status_id = 1
+            portfolio_status: PortfolioStatus = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.
+                underlying_read_portfolio_status_by_id_http(portfolio_status_id))
+
+            if not portfolio_status.kill_switch and kill_switch_state:
+                portfolio_status.kill_switch = True
+                StratManagerServiceRoutesCallbackBaseNativeOverride.RecoveredKillSwitchUpdate = True
+                await (StratManagerServiceRoutesCallbackBaseNativeOverride.
+                       underlying_partial_update_portfolio_status_http(
+                        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True)))
+            elif not kill_switch_state and portfolio_status.kill_switch:
+                logging.warning("Found kill switch in db as True but is_kill_switch_enabled returned False, "
+                                "calling trading_link.trigger_kill_switch")
+                await self.trading_link.trigger_kill_switch()
+            # else not required: all okay
 
     @staticmethod
     def create_n_run_fx_so_shell_script():
@@ -1034,6 +1072,54 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
 
     async def filtered_notify_pair_strat_update_query_ws_pre(self):
         return filter_ws_pair_strat
+
+    async def update_portfolio_status_pre(self, stored_portfolio_status_obj: PortfolioStatus,
+                                          updated_portfolio_status_obj: PortfolioStatus):
+        if not stored_portfolio_status_obj.kill_switch and updated_portfolio_status_obj.kill_switch:
+            if not StratManagerServiceRoutesCallbackBaseNativeOverride.RecoveredKillSwitchUpdate:
+                res = await self.trading_link.trigger_kill_switch()
+                if not res:
+                    err_str_ = "trading_link.trigger_kill_switch failed"
+                    logging.critical(err_str_)
+                    raise HTTPException(detail=err_str_, status_code=500)
+                # else not required: if res is fine make db update
+            # else not required: avoid trading_link.trigger_kill_switch if RecoveredKillSwitchUpdate is True updated
+            # from init check
+        elif stored_portfolio_status_obj.kill_switch and not updated_portfolio_status_obj.kill_switch:
+            res = await self.trading_link.revoke_kill_switch_n_resume_trading()
+            if not res:
+                err_str_ = "trading_link.revoke_kill_switch_n_resume_trading failed"
+                logging.critical(err_str_)
+                raise HTTPException(detail=err_str_, status_code=500)
+        # else not required: other case doesn't need trading link call
+
+    async def log_simulator_reload_config_query_pre(
+            self, log_simulator_reload_config_class_type: Type[LogSimulatorReloadConfig]):
+        self.trading_link.reload_portfolio_configs()
+        return []
+
+    async def partial_update_portfolio_status_pre(self, stored_portfolio_status_obj: PortfolioStatus,
+                                                  updated_portfolio_status_obj_json: Dict):
+        kill_switch_update = updated_portfolio_status_obj_json.get("kill_switch")
+        if kill_switch_update is not None:
+            if not stored_portfolio_status_obj.kill_switch and kill_switch_update:
+                if not StratManagerServiceRoutesCallbackBaseNativeOverride.RecoveredKillSwitchUpdate:
+                    res = await self.trading_link.trigger_kill_switch()
+                    if not res:
+                        err_str_ = "trading_link.trigger_kill_switch failed"
+                        logging.critical(err_str_)
+                        raise HTTPException(detail=err_str_, status_code=500)
+                    # else not required: if res is fine make db update
+                # else not required: avoid trading_link.trigger_kill_switch if RecoveredKillSwitchUpdate is True
+                # updated from init check
+            elif stored_portfolio_status_obj.kill_switch and not kill_switch_update:
+                res = await self.trading_link.revoke_kill_switch_n_resume_trading()
+                if not res:
+                    err_str_ = "trading_link.revoke_kill_switch_n_resume_trading failed"
+                    logging.critical(err_str_)
+                    raise HTTPException(detail=err_str_, status_code=500)
+            # else not required: other case doesn't need trading link call
+        return updated_portfolio_status_obj_json
 
 
 def filter_ws_pair_strat(pair_strat_obj_json: Dict, **kwargs):

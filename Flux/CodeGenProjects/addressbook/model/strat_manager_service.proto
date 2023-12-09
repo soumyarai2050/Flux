@@ -330,6 +330,14 @@ message PairStratList {
   repeated PairStrat pair_strat = 1;
 }
 
+message LogSimulatorReloadConfig{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "log_simulator_reload_config"
+  };
+  required bool resp = 1;
+}
+
+
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage{
   optional ButtonType temp = 1;

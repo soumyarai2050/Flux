@@ -117,11 +117,11 @@ message MarketDepth {
 message LastTrade {
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 5.0,
-    CreateOp: AggregateType_FilterAggregate,
+    CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
-    ReadOp: AggregateType_FilterAggregate,
+    ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_FilterAggregate,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
     ExpireAfterSeconds: 5
   };
@@ -139,7 +139,6 @@ message LastTrade {
     depends_on_other_model_for_dynamic_url: true
   };
   option (FluxMsgUIGetAllLimit) = "-100";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
 
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];

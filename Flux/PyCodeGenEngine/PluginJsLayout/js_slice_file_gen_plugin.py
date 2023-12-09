@@ -197,11 +197,24 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                       " async (payload, { rejectWithValue }) => " + "{\n"
         if (not self.current_message_is_dependent and
                 self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None):
-            output_str += "    const { url } = payload;\n"
-            output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
-            output_str += "    return axios.get(`${serverUrl}/" + f"get-all-{message_name_snake_cased}`)\n"
+            if (message_name in self.repeated_layout_msg_name_list and
+                    JsSliceFileGenPlugin.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_ui_get_all_limit)):
+                output_str += "    const { url, uiLimit } = payload;\n"
+                output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                output_str += ("    return axios.get(`${serverUrl}/" +
+                               f"get-all-{message_name_snake_cased}?limit_obj_count="
+                               "${uiLimit}`)\n")
+            else:
+                output_str += "    const { url } = payload;\n"
+                output_str += "    const serverUrl = PROXY_SERVER ? API_ROOT_URL : url;\n"
+                output_str += "    return axios.get(`${serverUrl}/" + f"get-all-{message_name_snake_cased}`)\n"
         else:
-            output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
+            if (message_name in self.repeated_layout_msg_name_list and
+                    JsSliceFileGenPlugin.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_ui_get_all_limit)):
+                output_str += "    return axios.get(`${API_ROOT_URL}/" + (f"get-all-{message_name_snake_cased}?limit_obj_count="
+                                                                          "${uiLimit}`)\n")
+            else:
+                output_str += "    return axios.get(`${API_ROOT_URL}/" + f"get-all-{message_name_snake_cased}`)\n"
         output_str += "        .then(res => res.data)\n"
         output_str += "        .catch(err => rejectWithValue(getErrorDetails(err)));\n"
         output_str += "})\n\n"

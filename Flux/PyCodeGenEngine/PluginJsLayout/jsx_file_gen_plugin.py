@@ -210,7 +210,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "\n\n"
         return output_str
 
-    def handle_non_abbreviated_return(self, message_name: str, message_name_camel_cased: str, layout_type: str) -> str:
+    def handle_non_abbreviated_return(self, message: protogen.Message, message_name: str,
+                                      message_name_camel_cased: str, layout_type: str) -> str:
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str = '    let menu = (\n'
             output_str += '        <DynamicMenu\n'
@@ -354,6 +355,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onColumnOrdersChange={onColumnOrdersChange}\n"
         if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                    forceUpdate={forceUpdate}\n"
+        if layout_type == JsxFileGenPlugin.repeated_root_type:
+            # if repeated and from other file
+            widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
+                message, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
+            if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field):
+                output_str += "                    url={url}\n"
         output_str += "                />\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "            ) : widgetOption.view_layout === Layouts.PIVOT_TABLE ? (\n"
@@ -1063,11 +1070,20 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 other_file_dependent_msg_name = self._get_ui_msg_dependent_msg_name_from_another_proto(message)
                 if other_file_dependent_msg_name is not None:
                     output_str += "        if (url) {\n"
-                    output_str += f"            dispatch(getAll{message_name}("+"{ url }));\n"
+                    if (layout_type == JsxFileGenPlugin.repeated_root_type and
+                            JsxFileGenPlugin.is_option_enabled(message, JsxFileGenPlugin.flux_msg_ui_get_all_limit)):
+                        output_str += f"            dispatch(getAll{message_name}("+"{ url, uiLimit }));\n"
+                    else:
+                        output_str += f"            dispatch(getAll{message_name}("+"{ url }));\n"
                     output_str += "        }\n"
                     output_str += "    }, [url]);\n\n"
                 else:
-                    output_str += f"        dispatch(getAll{message_name}());\n"
+                    if (layout_type == JsxFileGenPlugin.repeated_root_type and
+                        JsxFileGenPlugin.is_option_enabled(message, JsxFileGenPlugin.flux_msg_ui_get_all_limit)):
+                        output_str += f"        dispatch(getAll{message_name}("+"{ url, uiLimit }));\n"
+                    else:
+                        output_str += f"        dispatch(getAll{message_name}());\n"
+
                     output_str += "    }, []);\n\n"
                     if layout_type == JsxFileGenPlugin.root_type:
                         output_str += "    useEffect(() => {\n"
@@ -1886,10 +1902,17 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "    const onUpdate = () => { }\n\n"
             output_str += "    const onButtonToggle = () => { }\n\n"
             output_str += "    const onReload = () => {\n"
-            if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
-                output_str += f"        dispatch(getAll{message_name}("+"{ url }));\n"
+
+            if JsxFileGenPlugin.is_option_enabled(message, JsxFileGenPlugin.flux_msg_ui_get_all_limit):
+                if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
+                    output_str += f"        dispatch(getAll{message_name}(" + "{ url, uiLimit }));\n"
+                else:
+                    output_str += f"        dispatch(getAll{message_name}());\n"
             else:
-                output_str += f"        dispatch(getAll{message_name}());\n"
+                if self._get_ui_msg_dependent_msg_name_from_another_proto(message) is not None:
+                    output_str += f"        dispatch(getAll{message_name}("+"{ url }));\n"
+                else:
+                    output_str += f"        dispatch(getAll{message_name}());\n"
             output_str += "        setMode(Modes.READ_MODE);\n"
             output_str += "    }\n\n"
             output_str += "    const onConfirmSave = () => { }\n\n"
@@ -2134,7 +2157,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += self.handle_abbreviated_return(message, message_name_camel_cased, layout_type)
         else:
-            output_str += self.handle_non_abbreviated_return(message_name, message_name_camel_cased, layout_type)
+            output_str += self.handle_non_abbreviated_return(message, message_name,
+                                                             message_name_camel_cased, layout_type)
         output_str += f"export default React.memo({message_name});\n\n"
 
         return output_str

@@ -76,11 +76,11 @@ message SymbolSideSnapshot{
 // Widget - 5
 message FillsJournal{
   option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_FilterAggregate,
-    ReadOp: AggregateType_FilterAggregate,
-    PatchOp: AggregateType_FilterAggregate,
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_FilterAggregate
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
@@ -97,7 +97,6 @@ message FillsJournal{
   };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
-  option (FluxMsgMainCRUDOperationsAgg) = {agg_var_name: "get_limited_objs", agg_params: ["-100"]}; // only useful for initial snapshot to be of size 100 , subsequently each record is sent independently and UI is to discard the oldest (from bottom) and add the newest (on top)
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_underlying_account_cumulative_fill_qty",
       AggregateVarName: "get_symbol_side_underlying_account_cumulative_fill_qty",

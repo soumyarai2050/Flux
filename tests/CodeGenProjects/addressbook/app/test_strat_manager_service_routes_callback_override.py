@@ -711,10 +711,66 @@ def test_sell_buy_pair_order(
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
-def test_validate_kill_switch_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                                         expected_strat_limits_, expected_start_status_,
-                                         symbol_overview_obj_list, last_trade_fixture_list,
-                                         market_depth_basemodel_list, top_of_book_list_):
+def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+                                        expected_strat_limits_, expected_start_status_,
+                                        symbol_overview_obj_list, last_trade_fixture_list,
+                                        market_depth_basemodel_list, top_of_book_list_):
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+
+    created_pair_strat, executor_web_client = (
+        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list,
+                                           last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    # positive test
+    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
+    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+
+    # internally checks order_journal existence
+    order_journal: OrderJournal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                                  leg1_symbol, executor_web_client)
+
+    # negative test
+    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
+    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
+        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+    assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
+                                                 "expected to be True"
+
+    time.sleep(2)
+    # validating if trading_link.trigger_kill_switch got called
+    check_str = "Called TradingLink.trigger_kill_switch"
+    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    for alert in portfolio_alert.alerts:
+        if re.search(check_str, alert.alert_brief):
+            break
+    else:
+        assert False, f"Can't find portfolio alert saying '{check_str}'"
+
+    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
+    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+    # internally checking buy order
+    order_journal = \
+        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                        leg1_symbol, executor_web_client,
+                                                        last_order_id=order_journal.order.order_id,
+                                                        expect_no_order=True)
+
+    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
+    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
+    # internally checking sell order
+    order_journal = \
+        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                        leg2_symbol, executor_web_client, expect_no_order=True)
+
+
+def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                            pair_strat_, expected_strat_limits_,
+                                            expected_start_status_, symbol_overview_obj_list,
+                                            last_trade_fixture_list, market_depth_basemodel_list,
+                                            top_of_book_list_, buy_order_, sell_order_):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
@@ -724,48 +780,16 @@ def test_validate_kill_switch_systematic(static_data_, clean_and_set_limits, leg
                                                last_trade_fixture_list,
                                                market_depth_basemodel_list, top_of_book_list_))
 
-        portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-        updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
-            jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
-        assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
-                                                     "expected to be True"
-
-        time.sleep(5)
-        check_str = "Triggering portfolio_status Kill_SWITCH"
-        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
-        for alert in portfolio_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            assert False, f"Can't find portfolio alert saying '{check_str}'"
-
-        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+        # positive test
+        # placing buy order
+        place_new_order(leg1_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
+        time.sleep(2)
         # internally checking buy order
-        order_journal = \
+        order_journal: OrderJournal = \
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                             leg1_symbol, executor_web_client, expect_no_order=True)
 
-        run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
-        # internally checking sell order
-        order_journal = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                            leg2_symbol, executor_web_client, expect_no_order=True)
-
-
-def test_validate_kill_switch_non_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                             pair_strat_, expected_strat_limits_,
-                                             expected_start_status_, symbol_overview_obj_list,
-                                             last_trade_fixture_list, market_depth_basemodel_list,
-                                             top_of_book_list_, buy_order_, sell_order_):
-    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-
-    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        created_pair_strat, executor_web_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_start_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
-
+        # negative test
         portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
         updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
             jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
@@ -773,7 +797,8 @@ def test_validate_kill_switch_non_systematic(static_data_, clean_and_set_limits,
                                                      "expected to be True"
 
         time.sleep(5)
-        check_str = "Triggering portfolio_status Kill_SWITCH"
+        # validating if trading_link.trigger_kill_switch got called
+        check_str = "Called TradingLink.trigger_kill_switch"
         portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
         for alert in portfolio_alert.alerts:
             if re.search(check_str, alert.alert_brief):
@@ -785,9 +810,10 @@ def test_validate_kill_switch_non_systematic(static_data_, clean_and_set_limits,
         place_new_order(leg1_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
         time.sleep(2)
         # internally checking buy order
-        order_journal = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                            leg1_symbol, executor_web_client, expect_no_order=True)
+        order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                        leg1_symbol, executor_web_client,
+                                                                        last_order_id=order_journal.order.order_id,
+                                                                        expect_no_order=True)
 
         # placing sell order
         place_new_order(leg2_symbol, Side.SELL, sell_order_.order.px, sell_order_.order.qty, executor_web_client)
@@ -796,6 +822,163 @@ def test_validate_kill_switch_non_systematic(static_data_, clean_and_set_limits,
         order_journal = \
             get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
                                                             leg2_symbol, executor_web_client, expect_no_order=True)
+
+
+def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+                            expected_strat_limits_, expected_start_status_,
+                            symbol_overview_obj_list, last_trade_fixture_list,
+                            market_depth_basemodel_list, top_of_book_list_, residual_wait_sec):
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+
+    created_pair_strat, executor_web_client = (
+        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list,
+                                           last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    # positive test
+    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
+    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
+        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+    assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
+                                                 "expected to be True"
+    time.sleep(2)
+    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
+    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+    # internally checking buy order
+    order_journal = \
+        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                        leg1_symbol, executor_web_client, expect_no_order=True)
+
+    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
+    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
+    # internally checking sell order
+    order_journal = \
+        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                        leg2_symbol, executor_web_client, expect_no_order=True)
+
+    # negative test
+    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=False)
+    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
+        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+    assert not updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is True, " \
+                                                     "expected to be False"
+    time.sleep(2)
+    # validating if trading_link.trigger_kill_switch got called
+    check_str = "Called TradingLink.revoke_kill_switch_n_resume_trading"
+    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    for alert in portfolio_alert.alerts:
+        if re.search(check_str, alert.alert_brief):
+            break
+    else:
+        assert False, f"Can't find portfolio alert saying '{check_str}'"
+
+    # empty sell tob to align tob pattern - self._top_of_books_update_date_time in strat_executor doesn't get updated
+    # when kill switch is enabled, to make is aligned with last_update_time placing non-order triggering tob once
+    # kill switch revoked
+    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0], avoid_order_trigger=True)
+
+    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
+    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+
+    # internally checks order_journal existence
+    order_journal: OrderJournal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                                                  leg1_symbol, executor_web_client)
+    time.sleep(residual_wait_sec)
+
+    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
+    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
+    # internally checking sell order
+    order_journal = \
+        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
+                                                        leg2_symbol, executor_web_client)
+
+
+def test_trigger_switch_fail(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list,
+        market_depth_basemodel_list, top_of_book_list_):
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"kill_switch_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        config_dict["trigger_kill_switch"] = False
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
+
+        try:
+            portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
+            strat_manager_service_native_web_client.patch_portfolio_status_client(
+                jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+        except Exception as e:
+            if "trading_link.trigger_kill_switch failed" not in str(e):
+                raise Exception("Something went wrong while enabling portfolio_status kill switch")
+        else:
+            assert False, ("Configured simulate config to return False from trigger_kill_switch to fail enable "
+                           "kill switch, but patch went successful - check why simulate didn't work")
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+        # updating simulator's configs
+        strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
+
+
+def test_revoke_switch_fail(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list,
+        market_depth_basemodel_list, top_of_book_list_):
+    config_file_path = STRAT_EXECUTOR / "data" / f"kill_switch_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
+    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
+        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+    assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
+                                                 "expected to be True"
+    try:
+        # updating yaml_configs according to this test
+        config_dict["revoke_kill_switch_n_resume_trading"] = False
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
+
+        try:
+            portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=False)
+            strat_manager_service_native_web_client.patch_portfolio_status_client(
+                jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+        except Exception as e:
+            if "trading_link.revoke_kill_switch_n_resume_trading failed" not in str(e):
+                raise Exception("Something went wrong while disabling portfolio_status kill switch")
+        else:
+            assert False, ("Configured simulate config to return False from revoke_kill_switch_n_resume_trading to "
+                           "fail disable kill switch, but patch went successful - check why simulate didn't work")
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+        # updating simulator's configs
+        strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
 
 
 def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
@@ -2704,7 +2887,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
 
             latest_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK,
                                                                                    symbol, executor_http_client)
-            order_snapshot_list = executor_http_client.get_all_order_snapshot_client()
+            order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-100)
             for order_snapshot in order_snapshot_list:
                 if order_snapshot.order_brief.order_id == latest_order_journal.order.order_id:
                     order_snapshot_before_fill = order_snapshot
@@ -2756,7 +2939,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
             placed_fill_journal_obj = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id,
                                                                             executor_http_client)
             # OrderSnapshot check
-            order_snapshot_list = executor_http_client.get_all_order_snapshot_client()
+            order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-100)
             for order_snapshot in order_snapshot_list:
                 if order_snapshot.order_brief.order_id == placed_fill_journal_obj.order_id:
                     order_snapshot_after_fill = order_snapshot_list[0]
@@ -3144,15 +3327,15 @@ def test_unload_reload_strat_from_collection(
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def test_sequenced_active_strats_with_same_symbol_side_block(
+def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_buy(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
 
     created_pair_strat, executor_http_client = (
-        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
                                            market_depth_basemodel_list, top_of_book_list_))
 
@@ -3161,10 +3344,44 @@ def test_sequenced_active_strats_with_same_symbol_side_block(
 
     try:
         created_pair_strat, executor_http_client = (
-            create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
                                                last_trade_fixture_list,
                                                market_depth_basemodel_list, top_of_book_list_))
+    except Exception as e:
+        err_str_ = ("Ongoing strat already exists with same symbol-side pair legs - can't activate this "
+                    "strat till other strat is ongoing")
+        assert err_str_ in str(e), \
+            (f"Strat tring to be activated with same symbol-side must raise exception with description: "
+             f"{err_str_} but can't find this description, exception: {e}")
+    else:
+        assert False, ("Strat with same symbol-side must raise exception while another strat is already ongoing, "
+                       "but got activated likely because of some bug")
+
+
+def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_sell(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+
+    created_pair_strat, executor_http_client = (
+        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_, leg1_side=Side.SELL,
+                                           leg2_side=Side.BUY))
+
+    # First created strat is already active, checking if next strat, if tries to get activated with same symbol-side
+    # gets exception
+
+    try:
+        created_pair_strat, executor_http_client = (
+            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_start_status_, symbol_overview_obj_list,
+                                               last_trade_fixture_list,
+                                               market_depth_basemodel_list, top_of_book_list_, leg1_side=Side.SELL,
+                                               leg2_side=Side.BUY))
     except Exception as e:
         err_str_ = ("Ongoing strat already exists with same symbol-side pair legs - can't activate this "
                     "strat till other strat is ongoing")
@@ -3200,12 +3417,12 @@ def test_sequenced_fully_consume_same_symbol_strats(
         residual_wait_sec, Side.BUY)
 
 
-def test_sequenced_fully_consume_opp_symbol_strats(
+def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
 
     # updating order_limits
     expected_order_limits_.min_order_notional = 15000
@@ -3214,15 +3431,49 @@ def test_sequenced_fully_consume_opp_symbol_strats(
 
     expected_strat_limits_.max_cb_notional = 18000
     strat_done_after_exhausted_consumable_notional(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
         residual_wait_sec, Side.BUY)
 
     try:
         strat_done_after_exhausted_consumable_notional(
-            sell_symbol, buy_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+            leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
             symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-            residual_wait_sec, Side.BUY)
+            residual_wait_sec, Side.BUY, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
+    except Exception as e:
+        err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
+                    "can't activate this strat today")
+        assert err_str_ in str(e), \
+            (f"Strat created with opposite symbol-side must raise exception with description: {err_str_} but "
+             f"can't find this description, exception: {e}")
+    else:
+        assert False, ("Strat with opposite symbol-side must raise exception while activating in same day of "
+                       "other strat activated, but got activated likely because of some bug")
+
+
+def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
+        expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
+
+    # updating order_limits
+    expected_order_limits_.min_order_notional = 15000
+    expected_order_limits_.id = 1
+    strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+
+    expected_strat_limits_.max_cb_notional = 18000
+    strat_done_after_exhausted_consumable_notional(
+        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+        residual_wait_sec, Side.SELL, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
+
+    try:
+        strat_done_after_exhausted_consumable_notional(
+            leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
+            symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+            residual_wait_sec, Side.SELL)
     except Exception as e:
         err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
                     "can't activate this strat today")

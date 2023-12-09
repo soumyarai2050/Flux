@@ -126,9 +126,10 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
     def handle_get_all_message_http_client(self, message: protogen.Message):
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = " "*4 + f"def get_all_{message_name_snake_cased}_client(self) -> List[{message_name}BaseModel]:\n"
+        output_str = " "*4 + (f"def get_all_{message_name_snake_cased}_client(self, limit_obj_count: int | None = None"
+                              f") -> List[{message_name}BaseModel]:\n")
         output_str += " "*4 + f"    return generic_http_get_all_client(self.get_all_" \
-                      f"{message_name_snake_cased}_client_url, {message_name}BaseModel)\n\n"
+                      f"{message_name_snake_cased}_client_url, {message_name}BaseModel, limit_obj_count)\n\n"
         return output_str
 
     def _import_model_in_client_file(self) -> str:
