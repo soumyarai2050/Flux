@@ -1,16 +1,6 @@
-import datetime
-import inspect
-import logging
 import os
-import sys
-import threading
-import time
-from pathlib import PurePath
 from threading import Thread
 import math
-import traceback
-from fastapi.encoders import jsonable_encoder
-from typing import Callable, Final
 import subprocess
 import stat
 
@@ -281,7 +271,7 @@ class StratExecutor:
         self.internal_reject_count += 1
         internal_reject_order_id: str = str(self.internal_reject_count * -1) + str(DateTime.utcnow())
         self.trading_link_internal_order_state_update(
-            OrderEventType.OE_REJ, internal_reject_order_id, new_order.side, None,
+            OrderEventType.OE_INT_REJ, internal_reject_order_id, new_order.side, None,
             new_order.security.sec_id, None, reject_msg)
 
     def set_unack(self, system_symbol: str, unack_state: bool):
@@ -307,7 +297,7 @@ class StratExecutor:
         return False
 
     def place_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
-                        order_limits: OrderLimitsBaseModel, px: float, usd_px: float, qty: int,
+                        order_limits: OrderLimits, pair_strat: PairStrat, px: float, usd_px: float, qty: int,
                         side: Side, system_symbol: str, err_dict: Dict[str, any] | None = None,
                         is_eqt: bool | None = None, check_mask: int = OrderControl.ORDER_CONTROL_SUCCESS) -> int:
         ret_val: int
@@ -330,10 +320,10 @@ class StratExecutor:
                 return OrderControl.ORDER_CONTROL_CHECK_UNACK_FAIL
 
             if OrderControl.ORDER_CONTROL_SUCCESS == (ret_val := self.check_new_order(top_of_book, strat_brief,
-                                                                                      order_limits, px, usd_px,
-                                                                                      qty, side, system_symbol,
-                                                                                      account, exchange, err_dict,
-                                                                                      check_mask)):
+                                                                                      order_limits, pair_strat,
+                                                                                      px, usd_px, qty, side,
+                                                                                      system_symbol, account,
+                                                                                      exchange, err_dict, check_mask)):
                 # check and block order if strat not in activ state [second fail-safe-check]
                 # If pair_strat is not active, don't act, just return [check MD state and take action if required]
                 pair_strat = self._get_latest_pair_strat()
@@ -390,7 +380,7 @@ class StratExecutor:
         else:
             return True
 
-    def check_strat_limits(self, strat_brief: StratBriefBaseModel, order_limits: OrderLimitsBaseModel,
+    def check_strat_limits(self, strat_brief: StratBriefBaseModel, order_limits: OrderLimits,
                            px: float, usd_px: float, qty: int, side: Side,
                            order_usd_notional: float, system_symbol: str, err_dict: Dict[str, any]):
         checks_passed = OrderControl.ORDER_CONTROL_SUCCESS
@@ -518,7 +508,7 @@ class StratExecutor:
 
         return checks_passed
 
-    def get_breach_threshold_px(self, top_of_book: TopOfBookBaseModel, order_limits: OrderLimitsBaseModel,
+    def get_breach_threshold_px(self, top_of_book: TopOfBookBaseModel, order_limits: OrderLimits,
                                 side: Side, system_symbol: str) -> float | None:
         # TODO important - check and change reference px in cases where last px is not available
         if top_of_book.last_trade is None or math.isclose(top_of_book.last_trade.px, 0):
@@ -537,7 +527,7 @@ class StratExecutor:
         market_depths, _ = self.strat_cache.get_market_depth(system_symbol, aggressive_side)
         return self._get_breach_threshold_px(top_of_book, order_limits, side, system_symbol, market_depths)
 
-    def _get_breach_threshold_px(self, top_of_book: TopOfBookBaseModel, order_limits: OrderLimitsBaseModel,
+    def _get_breach_threshold_px(self, top_of_book: TopOfBookBaseModel, order_limits: OrderLimits,
                                  side: Side, system_symbol: str, market_depths: List[MarketDepth]) -> float | None:
         px_by_max_level: float = 0
         for market_depth in market_depths:
@@ -582,14 +572,15 @@ class StratExecutor:
             return max(min_px_by_deviation, min_px_by_basis_point, px_by_max_level)
 
     def check_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
-                        order_limits: OrderLimitsBaseModel, px: float, usd_px: float,
+                        order_limits: OrderLimits, pair_strat: PairStrat, px: float, usd_px: float,
                         qty: int, side: Side, system_symbol: str, account: str, exchange: str,
                         err_dict: Dict[str, any], check_mask: int = OrderControl.ORDER_CONTROL_SUCCESS) -> int:
         checks_passed: int = OrderControl.ORDER_CONTROL_SUCCESS
 
         order_usd_notional = usd_px * qty
-        # min order notional is to be a order opportunity condition instead of order check
-        checks_passed_ = OrderControl.check_min_order_notional(order_limits, order_usd_notional, system_symbol, side)
+
+        checks_passed_ = OrderControl.check_min_order_notional(pair_strat, order_limits, order_usd_notional,
+                                                               system_symbol, side)
 
         if checks_passed_ != OrderControl.ORDER_CONTROL_SUCCESS: checks_passed |= checks_passed_
 
@@ -828,7 +819,7 @@ class StratExecutor:
         return px / self.leg1_fx
 
     def _check_tob_n_place_non_systematic_order(self, new_order: NewOrderBaseModel, pair_strat: PairStrat,
-                                                strat_brief: StratBriefBaseModel, order_limits: OrderLimitsBaseModel,
+                                                strat_brief: StratBriefBaseModel, order_limits: OrderLimits,
                                                 top_of_books: List[TopOfBookBaseModel]) -> int:
         leg1_tob: TopOfBookBaseModel | None
         leg2_tob: TopOfBookBaseModel | None
@@ -851,7 +842,8 @@ class StratExecutor:
             return False
         else:
             usd_px = self.get_usd_px(new_order.px, new_order.security.sec_id)
-            order_placed: int = self.place_new_order(trade_tob, strat_brief, order_limits, new_order.px, usd_px,
+            order_placed: int = self.place_new_order(trade_tob, strat_brief, order_limits, pair_strat,
+                                                     new_order.px, usd_px,
                                                      new_order.qty, new_order.side,
                                                      system_symbol=new_order.security.sec_id)
             return order_placed
@@ -863,7 +855,7 @@ class StratExecutor:
         return leg1_px / leg2_px
 
     def _place_order(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
-                     order_limits: OrderLimitsBaseModel, quote: QuoteOptional, tob: TopOfBookBaseModel) -> float:
+                     order_limits: OrderLimits, quote: QuoteOptional, tob: TopOfBookBaseModel) -> float:
         """returns float posted notional of the order sent"""
         # fail-safe
         pair_strat = self.strat_cache.get_pair_strat_obj()
@@ -874,7 +866,7 @@ class StratExecutor:
                 return 0  # no order sent = no posted notional
         if not (quote.qty == 0 or math.isclose(quote.px, 0)):
             ask_usd_px: float = self.get_usd_px(quote.px, tob.symbol)
-            order_placed = self.place_new_order(tob, strat_brief, order_limits, quote.px,
+            order_placed = self.place_new_order(tob, strat_brief, order_limits, pair_strat, quote.px,
                                                 ask_usd_px, quote.qty,
                                                 Side.BUY, tob.symbol)
             if order_placed == OrderControl.ORDER_CONTROL_SUCCESS:
@@ -886,7 +878,7 @@ class StratExecutor:
             return 0  # no order sent = no posted notional
 
     def _check_tob_and_place_order(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
-                                   order_limits: OrderLimitsBaseModel, top_of_books: List[TopOfBookBaseModel]) -> int:
+                                   order_limits: OrderLimits, top_of_books: List[TopOfBookBaseModel]) -> int:
         posted_leg1_notional: float = 0
         posted_leg2_notional: float = 0
         leg1_tob: TopOfBookBaseModel | None
@@ -932,7 +924,7 @@ class StratExecutor:
         return order_placed
 
     def _check_tob_and_place_order_test(self, pair_strat: PairStratBaseModel | PairStrat,
-                                        strat_brief: StratBriefBaseModel, order_limits: OrderLimitsBaseModel,
+                                        strat_brief: StratBriefBaseModel, order_limits: OrderLimits,
                                         top_of_books: List[TopOfBookBaseModel]) -> int:
         buy_top_of_book: TopOfBookBaseModel | None = None
         sell_top_of_book: TopOfBookBaseModel | None = None
@@ -992,7 +984,8 @@ class StratExecutor:
                             if buy_top_of_book.bid_quote.px == 110:
                                 px = 100
                                 usd_px: float = self.get_usd_px(px, buy_top_of_book.symbol)
-                                order_placed = self.place_new_order(buy_top_of_book, strat_brief, order_limits, px,
+                                order_placed = self.place_new_order(buy_top_of_book, strat_brief, order_limits,
+                                                                    pair_strat, px,
                                                                     usd_px, 90,
                                                                     Side.BUY, buy_top_of_book.symbol)
                     elif sell_top_of_book is not None:
@@ -1001,7 +994,8 @@ class StratExecutor:
                             if sell_top_of_book.ask_quote.px == 120:
                                 px = 110
                                 usd_px: float = self.get_usd_px(px, sell_top_of_book.symbol)
-                                order_placed = self.place_new_order(sell_top_of_book, strat_brief, order_limits, px,
+                                order_placed = self.place_new_order(sell_top_of_book, strat_brief, order_limits,
+                                                                    pair_strat, px,
                                                                     usd_px, 70,
                                                                     Side.SELL, sell_top_of_book.symbol)
                     else:
@@ -1065,7 +1059,7 @@ class StratExecutor:
         except Exception as e:
             logging.exception(f"trading_link_place_cxl_order failed with exception: {e}")
 
-    def is_pair_strat_done(self, strat_brief: StratBriefBaseModel, ol: OrderLimitsBaseModel) -> int:
+    def is_pair_strat_done(self, strat_brief: StratBriefBaseModel, ol: OrderLimits) -> int:
         """
         Args:
             strat_brief:
@@ -1194,7 +1188,7 @@ class StratExecutor:
                                   f"{self.strat_cache.get_key()};;;strat_cache: [ {self.strat_cache} ]")
                     continue  # go next run - we don't stop processing for one faulty strat_cache
 
-                order_limits: OrderLimitsBaseModel | None = None
+                order_limits: OrderLimits | None = None
                 order_limits_tuple = self.trading_data_manager.trading_cache.get_order_limits()
                 if order_limits_tuple:
                     order_limits, _ = order_limits_tuple

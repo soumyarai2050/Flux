@@ -65,7 +65,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                 message, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
             if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field):
-                output_str += ", setUrl"
+                # if self.current_proto_file_name is not present that means there is no message from other
+                # project at all and if is not None then checking if current proto file_name is not in imported
+                # core file from which this message is imported - this confirms that this message is from another
+                # project
+                if (self.current_proto_file_name is not None and
+                        self.current_proto_file_name not in message.parent_file.proto.name):
+                    output_str += ", setUrl"
             output_str += "\n"
         elif layout_type == JsxFileGenPlugin.root_type:
             output_str += f"    getAll{message_name}, create{message_name}, update{message_name},\n"
@@ -360,7 +366,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                 message, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
             if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field):
-                output_str += "                    url={url}\n"
+                # if self.current_proto_file_name is not present that means there is no message from other
+                # project at all and if is not None then checking if current proto file_name is not in imported
+                # core file from which this message is imported - this confirms that this message is from another
+                # project
+                if (self.current_proto_file_name is not None and
+                        self.current_proto_file_name not in message.parent_file.proto.name):
+                    output_str += "                    url={url}\n"
         output_str += "                />\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "            ) : widgetOption.view_layout === Layouts.PIVOT_TABLE ? (\n"
@@ -459,7 +471,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                     message, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
                 if widget_ui_option_value.get(JsxFileGenPlugin.widget_ui_option_depending_proto_model_name_field):
-                    output_str += ", url"
+                    # if self.current_proto_file_name is not present that means there is no message from other
+                    # project at all and if is not None then checking if current proto file_name is not in imported
+                    # core file from which this message is imported - this confirms that this message is from another
+                    # project
+                    if (self.current_proto_file_name is not None and
+                            self.current_proto_file_name not in message.parent_file.proto.name):
+                        output_str += ", url"
                 output_str += "\n"
                 output_str += "    } = useSelector(state => " + f"state.{message_name_camel_cased});\n"
                 other_file_dependent_msg_name = self._get_ui_msg_dependent_msg_name_from_another_proto(message)

@@ -26,13 +26,14 @@ class TradeSimulator(TradingLinkBase):
     continuous_symbol_based_orders_counter: ClassVar[Dict | None] = {}
     cxl_rej_symbol_to_bool_dict: ClassVar[Dict | None] = {}
     symbol_configs: ClassVar[Dict | None] = init_symbol_configs()
+    special_order_counter = 0
 
     @classmethod
     def reload_symbol_configs(cls):
         # reloading executor configs
         TradingLinkBase.reload_executor_configs()
-
         cls.symbol_configs = init_symbol_configs()
+        cls.special_order_counter = 0
 
     @classmethod
     def get_symbol_configs(cls, symbol: str) -> Dict | None:
@@ -81,6 +82,7 @@ class TradeSimulator(TradingLinkBase):
             if cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] < \
                     cls.continuous_symbol_based_orders_counter[symbol]["continues_special_order_count"]:
                 cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] += 1
+                cls.special_order_counter += 1
                 return True
             else:
                 cls.continuous_symbol_based_orders_counter[symbol]["order_counter"] = 1
@@ -92,9 +94,14 @@ class TradeSimulator(TradingLinkBase):
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
             underlying_create_order_journal_http)
         create_date_time = DateTime.utcnow()
-        order_journal = OrderJournal(order=order_brief,
-                                     order_event_date_time=create_date_time,
-                                     order_event=OrderEventType.OE_REJ)
+
+        if cls.special_order_counter % 2 == 0:
+            order_event = OrderEventType.OE_BRK_REJ
+        else:
+            order_event = OrderEventType.OE_EXH_REJ
+
+        order_journal = OrderJournal(order=order_brief, order_event_date_time=create_date_time,
+                                     order_event=order_event)
         msg = f"SIM:Order REJ for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
               f"and side {order_journal.order.side}"
         add_to_texts(order_brief, msg)
@@ -132,7 +139,7 @@ class TradeSimulator(TradingLinkBase):
             if symbol_configs.get("simulate_new_to_reject_orders") and cls.is_special_order(system_sec_id):
                 await cls.process_order_reject(order_brief)
             elif symbol_configs.get("simulate_new_unsolicited_cxl_orders") and cls.is_special_order(system_sec_id):
-                await cls.process_cxl_ack(order_brief)
+                await cls.process_cxl_ack(order_brief, is_unsol_cxl=True)
             else:
                 await cls.process_order_ack(order_id, order_brief.px, order_brief.qty, order_brief.side, system_sec_id,
                                             account)
@@ -172,7 +179,7 @@ class TradeSimulator(TradingLinkBase):
                 await cls.process_order_reject(order_journal_obj.order)
             elif (symbol_configs.get("simulate_ack_unsolicited_cxl_orders") and
                   cls.is_special_order(order_journal_obj.order.security.sec_id)):
-                await cls.process_cxl_ack(order_journal_obj.order)
+                await cls.process_cxl_ack(order_journal_obj.order, is_unsol_cxl=True)
             else:
                 await cls.process_fill(order_journal_obj.order.order_id, order_journal_obj.order.px,
                                        order_journal_obj.order.qty, order_journal_obj.order.side,
@@ -247,12 +254,17 @@ class TradeSimulator(TradingLinkBase):
         await underlying_create_order_journal_http(order_journal)
 
     @classmethod
-    async def process_cxl_ack(cls, order_brief: OrderBrief):
+    async def process_cxl_ack(cls, order_brief: OrderBrief, is_unsol_cxl: bool | None = None):
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
             underlying_create_order_journal_http)
-        order_journal = OrderJournal(order=order_brief,
-                                     order_event_date_time=DateTime.utcnow(),
-                                     order_event=OrderEventType.OE_CXL_ACK)
+
+        if is_unsol_cxl:
+            order_event = OrderEventType.OE_UNSOL_CXL
+        else:
+            order_event = OrderEventType.OE_CXL_ACK
+
+        order_journal = OrderJournal(order=order_brief, order_event_date_time=DateTime.utcnow(),
+                                     order_event=order_event)
         msg = f"SIM:Cancel ACK for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
               f"and side {order_journal.order.side}"
         add_to_texts(order_brief, msg)

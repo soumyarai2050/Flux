@@ -85,6 +85,48 @@ def get_ongoing_pair_strat_filter(security_id: str | None = None):
     return agg_pipeline
 
 
+def get_all_pair_strat_from_symbol_n_side(sec_id: str, side: Side):
+    agg_pipeline = {
+        "aggregate": [
+            {
+                "$match": {
+                    "$or": [
+                        {
+                            "$and": [
+                                {
+                                    "pair_strat_params.strat_leg1.sec.sec_id": {
+                                        "$eq": sec_id
+                                    }
+                                },
+                                {
+                                    "pair_strat_params.strat_leg1.side": {
+                                        "$eq": side
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "$and": [
+                                {
+                                    "pair_strat_params.strat_leg2.sec.sec_id": {
+                                        "$eq": sec_id
+                                    }
+                                },
+                                {
+                                    "pair_strat_params.strat_leg2.side": {
+                                        "$eq": side
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+    return agg_pipeline
+
+
 # if __name__ == '__main__':
     # with_symbol_agg_query = get_last_n_sec_orders_by_event("sym-1", 5, "OE_NEW")
     # print(with_symbol_agg_query)

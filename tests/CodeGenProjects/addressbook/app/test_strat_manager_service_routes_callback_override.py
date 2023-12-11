@@ -286,9 +286,9 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
             run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
 
-            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
-                                                                                buy_symbol, executor_web_client,
-                                                                                last_order_id=buy_ack_order_id)
+            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+                                                                               buy_symbol, executor_web_client,
+                                                                               last_order_id=buy_ack_order_id)
             buy_ack_order_id = ack_order_journal.order.order_id
 
             if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
@@ -301,9 +301,9 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
             run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
-            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
-                                                                                sell_symbol, executor_web_client,
-                                                                                last_order_id=sell_ack_order_id)
+            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+                                                                               sell_symbol, executor_web_client,
+                                                                               last_order_id=sell_ack_order_id)
             sell_ack_order_id = ack_order_journal.order.order_id
 
             if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
@@ -729,8 +729,8 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
 
     # internally checks order_journal existence
-    order_journal: OrderJournal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                                  leg1_symbol, executor_web_client)
+    order_journal: OrderJournal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                                 leg1_symbol, executor_web_client)
 
     # negative test
     portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
@@ -753,17 +753,17 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
     # internally checking buy order
     order_journal = \
-        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                        leg1_symbol, executor_web_client,
-                                                        last_order_id=order_journal.order.order_id,
-                                                        expect_no_order=True)
+        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                       leg1_symbol, executor_web_client,
+                                                       last_order_id=order_journal.order.order_id,
+                                                       expect_no_order=True)
 
     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
     run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
     # internally checking sell order
     order_journal = \
-        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                        leg2_symbol, executor_web_client, expect_no_order=True)
+        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                       leg2_symbol, executor_web_client, expect_no_order=True)
 
 
 def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
@@ -771,57 +771,56 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                                             expected_start_status_, symbol_overview_obj_list,
                                             last_trade_fixture_list, market_depth_basemodel_list,
                                             top_of_book_list_, buy_order_, sell_order_):
-    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    leg1_symbol = leg1_leg2_symbol_list[0][0]
+    leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        created_pair_strat, executor_web_client = (
-            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_start_status_, symbol_overview_obj_list,
-                                               last_trade_fixture_list,
-                                               market_depth_basemodel_list, top_of_book_list_))
+    created_pair_strat, executor_web_client = (
+        create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list,
+                                           last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+    # positive test
+    # placing buy order
+    place_new_order(leg1_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
+    time.sleep(2)
+    # internally checking buy order
+    order_journal: OrderJournal = \
+        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                       leg1_symbol, executor_web_client)
 
-        # positive test
-        # placing buy order
-        place_new_order(leg1_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
-        time.sleep(2)
-        # internally checking buy order
-        order_journal: OrderJournal = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                            leg1_symbol, executor_web_client, expect_no_order=True)
+    # negative test
+    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
+    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
+        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+    assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
+                                                 "expected to be True"
 
-        # negative test
-        portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-        updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
-            jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
-        assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
-                                                     "expected to be True"
+    time.sleep(5)
+    # validating if trading_link.trigger_kill_switch got called
+    check_str = "Called TradingLink.trigger_kill_switch"
+    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    for alert in portfolio_alert.alerts:
+        if re.search(check_str, alert.alert_brief):
+            break
+    else:
+        assert False, f"Can't find portfolio alert saying '{check_str}'"
 
-        time.sleep(5)
-        # validating if trading_link.trigger_kill_switch got called
-        check_str = "Called TradingLink.trigger_kill_switch"
-        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
-        for alert in portfolio_alert.alerts:
-            if re.search(check_str, alert.alert_brief):
-                break
-        else:
-            assert False, f"Can't find portfolio alert saying '{check_str}'"
+    # placing buy order
+    place_new_order(leg1_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
+    time.sleep(2)
+    # internally checking buy order
+    order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                   leg1_symbol, executor_web_client,
+                                                                   last_order_id=order_journal.order.order_id,
+                                                                   expect_no_order=True)
 
-        # placing buy order
-        place_new_order(leg1_symbol, Side.BUY, buy_order_.order.px, buy_order_.order.qty, executor_web_client)
-        time.sleep(2)
-        # internally checking buy order
-        order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                        leg1_symbol, executor_web_client,
-                                                                        last_order_id=order_journal.order.order_id,
-                                                                        expect_no_order=True)
-
-        # placing sell order
-        place_new_order(leg2_symbol, Side.SELL, sell_order_.order.px, sell_order_.order.qty, executor_web_client)
-        time.sleep(2)
-        # internally checking sell order
-        order_journal = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                            leg2_symbol, executor_web_client, expect_no_order=True)
+    # placing sell order
+    place_new_order(leg2_symbol, Side.SELL, sell_order_.order.px, sell_order_.order.qty, executor_web_client)
+    time.sleep(2)
+    # internally checking sell order
+    order_journal = \
+        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                       leg2_symbol, executor_web_client, expect_no_order=True)
 
 
 def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
@@ -848,15 +847,15 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
     # internally checking buy order
     order_journal = \
-        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                        leg1_symbol, executor_web_client, expect_no_order=True)
+        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                       leg1_symbol, executor_web_client, expect_no_order=True)
 
     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
     run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
     # internally checking sell order
     order_journal = \
-        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                        leg2_symbol, executor_web_client, expect_no_order=True)
+        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                       leg2_symbol, executor_web_client, expect_no_order=True)
 
     # negative test
     portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=False)
@@ -883,16 +882,16 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
 
     # internally checks order_journal existence
-    order_journal: OrderJournal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                                  leg1_symbol, executor_web_client)
+    order_journal: OrderJournal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                                 leg1_symbol, executor_web_client)
     time.sleep(residual_wait_sec)
 
     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
     run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[1])
     # internally checking sell order
     order_journal = \
-        get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                        leg2_symbol, executor_web_client)
+        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                       leg2_symbol, executor_web_client)
 
 
 def test_trigger_switch_fail(
@@ -1146,8 +1145,8 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
             time.sleep(2)  # delay for order to get placed
 
-            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
-                                                                                executor_http_client)
+            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
+                                                                               executor_http_client)
             latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
                                                                         executor_http_client)
             last_fill_date_time = latest_fill_journal.fill_date_time
@@ -1222,8 +1221,8 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(2)  # delay for order to get placed
 
-        ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
-                                                                            executor_http_client)
+        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
+                                                                           executor_http_client)
         latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
                                                                     executor_http_client)
         last_fill_date_time = latest_fill_journal.fill_date_time
@@ -1325,8 +1324,8 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(5)  # delay for order to get placed
 
-        ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol,
-                                                                            executor_http_client)
+        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
+                                                                           executor_http_client)
         latest_fill_journal = get_latest_fill_journal_from_order_id(ack_order_journal.order.order_id,
                                                                     executor_http_client)
         last_fill_date_time = latest_fill_journal.fill_date_time
@@ -1729,9 +1728,9 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
             run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
-            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                                buy_symbol, executor_http_client,
-                                                                                last_order_id=buy_new_order_id)
+            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                               buy_symbol, executor_http_client,
+                                                                               last_order_id=buy_new_order_id)
             buy_new_order_id = ack_order_journal.order.order_id
             order_create_time_list.append(ack_order_journal.order_event_date_time)
             if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
@@ -2110,9 +2109,10 @@ def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_symb
         loop_count = 1
         run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
-        latest_unack_obj = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
-                                                                           executor_http_client)
-        latest_cxl_ack_obj = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, buy_symbol,
+        latest_unack_obj = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, buy_symbol,
+                                                                          executor_http_client)
+        latest_cxl_ack_obj = get_latest_order_journal_with_events_and_symbol([OrderEventType.OE_CXL_ACK,
+                                                                              OrderEventType.OE_UNSOL_CXL], buy_symbol,
                                                                              executor_http_client)
 
         executor_http_client.trade_simulator_process_order_ack_query_client(
@@ -2189,8 +2189,8 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
         place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
         print(f"symbol: {buy_symbol}, Created new_order obj")
 
-        new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, buy_symbol,
-                                                                            executor_http_client)
+        new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, buy_symbol,
+                                                                           executor_http_client)
 
         time.sleep(2)
         strat_alert = log_analyzer_web_client.get_strat_alert_client(active_pair_strat.id)
@@ -2797,8 +2797,8 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
             else:
                 run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
 
-            ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
-                                                                                symbol, executor_http_client)
+            ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+                                                                               symbol, executor_http_client)
             ack_order_id = ack_order_journal.order.order_id
 
             executor_http_client.trade_simulator_place_cxl_order_query_client(
@@ -2885,8 +2885,8 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                 run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
             time.sleep(2)  # delay for order to get placed
 
-            latest_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK,
-                                                                                   symbol, executor_http_client)
+            latest_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_UNSOL_CXL,
+                                                                                  symbol, executor_http_client)
             order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-100)
             for order_snapshot in order_snapshot_list:
                 if order_snapshot.order_brief.order_id == latest_order_journal.order.order_id:

@@ -85,6 +85,8 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
             self.handle_dependency_files(file, message_list)
             self.project_name = file.proto.package
 
+        message_list.sort(key=lambda message_: message_.proto.name)
+
         # handling current file
         for message in set(message_list):
             if (BaseJSLayoutPlugin.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_json_root) or

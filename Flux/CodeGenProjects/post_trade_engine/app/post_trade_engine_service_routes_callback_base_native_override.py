@@ -17,8 +17,7 @@ from Flux.CodeGenProjects.post_trade_engine.app.post_trade_engine_service_helper
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
     strat_manager_service_http_client, PairStratBaseModel, StratState, guaranteed_call_pair_strat_client)
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
-from Flux.CodeGenProjects.strat_executor.app.aggregate import (get_last_n_sec_orders_by_event)
-from Flux.CodeGenProjects.post_trade_engine.app.aggregate import get_open_order_counts
+from Flux.CodeGenProjects.post_trade_engine.app.aggregate import get_open_order_counts, get_last_n_sec_orders_by_events
 
 
 class ContainerObject(BaseModel):
@@ -37,7 +36,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
     underlying_read_strat_brief_http: Callable[..., Any] | None = None
     underlying_create_strat_brief_http: Callable[..., Any] | None = None
     underlying_update_strat_brief_http: Callable[..., Any] | None = None
-    underlying_get_last_n_sec_orders_by_event_query_http: Callable[..., Any] | None = None
+    underlying_get_last_n_sec_orders_by_events_query_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_routes(cls):
@@ -46,7 +45,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             underlying_create_all_order_snapshot_http, underlying_update_all_order_snapshot_http,
             underlying_create_all_order_journal_http, underlying_read_strat_brief_http,
             underlying_create_strat_brief_http, underlying_update_strat_brief_http,
-            underlying_get_last_n_sec_orders_by_event_query_http)
+            underlying_get_last_n_sec_orders_by_events_query_http)
         cls.underlying_read_order_journal_http = underlying_read_order_journal_http
         cls.underlying_read_order_snapshot_http = underlying_read_order_snapshot_http
         cls.underlying_create_all_order_snapshot_http = underlying_create_all_order_snapshot_http
@@ -55,7 +54,7 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
         cls.underlying_read_strat_brief_http = underlying_read_strat_brief_http
         cls.underlying_create_strat_brief_http = underlying_create_strat_brief_http
         cls.underlying_update_strat_brief_http = underlying_update_strat_brief_http
-        cls.underlying_get_last_n_sec_orders_by_event_query_http = underlying_get_last_n_sec_orders_by_event_query_http
+        cls.underlying_get_last_n_sec_orders_by_events_query_http = underlying_get_last_n_sec_orders_by_events_query_http
 
     def __init__(self):
         super().__init__()
@@ -142,10 +141,10 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
             logging.critical(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
 
-    async def get_last_n_sec_orders_by_event_query_pre(self, order_journal_class_type: Type[OrderJournal],
-                                                       last_n_sec: int, order_event: str):
+    async def get_last_n_sec_orders_by_events_query_pre(self, order_journal_class_type: Type[OrderJournal],
+                                                        last_n_sec: int, order_event_list: List[str]):
         return await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_journal_http(
-            get_last_n_sec_orders_by_event(last_n_sec, order_event))
+            get_last_n_sec_orders_by_events(last_n_sec, order_event_list))
 
     async def get_open_order_count_query_pre(self, open_order_count_class_type: Type[OpenOrderCount], symbol: str):
         open_orders = await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
@@ -405,13 +404,13 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
 
         order_count_updated_order_journals: List[OrderJournal] = (
             await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.
-            underlying_get_last_n_sec_orders_by_event_query_http(rolling_order_count_period_seconds,
-                                                                 OrderEventType.OE_NEW))
+            underlying_get_last_n_sec_orders_by_events_query_http(rolling_order_count_period_seconds,
+                                                                 [OrderEventType.OE_NEW]))
 
         if len(order_count_updated_order_journals) == 1:
             rolling_new_order_count = order_count_updated_order_journals[-1].current_period_order_count
         elif len(order_count_updated_order_journals) > 1:
-            err_str_ = ("Must receive only one object in list by get_last_n_sec_orders_by_event_query, "
+            err_str_ = ("Must receive only one object in list by get_last_n_sec_orders_by_events_query, "
                         f"received {len(order_count_updated_order_journals)}, avoiding this check, "
                         f"received list: {order_count_updated_order_journals}")
             logging.error(err_str_)
@@ -432,11 +431,12 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
 
         order_count_updated_order_journals: List[OrderJournal] = (
             await PostTradeEngineServiceRoutesCallbackBaseNativeOverride.
-            underlying_get_last_n_sec_orders_by_event_query_http(rolling_rej_count_period_seconds, "OE_REJ"))
+            underlying_get_last_n_sec_orders_by_events_query_http(
+                rolling_rej_count_period_seconds, [OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ]))
         if len(order_count_updated_order_journals) == 1:
             rolling_rej_order_count = order_count_updated_order_journals[0].current_period_order_count
         elif len(order_count_updated_order_journals) > 0:
-            err_str_ = ("Must receive only one object in list from get_last_n_sec_orders_by_event_query, "
+            err_str_ = ("Must receive only one object in list from get_last_n_sec_orders_by_events_query, "
                         f"received: {len(order_count_updated_order_journals)}, avoiding this check, "
                         f"received list: {order_count_updated_order_journals}")
             logging.error(err_str_)

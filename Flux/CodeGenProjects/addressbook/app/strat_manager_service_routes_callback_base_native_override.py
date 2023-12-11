@@ -27,7 +27,8 @@ from Flux.CodeGenProjects.addressbook.app.addressbook_service_helper import (
     get_strat_key_from_pair_strat, get_id_from_strat_key)
 from Flux.CodeGenProjects.addressbook.app.pair_strat_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.addressbook.app.static_data import SecurityRecordManager
-from Flux.CodeGenProjects.addressbook.app.aggregate import get_ongoing_pair_strat_filter
+from Flux.CodeGenProjects.addressbook.app.aggregate import (
+    get_ongoing_pair_strat_filter, get_all_pair_strat_from_symbol_n_side)
 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import (
     StratExecutorServiceHttpClient)
 from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import log_pattern_to_restart_tail_process
@@ -1043,12 +1044,20 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
                 return []
             else:
-                err_str_ = "Something unexpected happened while fetching ongoing strats, " \
-                           f"please check logs for more details, symbol_side_snapshot: " \
-                           f"{get_symbol_side_key([(sec_id, side)])}"
+                err_str_ = (f"Something unexpected happened while fetching ongoing strats, please check logs for more "
+                            f"details, symbol_side_snapshot: {get_symbol_side_key([(sec_id, side)])} "
+                            f"len match_level_1_pair_strats: {len(match_level_1_pair_strats)};  ;;;"
+                            f"len match_level_2_pair_strats: {len(match_level_2_pair_strats)};  ;;;"
+                            f"match_level_1_pair_strats: {match_level_1_pair_strats};  "
+                            f"match_level_2_pair_strats: {match_level_2_pair_strats} ")
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
         return [matched_strat]
+
+    async def get_all_pair_strats_from_symbol_side_query_pre(self, pair_strat_class_type: Type[PairStrat],
+                                                             sec_id: str, side: Side):
+        return await (StratManagerServiceRoutesCallbackBaseNativeOverride.
+                      underlying_read_pair_strat_http(get_all_pair_strat_from_symbol_n_side(sec_id, side)))
 
     async def create_command_n_control_pre(self, command_n_control_obj: CommandNControl):
         match command_n_control_obj.command_type:

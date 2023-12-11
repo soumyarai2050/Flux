@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Type
+from typing import List, Dict, Any
 import os
 
 os.environ["DBType"] = "beanie"
@@ -20,3 +20,74 @@ def get_open_order_counts():
                 ]
             },
         }]}
+
+
+def get_last_n_sec_orders_by_events(last_n_sec: int, order_event_list: List[str]):
+    agg_query: Dict[str, Any] = {"aggregate": [
+        {
+            "$match": {
+                "$expr": {
+                    "$gte": [
+                        "$order_event_date_time",
+                        {"$dateSubtract": {"startDate": "$$NOW", "unit": "second", "amount": last_n_sec}}
+                    ]
+                }
+            }
+        },
+        {
+            "$match": {},
+        },
+        {
+            "$match": {},
+        },
+
+        {
+            "$setWindowFields": {
+                "sortBy": {
+                    "order_event_date_time": 1.0
+                },
+                "output": {
+                    "current_period_order_count": {
+                        "$count": {},
+                        "window": {
+                            "range": [
+                                -last_n_sec,
+                                "current"
+                            ],
+                            "unit": "second"
+                        }
+                    }
+                }
+            }
+        },
+        # Sorting in descending order since limit only takes first n objects
+        {
+            "$sort": {"order_event_date_time": -1}
+        },
+        {
+            "$limit": 1
+        }
+    ]}
+
+    if len(order_event_list) == 1:
+        agg_query["aggregate"][2]["$match"] = {"order_event": order_event_list}
+    else:
+        agg_query["aggregate"][2]["$match"] = {"$or": []}
+        for order_event in order_event_list:
+            agg_query["aggregate"][2]["$match"]["$or"].append({"order_event": order_event})
+    return agg_query
+
+
+def get_last_n_sec_orders_by_event_n_symbol(symbol: str | None, last_n_sec: int, order_event: str):
+    # Model - order journal
+    # Below match aggregation stages are based on max filtering first (stage that filters most gets precedence)
+    # since this aggregate is used to count
+    # Note: if you change sequence of match stages, don't forget to change hardcoded index number below to add
+    # symbol based match aggregation layer
+    agg_query = get_last_n_sec_orders_by_events(last_n_sec, [order_event])
+    if symbol is not None:
+        match_agg = {
+            "order.security.sec_id": symbol
+        }
+        agg_query["aggregate"][1]["$match"] = match_agg
+    return agg_query

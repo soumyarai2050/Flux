@@ -66,3 +66,10 @@ enum StratState{
   // set StratState_SNOOZED state when strat is unloaded from collection
   StratState_SNOOZED = 6;
 }
+
+
+enum StratMode{
+  StratMode_Normal = 0;
+  StratMode_Relaxed = 1;
+  StratMode_Aggressive = 2;
+}

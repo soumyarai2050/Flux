@@ -1258,6 +1258,12 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         if symbol_side_snapshot_obj.security.sec_type is None:
             symbol_side_snapshot_obj.security.sec_type = SecurityType.TICKER
 
+    @staticmethod
+    def is_cxled_event(event: OrderEventType) -> bool:
+        if event in [OrderEventType.OE_CXL_ACK, OrderEventType.OE_UNSOL_CXL]:
+            return True
+        return False
+
     async def _update_order_snapshot_from_order_journal(
             self, order_journal_obj: OrderJournal) -> Tuple[int, OrderSnapshot, StratBrief | None,
                                                             PortfolioStatusUpdatesContainer | None] | None:
@@ -1340,7 +1346,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
-            case OrderEventType.OE_CXL_ACK:
+            case OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL:
                 async with OrderSnapshot.reentrant_lock:
                     order_snapshot = \
                         await self._check_state_and_get_order_snapshot_obj(
@@ -1355,8 +1361,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                          f"{get_order_journal_log_key(order_journal_obj)};;; "
                                          f"order_journal: {order_journal_obj}, order_snapshot: {order_snapshot}")
                         else:
-                            # If CXL_ACK comes after OE_ACKED or OE_UNACK directly without cxl request that is
-                            # treated as unsolicited cxl
+                            # If order_event is OE_UNSOL_CXL, that is treated as unsolicited cxl
                             # If CXL_ACK comes after OE_CXL_UNACK, that means cxl_ack came after cxl request
                             order_brief = OrderBrief(**order_snapshot.order_brief.dict())
                             if order_journal_obj.order.text:
@@ -1470,7 +1475,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
 
-            case OrderEventType.OE_REJ:
+            case OrderEventType.OE_INT_REJ | OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ:
                 async with OrderSnapshot.reentrant_lock:
                     order_snapshot = \
                         await self._check_state_and_get_order_snapshot_obj(
@@ -1582,7 +1587,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         updated_symbol_side_snapshot_obj.total_qty = (
                                 symbol_side_snapshot_obj.total_qty + order_journal.order.qty)
                         updated_symbol_side_snapshot_obj.last_update_date_time = order_journal.order_event_date_time
-                    case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
+                    case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
+                          OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
                         updated_symbol_side_snapshot_obj.total_cxled_qty = (
                                 symbol_side_snapshot_obj.total_cxled_qty + order_snapshot_obj.cxled_qty)
                         updated_symbol_side_snapshot_obj.total_cxled_notional = (
@@ -1619,7 +1625,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             else:
                 ord_journal_key: str = get_order_journal_log_key(order_journal_obj)
                 ord_snapshot_key: str = get_order_snapshot_log_key(order_snapshot_obj)
-                err_str_: str = f"_check_state_and_get_order_snapshot_obj: order_journal: {ord_journal_key} " \
+                err_str_: str = f"_check_state_and_get_order_snapshot_obj: order_journal of key: {ord_journal_key} " \
                                 f"received with event: {order_journal_obj.order_event}, to update status of " \
                                 f"order_snapshot: {ord_snapshot_key}, with status: " \
                                 f"{order_snapshot_obj.order_status}, but order_snapshot doesn't contain any of " \
@@ -1650,7 +1656,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                 update_strat_status_obj.total_open_buy_notional += \
                                     order_journal_obj.order.qty * self.get_usd_px(order_snapshot.order_brief.px,
                                                                                   order_snapshot.order_brief.security.sec_id)
-                            case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
+                            case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
+                                  OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
                                 total_buy_unfilled_qty = \
                                     order_snapshot.order_brief.qty - order_snapshot.filled_qty
                                 update_strat_status_obj.total_open_buy_qty -= total_buy_unfilled_qty
@@ -1688,7 +1695,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                 update_strat_status_obj.total_open_sell_notional += \
                                     order_journal_obj.order.qty * self.get_usd_px(order_journal_obj.order.px,
                                                                                   order_journal_obj.order.security.sec_id)
-                            case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
+                            case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
+                                  OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
                                 total_sell_unfilled_qty = \
                                     order_snapshot.order_brief.qty - order_snapshot.filled_qty
                                 update_strat_status_obj.total_open_sell_qty -= total_sell_unfilled_qty
@@ -1791,18 +1799,21 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                         order_snapshot.order_brief.qty *
                                         self.get_usd_px(order_snapshot.order_brief.px,
                                                         order_snapshot.order_brief.security.sec_id)))
-                        elif order_journal.order_event == OrderEventType.OE_REJ:
-                            # When order_event is OE_REJ then just removing current order's total qty from existing
-                            # open_qty + total notional (total order Qty * order px) from existing open_notional
+                        elif order_journal.order_event in [OrderEventType.OE_INT_REJ, OrderEventType.OE_BRK_REJ,
+                                                           OrderEventType.OE_EXH_REJ]:
+                            # When order_event is OE_INT_REJ or OE_BRK_REJ or OE_EXH_REJ then just removing
+                            # current order's total qty from existing open_qty + total notional
+                            # (total order Qty * order px) from existing open_notional
                             open_qty = fetched_open_qty - order_snapshot.order_brief.qty
                             open_notional = (
                                     fetched_open_notional - (
                                         order_snapshot.order_brief.qty *
                                         self.get_usd_px(order_snapshot.order_brief.px,
                                                         order_snapshot.order_brief.security.sec_id)))
-                        elif order_journal.order_event == OrderEventType.OE_CXL_ACK:
-                            # When order_event is OE_CXL_ACK then removing current order's unfilled qty from existing
-                            # open_qty + unfilled notional (unfilled order Qty * order px) from existing open_notional
+                        elif order_journal.order_event in [OrderEventType.OE_CXL_ACK, OrderEventType.OE_UNSOL_CXL]:
+                            # When order_event is OE_CXL_ACK or OE_UNSOL_CXL then removing current order's
+                            # unfilled qty from existing open_qty + unfilled notional
+                            # (unfilled order Qty * order px) from existing open_notional
                             unfilled_qty = order_snapshot.order_brief.qty - order_snapshot.filled_qty
                             open_qty = fetched_open_qty - unfilled_qty
                             open_notional = (
@@ -1811,8 +1822,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                                                        order_snapshot.order_brief.security.sec_id)))
                         else:
                             err_str_: str = (f"Unsupported OrderEventType: Must be either of "
-                                             f"[{OrderEventType.OE_NEW}, {OrderEventType.OE_REJ}, "
-                                             f"{OrderEventType.OE_CXL_ACK}], "
+                                             f"[{OrderEventType.OE_NEW}, {OrderEventType.OE_INT_REJ}, "
+                                             f"{OrderEventType.OE_BRK_REJ}, {OrderEventType.OE_EXH_REJ}"
+                                             f"{OrderEventType.OE_CXL_ACK}, {OrderEventType.OE_UNSOL_CXL}], "
                                              f"Found: {order_journal_or_fills_journal.order_event} - ignoring "
                                              f"strat_brief update")
                             logging.error(err_str_)
@@ -1995,7 +2007,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         update_overall_buy_notional = \
                             self.get_usd_px(order_journal_obj.order.px, order_journal_obj.order.security.sec_id) * \
                             order_journal_obj.order.qty
-                    case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
+                    case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
+                          OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
                         total_buy_unfilled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
                         update_overall_buy_notional = \
                             -(self.get_usd_px(order_snapshot_obj.order_brief.px,
@@ -2008,7 +2021,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         update_overall_sell_notional = \
                             self.get_usd_px(order_journal_obj.order.px, order_journal_obj.order.security.sec_id) * \
                             order_journal_obj.order.qty
-                    case OrderEventType.OE_CXL_ACK | OrderEventType.OE_REJ:
+                    case (OrderEventType.OE_CXL_ACK | OrderEventType.OE_UNSOL_CXL | OrderEventType.OE_INT_REJ |
+                          OrderEventType.OE_BRK_REJ | OrderEventType.OE_EXH_REJ):
                         total_sell_unfilled_qty = order_snapshot_obj.order_brief.qty - order_snapshot_obj.filled_qty
                         update_overall_sell_notional = \
                             -(self.get_usd_px(order_snapshot_obj.order_brief.px,

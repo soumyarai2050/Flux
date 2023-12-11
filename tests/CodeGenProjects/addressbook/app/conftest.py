@@ -313,7 +313,8 @@ def expected_strat_limits_():
 @pytest.fixture()
 def expected_order_limits_():
     yield OrderLimitsBaseModel(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                               max_order_qty=500, min_order_notional=100, max_order_notional=90_000)
+                               max_order_qty=500, min_order_notional=100, max_order_notional=90_000,
+                               min_order_notional_allowance=1000)
 
 
 @pytest.fixture()
@@ -369,7 +370,8 @@ def pair_strat_(pair_securities_with_sides_):
         },
         "exch_response_max_seconds": 5,
         "common_premium": 40,
-        "hedge_ratio": 5
+        "hedge_ratio": 5,
+        "strat_mode": StratMode.StratMode_Normal
         },
         "pair_strat_params_update_seq_num": 0,
         "market_premium": 0

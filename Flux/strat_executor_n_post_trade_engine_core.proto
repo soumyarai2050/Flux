@@ -13,8 +13,11 @@ enum OrderEventType{
   OE_ACK = 2;
   OE_CXL = 3;
   OE_CXL_ACK = 4;
-  OE_CXL_REJ = 5;
-  OE_REJ = 6;
+  OE_UNSOL_CXL = 5;
+  OE_CXL_REJ = 6;
+  OE_INT_REJ = 7;
+  OE_BRK_REJ = 8;
+  OE_EXH_REJ = 9;
 }
 
 enum OrderStatusType{
@@ -49,12 +52,12 @@ message OrderJournal{
     depends_on_other_model_for_dynamic_url: true
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_last_n_sec_orders_by_event",
+      QueryName: "get_last_n_sec_orders_by_events",
       AggregateVarName: "get_last_n_sec_orders_by_event",
       QueryParams: "last_n_sec",
-      QueryParams: "order_event",
+      QueryParams: "order_event_list",
       QueryParamsDataType: "int",
-      QueryParamsDataType: "str"
+      QueryParamsDataType: "List[str]"
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "filtered_notify_order_journal_update",

@@ -2435,13 +2435,13 @@ def verify_portfolio_status(total_loop_count: int, symbol_pair_count: int,
                                                                f"{portfolio_status_list}"
 
 
-def get_latest_order_journal_with_status_and_symbol(expected_order_event, expected_symbol,
-                                                    executor_web_client: StratExecutorServiceHttpClient,
-                                                    expect_no_order: bool | None = None,
-                                                    last_order_id: str | None = None,
-                                                    max_loop_count: int | None = None,
-                                                    loop_wait_secs: int | None = None,
-                                                    assert_code: int = 0):
+def get_latest_order_journal_with_event_and_symbol(expected_order_event, expected_symbol,
+                                                   executor_web_client: StratExecutorServiceHttpClient,
+                                                   expect_no_order: bool | None = None,
+                                                   last_order_id: str | None = None,
+                                                   max_loop_count: int | None = None,
+                                                   loop_wait_secs: int | None = None,
+                                                   assert_code: int = 0):
     start_time = DateTime.utcnow()
     placed_order_journal = None
     if max_loop_count is None:
@@ -2477,6 +2477,54 @@ def get_latest_order_journal_with_status_and_symbol(expected_order_event, expect
     else:
         assert placed_order_journal is not None, \
             f"Can't find any order_journal with symbol {expected_symbol} order_event {expected_order_event}, " \
+            f"expect_no_order {expect_no_order} and last_order_id {last_order_id} - assert_code: {assert_code}"
+
+    return placed_order_journal
+
+
+# @@@ copy of get_latest_order_journal_with_event_and_symbol - contains code repetition
+def get_latest_order_journal_with_events_and_symbol(expected_order_event_list, expected_symbol,
+                                                    executor_web_client: StratExecutorServiceHttpClient,
+                                                    expect_no_order: bool | None = None,
+                                                    last_order_id: str | None = None,
+                                                    max_loop_count: int | None = None,
+                                                    loop_wait_secs: int | None = None,
+                                                    assert_code: int = 0):
+    start_time = DateTime.utcnow()
+    placed_order_journal = None
+    if max_loop_count is None:
+        max_loop_count = 20
+    if loop_wait_secs is None:
+        loop_wait_secs = 2
+
+    for loop_count in range(max_loop_count):
+        stored_order_journal_list = executor_web_client.get_all_order_journal_client(-100)
+        for stored_order_journal in stored_order_journal_list:
+            if stored_order_journal.order_event in expected_order_event_list and \
+                    stored_order_journal.order.security.sec_id == expected_symbol:
+                if last_order_id is None:
+                    placed_order_journal = stored_order_journal
+                else:
+                    if last_order_id != stored_order_journal.order.order_id:
+                        placed_order_journal = stored_order_journal
+                        # since get_all return orders in descendant order of date_time, first match is latest
+                break
+        if placed_order_journal is not None:
+            break
+        time.sleep(loop_wait_secs)
+
+    time_delta = DateTime.utcnow() - start_time
+    print(f"Found placed_order_journal - {placed_order_journal} in {time_delta.total_seconds()}, "
+          f"for symbol {expected_symbol}, order_events {expected_order_event_list}, "
+          f"expect_no_order {expect_no_order} and last_order_id {last_order_id}")
+
+    if expect_no_order:
+        assert placed_order_journal is None, f"Expected no new order for symbol {expected_symbol}, " \
+                                             f"received {placed_order_journal} - assert_code: {assert_code}"
+        placed_order_journal = OrderJournalBaseModel(order=OrderBriefOptional(order_id=last_order_id))
+    else:
+        assert placed_order_journal is not None, \
+            f"Can't find any order_journal with symbol {expected_symbol} order_events {expected_order_event_list}, " \
             f"expect_no_order {expect_no_order} and last_order_id {last_order_id} - assert_code: {assert_code}"
 
     return placed_order_journal
@@ -2525,11 +2573,16 @@ def create_pre_order_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_
                                        last_trade_fixture_list: List[Dict],
                                        market_depth_basemodel_list: List[MarketDepthBaseModel],
                                        top_of_book_json_list: List[Dict],
-                                       leg1_side: Side | None = None, leg2_side: Side | None = None
-                                       ) -> Tuple[PairStratBaseModel, StratExecutorServiceHttpClient]:
+                                       leg1_side: Side | None = None, leg2_side: Side | None = None,
+                                       strat_mode: StratMode | None = None) -> Tuple[PairStratBaseModel,
+                                                                                     StratExecutorServiceHttpClient]:
     print(f"Test started, leg1_symbol: {leg1_symbol}, leg2_symbol: {leg2_symbol}")
 
     # Creating Strat
+
+    if strat_mode is None:
+        strat_mode = StratMode.StratMode_Normal
+    pair_strat_.pair_strat_params.strat_mode = strat_mode
     active_pair_strat, executor_web_client = create_n_activate_strat(
         leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_), copy.deepcopy(expected_strat_limits_),
         copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_json_list,
@@ -2639,9 +2692,9 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               buy_symbol, executor_web_client,
-                                                                               last_order_id=order_id)
+        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                              buy_symbol, executor_web_client,
+                                                                              last_order_id=order_id)
         order_id = placed_order_journal.order.order_id
         create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
@@ -2664,7 +2717,7 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
         )
 
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
 
         # Checking Ack response on placed order
         placed_buy_order_ack_receive(loop_count, order_id, create_buy_order_date_time,
@@ -2743,9 +2796,9 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               sell_symbol, executor_web_client,
-                                                                               last_order_id=order_id)
+        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                              sell_symbol, executor_web_client,
+                                                                              last_order_id=order_id)
         create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
         order_id = placed_order_journal.order.order_id
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
@@ -2767,7 +2820,7 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
             current_itr_expected_sell_order_journal_.order.underlying_account)
 
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
 
         # Checking Ack response on placed order
         placed_sell_order_ack_receive(loop_count, order_id, create_sell_order_date_time,
@@ -2876,9 +2929,9 @@ def handle_test_sell_buy_order(leg1_symbol: str, leg2_symbol: str, total_loop_co
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               sell_symbol, executor_web_client,
-                                                                               last_order_id=order_id)
+        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                              sell_symbol, executor_web_client,
+                                                                              last_order_id=order_id)
         create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
         order_id = placed_order_journal.order.order_id
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
@@ -2900,7 +2953,7 @@ def handle_test_sell_buy_order(leg1_symbol: str, leg2_symbol: str, total_loop_co
             current_itr_expected_sell_order_journal_.order.underlying_account)
 
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
 
         # Checking Ack response on placed order
         placed_sell_order_ack_receive(loop_count, order_id, create_sell_order_date_time,
@@ -2982,9 +3035,9 @@ def handle_test_sell_buy_order(leg1_symbol: str, leg2_symbol: str, total_loop_co
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               buy_symbol, executor_web_client,
-                                                                               last_order_id=order_id)
+        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                              buy_symbol, executor_web_client,
+                                                                              last_order_id=order_id)
         order_id = placed_order_journal.order.order_id
         create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
@@ -3008,7 +3061,7 @@ def handle_test_sell_buy_order(leg1_symbol: str, leg2_symbol: str, total_loop_co
         )
 
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
 
         # Checking Ack response on placed order
         placed_buy_order_ack_receive(loop_count, order_id, create_buy_order_date_time,
@@ -3078,13 +3131,13 @@ def verify_rej_orders(check_ack_to_reject_orders: bool, last_order_id: int | Non
                       check_order_event: OrderEventType, symbol: str,
                       executor_web_client: StratExecutorServiceHttpClient) -> str:
     # internally checks order_journal is not None else raises assert exception internally
-    latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, symbol,
-                                                                           executor_web_client,
-                                                                           last_order_id=last_order_id)
+    latest_order_journal = get_latest_order_journal_with_event_and_symbol(check_order_event, symbol,
+                                                                          executor_web_client,
+                                                                          last_order_id=last_order_id)
     last_order_id = latest_order_journal.order.order_id
 
     if check_ack_to_reject_orders:
-        if check_order_event != OrderEventType.OE_REJ:
+        if check_order_event not in [OrderEventType.OE_INT_REJ, OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ]:
             # internally checks fills_journal is not None else raises assert exception
             latest_fill_journal = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id,
                                                                         executor_web_client)
@@ -3109,6 +3162,7 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
     continues_order_count, continues_special_order_count = get_continuous_order_configs(buy_symbol, config_dict)
     buy_order_count = 0
     buy_special_order_count = 0
+    special_case_counter = 0
     last_id = None
     buy_rej_last_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
@@ -3121,7 +3175,11 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
             buy_order_count += 1
         else:
             if buy_special_order_count < continues_special_order_count:
-                check_order_event = OrderEventType.OE_REJ
+                special_case_counter += 1
+                if special_case_counter % 2 == 0:
+                    check_order_event = OrderEventType.OE_BRK_REJ
+                else:
+                    check_order_event = OrderEventType.OE_EXH_REJ
                 buy_special_order_count += 1
             else:
                 check_order_event = OrderEventType.OE_CXL_ACK
@@ -3132,7 +3190,7 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
         last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
                                     buy_symbol, executor_web_client)
 
-        if check_order_event == OrderEventType.OE_REJ:
+        if check_order_event in [OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ]:
             buy_rej_last_id = last_id
 
     if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
@@ -3154,7 +3212,11 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
             sell_order_count += 1
         else:
             if sell_special_order_count < continues_special_order_count:
-                check_order_event = OrderEventType.OE_REJ
+                special_case_counter += 1
+                if special_case_counter % 2 == 0:
+                    check_order_event = OrderEventType.OE_BRK_REJ
+                else:
+                    check_order_event = OrderEventType.OE_EXH_REJ
                 sell_special_order_count += 1
             else:
                 check_order_event = OrderEventType.OE_CXL_ACK
@@ -3165,7 +3227,7 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
         last_id = verify_rej_orders(check_ack_to_reject_orders, last_id, check_order_event,
                                     sell_symbol, executor_web_client)
 
-        if check_order_event == OrderEventType.OE_REJ:
+        if check_order_event in [OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ]:
             sell_rej_last_id = last_id
     return buy_rej_last_id, sell_rej_last_id
 
@@ -3175,9 +3237,9 @@ def verify_cxl_rej(last_cxl_order_id: str | None, last_cxl_rej_order_id: str | N
     if check_order_event == OrderEventType.OE_CXL_REJ:
         # internally checks order_journal is not None else raises assert exception internally
         latest_cxl_rej_order_journal = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_REJ, symbol,
-                                                            executor_web_client,
-                                                            last_order_id=last_cxl_rej_order_id)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_REJ, symbol,
+                                                           executor_web_client,
+                                                           last_order_id=last_cxl_rej_order_id)
         last_cxl_rej_order_id = latest_cxl_rej_order_journal.order.order_id
 
         order_snapshot = get_order_snapshot_from_order_id(latest_cxl_rej_order_journal.order.order_id,
@@ -3196,9 +3258,9 @@ def verify_cxl_rej(last_cxl_order_id: str | None, last_cxl_rej_order_id: str | N
                 f"received {order_snapshot.order_status}"
 
     # checks order_journal is not None else raises assert exception internally
-    latest_cxl_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, symbol,
-                                                                               executor_web_client,
-                                                                               last_order_id=last_cxl_order_id)
+    latest_cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK, symbol,
+                                                                              executor_web_client,
+                                                                              last_order_id=last_cxl_order_id)
     last_cxl_order_id = latest_cxl_order_journal.order.order_id
 
     return last_cxl_order_id, last_cxl_rej_order_id
@@ -3223,9 +3285,9 @@ def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, 
         wait_for_get_new_order_placed_from_tob(wait_stop_px, symbol, tob_last_update_date_time_tracker,
                                                side, executor_web_client)
 
-    placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                           symbol, executor_web_client,
-                                                                           last_order_id=order_id)
+    placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                          symbol, executor_web_client,
+                                                                          last_order_id=order_id)
     order_id = placed_order_journal.order.order_id
 
     executor_web_client.trade_simulator_process_order_ack_query_client(
@@ -3255,15 +3317,15 @@ def verify_unsolicited_cxl_orders(last_id: str | None,
                                   executor_web_client: StratExecutorServiceHttpClient) -> str:
     # internally checks order_journal is not None else raises assert exception internally
     if check_order_event == OrderEventType.OE_CXL:
-        latest_order_journal = get_latest_order_journal_with_status_and_symbol(check_order_event, symbol,
-                                                                               executor_web_client,
-                                                                               last_order_id=last_id)
+        latest_order_journal = get_latest_order_journal_with_event_and_symbol(check_order_event, symbol,
+                                                                              executor_web_client,
+                                                                              last_order_id=last_id)
     else:
         # checking no latest order with OE_CXL
-        latest_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL, symbol,
-                                                                               executor_web_client,
-                                                                               expect_no_order=True,
-                                                                               last_order_id=last_id)
+        latest_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL, symbol,
+                                                                              executor_web_client,
+                                                                              expect_no_order=True,
+                                                                              last_order_id=last_id)
 
     return latest_order_journal.order.order_id
 
@@ -3277,7 +3339,7 @@ def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id:
         time.sleep(10)
     else:
         if cxl_count < continues_unsolicited_cxl_count:
-            check_order_event = OrderEventType.OE_CXL_ACK
+            check_order_event = OrderEventType.OE_UNSOL_CXL
             cxl_count += 1
         else:
             check_order_event = OrderEventType.OE_CXL
@@ -3287,10 +3349,11 @@ def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id:
 
     # internally contains assert checks
     last_id = verify_unsolicited_cxl_orders(last_id, check_order_event, symbol, executor_web_client)
-    latest_cxl_ack_obj = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK,
-                                                                         symbol, executor_web_client,
-                                                                         last_order_id=last_cxl_ack_id)
-    last_cxl_ack_id = latest_cxl_ack_obj.order.order_id
+    if check_order_event != OrderEventType.OE_UNSOL_CXL:
+        latest_cxl_ack_obj = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK,
+                                                                            symbol, executor_web_client,
+                                                                            last_order_id=last_cxl_ack_id)
+        last_cxl_ack_id = latest_cxl_ack_obj.order.order_id
 
     return last_id, last_cxl_ack_id, order_count, cxl_count
 
@@ -3346,15 +3409,15 @@ def get_partial_allowed_ack_qty(symbol: str, qty: int, config_dict: Dict):
 
 def handle_partial_ack_checks(symbol: str, new_order_id: str, acked_order_id: str,
                               executor_web_client: StratExecutorServiceHttpClient, config_dict):
-    new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                        symbol, executor_web_client,
-                                                                        last_order_id=new_order_id)
+    new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                       symbol, executor_web_client,
+                                                                       last_order_id=new_order_id)
     new_order_id = new_order_journal.order.order_id
     partial_ack_qty = get_partial_allowed_ack_qty(symbol, new_order_journal.order.qty, config_dict)
 
-    ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
-                                                                        symbol, executor_web_client,
-                                                                        last_order_id=acked_order_id)
+    ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+                                                                       symbol, executor_web_client,
+                                                                       last_order_id=acked_order_id)
     acked_order_id = ack_order_journal.order.order_id
     assert ack_order_journal.order.qty == partial_ack_qty, f"Mismatch partial_ack_qty: expected {partial_ack_qty}, " \
                                                            f"received {ack_order_journal.order.qty}"
@@ -3365,14 +3428,14 @@ def handle_partial_ack_checks(symbol: str, new_order_id: str, acked_order_id: st
 def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
                                              expected_start_status_, symbol_overview_obj_list,
                                              last_trade_fixture_list, market_depth_basemodel_list,
-                                             top_of_book_list_):
+                                             top_of_book_list_, strat_mode: StratMode | None = None):
     buy_symbol = buy_sell_symbol_list[0][0]
     sell_symbol = buy_sell_symbol_list[0][1]
 
     activated_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           market_depth_basemodel_list, top_of_book_list_, strat_mode=strat_mode))
 
     # buy test
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
@@ -3390,25 +3453,24 @@ def handle_place_order_and_check_str_in_alert_for_executor_limits(symbol: str, s
     place_new_order(symbol, side, px, qty, executor_web_client)
     print(f"symbol: {symbol}, Created new_order obj")
 
-    new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, symbol,
-                                                                        executor_web_client,
-                                                                        expect_no_order=True,
-                                                                        last_order_id=last_order_id)
+    new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, symbol,
+                                                                       executor_web_client,
+                                                                       expect_no_order=True,
+                                                                       last_order_id=last_order_id)
 
     # Checking alert in strat_alert
     strat_alert = log_analyzer_web_client.get_strat_alert_client(activated_pair_strat_id)
     for alert in strat_alert.alerts:
         if re.search(check_str, alert.alert_brief):
-            break
+            return alert
     else:
         # Checking alert in portfolio_alert if reason failed to add in strat_alert
         portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
         for alert in portfolio_alert.alerts:
             if re.search(check_str, alert.alert_brief):
-                break
+                return alert
         else:
             assert False, assert_fail_msg
-    assert True
 
 
 def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symbol, sell_symbol, active_pair_strat_id,
@@ -3433,8 +3495,9 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symb
     place_new_order(check_symbol, side, px, qty, executor_web_client)
     print(f"symbol: {check_symbol}, Created new_order obj")
 
-    new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, check_symbol,
-                                                                        executor_web_client)
+    new_order_journal = get_latest_order_journal_with_events_and_symbol([OrderEventType.OE_CXL_ACK,
+                                                                         OrderEventType.OE_UNSOL_CXL], check_symbol,
+                                                                       executor_web_client)
     time.sleep(2)
     strat_alert = log_analyzer_web_client.get_strat_alert_client(active_pair_strat_id)
 
@@ -3472,10 +3535,10 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
     place_new_order(check_symbol, side, px, qty, executor_web_client)
     print(f"symbol: {check_symbol}, Created new_order obj")
 
-    ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, check_symbol,
-                                                                        executor_web_client)
-    cxl_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_CXL_ACK, check_symbol,
-                                                                        executor_web_client)
+    ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, check_symbol,
+                                                                       executor_web_client)
+    cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK, check_symbol,
+                                                                       executor_web_client)
 
     strat_alert = log_analyzer_web_client.get_strat_alert_client(active_pair_strat_id)
     for alert in strat_alert.alerts:
@@ -3539,9 +3602,9 @@ def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy
     else:
         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
-    order_ack_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
-                                                                        check_symbol, executor_web_client,
-                                                                        last_order_id=last_order_id)
+    order_ack_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+                                                                       check_symbol, executor_web_client,
+                                                                       last_order_id=last_order_id)
     last_order_id = order_ack_journal.order.order_id
     time.sleep(5)
 
@@ -3565,9 +3628,9 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
     else:
         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
-    new_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
-                                                                        check_symbol, executor_web_client,
-                                                                        last_order_id=last_order_id)
+    new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+                                                                       check_symbol, executor_web_client,
+                                                                       last_order_id=last_order_id)
     last_order_id = new_order_journal.order.order_id
 
     # ATTENTION: Below code is dummy of original impl present in trade_executor, keep it sync with original
@@ -3641,8 +3704,8 @@ def strat_done_after_exhausted_consumable_notional(
             check_symbol = sell_symbol
         time.sleep(2)  # delay for order to get placed
 
-        ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, check_symbol,
-                                                                                executor_http_client, assert_code=1)
+        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, check_symbol,
+                                                                           executor_http_client, assert_code=1)
         order_snapshot = get_order_snapshot_from_order_id(ack_order_journal.order.order_id, executor_http_client)
         assert order_snapshot.order_status == OrderStatusType.OE_ACKED, "OrderStatus mismatched: expected status " \
                                                                         f"OrderStatusType.OE_ACKED received " \
@@ -3661,9 +3724,9 @@ def strat_done_after_exhausted_consumable_notional(
             run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
         time.sleep(2)  # delay for order to get placed
         ack_order_journal = (
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW, check_symbol, executor_http_client,
-                                                            last_order_id=ack_order_journal.order.order_id,
-                                                            expect_no_order=True, assert_code=3))
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, check_symbol, executor_http_client,
+                                                           last_order_id=ack_order_journal.order.order_id,
+                                                           expect_no_order=True, assert_code=3))
         pair_strat = strat_manager_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
         assert pair_strat.strat_state == StratState.StratState_DONE, (
             f"Mismatched strat_state, expected {StratState.StratState_DONE}, received {pair_strat.strat_state}")
@@ -3778,9 +3841,9 @@ def handle_test_buy_sell_pair_order(buy_symbol: str, sell_symbol: str, total_loo
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               buy_symbol, executor_web_client,
-                                                                               last_order_id=order_id)
+        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                              buy_symbol, executor_web_client,
+                                                                              last_order_id=order_id)
         order_id = placed_order_journal.order.order_id
         create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
@@ -3803,7 +3866,7 @@ def handle_test_buy_sell_pair_order(buy_symbol: str, sell_symbol: str, total_loo
         )
 
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
 
         # Checking Ack response on placed order
         placed_buy_order_ack_receive(loop_count, order_id, create_buy_order_date_time,
@@ -3883,9 +3946,9 @@ def handle_test_buy_sell_pair_order(buy_symbol: str, sell_symbol: str, total_loo
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               sell_symbol, executor_web_client,
-                                                                               last_order_id=order_id)
+        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                              sell_symbol, executor_web_client,
+                                                                              last_order_id=order_id)
         create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
         order_id = placed_order_journal.order.order_id
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
@@ -3907,7 +3970,7 @@ def handle_test_buy_sell_pair_order(buy_symbol: str, sell_symbol: str, total_loo
             current_itr_expected_sell_order_journal_.order.underlying_account)
 
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
 
         # Checking Ack response on placed order
         placed_sell_order_ack_receive(loop_count, order_id, create_sell_order_date_time,
@@ -4016,9 +4079,9 @@ def handle_test_sell_buy_pair_order(leg1_symbol: str, leg2_symbol: str, total_lo
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               sell_symbol, executor_web_client,
-                                                                               last_order_id=order_id)
+        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                              sell_symbol, executor_web_client,
+                                                                              last_order_id=order_id)
         create_sell_order_date_time: DateTime = placed_order_journal.order_event_date_time
         order_id = placed_order_journal.order.order_id
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received order_journal with {order_id}")
@@ -4040,7 +4103,7 @@ def handle_test_sell_buy_pair_order(leg1_symbol: str, leg2_symbol: str, total_lo
             current_itr_expected_sell_order_journal_.order.underlying_account)
 
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, sell_symbol, executor_web_client)
 
         # Checking Ack response on placed order
         placed_sell_order_ack_receive(loop_count, order_id, create_sell_order_date_time,
@@ -4121,9 +4184,9 @@ def handle_test_sell_buy_pair_order(leg1_symbol: str, leg2_symbol: str, total_lo
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_order obj")
             time.sleep(2)
 
-        placed_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_NEW,
-                                                                               buy_symbol, executor_web_client,
-                                                                               last_order_id=order_id)
+        placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
+                                                                              buy_symbol, executor_web_client,
+                                                                              last_order_id=order_id)
         order_id = placed_order_journal.order.order_id
         create_buy_order_date_time: DateTime = placed_order_journal.order_event_date_time
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received order_journal with {order_id}")
@@ -4147,7 +4210,7 @@ def handle_test_sell_buy_pair_order(leg1_symbol: str, leg2_symbol: str, total_lo
         )
 
         placed_order_journal_obj_ack_response = \
-            get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
+            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol, executor_web_client)
 
         # Checking Ack response on placed order
         placed_buy_order_ack_receive(loop_count, order_id, create_buy_order_date_time,
@@ -4204,10 +4267,10 @@ def place_sanity_orders_for_executor(
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
 
-        ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
-                                                                            buy_symbol, executor_web_client,
-                                                                            last_order_id=buy_ack_order_id,
-                                                                            expect_no_order=expect_no_order)
+        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+                                                                           buy_symbol, executor_web_client,
+                                                                           last_order_id=buy_ack_order_id,
+                                                                           expect_no_order=expect_no_order)
         buy_ack_order_id = ack_order_journal.order.order_id
 
         if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
@@ -4219,10 +4282,10 @@ def place_sanity_orders_for_executor(
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1])
 
-        ack_order_journal = get_latest_order_journal_with_status_and_symbol(OrderEventType.OE_ACK,
-                                                                            sell_symbol, executor_web_client,
-                                                                            last_order_id=sell_ack_order_id,
-                                                                            expect_no_order=expect_no_order)
+        ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
+                                                                           sell_symbol, executor_web_client,
+                                                                           last_order_id=sell_ack_order_id,
+                                                                           expect_no_order=expect_no_order)
         sell_ack_order_id = ack_order_journal.order.order_id
 
         if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):

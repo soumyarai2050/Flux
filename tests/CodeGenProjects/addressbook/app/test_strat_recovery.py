@@ -492,3 +492,134 @@ def test_update_pair_strat_from_pair_strat_log_analyzer(
     assert updated_pair_strat.strat_state == StratState.StratState_DONE, \
         (f"Mismatched: StratState must be Done after update when addressbook was down, "
          f"found: {updated_pair_strat.strat_state}")
+
+
+def test_recover_kill_switch_when_trading_server_has_enabled(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list,
+        market_depth_basemodel_list, top_of_book_list_, residual_wait_sec):
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"kill_switch_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        config_dict["is_kill_switch_enabled"] = True
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
+
+        pair_strat_port: int = strat_manager_service_native_web_client.port
+
+        for _ in range(10):
+            p_id: int = get_pid_from_port(pair_strat_port)
+            if p_id is not None:
+                os.kill(p_id, signal.SIGKILL)
+                print(f"Killed process: {p_id}, port: {pair_strat_port}")
+                break
+            else:
+                print("get_pid_from_port return None instead of pid")
+            time.sleep(2)
+        else:
+            assert False, f"Unexpected: Can't kill process - Can't find any pid from port {pair_strat_port}"
+
+        pair_strat_scripts_dir = (PurePath(__file__).parent.parent.parent.parent.parent / "Flux" /
+                                  "CodeGenProjects" / "addressbook" / "scripts")
+        pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
+                                              cwd=pair_strat_scripts_dir)
+        time.sleep(residual_wait_sec * 2)
+
+        portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(1)
+        assert portfolio_status.kill_switch, \
+            ("Kill Switch must be triggered and enabled after restart according to test configuration but "
+             "kill switch found False")
+
+        # validating if trading_link.trigger_kill_switch got called
+        check_str = "Called TradingLink.TradingLink.trigger_kill_switchtrigger_kill_switch"
+        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+        for alert in portfolio_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                assert False, \
+                    ("TradingLink.trigger_kill_switch must not have been triggered when kill switch is enabled in"
+                     "db by start-up check")
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+        # updating simulator's configs
+        strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
+
+
+def test_recover_kill_switch_when_trading_server_has_disabled(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+        expected_strat_limits_, expected_start_status_,
+        symbol_overview_obj_list, last_trade_fixture_list,
+        market_depth_basemodel_list, top_of_book_list_, residual_wait_sec):
+
+    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
+    strat_manager_service_native_web_client.patch_portfolio_status_client(
+        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"kill_switch_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        config_dict["is_kill_switch_enabled"] = False
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
+
+        pair_strat_port: int = strat_manager_service_native_web_client.port
+
+        for _ in range(10):
+            p_id: int = get_pid_from_port(pair_strat_port)
+            if p_id is not None:
+                os.kill(p_id, signal.SIGKILL)
+                print(f"Killed process: {p_id}, port: {pair_strat_port}")
+                break
+            else:
+                print("get_pid_from_port return None instead of pid")
+            time.sleep(2)
+        else:
+            assert False, f"Unexpected: Can't kill process - Can't find any pid from port {pair_strat_port}"
+
+        pair_strat_scripts_dir = (PurePath(__file__).parent.parent.parent.parent.parent / "Flux" /
+                                  "CodeGenProjects" / "addressbook" / "scripts")
+        pair_strat_process = subprocess.Popen(["python", "launch_beanie_fastapi.py"],
+                                              cwd=pair_strat_scripts_dir)
+        time.sleep(residual_wait_sec * 2)
+
+        portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(1)
+        assert portfolio_status.kill_switch, \
+            "Kill Switch must be unchanged after restart but found changed, kill_switch found as False"
+
+        # validating if trading_link.trigger_kill_switch got called
+        check_str = "Called TradingLink.trigger_kill_switch"
+        portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+        for alert in portfolio_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                break
+        else:
+            assert False, f"Can't find portfolio alert saying '{check_str}'"
+
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        print(f"Some Error Occurred: exception: {e}, "
+              f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        raise Exception(e)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+        # updating simulator's configs
+        strat_manager_service_native_web_client.log_simulator_reload_config_query_client()

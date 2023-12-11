@@ -41,6 +41,7 @@ message PairStratParams{
   // these are specific to CB-EQT strat - move to derived later
   required float common_premium = 4 [(FluxFldNumberFormat) = "%"];
   optional float hedge_ratio = 5 [default = 1];
+  optional StratMode strat_mode = 6 [default=StratMode_Normal];
 }
 
 
@@ -82,6 +83,7 @@ message OrderLimits{
   optional int32 max_contract_qty = 6 [(FluxFldValMax) = "10000", (FluxFldHelp) = "max qty for securities that trade in contracts"];
   optional float min_order_notional = 7 [(FluxFldDisplayType) = "int", (FluxFldValMin) = "1000", (FluxFldHelp) = "order qty times limit px must be greater than this limit"];
   optional float max_order_notional = 8 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "500000", (FluxFldHelp) = "order qty times limit px must be less than this limit"];
+  optional int64 min_order_notional_allowance = 9 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "50000", (FluxFldHelp) = "used by StratModeRelaxed to compute random next order opportunity min-notional from the min-notional , min-notional + this-allowance range"];
 }
 
 //Widget - 9
@@ -161,6 +163,14 @@ message PairStrat{
   };
     option (FluxMsgJsonQuery) = {
     QueryName: "get_pair_strat_from_symbol_side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side"
+  };
+    option (FluxMsgJsonQuery) = {
+    QueryName: "get_all_pair_strats_from_symbol_side",
+    AggregateVarName: "get_all_pair_strat_from_symbol_n_side",
     QueryParams: "sec_id",
     QueryParamsDataType: "str",
     QueryParams: "side",
