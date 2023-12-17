@@ -1,5 +1,4 @@
 # standard imports
-import logging
 import threading
 import time
 import copy
@@ -24,7 +23,7 @@ from FluxPythonUtils.scripts.utility_functions import (
 from Flux.CodeGenProjects.pair_strat_engine.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.pair_strat_engine.app.service_state import ServiceState
 from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import (
-    PortfolioLimitsBaseModel, StratLeg, FxSymbolOverviewBaseModel)
+    StratLeg, FxSymbolOverviewBaseModel)
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
     create_md_shell_script, MDShellEnvData, PairStratBaseModel, StratState, is_ongoing_strat,
     guaranteed_call_pair_strat_client)
@@ -39,8 +38,8 @@ from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_servic
 from Flux.CodeGenProjects.strat_executor.app.aggregate import (
     get_order_total_sum_of_last_n_sec, get_symbol_side_snapshot_from_symbol_side, get_strat_brief_from_symbol,
     get_open_order_snapshots_for_symbol, get_symbol_side_underlying_account_cumulative_fill_qty,
-    get_symbol_overview_from_symbol, get_last_n_sec_total_trade_qty, get_order_snapshots_by_order_status_list,
-    get_market_depths)
+    get_symbol_overview_from_symbol, get_last_n_sec_total_trade_qty, get_market_depths,
+    get_last_n_order_journals_from_order_id)
 from Flux.CodeGenProjects.post_trade_engine.generated.Pydentic.post_trade_engine_service_model_imports import (
     PortfolioStatusUpdatesContainer)
 from FluxPythonUtils.scripts.ws_reader import WSReader
@@ -77,7 +76,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     residual_compute_shared_lock: AsyncRLock | None = None
     journal_shared_lock: AsyncRLock | None = None
     underlying_read_strat_brief_http: Callable[..., Any] | None = None
-    underlying_get_symbol_overview_from_symbol_query_http: Callable[..., Any] | None = None
     underlying_create_strat_limits_http: Callable[..., Any] | None = None
     underlying_delete_strat_limits_http: Callable[..., Any] | None = None
     underlying_create_strat_status_http: Callable[..., Any] | None = None
@@ -120,8 +118,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
-            underlying_read_strat_brief_http, underlying_get_symbol_overview_from_symbol_query_http,
-            residual_compute_shared_lock, journal_shared_lock,
+            underlying_read_strat_brief_http, residual_compute_shared_lock, journal_shared_lock,
             underlying_create_strat_limits_http, underlying_delete_strat_limits_http,
             underlying_create_strat_status_http, underlying_update_strat_status_http,
             underlying_get_executor_check_snapshot_query_http, underlying_create_strat_brief_http,
@@ -136,7 +133,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
             underlying_partial_update_strat_status_http, underlying_get_open_order_count_query_http,
             underlying_partial_update_strat_brief_http, underlying_delete_symbol_side_snapshot_http,
             get_symbol_side_underlying_account_cumulative_fill_qty_query_http, underlying_read_fills_journal_http,
-            underlying_read_last_trade_http, get_order_snapshots_by_order_status_list,
+            underlying_read_last_trade_http,
             underlying_delete_strat_brief_http, underlying_read_market_depth_http, underlying_read_strat_status_http,
             underlying_read_strat_status_by_id_http, underlying_read_cancel_order_http,
             underlying_read_strat_limits_http, underlying_delete_strat_status_http,
@@ -145,8 +142,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         cls.residual_compute_shared_lock = residual_compute_shared_lock
         cls.journal_shared_lock = journal_shared_lock
         cls.underlying_read_strat_brief_http = underlying_read_strat_brief_http
-        cls.underlying_get_symbol_overview_from_symbol_query_http = (
-            underlying_get_symbol_overview_from_symbol_query_http)
         cls.underlying_create_strat_limits_http = underlying_create_strat_limits_http
         cls.underlying_delete_strat_limits_http = underlying_delete_strat_limits_http
         cls.underlying_create_strat_status_http = underlying_create_strat_status_http
@@ -178,8 +173,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         cls.underlying_read_fills_journal_http = underlying_read_fills_journal_http
         cls.underlying_read_last_trade_http = underlying_read_last_trade_http
         cls.underlying_read_strat_brief_http = underlying_read_strat_brief_http
-        cls.underlying_get_symbol_overview_from_symbol_query_http = (
-            underlying_get_symbol_overview_from_symbol_query_http)
         cls.underlying_delete_strat_brief_http = underlying_delete_strat_brief_http
         cls.underlying_create_cancel_order_http = underlying_create_cancel_order_http
         cls.underlying_read_market_depth_http = underlying_read_market_depth_http
@@ -332,10 +325,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                 except Exception as e:
                                     logging.exception(f"patch_pair_strat_client failed with exception: {e}")
                                     continue
-
-                                # guaranteed_call_pair_strat_client(
-                                #     PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
-                                #     _id=pair_strat.id, is_partially_running=True, port=self.port)
                             # else not required: not updating if already is_executor_running
                             logging.debug("Marked pair_strat.is_partially_running True")
 
@@ -361,11 +350,31 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                             logging.exception(f"update_fx_symbol_overview_dict_from_http failed with exception: {e}")
 
                     if not symbol_overview_for_symbol_exists:
+                        # updating symbol_overviews
                         symbol_overview_list = self.strat_cache.get_symbol_overviews
                         if None not in symbol_overview_list:
                             symbol_overview_for_symbol_exists = True
                         else:
-                            symbol_overview_for_symbol_exists = False
+                            run_coro = (
+                                StratExecutorServiceRoutesCallbackBaseNativeOverride.
+                                underlying_read_symbol_overview_http())
+                            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+
+                            # block for task to finish
+                            try:
+                                symbol_overview_list = future.result()
+                            except Exception as e:
+                                logging.exception(f"underlying_read_symbol_overview_http "
+                                                  f"failed with exception: {e}")
+                            else:
+                                for symbol_overview in symbol_overview_list:
+                                    self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview)
+
+                            symbol_overview_list = self.strat_cache.get_symbol_overviews
+                            if None not in symbol_overview_list:
+                                symbol_overview_for_symbol_exists = True
+                            else:
+                                symbol_overview_for_symbol_exists = False
 
                     # service loop: manage all sub-services within their private try-catch to allow high level
                     # service to remain partially operational even if some sub-service is not available for any reason
@@ -504,84 +513,119 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         return False
 
     def _check_n_create_default_strat_limits(self):
-        strat_limits_tuple: Tuple[StratLimits, DateTime] = self.strat_cache.get_strat_limits()
-        if strat_limits_tuple is None:
-            eligible_brokers: Broker | None = None
-            try:
-                dismiss_filter_portfolio_limit_broker_obj_list = (
-                    strat_manager_service_http_client.get_dismiss_filter_portfolio_limit_brokers_query_client(
-                        self.strat_leg_1.sec.sec_id, self.strat_leg_2.sec.sec_id))
-                if dismiss_filter_portfolio_limit_broker_obj_list:
-                    eligible_brokers = dismiss_filter_portfolio_limit_broker_obj_list[0].brokers
-                else:
-                    err_str_ = ("Http Query get_dismiss_filter_portfolio_limit_brokers_query returned empty list, "
-                                "expected dismiss_filter_portfolio_limit_broker_obj_list obj with brokers list")
-                    logging.error(err_str_)
-            except Exception as e:
-                err_str_ = (f"Exception occurred while fetching filtered broker from portfolio_status - "
-                            f"will retry strat_limits create: exception: {e}")
-                logging.error(err_str_)
-                return
+        run_coro = (
+            StratExecutorServiceRoutesCallbackBaseNativeOverride.
+            underlying_read_strat_limits_http())
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
-            strat_limits = get_new_strat_limits(eligible_brokers)
-            strat_limits.id = self.pair_strat_id  # syncing id with pair_strat which triggered this server
-
-            run_coro = StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_limits_http(
-                strat_limits)
-            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-
-            # block for task to finish
-            try:
-                created_strat_limits: StratLimits = future.result()
-            except Exception as e:
-                logging.exception(f"underlying_create_strat_limits_http failed, ignoring create strat_limits, "
-                                  f"exception: {e}")
-                return
-
-            logging.debug(f"Created strat_limits: {strat_limits}")
-            return created_strat_limits
+        # block for task to finish
+        try:
+            strat_limits_list = future.result()
+        except Exception as e:
+            logging.exception(f"underlying_read_symbol_overview_http "
+                              f"failed with exception: {e}")
         else:
-            return strat_limits_tuple[0]
 
-    async def _remove_strat_limits(self):
+            if not strat_limits_list:
+                eligible_brokers: Broker | None = None
+                try:
+                    dismiss_filter_portfolio_limit_broker_obj_list = (
+                        strat_manager_service_http_client.get_dismiss_filter_portfolio_limit_brokers_query_client(
+                            self.strat_leg_1.sec.sec_id, self.strat_leg_2.sec.sec_id))
+                    if dismiss_filter_portfolio_limit_broker_obj_list:
+                        eligible_brokers = dismiss_filter_portfolio_limit_broker_obj_list[0].brokers
+                    else:
+                        err_str_ = ("Http Query get_dismiss_filter_portfolio_limit_brokers_query returned empty list, "
+                                    "expected dismiss_filter_portfolio_limit_broker_obj_list obj with brokers list")
+                        logging.error(err_str_)
+                except Exception as e:
+                    err_str_ = (f"Exception occurred while fetching filtered broker from portfolio_status - "
+                                f"will retry strat_limits create: exception: {e}")
+                    logging.error(err_str_)
+                    return
+
+                strat_limits = get_new_strat_limits(eligible_brokers)
+                strat_limits.id = self.pair_strat_id  # syncing id with pair_strat which triggered this server
+
+                run_coro = StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_limits_http(
+                    strat_limits)
+                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+
+                # block for task to finish
+                try:
+                    created_strat_limits: StratLimits = future.result()
+                except Exception as e:
+                    logging.exception(f"underlying_create_strat_limits_http failed, ignoring create strat_limits, "
+                                      f"exception: {e}")
+                    return
+
+                logging.debug(f"Created strat_limits: {strat_limits}")
+                return created_strat_limits
+            else:
+                if len(strat_limits_list) > 1:
+                    err_str_: str = ("Unexpected: Found multiple StratLimits in single executor - ignoring "
+                                     "strat_cache update for strat_limits - symbol_side_key: "
+                                     f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])};;; "
+                                     f"strat_limits_list: {strat_limits_list}")
+                    logging.error(err_str_)
+                else:
+                    self.trading_data_manager.handle_strat_limits_get_all_ws(strat_limits_list[0])
+                return strat_limits_list[0]
+
+    async def _check_n_remove_strat_limits(self):
         strat_limits_tuple = self.strat_cache.get_strat_limits()
 
         if strat_limits_tuple is not None:
             strat_limits, _ = strat_limits_tuple
             await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_limits_http(
                 strat_limits.id)
-        else:
-            err_str_ = ("Can't find any strat_limits in cache to delete, while unloading strat, symbol_side_key: "
-                        f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
-            logging.error(err_str_)
+        # ignore if strat_limits doesn't exist - happens when strat is in SNOOZED at the time of this call
 
     def _check_n_create_or_update_strat_status(self, strat_limits: StratLimits):
-        strat_status_tuple: Tuple[StratStatus, DateTime] = self.strat_cache.get_strat_status()
+        run_coro = (
+            StratExecutorServiceRoutesCallbackBaseNativeOverride.
+            underlying_read_strat_status_http())
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
-        if strat_status_tuple is None:      # When strat is newly created or reloaded after unloading from collection
-            strat_status = get_new_strat_status(strat_limits)
-            strat_status.id = self.pair_strat_id  # syncing id with pair_strat which triggered this server
+        # block for task to finish
+        try:
+            strat_status_list = future.result()
+        except Exception as e:
+            logging.exception(f"underlying_read_symbol_overview_http "
+                              f"failed with exception: {e}")
+        else:
+            if not strat_status_list:      # When strat is newly created or reloaded after unloading from collection
+                strat_status = get_new_strat_status(strat_limits)
+                strat_status.id = self.pair_strat_id  # syncing id with pair_strat which triggered this server
 
-            run_coro = (
-                StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_status_http(
-                    strat_status))
-            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                run_coro = (
+                    StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_status_http(
+                        strat_status))
+                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
-            # block for task to finish
-            try:
-                created_strat_status: StratStatus = future.result()
-            except Exception as e:
-                logging.exception(f"underlying_create_strat_status_http failed: ignoring create strat_status, "
-                                  f"exception: {e}")
-                return
+                # block for task to finish
+                try:
+                    created_strat_status: StratStatus = future.result()
+                except Exception as e:
+                    logging.exception(f"underlying_create_strat_status_http failed: ignoring create strat_status, "
+                                      f"exception: {e}")
+                    return
 
-            logging.debug(f"Created Strat_status: {strat_status}")
-            return created_strat_status
-        else:   # When strat is restarted
-            existing_strat_status, _ = strat_status_tuple
-            return existing_strat_status
+                logging.debug(f"Created Strat_status: {strat_status}")
+                return created_strat_status
+            else:   # When strat is restarted
+                if len(strat_status_list) > 1:
+                    err_str_: str = (
+                        "Unexpected: Found multiple StratStatus in single executor - ignoring strat_cache update"
+                        f"for strat_status - symbol_side_key: "
+                        f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])};;; "
+                        f"strat_status_list: {strat_status_list}")
+                    logging.error(err_str_)
+                else:
+                    self.trading_data_manager.handle_strat_status_get_all_ws(strat_status_list[0])
+                return strat_status_list[0]
 
-    async def _remove_strat_status(self):
+    async def _check_n_remove_strat_status(self):
         async with StratStatus.reentrant_lock:
             strat_status_tuple = self.strat_cache.get_strat_status()
 
@@ -589,11 +633,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                 strat_status, _ = strat_status_tuple
                 await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_status_http(
                     strat_status.id)
-            else:
-                err_str_ = ("Can't find any strat_status in strat_cache to delete, while unloading strat, "
-                            "symbol_side_key: "
-                            f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
-                logging.warning(err_str_)
+            # ignore if strat_limits doesn't exist - happens when strat is in SNOOZED at the time of this call
 
     def get_consumable_concentration_from_source(self, symbol: str, strat_limits: StratLimits):
         security_float: float | None = self.static_data.get_security_float_from_ticker(symbol)
@@ -621,8 +661,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         else:
             # If no strat_brief exists for this symbol
             consumable_open_orders = strat_limits.max_open_orders_per_side
-            consumable_notional = strat_limits.max_cb_notional
-            consumable_open_notional = strat_limits.max_open_cb_notional
+            consumable_notional = strat_limits.max_single_leg_notional
+            consumable_open_notional = strat_limits.max_open_single_leg_notional
 
         residual_qty = 0
         all_bkr_cxlled_qty = 0
@@ -798,9 +838,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         try:
                             strat_manager_service_http_client.patch_pair_strat_client(
                                 jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
-                        # guaranteed_call_pair_strat_client(
-                        #     PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
-                        #     _id=pair_strat.id, is_executor_running=True, strat_state=strat_state)
                             logging.debug(f"pair_strat's is_executor_running set to True, pair_strat: {pair_strat}")
                             return True
                         except Exception as e:
@@ -814,38 +851,6 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         return False
 
     async def load_strat_cache(self):
-        # updating strat_status
-        strat_status_list = \
-            await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_status_http()
-        if len(strat_status_list) > 1:
-            err_str_: str = ("Unexpected: Found multiple StratStatus in single executor - ignoring strat_cache update"
-                             f"for strat_status - symbol_side_key: "
-                             f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])};;; "
-                             f"strat_status_list: {strat_status_list}")
-            logging.error(err_str_)
-        else:
-            for strat_status in strat_status_list:
-                self.trading_data_manager.handle_strat_status_get_all_ws(strat_status)
-
-        # updating strat_limits
-        strat_limits_list = \
-            await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_limits_http()
-        if len(strat_limits_list) > 1:
-            err_str_: str = ("Unexpected: Found multiple StratLimits in single executor - ignoring strat_cache update"
-                             f"for strat_limits - symbol_side_key: "
-                             f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])};;; "
-                             f"strat_limits_list: {strat_limits_list}")
-            logging.error(err_str_)
-        else:
-            for strat_limits in strat_limits_list:
-                self.trading_data_manager.handle_strat_limits_get_all_ws(strat_limits)
-
-        # updating symbol_overviews
-        symbol_overview_list: List[SymbolOverview] = \
-            await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_symbol_overview_http()
-        for symbol_overview in symbol_overview_list:
-            self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview)
-
         # updating strat_brief
         strat_brief_list: List[StratBrief] = \
             await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http()
@@ -1106,15 +1111,15 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
     # Strat lvl models update pre handling
     ######################################
 
-    async def create_command_n_control_pre(self, command_n_control_obj: CommandNControl):
-        match command_n_control_obj.command_type:
+    async def create_admin_control_pre(self, admin_control_obj: AdminControl):
+        match admin_control_obj.command_type:
             case CommandType.RESET_STATE:
                 from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_beanie_database \
                     import document_models
                 for document_model in document_models:
                     document_model._cache_obj_id_to_obj_dict = {}
             case other_:
-                logging.error(f"create_command_n_control_pre failed. unrecognized command_type: {other_}")
+                logging.error(f"create_admin_control_pre failed. unrecognized command_type: {other_}")
 
     async def _update_strat_limits_pre(self, stored_strat_limits_obj: StratLimits,
                                        updated_strat_limits_obj: StratLimits):
@@ -1419,15 +1424,14 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_order_snapshot_obj and hence would have been added to alert already
 
-            case OrderEventType.OE_CXL_REJ:
-                async with OrderSnapshot.reentrant_lock:
+            case OrderEventType.OE_CXL_INT_REJ | OrderEventType.OE_CXL_BRK_REJ | OrderEventType.OE_CXL_EXH_REJ:
+                # reverting the state of order_snapshot after receiving cxl reject
 
+                async with OrderSnapshot.reentrant_lock:
                     order_snapshot = await self._check_state_and_get_order_snapshot_obj(
-                        order_journal_obj, [OrderStatusType.OE_CXL_UNACK])
+                        order_journal_obj, [OrderStatusType.OE_CXL_UNACK, OrderStatusType.OE_FILLED])
                     if order_snapshot is not None:
                         if order_snapshot.order_brief.qty > order_snapshot.filled_qty:
-                            from Flux.CodeGenProjects.strat_executor.app.aggregate import \
-                                get_last_n_order_journals_from_order_id
                             last_3_order_journals_from_order_id = \
                                 await (StratExecutorServiceRoutesCallbackBaseNativeOverride.
                                        underlying_read_order_journal_http(
@@ -1435,22 +1439,28 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                             order_journal_obj.order.order_id, 3),
                                         self.get_generic_read_route()))
                             if last_3_order_journals_from_order_id:
-                                if last_3_order_journals_from_order_id[0].order_event == OrderEventType.OE_CXL_REJ:
+                                if (last_3_order_journals_from_order_id[0].order_event in
+                                        [OrderEventType.OE_CXL_INT_REJ,
+                                         OrderEventType.OE_CXL_BRK_REJ,
+                                         OrderEventType.OE_CXL_EXH_REJ]):
                                     if last_3_order_journals_from_order_id[-1].order_event == OrderEventType.OE_NEW:
                                         order_status = OrderStatusType.OE_UNACK
                                     elif last_3_order_journals_from_order_id[-1].order_event == OrderEventType.OE_ACK:
                                         order_status = OrderStatusType.OE_ACKED
                                     else:
-                                        err_str_ = "3rd order journal from order_journal of status OE_CXL_REJ, must be" \
-                                                   "of status OE_ACK and OE_UNACK, received last 3 order_journals " \
-                                                   f"{last_3_order_journals_from_order_id}, " \
-                                                   f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
+                                        err_str_ = ("3rd order journal from order_journal of status OE_CXL_INT_REJ "
+                                                    "or OE_CXL_BRK_REJ or OE_CXL_EXH_REJ, must be"
+                                                    "of status OE_ACK or OE_UNACK, received last 3 order_journals "
+                                                    f"{last_3_order_journals_from_order_id}, "
+                                                    f"order_journal_key: "
+                                                    f"{get_order_journal_log_key(order_journal_obj)}")
                                         logging.error(err_str_)
                                         return None
                                 else:
-                                    err_str_ = "Recent order journal must be of status OE_CXL_REJ, " \
-                                               f"received last 3 order_journals {last_3_order_journals_from_order_id}, " \
-                                               f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
+                                    err_str_ = ("Recent order journal must be of status OE_CXL_INT_REJ "
+                                                "or OE_CXL_BRK_REJ or OE_CXL_EXH_REJ, received last 3 "
+                                                "order_journals {last_3_order_journals_from_order_id}, "
+                                                f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}")
                                     logging.error(err_str_)
                                     return None
                             else:
@@ -1738,10 +1748,10 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                                                update_strat_status_obj.total_open_sell_notional)
                 if update_strat_status_obj.total_fill_buy_notional < update_strat_status_obj.total_fill_sell_notional:
                     update_strat_status_obj.balance_notional = \
-                        strat_limits.max_cb_notional - update_strat_status_obj.total_fill_buy_notional
+                        strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_buy_notional
                 else:
                     update_strat_status_obj.balance_notional = \
-                        strat_limits.max_cb_notional - update_strat_status_obj.total_fill_sell_notional
+                        strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_sell_notional
 
                 updated_residual = self.__get_residual_obj(order_snapshot.order_brief.side, strat_brief)
                 if updated_residual is not None:
@@ -1852,9 +1862,9 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                          f"strat_brief update")
                         logging.error(err_str_)
                         return
-                    consumable_notional = (strat_limits.max_cb_notional - symbol_side_snapshot.total_fill_notional -
+                    consumable_notional = (strat_limits.max_single_leg_notional - symbol_side_snapshot.total_fill_notional -
                                            open_notional)
-                    consumable_open_notional = strat_limits.max_open_cb_notional - open_notional
+                    consumable_open_notional = strat_limits.max_open_single_leg_notional - open_notional
                     security_float = self.static_data.get_security_float_from_ticker(symbol)
                     if security_float is not None:
                         consumable_concentration = \
@@ -2208,7 +2218,8 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                         if received_fill_after_dod:
                             logging.error("Unexpected: Received fill that makes order_snapshot OE_FILLED which is "
                                           "already of state OE_DOD, ignoring this fill and putting this strat to "
-                                          f"PAUSE;;; fills_journal {fills_journal_obj}, order_snapshot: "
+                                          f"PAUSE, symbol_side_key: {get_fills_journal_log_key(fills_journal_obj)}"
+                                          f";;; fills_journal {fills_journal_obj}, order_snapshot: "
                                           f"{order_snapshot_obj}")
                             pause_strat = True
                         else:
@@ -2223,6 +2234,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                           f"{fills_journal_obj.fill_qty}, extra_qty: {non_required_received_fill_qty} "
                                           f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
                                           f"ignoring order_snapshot updates for this fill and putting strat to PAUSE"
+                                          f"symbol_side_key: {get_fills_journal_log_key(fills_journal_obj)}"
                                           f";;; fills_journal {fills_journal_obj}, order_snapshot: "
                                           f"{order_snapshot_obj}")
                         else:
@@ -2231,6 +2243,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                           f"{fills_journal_obj.fill_qty}, extra_qty: {non_required_received_fill_qty} "
                                           f"from fills_journal_key {get_fills_journal_log_key(fills_journal_obj)} - "
                                           f"ignoring order_snapshot updates for this fill and putting strat to PAUSE"
+                                          f"symbol_side_key: {get_fills_journal_log_key(fills_journal_obj)}"
                                           f";;; fills_journal {fills_journal_obj}, order_snapshot: "
                                           f"{order_snapshot_obj}")
                         pause_strat = True
@@ -2421,10 +2434,10 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                                                                   update_strat_status_obj.total_cxl_sell_notional)
                 if update_strat_status_obj.total_fill_buy_notional < update_strat_status_obj.total_fill_sell_notional:
                     update_strat_status_obj.balance_notional = \
-                        strat_limits.max_cb_notional - update_strat_status_obj.total_fill_buy_notional
+                        strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_buy_notional
                 else:
                     update_strat_status_obj.balance_notional = \
-                        strat_limits.max_cb_notional - update_strat_status_obj.total_fill_sell_notional
+                        strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_sell_notional
 
                 updated_residual = self.__get_residual_obj(order_snapshot_obj.order_brief.side, strat_brief_obj)
                 if updated_residual is not None:
@@ -2441,7 +2454,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                               f"strat_status_tuple: {strat_status_tuple}, strat_limits_tuple: {strat_limits_tuple}")
                 return
 
-    async def _delete_symbol_side_snapshot_from_unload_strat(self) -> bool:
+    async def _check_n_delete_symbol_side_snapshot_from_unload_strat(self) -> bool:
         pair_symbol_side_list = [
             (self.strat_leg_1.sec, self.strat_leg_1.side),
             (self.strat_leg_2.sec, self.strat_leg_2.side)
@@ -2456,7 +2469,7 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
                     symbol_side_snapshot.id)
         return True
 
-    async def _delete_strat_brief_for_unload_strat(self) -> bool:
+    async def _check_n_delete_strat_brief_for_unload_strat(self) -> bool:
         symbol = self.strat_leg_1.sec.sec_id
         strat_brief_obj_tuple = self.strat_cache.get_strat_brief()
 
@@ -2756,22 +2769,24 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         open_order_snapshots_list: List[OrderSnapshot] = self.strat_cache.get_open_order_snapshots()
 
         for open_order_snapshot in open_order_snapshots_list:
-            strat_limits_tuple = self.strat_cache.get_strat_limits()
-            time_delta = DateTime.utcnow() - open_order_snapshot.create_date_time
+            if open_order_snapshot.order_status != OrderStatusType.OE_CXL_UNACK:
+                strat_limits_tuple = self.strat_cache.get_strat_limits()
+                time_delta = DateTime.utcnow() - open_order_snapshot.create_date_time
 
-            if strat_limits_tuple is not None:
-                strat_limits, _ = strat_limits_tuple
-                if time_delta.total_seconds() > strat_limits.residual_restriction.residual_mark_seconds:
-                    await StratExecutor.trading_link.place_cxl_order(
-                        open_order_snapshot.order_brief.order_id, open_order_snapshot.order_brief.side,
-                        open_order_snapshot.order_brief.security.sec_id,
-                        open_order_snapshot.order_brief.security.sec_id,
-                        open_order_snapshot.order_brief.underlying_account)
-                # else not required: If time-delta is still less than residual_mark_seconds then avoiding
-                # cancellation of order
-            else:
-                logging.error("Received strat_limits_tuple as None from strat_cache, ignoring cxl expiring order "
-                              f"for this call, will retry again in {self.min_refresh_interval} secs")
+                if strat_limits_tuple is not None:
+                    strat_limits, _ = strat_limits_tuple
+                    if time_delta.total_seconds() > strat_limits.residual_restriction.residual_mark_seconds:
+                        await StratExecutor.trading_link.place_cxl_order(
+                            open_order_snapshot.order_brief.order_id, open_order_snapshot.order_brief.side,
+                            open_order_snapshot.order_brief.security.sec_id,
+                            open_order_snapshot.order_brief.security.sec_id,
+                            open_order_snapshot.order_brief.underlying_account)
+                    # else not required: If time-delta is still less than residual_mark_seconds then avoiding
+                    # cancellation of order
+                else:
+                    logging.error("Received strat_limits_tuple as None from strat_cache, ignoring cxl expiring order "
+                                  f"for this call, will retry again in {self.min_refresh_interval} secs")
+            # else not required: avoiding cxl request if order_snapshot already got cxl request
 
     async def get_strat_brief_from_symbol_query_pre(self, strat_brief_class_type: Type[StratBrief], security_id: str):
         return await StratExecutorServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http(
@@ -2827,19 +2842,19 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
 
     async def put_strat_to_snooze_query_pre(self, strat_status_class_type: Type[StratStatus]):
         # removing current strat_status
-        await self._remove_strat_status()
+        await self._check_n_remove_strat_status()
 
         # removing current strat limits
-        await self._remove_strat_limits()
+        await self._check_n_remove_strat_limits()
 
         # If strat_cache stopped means strat is not ongoing anymore or was never ongoing
         # - removing related models that would have created if strat got activated
         if self.strat_cache.stopped:
             # deleting strat's both leg's symbol_side_snapshots
-            await self._delete_symbol_side_snapshot_from_unload_strat()
+            await self._check_n_delete_symbol_side_snapshot_from_unload_strat()
 
             # deleting strat's strat_brief
-            await self._delete_strat_brief_for_unload_strat()
+            await self._check_n_delete_strat_brief_for_unload_strat()
 
             # making force publish flag back to false for current strat's symbol's symbol_overview
             await self._force_unpublish_symbol_overview_from_unload_strat()
@@ -2848,8 +2863,11 @@ class StratExecutorServiceRoutesCallbackBaseNativeOverride(StratExecutorServiceR
         try:
             log_analyzer_service_http_client.delete_strat_alert_client(self.pair_strat_id)
         except Exception as e:
-            err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
-            raise HTTPException(detail=err_str_, status_code=500)
+            if '{"detail":"Id not Found:' in str(e):
+                logging.info(f"Strat Alert with id: {self.pair_strat_id} not found while deleting strat_alert")
+            else:
+                err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
+                raise HTTPException(detail=err_str_, status_code=500)
 
         # cleaning executor config.yaml file
         try:

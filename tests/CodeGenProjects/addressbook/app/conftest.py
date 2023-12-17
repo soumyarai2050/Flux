@@ -10,14 +10,7 @@ from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_servi
 from Flux.CodeGenProjects.addressbook.generated.Pydentic.strat_manager_service_model_imports import *
 from Flux.CodeGenProjects.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
-from tests.CodeGenProjects.addressbook.app.utility_test_functions import set_n_verify_limits, \
-    create_n_verify_portfolio_status, create_fx_symbol_overview, clean_all_collections_ignoring_ui_layout, \
-    test_config_file_path, clean_today_activated_ticker_dict, clear_cache_in_model, \
-    ps_config_yaml_dict, PAIR_STRAT_BEANIE_PORT, LOG_ANALYZER_BEANIE_PORT, log_analyzer_web_client, \
-    strat_manager_service_native_web_client, renew_portfolio_alert, renew_strat_collection, \
-    clean_executors_and_today_activated_symbol_side_lock_file
-# from CodeGenProjects.strat_executor.app.trading_link_base import TradingLinkBase, executor_config_yaml_path
-# from CodeGenProjects.strat_executor.app.trade_simulator import TradeSimulator
+from tests.CodeGenProjects.addressbook.app.utility_test_functions import *
 
 
 @pytest.fixture()
@@ -43,8 +36,17 @@ def leg1_leg2_symbol_list():
 
 
 @pytest.fixture()
-def residual_wait_sec() -> int:
-    return 20
+def refresh_sec_update_fixture() -> int:
+    executor_config_file_path = STRAT_EXECUTOR / "data" / f"config.yaml"
+    executor_config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(executor_config_file_path)
+    executor_config_dict_str = YAMLConfigurationManager.load_yaml_configurations(executor_config_file_path,
+                                                                                 load_as_str=True)
+    min_refresh_interval = 5
+    executor_config_dict["min_refresh_interval"] = min_refresh_interval
+    YAMLConfigurationManager.update_yaml_configurations(executor_config_dict, str(executor_config_file_path))
+
+    yield min_refresh_interval
+    YAMLConfigurationManager.update_yaml_configurations(executor_config_dict_str, str(executor_config_file_path))
 
 
 @pytest.fixture
@@ -61,7 +63,7 @@ def db_names_list(leg1_leg2_symbol_list):
 
 @pytest.fixture
 def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, expected_portfolio_status_,
-                         db_names_list):
+                         expected_system_control_, db_names_list):
     # deleting existing executors
     clean_executors_and_today_activated_symbol_side_lock_file()
 
@@ -80,6 +82,9 @@ def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, exp
 
     # creating portfolio_status
     create_n_verify_portfolio_status(copy.deepcopy(expected_portfolio_status_))
+
+    # creating kill switch
+    create_n_verify_system_control(expected_system_control_)
 
     # creating fx_symbol_overview
     create_fx_symbol_overview()
@@ -283,8 +288,8 @@ def expected_start_status_(pair_securities_with_sides_):
 def expected_strat_limits_():
     yield StratLimitsBaseModel(**{
       "max_open_orders_per_side": 5,
-      "max_cb_notional": 300000,
-      "max_open_cb_notional": 300000,
+      "max_single_leg_notional": 300000,
+      "max_open_single_leg_notional": 300000,
       "max_net_filled_notional": 160000,
       "max_concentration": 10,
       "limit_up_down_volume_participation_rate": 1,
@@ -358,20 +363,21 @@ def pair_strat_(pair_securities_with_sides_):
         "last_active_date_time": "2023-02-13T20:30:31.165Z",
         "frequency": 1,
         "pair_strat_params": {
-        "strat_leg1": {
-          "exch_id": "E1",
-          "sec": pair_securities_with_sides_["security1"],
-          "side": pair_securities_with_sides_["side1"]
-        },
-        "strat_leg2": {
-          "exch_id": "E1",
-          "sec": pair_securities_with_sides_["security2"],
-          "side": pair_securities_with_sides_["side2"]
-        },
-        "exch_response_max_seconds": 5,
-        "common_premium": 40,
-        "hedge_ratio": 5,
-        "strat_mode": StratMode.StratMode_Normal
+            "strat_mode": StratMode.StratMode_Normal,
+            "strat_type": StratType.Premium,
+            "strat_leg1": {
+              "exch_id": "E1",
+              "sec": pair_securities_with_sides_["security1"],
+              "side": pair_securities_with_sides_["side1"]
+            },
+            "strat_leg2": {
+              "exch_id": "E1",
+              "sec": pair_securities_with_sides_["security2"],
+              "side": pair_securities_with_sides_["side2"]
+            },
+            "exch_response_max_seconds": 5,
+            "common_premium": 40,
+            "hedge_ratio": 5
         },
         "pair_strat_params_update_seq_num": 0,
         "market_premium": 0
@@ -460,13 +466,17 @@ def expected_symbol_side_snapshot_():
 def expected_portfolio_status_():
     yield PortfolioStatusBaseModel(**{
         "_id": 1,
-        "kill_switch": False,
         "portfolio_alerts": [],
         "overall_buy_notional": 0,
         "overall_sell_notional": 0,
         "overall_buy_fill_notional": 0,
         "overall_sell_fill_notional": 0
     })
+
+
+@pytest.fixture()
+def expected_system_control_():
+    yield SystemControlBaseModel(_id=1, kill_switch=False)
 
 
 @pytest.fixture()

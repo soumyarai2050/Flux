@@ -90,7 +90,7 @@ def is_ongoing_strat(pair_strat: PairStrat | PairStratBaseModel) -> bool:
 
 
 def get_new_portfolio_status() -> PortfolioStatus:
-    portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, kill_switch=False, overall_buy_notional=0,
+    portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, overall_buy_notional=0,
                                                         overall_sell_notional=0,
                                                         overall_buy_fill_notional=0,
                                                         overall_sell_fill_notional=0)
@@ -236,19 +236,20 @@ def guaranteed_call_pair_strat_client(pydantic_basemodel_type: Type | None, clie
             logging.exception("Connection Error in addressbook server call, likely server is "
                               "down, putting pair_strat client call as log for pair_strat_log "
                               f"analyzer handling - caller: {calframe[1][3]}")
-            log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
         elif "service is not initialized yet" in str(e):
             logging.exception("addressbook service not up yet, likely server restarted, but is "
                               "not ready yet, putting pair_strat client call as log for pair_strat_log "
                               f"analyzer handling - caller: {calframe[1][3]}")
-            log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
         elif "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))" in str(e):
             logging.exception("addressbook service connection error, putting pair_strat client call "
                               f"as log for pair_strat_log analyzer handling - caller: {calframe[1][3]}")
-            log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
+        elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
+              "it from responding to requests" in str(e) and "status_code: 503" in str(e)):
+            logging.exception("addressbook service connection error")
         else:
             raise Exception(f"guaranteed_call_pair_strat_client called from {calframe[1][3]} failed "
                             f"with exception: {e}")
+        log_pair_strat_client_call(pydantic_basemodel_type, client_callable, **kwargs)
 
 
 class MDShellEnvData(BaseModel):

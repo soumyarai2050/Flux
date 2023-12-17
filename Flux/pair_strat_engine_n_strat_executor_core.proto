@@ -8,7 +8,7 @@ enum CommandType {
   RESET_STATE = 2;
 }
 
-message CommandNControl {
+message AdminControl {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,

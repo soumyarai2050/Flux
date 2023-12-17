@@ -309,3 +309,7 @@ extend google.protobuf.FieldOptions
   repeated string FluxFldMappingProjectionQueryField = 60155; // mapping of projection query name to query field, if top-lvl field requires query_name as key and nothing after colan ex-"query_name:", if nested field requires dot seperated path to field after colan
 }
 
+extend google.protobuf.EnumOptions{
+  //General Options - 51
+  optional string FluxEnumCmnt = 51151;
+}

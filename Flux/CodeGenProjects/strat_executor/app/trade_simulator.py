@@ -1,4 +1,5 @@
 import logging
+import random
 from typing import ClassVar, List, Dict, Tuple
 import re
 
@@ -140,6 +141,9 @@ class TradeSimulator(TradingLinkBase):
                 await cls.process_order_reject(order_brief)
             elif symbol_configs.get("simulate_new_unsolicited_cxl_orders") and cls.is_special_order(system_sec_id):
                 await cls.process_cxl_ack(order_brief, is_unsol_cxl=True)
+            elif symbol_configs.get("simulate_new_to_cxl_rej_orders") and cls.is_special_order(system_sec_id):
+                cls.cxl_rej_symbol_to_bool_dict[system_sec_id] = True
+                await cls.place_cxl_order(order_id, side, security.sec_id, security.sec_id, account)
             else:
                 await cls.process_order_ack(order_id, order_brief.px, order_brief.qty, order_brief.side, system_sec_id,
                                             account)
@@ -171,7 +175,7 @@ class TradeSimulator(TradingLinkBase):
         return order_journal_obj
 
     @classmethod
-    async def _process_order_ack_symbol_specfic_handling(cls, order_journal_obj: OrderJournal):
+    async def _process_order_ack_symbol_specific_handling(cls, order_journal_obj: OrderJournal):
         symbol_configs = cls.get_symbol_configs(order_journal_obj.order.security.sec_id)
         if symbol_configs is not None and symbol_configs.get("simulate_reverse_path"):
             if (symbol_configs.get("simulate_ack_to_reject_orders") and
@@ -185,13 +189,16 @@ class TradeSimulator(TradingLinkBase):
                                        order_journal_obj.order.qty, order_journal_obj.order.side,
                                        order_journal_obj.order.security.sec_id,
                                        order_journal_obj.order.underlying_account)
-                if (symbol_configs.get("simulate_cxl_rej_orders") and
+
+                if (symbol_configs.get("simulate_ack_to_cxl_rej_orders") and
                         cls.is_special_order(order_journal_obj.order.security.sec_id)):
                     cls.cxl_rej_symbol_to_bool_dict[order_journal_obj.order.security.sec_id] = True
                     await cls.place_cxl_order(order_journal_obj.order.order_id, order_journal_obj.order.side,
                                               order_journal_obj.order.security.sec_id,
                                               order_journal_obj.order.security.sec_id,
-                                              order_journal_obj.order.underlying_account)
+                                              order_journal_obj.order.underlying_account,
+                                              px=order_journal_obj.order.px,
+                                              qty=order_journal_obj.order.qty)
 
     @classmethod
     async def process_order_ack(cls, order_id, px: float, qty: int, side: Side, sec_id: str,
@@ -201,7 +208,7 @@ class TradeSimulator(TradingLinkBase):
             underlying_create_order_journal_http)
         order_journal_obj = cls._process_order_ack(order_id, px, qty, side, sec_id, underlying_account, text)
         await underlying_create_order_journal_http(order_journal_obj)
-        await cls._process_order_ack_symbol_specfic_handling(order_journal_obj)
+        await cls._process_order_ack_symbol_specific_handling(order_journal_obj)
 
     @classmethod
     def get_partial_qty_from_total_qty_and_percentage(cls, fill_percent: int, total_qty: int) -> int:
@@ -228,26 +235,61 @@ class TradeSimulator(TradingLinkBase):
         return qty, total_fill_count
 
     @classmethod
-    async def process_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
-        """Simulates Order's fills"""
+    async def process_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str,
+                           underlying_account: str) -> bool:
+        """Simulates Order's fills - returns True if fully fills order else returns False"""
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
             underlying_create_fills_journal_http)
 
-        qty, total_fill_count = cls._process_fill(sec_id, qty)
+        fill_qty, total_fill_count = cls._process_fill(sec_id, qty)
 
+        total_fill_qty = 0
         for fill_count in range(total_fill_count):
-            fill_journal = FillsJournal(order_id=order_id, fill_px=px, fill_qty=qty, fill_symbol=sec_id,
+            fill_journal = FillsJournal(order_id=order_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
                                         fill_side=side, underlying_account=underlying_account,
                                         fill_date_time=DateTime.utcnow(),
                                         fill_id=f"F{order_id[1:]}")
+            total_fill_count += fill_count
             await underlying_create_fills_journal_http(fill_journal)
+
+        if total_fill_qty == qty:
+            return True
+        else:
+            return False
+
+    @classmethod
+    async def force_fully_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str,
+                               underlying_account: str):
+        """Simulates Order's force fully fill """
+        from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
+            underlying_create_fills_journal_http)
+
+        symbol_configs = cls.get_symbol_configs(sec_id)
+
+        fill_percent = symbol_configs.get("fill_percent")
+
+        if fill_percent is None:
+            fill_qty = qty
+        else:
+            remaining_qty_per = 100 - fill_percent
+            fill_qty = cls.get_partial_qty_from_total_qty_and_percentage(remaining_qty_per, qty)
+
+        fill_journal = FillsJournal(order_id=order_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
+                                    fill_side=side, underlying_account=underlying_account,
+                                    fill_date_time=DateTime.utcnow(),
+                                    fill_id=f"F{order_id[1:]}")
+        await underlying_create_fills_journal_http(fill_journal)
 
     @classmethod
     async def process_cxl_rej(cls, order_brief: OrderBrief):
         from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_routes import (
             underlying_create_order_journal_http)
+
+        order_event = random.choice([OrderEventType.OE_CXL_INT_REJ,
+                                      OrderEventType.OE_CXL_BRK_REJ,
+                                      OrderEventType.OE_CXL_EXH_REJ])
         order_journal = OrderJournal(order=order_brief, order_event_date_time=DateTime.utcnow(),
-                                     order_event=OrderEventType.OE_CXL_REJ)
+                                     order_event=order_event)
         msg = f"SIM:Cancel REJ for {order_journal.order.security.sec_id}, order_id {order_journal.order.order_id} " \
               f"and side {order_journal.order.side}"
         add_to_texts(order_brief, msg)
@@ -272,7 +314,8 @@ class TradeSimulator(TradingLinkBase):
 
     @classmethod
     async def place_cxl_order(cls, order_id: str, side: Side | None = None, trading_sec_id: str | None = None,
-                              system_sec_id: str | None = None, underlying_account: str | None = "trading-account"):
+                              system_sec_id: str | None = None, underlying_account: str | None = "trading-account",
+                              px: int | None = None, qty: int | None = None):
         """
         cls.simulate_reverse_path or not - always simulate cancel order's Ack/Rejects (unless configured for unack)
         when invoked form log analyzer - all params are passed as strings
@@ -293,6 +336,10 @@ class TradeSimulator(TradingLinkBase):
         await underlying_create_order_journal_http(order_journal)
 
         if system_sec_id in cls.cxl_rej_symbol_to_bool_dict and cls.cxl_rej_symbol_to_bool_dict.get(system_sec_id):
+            symbol_configs = cls.get_symbol_configs(system_sec_id)
+            if symbol_configs.get("force_fully_fill"):
+                await cls.force_fully_fill(order_id, px, qty, side, system_sec_id, underlying_account)
+
             cls.cxl_rej_symbol_to_bool_dict[system_sec_id] = False
             await cls.process_cxl_rej(order_brief)
         else:

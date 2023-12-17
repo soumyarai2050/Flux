@@ -55,6 +55,10 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     underlying_partial_update_all_pair_strat_http: Callable[..., Any] | None = None
     underlying_read_strat_collection_by_id_http: Callable[..., Any] | None = None
     underlying_get_pair_strat_from_symbol_side_query_http: Callable[..., Any] | None = None
+    underlying_read_system_control_by_id_http: Callable[..., Any] | None = None
+    underlying_partial_update_system_control_http: Callable[..., Any] | None = None
+    underlying_read_system_control_http: Callable[..., Any] | None = None
+    underlying_create_system_control_http: Callable[..., Any] | None = None
 
     Fx_SO_FilePath = CURRENT_PROJECT_SCRIPTS_DIR / f"fx_so.sh"
     RecoveredKillSwitchUpdate: bool = False
@@ -70,7 +74,9 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
             underlying_create_strat_collection_http, underlying_update_strat_collection_http,
             underlying_partial_update_pair_strat_http, underlying_update_pair_strat_to_non_running_state_query_http,
             underlying_read_pair_strat_by_id_http, underlying_partial_update_all_pair_strat_http,
-            underlying_read_strat_collection_by_id_http, underlying_get_pair_strat_from_symbol_side_query_http)
+            underlying_read_strat_collection_by_id_http, underlying_get_pair_strat_from_symbol_side_query_http,
+            underlying_read_system_control_by_id_http, underlying_partial_update_system_control_http,
+            underlying_read_system_control_http, underlying_create_system_control_http)
         cls.underlying_read_portfolio_status_http = underlying_read_portfolio_status_http
         cls.underlying_create_portfolio_status_http = underlying_create_portfolio_status_http
         cls.underlying_read_order_limits_http = underlying_read_order_limits_http
@@ -89,6 +95,10 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         cls.underlying_read_pair_strat_by_id_http = underlying_read_pair_strat_by_id_http
         cls.underlying_partial_update_all_pair_strat_http = underlying_partial_update_all_pair_strat_http
         cls.underlying_read_strat_collection_by_id_http = underlying_read_strat_collection_by_id_http
+        cls.underlying_read_system_control_by_id_http = underlying_read_system_control_by_id_http
+        cls.underlying_partial_update_system_control_http = underlying_partial_update_system_control_http
+        cls.underlying_read_system_control_http = underlying_read_system_control_http
+        cls.underlying_create_system_control_http = underlying_create_system_control_http
         cls.underlying_get_pair_strat_from_symbol_side_query_http = (
             underlying_get_pair_strat_from_symbol_side_query_http)
 
@@ -116,6 +126,16 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 portfolio_status: PortfolioStatus = get_new_portfolio_status()
                 await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_status_http(
                     portfolio_status)
+
+    @staticmethod
+    async def _check_n_create_system_control():
+        async with SystemControl.reentrant_lock:
+            system_control_list: List[SystemControl] = (
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_system_control_http())
+            if 0 == len(system_control_list):  # no system_control set yet, create one
+                system_control: SystemControl = SystemControl(_id=1, kill_switch=False)
+                await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_create_system_control_http(
+                    system_control)
 
     @staticmethod
     async def _check_n_create_order_limits():
@@ -151,6 +171,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     async def _check_and_create_start_up_models() -> bool:
         try:
             await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_status()
+            await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_system_control()
             await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_order_limits()
             await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_limits()
             await StratManagerServiceRoutesCallbackBaseNativeOverride._check_n_create_strat_collection()
@@ -297,19 +318,19 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
     async def _recover_kill_switch_state(self) -> None:
         kill_switch_state = await self.trading_link.is_kill_switch_enabled()
 
-        async with PortfolioStatus.reentrant_lock:
-            portfolio_status_id = 1
-            portfolio_status: PortfolioStatus = (
+        async with SystemControl.reentrant_lock:
+            system_control_id = 1
+            system_control: SystemControl = (
                 await StratManagerServiceRoutesCallbackBaseNativeOverride.
-                underlying_read_portfolio_status_by_id_http(portfolio_status_id))
+                underlying_read_system_control_by_id_http(system_control_id))
 
-            if not portfolio_status.kill_switch and kill_switch_state:
-                portfolio_status.kill_switch = True
+            if not system_control.kill_switch and kill_switch_state:
+                system_control.kill_switch = True
                 StratManagerServiceRoutesCallbackBaseNativeOverride.RecoveredKillSwitchUpdate = True
                 await (StratManagerServiceRoutesCallbackBaseNativeOverride.
-                       underlying_partial_update_portfolio_status_http(
-                        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True)))
-            elif not kill_switch_state and portfolio_status.kill_switch:
+                       underlying_partial_update_system_control_http(
+                        jsonable_encoder(system_control, by_alias=True, exclude_none=True)))
+            elif not kill_switch_state and system_control.kill_switch:
                 logging.warning("Found kill switch in db as True but is_kill_switch_enabled returned False, "
                                 "calling trading_link.trigger_kill_switch")
                 await self.trading_link.trigger_kill_switch()
@@ -375,6 +396,12 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                                     logging.error(f"PairStrat found to have port set to {pair_strat.port} but executor "
                                                   f"server is down, recovering executor for pair_strat_id: "
                                                   f"{pair_strat.id};;; pair_strat: {pair_strat}")
+                                    crashed_strats.append(pair_strat)
+                                elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
+                                      "it from responding to requests" in str(e) and "status_code: 503" in str(e)):
+                                    pid = get_pid_from_port(pair_strat.port)
+                                    if pid is not None:
+                                        os.kill(pid, signal.SIGKILL)
                                     crashed_strats.append(pair_strat)
                                 else:
                                     logging.exception("Something went wrong while checking is_service_up of executor "
@@ -845,7 +872,11 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         port: int = pydantic_obj_to_be_deleted.port
         sec_id = pydantic_obj_to_be_deleted.pair_strat_params.strat_leg1.sec.sec_id
         side = pydantic_obj_to_be_deleted.pair_strat_params.strat_leg1.side
-        if pydantic_obj_to_be_deleted.is_executor_running:
+
+        start_key = get_strat_key_from_pair_strat(pydantic_obj_to_be_deleted)
+        strat_collection = await (StratManagerServiceRoutesCallbackBaseNativeOverride.
+                                  underlying_read_strat_collection_by_id_http(1))
+        if start_key in strat_collection.loaded_strat_keys:
             if pydantic_obj_to_be_deleted.port is not None:
                 strat_web_client: StratExecutorServiceHttpClient = (
                     StratExecutorServiceHttpClient.set_or_get_if_instance_exists(pydantic_obj_to_be_deleted.host,
@@ -927,8 +958,8 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
                     strat_collection)
         else:
-            err_str_ = ("Strat is not running, Deletion of strat that is not in running_state is not supported, "
-                        "please load strat and make it not ongoing and then retry, ignoring this strat delete, "
+            err_str_ = ("Strat is not loaded, Deletion of strat that is not in loaded collections is not supported, "
+                        "please load strat and keep it not ongoing and then retry, ignoring this strat delete, "
                         f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=400)
@@ -1059,8 +1090,8 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         return await (StratManagerServiceRoutesCallbackBaseNativeOverride.
                       underlying_read_pair_strat_http(get_all_pair_strat_from_symbol_n_side(sec_id, side)))
 
-    async def create_command_n_control_pre(self, command_n_control_obj: CommandNControl):
-        match command_n_control_obj.command_type:
+    async def create_admin_control_pre(self, admin_control_obj: AdminControl):
+        match admin_control_obj.command_type:
             case CommandType.CLEAR_STRAT:
                 pair_strat_list: List[PairStrat] = (
                     await StratManagerServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http())
@@ -1077,14 +1108,14 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 for document_model in document_models:
                     document_model._cache_obj_id_to_obj_dict = {}
             case other_:
-                logging.error(f"create_command_n_control_pre failed. unrecognized command_type: {other_}")
+                logging.error(f"create_admin_control_pre failed. unrecognized command_type: {other_}")
 
     async def filtered_notify_pair_strat_update_query_ws_pre(self):
         return filter_ws_pair_strat
 
-    async def update_portfolio_status_pre(self, stored_portfolio_status_obj: PortfolioStatus,
-                                          updated_portfolio_status_obj: PortfolioStatus):
-        if not stored_portfolio_status_obj.kill_switch and updated_portfolio_status_obj.kill_switch:
+    async def update_system_control_pre(self, stored_system_control_obj: SystemControl,
+                                        updated_system_control_obj: SystemControl):
+        if not stored_system_control_obj.kill_switch and updated_system_control_obj.kill_switch:
             if not StratManagerServiceRoutesCallbackBaseNativeOverride.RecoveredKillSwitchUpdate:
                 res = await self.trading_link.trigger_kill_switch()
                 if not res:
@@ -1094,7 +1125,7 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                 # else not required: if res is fine make db update
             # else not required: avoid trading_link.trigger_kill_switch if RecoveredKillSwitchUpdate is True updated
             # from init check
-        elif stored_portfolio_status_obj.kill_switch and not updated_portfolio_status_obj.kill_switch:
+        elif stored_system_control_obj.kill_switch and not updated_system_control_obj.kill_switch:
             res = await self.trading_link.revoke_kill_switch_n_resume_trading()
             if not res:
                 err_str_ = "trading_link.revoke_kill_switch_n_resume_trading failed"
@@ -1107,11 +1138,11 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
         self.trading_link.reload_portfolio_configs()
         return []
 
-    async def partial_update_portfolio_status_pre(self, stored_portfolio_status_obj: PortfolioStatus,
-                                                  updated_portfolio_status_obj_json: Dict):
-        kill_switch_update = updated_portfolio_status_obj_json.get("kill_switch")
+    async def partial_update_system_control_pre(self, stored_system_control_obj: SystemControl,
+                                                updated_system_control_obj_json: Dict):
+        kill_switch_update = updated_system_control_obj_json.get("kill_switch")
         if kill_switch_update is not None:
-            if not stored_portfolio_status_obj.kill_switch and kill_switch_update:
+            if not stored_system_control_obj.kill_switch and kill_switch_update:
                 if not StratManagerServiceRoutesCallbackBaseNativeOverride.RecoveredKillSwitchUpdate:
                     res = await self.trading_link.trigger_kill_switch()
                     if not res:
@@ -1121,14 +1152,14 @@ class StratManagerServiceRoutesCallbackBaseNativeOverride(StratManagerServiceRou
                     # else not required: if res is fine make db update
                 # else not required: avoid trading_link.trigger_kill_switch if RecoveredKillSwitchUpdate is True
                 # updated from init check
-            elif stored_portfolio_status_obj.kill_switch and not kill_switch_update:
+            elif stored_system_control_obj.kill_switch and not kill_switch_update:
                 res = await self.trading_link.revoke_kill_switch_n_resume_trading()
                 if not res:
                     err_str_ = "trading_link.revoke_kill_switch_n_resume_trading failed"
                     logging.critical(err_str_)
                     raise HTTPException(detail=err_str_, status_code=500)
             # else not required: other case doesn't need trading link call
-        return updated_portfolio_status_obj_json
+        return updated_system_control_obj_json
 
 
 def filter_ws_pair_strat(pair_strat_obj_json: Dict, **kwargs):

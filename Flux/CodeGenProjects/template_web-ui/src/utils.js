@@ -104,10 +104,17 @@ function getAutocompleteDict(autocompleteValue) {
     autocompleteFieldSet.forEach(fieldSet => {
         if (fieldSet.indexOf(':') > 0) {
             let [key, value] = fieldSet.split(':');
-            autocompleteDict[key] = value;
-        } else {
+            autocompleteDict[key] = [value, 'options'];
+        } else if (fieldSet.indexOf('=') > 0) {
             let [key, value] = fieldSet.split('=');
-            autocompleteDict[key] = value;
+            let indicator = 'assign';
+            if (value === 'server_populate') {
+                indicator = 'server_populate';
+            }
+            autocompleteDict[key] = [value, indicator];
+        } else {  // field separator is ~
+            let [key, value] = fieldSet.split('~');
+            autocompleteDict[key] = [value, 'dynamic_options']
         }
     })
     return autocompleteDict;
@@ -116,16 +123,22 @@ function getAutocompleteDict(autocompleteValue) {
 function setAutocompleteValue(schema, object, autocompleteDict, propname, usageName) {
     for (const path in autocompleteDict) {
         if (path === propname || object.xpath.endsWith(path)) {
-            object[usageName] = autocompleteDict[path];
-            const autocompleteValue = autocompleteDict[path];
-            if (schema.autocomplete.hasOwnProperty(autocompleteValue)) {
-                object.options = schema.autocomplete[autocompleteValue];
-            } else {
-                if (autocompleteValue === 'server_populate') {
-                    object.serverPopulate = true;
-                    delete object[usageName];
+            const [value, indicator] = autocompleteDict[path];
+            // object[usageName] = autocompleteDict[path];
+            // const autocompleteValue = autocompleteDict[path];
+            object[usageName] = value;
+            if (indicator === 'options') {
+                if (schema.autocomplete.hasOwnProperty(value)) {
+                    object.options = schema.autocomplete[value];
                 }
+            } else if (indicator === 'dynamic_options') {
+                object.dynamic_autocomplete = true;
+                object.options = [];
+            } else if (indicator === 'server_populate') {
+                object.serverPopulate = true;
+                delete object[usageName];
             }
+
         }
     }
 }
@@ -411,13 +424,19 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
 
                 for (const path in autocompleteDict) {
                     if (propname === path || xpath.endsWith(path)) {
-                        if (!schema.autocomplete.hasOwnProperty(autocompleteDict[path])) {
-                            if (autocompleteDict[path] === 'server_populate') {
-                                delete object[propname];
-                            } else {
-                                object[propname] = autocompleteDict[path];
-                            }
+                        const [value, indicator] = autocompleteDict[path];
+                        if (indicator === 'server_populate') {
+                            delete object[propname];
+                        } else if (indicator === 'assign') {
+                            object[propname] = value;
                         }
+                        // if (!schema.autocomplete.hasOwnProperty(autocompleteDict[path])) {
+                        //     if (autocompleteDict[path] === 'server_populate') {
+                        //         delete object[propname];
+                        //     } else {
+                        //         object[propname] = autocompleteDict[path];
+                        //     }
+                        // }
                     }
                 }
             }
@@ -620,6 +639,16 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
                     let autocompleteDict = getAutocompleteDict(propertyValue);
                     setAutocompleteValue(schema, node, autocompleteDict, propname, usageName);
                     if (node.hasOwnProperty('options')) {
+                        if (node.hasOwnProperty('dynamic_autocomplete')) {
+                            const dynamicValuePath = node.autocomplete.substring(node.autocomplete.indexOf('.') + 1);
+                            const dynamicValue = _.get(data, dynamicValuePath);
+                            if (dynamicValue && schema.autocomplete.hasOwnProperty(dynamicValue)) {
+                                node.options = schema.autocomplete[dynamicValue];
+                                if (!node.options.includes(node.value)) {
+                                    node.value = null;
+                                }
+                            }
+                        }
                         node.customComponentType = 'autocomplete';
                         node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
                     }

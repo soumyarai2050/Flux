@@ -209,7 +209,7 @@ message StratStatus{
   // these are specific to CB-EQT strat - move to derived later
   optional float average_premium = 27 [(FluxFldNumberFormat) = "%"];
   optional Residual residual = 28;
-  optional float balance_notional = 29 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratLimits.max_cb_notional", (FluxFldProgressBar) = {
+  optional float balance_notional = 29 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="StratLimits.max_single_leg_notional", (FluxFldProgressBar) = {
     value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // order of condition matching -> left to right (select first match)
     hover_text_type: HoverTextType_VALUE,
     is_reverse: true
@@ -250,8 +250,8 @@ message StratLimits{
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 max_open_orders_per_side = 2 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open orders allowed per side for this strat"];
-  optional float max_cb_notional = 3 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000", (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
-  optional float max_open_cb_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
+  optional float max_single_leg_notional = 3 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000", (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
+  optional float max_open_single_leg_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
   optional float max_net_filled_notional = 5  [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "absolute [buy fill - sell fill] maximum notional allowed for this strat"];
   optional float max_concentration = 6 [(FluxFldValMax) = "10", (FluxFldHelp) = "max symbol specific concentration % (w.r.t. market total for the symbol)"];
   optional float limit_up_down_volume_participation_rate = 7 [(FluxFldValMax) = "30", (FluxFldHelp) = "At limit up down: % participation allowed against open interest on specific side of outstanding queue"];

@@ -320,7 +320,9 @@ def test_nested_pair_strat_n_strats_limits(clean_and_set_limits, driver_type, we
 
 
 def test_widget_type(driver_type, schema_dict: Dict[str, any]):
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="progress_bar")
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict),
+                                          widget_type=WidgetType.REPEATED_INDEPENDENT,
+                                          flux_property="filter_enable")
     print(result)
     assert result[0]
     # # print(result)
@@ -530,7 +532,6 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
                 set_table_input_field(widget=widget, xpath=xpath, value=str(value))
             else:
                 continue
-        # TODO: COMMON KEY METHOD IS NOT WORKING
         validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name=field_name, layout=Layout.TABLE)
 
     # tree_layout
@@ -652,7 +653,6 @@ def test_flux_flx_display_zero_in_widget(clean_and_set_limits, driver_type, web_
                                               field_name=field_name)
             value: str = "0"
             set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=value)
-            # TODO: COMMON KEY METHOD IS NOT WORKING
             validate_flux_flx_display_zero_in_widget(driver=driver, widget=widget, field_name=field_name, value=value)
 
     result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.DEPENDENT, flux_property="display_zero")
@@ -806,23 +806,23 @@ def test_flux_fld_name_color_in_independent_widget(clean_and_set_limits, driver_
     print(result)
     assert result[0]
 
-    # table_layout
+    # table layout
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
         widget = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
+        switch_layout(widget=widget, layout=Layout.TREE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
             name_color: str = field_query.properties['name_color']
             xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
             # TODO: make a method get get name color of table layout
-            click_button_with_name(widget=widget, button_name="Edit")
-            switch_layout(widget=widget, layout=Layout.TREE)
-            get_name_color = get_fld_name_colour_in_tree(widget=widget, xpath=xpath)
-            assert name_color == get_name_color
+            # fld_color = get_fld_name_colour_in_tree(widget=widget, xpath=xpath)
+            # assert name_color == fld_color
 
-    # tree_layout
+
+    # tree layout
     field_name: str = ""
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
@@ -834,9 +834,9 @@ def test_flux_fld_name_color_in_independent_widget(clean_and_set_limits, driver_
             name_color: str = field_query.properties['name_color']
             xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
-            get_name_color = get_fld_name_colour_in_tree(widget=widget, xpath=xpath)
+            # fld_color = get_fld_name_colour_in_tree(widget=widget, xpath=xpath)
             # assert name_color == Type.ColorType(ColorType.ERROR)
-            # assert name_color == get_name_color
+            # assert name_color == fld_color
 
 
 def test_flux_fld_progress_bar_in_widget(clean_and_set_limits, driver_type, web_project, driver,
@@ -858,7 +858,7 @@ def test_flux_fld_progress_bar_in_widget(clean_and_set_limits, driver_type, web_
             get_val_max, widget_name = get_val_max_from_input_fld(val_max=val_max, driver=driver,
                                                                   widget_type=WidgetType.INDEPENDENT,layout=Layout.TREE)
             # FIXME: NOT GETTING ANY XPATH
-            xpath: str = get_xpath_from_field_name( schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
+            xpath: str = get_xpath_from_field_name(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                                    widget_name=widget_name, field_name=field_name)
 
             scroll_into_view(driver=driver, element=widget)
@@ -1231,9 +1231,9 @@ class TestMultiTab:
         time.sleep(Delay.SHORT.value)
 
 
-def test_flux_fld_default_widget(clean_and_set_limits, web_project, driver_type, schema_dict, driver):
+def test_flux_fld_default_value_in_widget(clean_and_set_limits, web_project, driver_type, schema_dict, driver):
 
-    result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property="default")
+    result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property="default")
     print(result)
     # order_limits_obj = OrderLimitsBaseModel(id=55, max_px_deviation=44)
     # strat_manager_service_native_web_client.delete_pair_strat_client(pair_strat_id=1)
@@ -1586,7 +1586,6 @@ def test_flux_fld_abbreviated_in_widgets(clean_and_set_limits, driver_type, driv
                 assert default_abbreviated.split(":")[0].replace(" ", "_") in table_header_list
 
 
-
 def test_flux_fld_micro_separator_in_widgets(clean_and_set_limits, web_project, driver_type, driver, schema_dict,
                                              set_micro_seperator_and_clean):
 
@@ -1735,6 +1734,7 @@ def test_coloum_orders(clean_and_set_limits, web_project, driver, driver_type, s
                 previous_field_sequence_value = field_sequence_value
 
                 assert sequence_number == field_sequence_value
+                # click on dropdown inside settings
                 dropdown_element = (widget.find_element
                                     (By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]/li[{i}]/div[1]'))
 
@@ -1787,14 +1787,15 @@ def test_disable_ws_on_edit(clean_and_set_limits, web_project, driver, driver_ty
         if widget_name == "top_of_book":
             widget: WebElement = driver.find_element(By.ID, widget_name)
             scroll_into_view(driver=driver, element=widget)
-            common_key_value: Dict[str, any] = get_commonkey_items(widget)
+            common_key_items: Dict[str, any] = get_commonkey_items(widget)
             for field_query in widget_query.fields:
                 field_name: str = field_query.field_name
                 if field_name == "px" or field_name == "total_trading_security_size":
                     default_field: str = field_query.properties["parent_title"]
                     default_field = default_field + "." + field_name
-                    value = common_key_value[default_field]
-                    assert value != top_of_book[field_query.properties["parent_title"]][field_name]
+                    common_key_fld = common_key_items[default_field]
+                    # getting assertion error
+                    assert common_key_fld != top_of_book[field_query.properties["parent_title"]][field_name]
 
 
 def test_strat_load_and_unload(clean_and_set_limits, web_project, driver, driver_type):

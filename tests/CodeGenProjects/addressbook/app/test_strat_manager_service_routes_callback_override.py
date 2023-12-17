@@ -50,10 +50,12 @@ def _test_sanity_create_strat_parallel(static_data_, clean_and_set_limits, buy_s
                 raise Exception(future.exception())
 
 
+@pytest.mark.nightly
 def test_clean_and_set_limits(clean_and_set_limits):
     pass
 
 
+@pytest.mark.nightly
 @pytest.mark.parametrize("web_client", clients_list)
 def test_create_get_put_patch_delete_order_limits_client(clean_and_set_limits, web_client):
     for index, return_type_param in enumerate([True, None, False]):
@@ -114,6 +116,7 @@ def test_create_get_put_patch_delete_order_limits_client(clean_and_set_limits, w
             assert delete_resp
 
 
+@pytest.mark.nightly
 @pytest.mark.parametrize("web_client", clients_list)
 def test_post_all(clean_and_set_limits, web_client):
     for index, return_value_type in enumerate([True, None, False]):
@@ -144,6 +147,7 @@ def test_post_all(clean_and_set_limits, web_client):
                                                         f"{fetched_strat_manager_beanie}"
 
 
+@pytest.mark.nightly
 @pytest.mark.parametrize("web_client", clients_list)
 def test_put_all(clean_and_set_limits, web_client):
     for index, return_value_type in enumerate([True, None, False]):
@@ -180,6 +184,7 @@ def test_put_all(clean_and_set_limits, web_client):
                 f"expected obj {expected_obj} not found in updated list of objects: {updated_order_limits_list}"
 
 
+@pytest.mark.nightly
 @pytest.mark.parametrize("web_client", clients_list)
 def test_patch_all(clean_and_set_limits, web_client):
     for index, return_value_type in enumerate([True, None, False]):
@@ -237,6 +242,7 @@ def test_patch_all(clean_and_set_limits, web_client):
 
 
 # sanity test to create and activate pair_strat
+@pytest.mark.nightly
 def test_create_pair_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                            expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                            top_of_book_list_, market_depth_basemodel_list):
@@ -249,16 +255,19 @@ def test_create_pair_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_
 
 
 # sanity test to create orders
+@pytest.mark.nightly
 def test_place_sanity_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                              expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                              last_trade_fixture_list, market_depth_basemodel_list,
                              top_of_book_list_, buy_order_, sell_order_,
-                             max_loop_count_per_side, residual_wait_sec):
+                             max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     # making limits suitable for this test
     expected_strat_limits_.max_open_orders_per_side = 10
     expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
 
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
@@ -477,6 +486,7 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
 #         time.sleep(loop_wait)
 
 
+@pytest.mark.nightly
 def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
     """Adding Broker entries in portfolio limits"""
     broker = broker_fixture()
@@ -494,6 +504,7 @@ def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
                                                                 f"{stored_portfolio_limits_.eligible_brokers}"
 
 
+@pytest.mark.nightly
 def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                               buy_order_, sell_order_, buy_fill_journal_,
                                               sell_fill_journal_, expected_buy_order_snapshot_,
@@ -503,11 +514,11 @@ def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits
                                               last_trade_fixture_list, symbol_overview_obj_list,
                                               market_depth_basemodel_list, expected_order_limits_,
                                               expected_portfolio_limits_, max_loop_count_per_side,
-                                              leg1_leg2_symbol_list, residual_wait_sec):
+                                              leg1_leg2_symbol_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:int(len(leg1_leg2_symbol_list) / 2)]
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         handle_test_buy_sell_order(leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                   residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
+                                   refresh_sec_update_fixture, buy_order_, sell_order_, buy_fill_journal_,
                                    sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
                                    expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
                                    expected_start_status_, expected_strat_brief_, expected_portfolio_status_,
@@ -519,6 +530,7 @@ def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
+@pytest.mark.nightly
 def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                             buy_order_, sell_order_, buy_fill_journal_,
                                             sell_fill_journal_, expected_buy_order_snapshot_,
@@ -528,10 +540,10 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             last_trade_fixture_list, symbol_overview_obj_list,
                                             market_depth_basemodel_list, expected_order_limits_,
                                             expected_portfolio_limits_, max_loop_count_per_side,
-                                            leg1_leg2_symbol_list, residual_wait_sec):
+                                            leg1_leg2_symbol_list, refresh_sec_update_fixture):
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_order, leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                   residual_wait_sec, copy.deepcopy(buy_order_),
+                                   refresh_sec_update_fixture, copy.deepcopy(buy_order_),
                                    copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
                                    copy.deepcopy(expected_sell_order_snapshot_),
@@ -552,6 +564,7 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
+@pytest.mark.nightly
 def test_sell_buy_order_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
                                             buy_order_, sell_order_, buy_fill_journal_,
                                             sell_fill_journal_, expected_buy_order_snapshot_,
@@ -561,10 +574,10 @@ def test_sell_buy_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             last_trade_fixture_list, symbol_overview_obj_list,
                                             market_depth_basemodel_list, expected_order_limits_,
                                             expected_portfolio_limits_, max_loop_count_per_side,
-                                            leg1_leg2_symbol_list, residual_wait_sec):
+                                            leg1_leg2_symbol_list, refresh_sec_update_fixture):
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_sell_buy_order, leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                   residual_wait_sec, copy.deepcopy(buy_order_),
+                                   refresh_sec_update_fixture, copy.deepcopy(buy_order_),
                                    copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
                                    copy.deepcopy(expected_sell_order_snapshot_),
@@ -585,6 +598,7 @@ def test_sell_buy_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
+@pytest.mark.nightly
 def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean_and_set_limits,
                                                              pair_securities_with_sides_,
                                                              buy_order_, sell_order_, buy_fill_journal_,
@@ -598,13 +612,12 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean
                                                              last_trade_fixture_list, symbol_overview_obj_list,
                                                              market_depth_basemodel_list, expected_order_limits_,
                                                              expected_portfolio_limits_, max_loop_count_per_side,
-                                                             leg1_leg2_symbol_list, residual_wait_sec):
+                                                             leg1_leg2_symbol_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:int(len(leg1_leg2_symbol_list) / 2)]
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         handle_test_buy_sell_order(leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                   residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
-                                   sell_fill_journal_,
-                                   expected_buy_order_snapshot_, expected_sell_order_snapshot_,
+                                   refresh_sec_update_fixture, buy_order_, sell_order_, buy_fill_journal_,
+                                   sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
                                    expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
                                    expected_start_status_, expected_strat_brief_, expected_portfolio_status_,
                                    top_of_book_list_, last_trade_fixture_list, symbol_overview_obj_list,
@@ -615,6 +628,7 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
+@pytest.mark.nightly
 def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_and_set_limits,
                                                            pair_securities_with_sides_,
                                                            buy_order_, sell_order_, buy_fill_journal_,
@@ -627,10 +641,10 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_a
                                                            last_trade_fixture_list, symbol_overview_obj_list,
                                                            market_depth_basemodel_list, expected_order_limits_,
                                                            expected_portfolio_limits_, max_loop_count_per_side,
-                                                           leg1_leg2_symbol_list, residual_wait_sec):
+                                                           leg1_leg2_symbol_list, refresh_sec_update_fixture):
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_order, buy_symbol, sell_symbol, max_loop_count_per_side,
-                                   residual_wait_sec, copy.deepcopy(buy_order_),
+                                   refresh_sec_update_fixture, copy.deepcopy(buy_order_),
                                    copy.deepcopy(sell_order_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_order_snapshot_),
                                    copy.deepcopy(expected_sell_order_snapshot_),
@@ -651,6 +665,7 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_a
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
+@pytest.mark.nightly
 def test_buy_sell_pair_order(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_order_, sell_order_, buy_fill_journal_,
@@ -661,7 +676,7 @@ def test_buy_sell_pair_order(
         last_trade_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_order_limits_,
         expected_portfolio_limits_, max_loop_count_per_side,
-        leg1_leg2_symbol_list, residual_wait_sec):
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     triggers buy & sell pair order (single buy order followed by single sell order) for max_loop_count_per_side times
     """
@@ -669,7 +684,7 @@ def test_buy_sell_pair_order(
     leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[0]
     handle_test_buy_sell_pair_order(
         leg1_symbol, leg2_symbol, max_loop_count_per_side,
-        residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
+        refresh_sec_update_fixture, buy_order_, sell_order_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
         expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
         expected_start_status_, expected_strat_brief_, expected_portfolio_status_,
@@ -681,6 +696,7 @@ def test_buy_sell_pair_order(
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
+@pytest.mark.nightly
 def test_sell_buy_pair_order(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_order_, sell_order_, buy_fill_journal_,
@@ -691,7 +707,7 @@ def test_sell_buy_pair_order(
         last_trade_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_order_limits_,
         expected_portfolio_limits_, max_loop_count_per_side,
-        leg1_leg2_symbol_list, residual_wait_sec):
+        leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     triggers buy & sell pair order (single buy order followed by single sell order) for max_loop_count_per_side times
     """
@@ -699,7 +715,7 @@ def test_sell_buy_pair_order(
     leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[0]
     handle_test_sell_buy_pair_order(
         leg1_symbol, leg2_symbol, max_loop_count_per_side,
-        residual_wait_sec, buy_order_, sell_order_, buy_fill_journal_,
+        refresh_sec_update_fixture, buy_order_, sell_order_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_order_snapshot_, expected_sell_order_snapshot_,
         expected_symbol_side_snapshot_, pair_strat_, expected_strat_limits_,
         expected_start_status_, expected_strat_brief_, expected_portfolio_status_,
@@ -711,12 +727,14 @@ def test_sell_buy_pair_order(
     verify_portfolio_status(max_loop_count_per_side, total_symbol_pairs, expected_portfolio_status)
 
 
+@pytest.mark.nightly
 def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                         expected_strat_limits_, expected_start_status_,
                                         symbol_overview_obj_list, last_trade_fixture_list,
-                                        market_depth_basemodel_list, top_of_book_list_):
+                                        market_depth_basemodel_list, top_of_book_list_, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
@@ -733,11 +751,10 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
                                                                                  leg1_symbol, executor_web_client)
 
     # negative test
-    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
-        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
-    assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
-                                                 "expected to be True"
+    system_control = SystemControlBaseModel(_id=1, kill_switch=True)
+    updated_system_control = strat_manager_service_native_web_client.patch_system_control_client(
+        jsonable_encoder(system_control, by_alias=True, exclude_none=True))
+    assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
     time.sleep(2)
     # validating if trading_link.trigger_kill_switch got called
@@ -766,14 +783,17 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
                                                        leg2_symbol, executor_web_client, expect_no_order=True)
 
 
+@pytest.mark.nightly
 def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                             pair_strat_, expected_strat_limits_,
                                             expected_start_status_, symbol_overview_obj_list,
                                             last_trade_fixture_list, market_depth_basemodel_list,
-                                            top_of_book_list_, buy_order_, sell_order_):
+                                            top_of_book_list_, buy_order_, sell_order_,
+                                            refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
@@ -789,11 +809,10 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                                                        leg1_symbol, executor_web_client)
 
     # negative test
-    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
-        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
-    assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
-                                                 "expected to be True"
+    system_control = SystemControlBaseModel(_id=1, kill_switch=True)
+    updated_system_control = strat_manager_service_native_web_client.patch_system_control_client(
+        jsonable_encoder(system_control, by_alias=True, exclude_none=True))
+    assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
     time.sleep(5)
     # validating if trading_link.trigger_kill_switch got called
@@ -823,13 +842,16 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                                                        leg2_symbol, executor_web_client, expect_no_order=True)
 
 
+@pytest.mark.nightly
 def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                             expected_strat_limits_, expected_start_status_,
                             symbol_overview_obj_list, last_trade_fixture_list,
-                            market_depth_basemodel_list, top_of_book_list_, residual_wait_sec):
+                            market_depth_basemodel_list, top_of_book_list_, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
@@ -837,11 +859,11 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
                                            market_depth_basemodel_list, top_of_book_list_))
 
     # positive test
-    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
-        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
-    assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
-                                                 "expected to be True"
+    system_control = SystemControlBaseModel(_id=1, kill_switch=True)
+    updated_system_control = strat_manager_service_native_web_client.patch_system_control_client(
+        jsonable_encoder(system_control, by_alias=True, exclude_none=True))
+    assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
+
     time.sleep(2)
     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
     run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
@@ -858,11 +880,11 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
                                                        leg2_symbol, executor_web_client, expect_no_order=True)
 
     # negative test
-    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=False)
-    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
-        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
-    assert not updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is True, " \
-                                                     "expected to be False"
+    system_control = SystemControlBaseModel(_id=1, kill_switch=False)
+    updated_system_control = strat_manager_service_native_web_client.patch_system_control_client(
+        jsonable_encoder(system_control, by_alias=True, exclude_none=True))
+    assert not updated_system_control.kill_switch, "Unexpected: kill_switch is True, expected to be False"
+
     time.sleep(2)
     # validating if trading_link.trigger_kill_switch got called
     check_str = "Called TradingLink.revoke_kill_switch_n_resume_trading"
@@ -894,6 +916,7 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
                                                        leg2_symbol, executor_web_client)
 
 
+@pytest.mark.nightly
 def test_trigger_switch_fail(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_start_status_,
@@ -913,12 +936,12 @@ def test_trigger_switch_fail(
         strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
 
         try:
-            portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-            strat_manager_service_native_web_client.patch_portfolio_status_client(
-                jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+            system_control = SystemControlBaseModel(_id=1, kill_switch=True)
+            strat_manager_service_native_web_client.patch_system_control_client(
+                jsonable_encoder(system_control, by_alias=True, exclude_none=True))
         except Exception as e:
             if "trading_link.trigger_kill_switch failed" not in str(e):
-                raise Exception("Something went wrong while enabling portfolio_status kill switch")
+                raise Exception("Something went wrong while enabling kill_switch kill switch")
         else:
             assert False, ("Configured simulate config to return False from trigger_kill_switch to fail enable "
                            "kill switch, but patch went successful - check why simulate didn't work")
@@ -935,6 +958,7 @@ def test_trigger_switch_fail(
         strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
 
 
+@pytest.mark.nightly
 def test_revoke_switch_fail(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_start_status_,
@@ -944,11 +968,10 @@ def test_revoke_switch_fail(
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
 
-    portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=True)
-    updated_portfolio_status = strat_manager_service_native_web_client.patch_portfolio_status_client(
-        jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
-    assert updated_portfolio_status.kill_switch, "Unexpected: Portfolio_status kill_switch is False, " \
-                                                 "expected to be True"
+    system_control = SystemControlBaseModel(_id=1, kill_switch=True)
+    updated_system_control = strat_manager_service_native_web_client.patch_system_control_client(
+        jsonable_encoder(system_control, by_alias=True, exclude_none=True))
+    assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
     try:
         # updating yaml_configs according to this test
         config_dict["revoke_kill_switch_n_resume_trading"] = False
@@ -958,12 +981,12 @@ def test_revoke_switch_fail(
         strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
 
         try:
-            portfolio_status = PortfolioStatusBaseModel(_id=1, kill_switch=False)
-            strat_manager_service_native_web_client.patch_portfolio_status_client(
-                jsonable_encoder(portfolio_status, by_alias=True, exclude_none=True))
+            system_control = SystemControlBaseModel(_id=1, kill_switch=False)
+            strat_manager_service_native_web_client.patch_system_control_client(
+                jsonable_encoder(system_control, by_alias=True, exclude_none=True))
         except Exception as e:
             if "trading_link.revoke_kill_switch_n_resume_trading failed" not in str(e):
-                raise Exception("Something went wrong while disabling portfolio_status kill switch")
+                raise Exception("Something went wrong while disabling kill_switch kill switch")
         else:
             assert False, ("Configured simulate config to return False from revoke_kill_switch_n_resume_trading to "
                            "fail disable kill switch, but patch went successful - check why simulate didn't work")
@@ -980,14 +1003,17 @@ def test_revoke_switch_fail(
         strat_manager_service_native_web_client.log_simulator_reload_config_query_client()
 
 
+@pytest.mark.nightly
 def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                  pair_strat_, expected_strat_limits_,
                                  expected_start_status_, symbol_overview_obj_list,
                                  last_trade_fixture_list, market_depth_basemodel_list,
                                  top_of_book_list_, buy_order_, sell_order_,
-                                 max_loop_count_per_side, residual_wait_sec):
+                                 max_loop_count_per_side, refresh_sec_update_fixture):
     partial_filled_qty: int | None = None
     unfilled_amount: int | None = None
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
 
     # updating fixture values for this test-case
     max_loop_count_per_side = 2
@@ -1046,14 +1072,17 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                        pair_strat_, expected_strat_limits_,
                                        expected_start_status_, symbol_overview_obj_list,
                                        last_trade_fixture_list, market_depth_basemodel_list,
                                        top_of_book_list_, buy_order_, sell_order_,
-                                       max_loop_count_per_side, residual_wait_sec):
+                                       max_loop_count_per_side, refresh_sec_update_fixture):
 
     partial_filled_qty: int | None = None
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
 
     # updating fixture values for this test-case
     max_loop_count_per_side = 2
@@ -1113,13 +1142,16 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                        pair_strat_, expected_strat_limits_,
                        expected_start_status_, symbol_overview_obj_list,
                        last_trade_fixture_list, market_depth_basemodel_list,
-                       top_of_book_list_, buy_order_, sell_order_):
+                       top_of_book_list_, buy_order_, sell_order_, refresh_sec_update_fixture):
         buy_symbol = leg1_leg2_symbol_list[0][0]
         sell_symbol = leg1_leg2_symbol_list[0][1]
+        expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+
         created_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -1186,15 +1218,17 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                           expected_start_status_, symbol_overview_obj_list,
                           last_trade_fixture_list, market_depth_basemodel_list,
-                          top_of_book_list_, buy_order_, sell_order_):
+                          top_of_book_list_, buy_order_, sell_order_, refresh_sec_update_fixture):
     """
     Test case when order_snapshot is in OE_ACKED and fill is triggered to make it over_filled
     """
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
@@ -1289,15 +1323,17 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                           expected_start_status_, symbol_overview_obj_list,
                           last_trade_fixture_list, market_depth_basemodel_list,
-                          top_of_book_list_, buy_order_, sell_order_):
+                          top_of_book_list_, buy_order_, sell_order_, refresh_sec_update_fixture):
     """
     Test case when order_snapshot is in OE_FILLED and fill is triggered to make it over_filled
     """
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
@@ -1393,13 +1429,16 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                           expected_start_status_, symbol_overview_obj_list,
+@pytest.mark.nightly
+def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+                           expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                            last_trade_fixture_list, market_depth_basemodel_list,
-                           top_of_book_list_, max_loop_count_per_side, residual_wait_sec):
+                           top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         # explicitly setting waived_min_orders to 10 for this test case
@@ -1438,13 +1477,16 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                             expected_start_status_, symbol_overview_obj_list,
+@pytest.mark.nightly
+def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+                             expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                              last_trade_fixture_list, market_depth_basemodel_list,
-                             top_of_book_list_, max_loop_count_per_side, residual_wait_sec):
+                             top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         # explicitly setting waived_min_orders to 10 for this test case
@@ -1483,15 +1525,17 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def test_cxl_rej(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                 pair_strat_, expected_strat_limits_,
-                 expected_start_status_, symbol_overview_obj_list,
-                 last_trade_fixture_list, market_depth_basemodel_list,
-                 top_of_book_list_, buy_order_, sell_order_,
-                 max_loop_count_per_side):
+@pytest.mark.nightly
+def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                   pair_strat_, expected_strat_limits_,
+                                   expected_start_status_, symbol_overview_obj_list,
+                                   last_trade_fixture_list, market_depth_basemodel_list,
+                                   top_of_book_list_, buy_order_, sell_order_,
+                                   max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         created_pair_strat, executor_http_client = (
@@ -1507,7 +1551,7 @@ def test_cxl_rej(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
         try:
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
-                config_dict["symbol_configs"][symbol]["simulate_cxl_rej_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_ack_to_cxl_rej_orders"] = True
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
                 config_dict["symbol_configs"][symbol]["fill_percent"] = 50
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
@@ -1535,7 +1579,7 @@ def test_cxl_rej(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                         order_count += 1
                     else:
                         if special_order_count < continues_special_order_count:
-                            check_order_event = OrderEventType.OE_CXL_REJ
+                            check_order_event = "REJ"
                             special_order_count += 1
                         else:
                             check_order_event = OrderEventType.OE_CXL_ACK
@@ -1545,7 +1589,8 @@ def test_cxl_rej(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                     # internally contains assert statements
                     last_cxl_order_id, last_cxl_rej_order_id = verify_cxl_rej(last_cxl_order_id, last_cxl_rej_order_id,
                                                                               check_order_event, check_symbol,
-                                                                              executor_http_client)
+                                                                              executor_http_client,
+                                                                              OrderStatusType.OE_ACKED)
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -1557,6 +1602,235 @@ def test_cxl_rej(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
+def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                   pair_strat_, expected_strat_limits_,
+                                   expected_start_status_, symbol_overview_obj_list,
+                                   last_trade_fixture_list, market_depth_basemodel_list,
+                                   top_of_book_list_, buy_order_, sell_order_,
+                                   max_loop_count_per_side, refresh_sec_update_fixture):
+    # updating fixture values for this test-case
+    max_loop_count_per_side = 5
+    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+
+    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
+        created_pair_strat, executor_http_client = (
+            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_start_status_, symbol_overview_obj_list,
+                                               last_trade_fixture_list,
+                                               market_depth_basemodel_list, top_of_book_list_))
+
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+        try:
+            # updating yaml_configs according to this test
+            for symbol in config_dict["symbol_configs"]:
+                config_dict["symbol_configs"][symbol]["simulate_new_to_cxl_rej_orders"] = True
+                config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+
+            YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+            # updating simulator's configs
+            executor_http_client.trade_simulator_reload_config_query_client()
+
+            for check_symbol in [leg1_symbol, leg2_symbol]:
+                continues_order_count, continues_special_order_count = get_continuous_order_configs(check_symbol,
+                                                                                                    config_dict)
+                order_count = 0
+                special_order_count = 0
+                last_cxl_order_id = None
+                last_cxl_rej_order_id = None
+                for loop_count in range(1, max_loop_count_per_side + 1):
+                    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
+                    if check_symbol == leg1_symbol:
+                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0])
+                    else:
+                        run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1])
+                    time.sleep(10)  # delay for order to get placed and trigger cxl
+
+                    if order_count < continues_order_count:
+                        check_order_event = OrderEventType.OE_CXL_ACK
+                        order_count += 1
+                    else:
+                        if special_order_count < continues_special_order_count:
+                            check_order_event = "REJ"
+                            special_order_count += 1
+                        else:
+                            check_order_event = OrderEventType.OE_CXL_ACK
+                            order_count = 1
+                            special_order_count = 0
+
+                    # internally contains assert statements
+                    last_cxl_order_id, last_cxl_rej_order_id = verify_cxl_rej(last_cxl_order_id, last_cxl_rej_order_id,
+                                                                              check_order_event, check_symbol,
+                                                                              executor_http_client,
+                                                                              OrderStatusType.OE_UNACK)
+        except AssertionError as e:
+            raise AssertionError(e)
+        except Exception as e:
+            err_str_ = (f"Some Error Occurred: exception: {e}, "
+                        f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+            print(err_str_)
+            raise Exception(err_str_)
+        finally:
+            YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                    pair_strat_, expected_strat_limits_,
+                                    expected_start_status_, symbol_overview_obj_list,
+                                    last_trade_fixture_list, market_depth_basemodel_list,
+                                    top_of_book_list_, buy_order_, sell_order_,
+                                    max_loop_count_per_side, refresh_sec_update_fixture):
+    # updating fixture values for this test-case
+    max_loop_count_per_side = 5
+    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+
+    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
+        created_pair_strat, executor_http_client = (
+            create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_start_status_, symbol_overview_obj_list,
+                                               last_trade_fixture_list,
+                                               market_depth_basemodel_list, top_of_book_list_))
+
+        config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+        config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+        config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+        try:
+            # updating yaml_configs according to this test
+            for symbol in config_dict["symbol_configs"]:
+                config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["force_fully_fill"] = True
+                config_dict["symbol_configs"][symbol]["simulate_ack_to_cxl_rej_orders"] = True
+
+            YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+            # updating simulator's configs
+            executor_http_client.trade_simulator_reload_config_query_client()
+
+            for check_symbol in [leg1_symbol, leg2_symbol]:
+                continues_order_count, continues_special_order_count = get_continuous_order_configs(check_symbol,
+                                                                                                    config_dict)
+                order_count = 0
+                special_order_count = 0
+                last_cxl_order_id = None
+                last_cxl_rej_order_id = None
+                for loop_count in range(1, max_loop_count_per_side + 1):
+                    run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
+                    if check_symbol == leg1_symbol:
+                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0])
+                    else:
+                        run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1])
+                    time.sleep(10)  # delay for order to get placed and trigger cxl
+
+                    if order_count < continues_order_count:
+                        check_order_event = OrderEventType.OE_CXL_ACK
+                        order_count += 1
+                    else:
+                        if special_order_count < continues_special_order_count:
+                            check_order_event = "REJ"
+                            special_order_count += 1
+                        else:
+                            check_order_event = OrderEventType.OE_CXL_ACK
+                            order_count = 1
+                            special_order_count = 0
+
+                    # internally contains assert statements
+                    if check_order_event == "REJ":
+                        # internally checks order_journal is not None else raises assert exception internally
+                        latest_cxl_rej_order_journal = \
+                            get_latest_order_journal_with_events_and_symbol([OrderEventType.OE_CXL_INT_REJ,
+                                                                             OrderEventType.OE_CXL_BRK_REJ,
+                                                                             OrderEventType.OE_CXL_EXH_REJ],
+                                                                            check_symbol, executor_http_client,
+                                                                            last_order_id=last_cxl_rej_order_id)
+                        last_cxl_rej_order_id = latest_cxl_rej_order_journal.order.order_id
+
+                        order_snapshot = get_order_snapshot_from_order_id(latest_cxl_rej_order_journal.order.order_id,
+                                                                          executor_http_client)
+                        assert order_snapshot.order_status == OrderStatusType.OE_FILLED, \
+                            f"Unexpected order_snapshot.order_status: expected {OrderStatusType.OE_FILLED}, " \
+                            f"received {order_snapshot.order_status}"
+                    else:
+                        # checks order_journal is not None else raises assert exception internally
+                        latest_cxl_order_journal = get_latest_order_journal_with_event_and_symbol(
+                            OrderEventType.OE_CXL_ACK, check_symbol, executor_http_client,
+                            last_order_id=last_cxl_order_id)
+                        last_cxl_order_id = latest_cxl_order_journal.order.order_id
+
+        except AssertionError as e:
+            raise AssertionError(e)
+        except Exception as e:
+            err_str_ = (f"Some Error Occurred: exception: {e}, "
+                        f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+            print(err_str_)
+            raise Exception(err_str_)
+        finally:
+            YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+        pair_strat_, expected_strat_limits_,
+        expected_start_status_, sample_alert, symbol_overview_obj_list,
+        top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
+        refresh_sec_update_fixture):
+    # creating strat
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
+    max_loop_count_per_side = 2
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+    created_pair_strat, executor_http_client = (
+        create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                           expected_start_status_, symbol_overview_obj_list,
+                                           last_trade_fixture_list,
+                                           market_depth_basemodel_list, top_of_book_list_))
+
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{created_pair_strat.id}_simulate_config.yaml"
+    config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
+    config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
+
+    try:
+        # updating yaml_configs according to this test
+        for symbol in config_dict["symbol_configs"]:
+            config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["avoid_cxl_ack_after_cxl_req"] = True
+
+        YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
+
+        # updating simulator's configs
+        executor_http_client.trade_simulator_reload_config_query_client()
+
+        run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+
+        cxl_req_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL,
+                                                                               buy_symbol, executor_http_client)
+        time.sleep(residual_wait_sec)
+        get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL,
+                                                       buy_symbol, executor_http_client, expect_no_order=True,
+                                                       last_order_id=cxl_req_order_journal.order.order_id)
+    except AssertionError as e:
+        raise AssertionError(e)
+    except Exception as e:
+        err_str_ = (f"Some Error Occurred: exception: {e}, "
+                    f"traceback: {''.join(traceback.format_exception(None, e, e.__traceback__))}")
+        print(err_str_)
+        raise Exception(err_str_)
+    finally:
+        YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
 def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                        pair_strat_, expected_strat_limits_,
                                        expected_start_status_, sample_alert, symbol_overview_obj_list,
@@ -1631,11 +1905,12 @@ def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_
                                                 f"{broker_id_list}"
 
 
+@pytest.mark.nightly
 def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                       pair_strat_, expected_strat_limits_,
                                                       expected_start_status_, symbol_overview_obj_list,
                                                       last_trade_fixture_list, market_depth_basemodel_list,
-                                                      top_of_book_list_, residual_wait_sec):
+                                                      top_of_book_list_, refresh_sec_update_fixture):
     underlying_account_prefix: str = "Acc"
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
@@ -1643,6 +1918,8 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
     sell_order_id = None
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
+        expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+        residual_wait_sec = 4 * refresh_sec_update_fixture
         active_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
@@ -1681,19 +1958,20 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
                         loop_count]
                 assert underlying_account_n_cum_fill_qty_obj.underlying_account == \
                        f"{underlying_account_prefix}_{underlying_account_count - loop_count}", \
-                    "underlying_account string field of underlying_account_n_cum_fill_qty_obj mismatched: " \
-                    f"expected {underlying_account_prefix}_{underlying_account_count - loop_count} " \
-                    f"received {underlying_account_n_cum_fill_qty_obj.underlying_account}"
+                       "underlying_account string field of underlying_account_n_cum_fill_qty_obj mismatched: " \
+                       f"expected {underlying_account_prefix}_{underlying_account_count - loop_count} " \
+                       f"received {underlying_account_n_cum_fill_qty_obj.underlying_account}"
                 assert underlying_account_n_cum_fill_qty_obj.cumulative_qty == 15, \
                     "Unexpected cumulative qty: expected 15 received " \
                     f"{underlying_account_n_cum_fill_qty_obj.cumulative_qty}"
 
 
+@pytest.mark.nightly
 def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                   pair_strat_, expected_strat_limits_,
                                   expected_start_status_, symbol_overview_obj_list,
                                   last_trade_fixture_list, market_depth_basemodel_list,
-                                  top_of_book_list_, buy_fill_journal_, residual_wait_sec):
+                                  top_of_book_list_, buy_fill_journal_, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     total_order_count_for_each_side = 10
@@ -1701,6 +1979,8 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
     expected_strat_limits_ = copy.deepcopy(expected_strat_limits_)
     expected_strat_limits_.residual_restriction.max_residual = 105000
     expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
@@ -1776,14 +2056,18 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                                last_trade_fixture_list, market_depth_basemodel_list,
                                top_of_book_list_, buy_order_, sell_order_,
-                               max_loop_count_per_side, residual_wait_sec):
+                               max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         # explicitly setting waived_min_orders to 10 for this test case
         expected_strat_limits_.cancel_rate.waived_min_orders = 10
@@ -1820,14 +2104,18 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                  expected_start_status_, symbol_overview_obj_list,
                                  last_trade_fixture_list, market_depth_basemodel_list,
                                  top_of_book_list_, buy_order_, sell_order_,
-                                 max_loop_count_per_side, residual_wait_sec):
+                                 max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         # explicitly setting waived_min_orders to 10 for this test case
         expected_strat_limits_.cancel_rate.waived_min_orders = 10
@@ -1865,11 +2153,14 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                    pair_strat_, expected_strat_limits_, expected_start_status_,
                                                    symbol_overview_obj_list, last_trade_fixture_list,
-                                                   market_depth_basemodel_list, top_of_book_list_):
+                                                   market_depth_basemodel_list, top_of_book_list_,
+                                                   refresh_sec_update_fixture):
     activated_strats = []
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     # creates and activates multiple pair_strats
     for buy_symbol, sell_symbol in leg1_leg2_symbol_list:
@@ -1919,6 +2210,7 @@ def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_l
                 f"{updates_strat_status.strat_status_update_seq_num}")
 
 
+@pytest.mark.nightly
 def test_portfolio_alert_updates(static_data_, clean_and_set_limits, sample_alert):
     stored_portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(portfolio_alert_id=1)
 
@@ -1943,15 +2235,18 @@ def test_portfolio_alert_updates(static_data_, clean_and_set_limits, sample_aler
                 f"received {alert_updated_portfolio_alert.alert_update_seq_num}")
 
 
+@pytest.mark.nightly
 def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                      expected_strat_limits_, top_of_book_list_,
                      expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                     market_depth_basemodel_list, leg1_leg2_symbol_list, residual_wait_sec):
+                     market_depth_basemodel_list, leg1_leg2_symbol_list, refresh_sec_update_fixture):
     partial_ack_qty: int | None = None
 
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         active_pair_strat, executor_http_client = (
@@ -2024,11 +2319,14 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
-                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_):
+                               last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
+                               refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
@@ -2075,13 +2373,16 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
             f"Mismatch residual_notional: expected 0 received {strat_status.residual.residual_notional}"
 
 
-def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                              expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
-                              last_trade_fixture_list, market_depth_basemodel_list,
-                              top_of_book_list_, buy_order_, sell_order_,
-                              max_loop_count_per_side, residual_wait_sec):
+@pytest.mark.nightly
+def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+                                  expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+                                  last_trade_fixture_list, market_depth_basemodel_list,
+                                  top_of_book_list_, buy_order_, sell_order_,
+                                  max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
@@ -2134,9 +2435,38 @@ def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_symb
             f"Mismatch order_snapshot.order_status: expected OrderStatusType.OE_DOD, " \
             f"received {order_snapshot.order_status}"
 
-        strat_alerts = log_analyzer_web_client.get_strat_alert_client(active_pair_strat.id)
-        assert len(strat_alerts.alerts) == 0, \
-            "Unexpected alerts found in strat_alerts, expected no alert for this test"
+        time.sleep(2)
+        check_str = "_check_state_and_get_order_snapshot_obj: order_journal of key:"
+        # Checking alert in strat_alert
+        strat_alert = log_analyzer_web_client.get_strat_alert_client(active_pair_strat.id)
+        for alert in strat_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                break
+        else:
+            # Checking alert in portfolio_alert if reason failed to add in strat_alert
+            portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+            for alert in portfolio_alert.alerts:
+                if re.search(check_str, alert.alert_brief):
+                    break
+            else:
+                assert False, f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+
+        check_str = ("Unexpected: Received fill that makes order_snapshot OE_FILLED which is already of state OE_DOD, "
+                     "ignoring this fill and putting this strat to PAUSE")
+        # Checking alert in strat_alert
+        strat_alert = log_analyzer_web_client.get_strat_alert_client(active_pair_strat.id)
+        for alert in strat_alert.alerts:
+            if re.search(check_str, alert.alert_brief):
+                break
+        else:
+            # Checking alert in portfolio_alert if reason failed to add in strat_alert
+            portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+            for alert in portfolio_alert.alerts:
+                if re.search(check_str, alert.alert_brief):
+                    break
+            else:
+                assert False, f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -2149,13 +2479,18 @@ def test_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_symb
 
 
 # strat pause tests
+@pytest.mark.nightly
 def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                  pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
                                                  last_trade_fixture_list, market_depth_basemodel_list,
-                                                 top_of_book_list_, buy_order_, sell_order_):
+                                                 top_of_book_list_, buy_order_, sell_order_,
+                                                 refresh_sec_update_fixture):
 
     expected_strat_limits_.residual_restriction.max_residual = 0
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
         underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
                                                  expected_start_status_, symbol_overview_obj_list,
@@ -2217,18 +2552,23 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, clean_and_set_limits,
                                                                  leg1_leg2_symbol_list,
                                                                  pair_strat_, expected_strat_limits_,
                                                                  expected_start_status_, symbol_overview_obj_list,
                                                                  last_trade_fixture_list, market_depth_basemodel_list,
-                                                                 top_of_book_list_, buy_order_, sell_order_):
+                                                                 top_of_book_list_, buy_order_, sell_order_,
+                                                                 refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
     # explicitly setting waived_min_orders to 10 for this test case
     expected_strat_limits_.cancel_rate.waived_min_orders = 0
     expected_strat_limits_.cancel_rate.max_cancel_rate = 1
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -2264,18 +2604,23 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, c
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, clean_and_set_limits,
                                                                   leg1_leg2_symbol_list,
                                                                   pair_strat_, expected_strat_limits_,
                                                                   expected_start_status_, symbol_overview_obj_list,
                                                                   last_trade_fixture_list, market_depth_basemodel_list,
-                                                                  top_of_book_list_, buy_order_, sell_order_):
+                                                                  top_of_book_list_, buy_order_, sell_order_,
+                                                                  refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
     # explicitly setting waived_min_orders to 10 for this test case
     expected_strat_limits_.cancel_rate.waived_min_orders = 0
     expected_strat_limits_.cancel_rate.max_cancel_rate = 1
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -2311,17 +2656,22 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                               pair_strat_, expected_strat_limits_,
                                                               expected_start_status_, symbol_overview_obj_list,
                                                               last_trade_fixture_list, market_depth_basemodel_list,
-                                                              top_of_book_list_, buy_order_, sell_order_):
+                                                              top_of_book_list_, buy_order_, sell_order_,
+                                                              refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
     # explicitly setting waived_min_orders to 10 for this test case
     expected_strat_limits_.cancel_rate.waived_min_orders = 0
     expected_strat_limits_.cancel_rate.max_cancel_rate = 19
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -2355,18 +2705,22 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clea
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits,
                                                                leg1_leg2_symbol_list,
                                                                pair_strat_, expected_strat_limits_,
                                                                expected_start_status_, symbol_overview_obj_list,
                                                                last_trade_fixture_list, market_depth_basemodel_list,
-                                                               top_of_book_list_, buy_order_, sell_order_):
+                                                               top_of_book_list_, buy_order_, sell_order_,
+                                                               refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
     # explicitly setting waived_min_orders to 10 for this test case
     expected_strat_limits_.cancel_rate.waived_min_orders = 0
     expected_strat_limits_.cancel_rate.max_cancel_rate = 19
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -2401,6 +2755,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, cle
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
     alert_list = []
     for i in range(10):
@@ -2550,7 +2905,7 @@ def _test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and
                                                          pair_strat_, expected_strat_limits_,
                                                          expected_start_status_, symbol_overview_obj_list,
                                                          last_trade_fixture_list, market_depth_basemodel_list,
-                                                         top_of_book_list_):
+                                                         top_of_book_list_, refresh_sec_update_fixture):
     """
     This test case contains check of update aggregate feature available in beanie part, put and patch http calls.
     Note: since post, put and patch all uses same method call for this feature and currently only
@@ -2562,7 +2917,7 @@ def _test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and
 
         buy_symbol = leg1_leg2_symbol_list[0][0]
         sell_symbol = leg1_leg2_symbol_list[0][1]
-
+        expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
         active_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
@@ -2668,6 +3023,7 @@ def _test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and
 #                         assert (projection_model.start_time < end_time)
 
 
+@pytest.mark.nightly
 def test_get_max_id_query(clean_and_set_limits):
     order_limits_max_id = strat_manager_service_native_web_client.get_order_limits_max_id_client()
     assert order_limits_max_id.max_id_val == 1, f"max_id mismatch, expected 1 received {order_limits_max_id.max_id_val}"
@@ -2680,15 +3036,16 @@ def test_get_max_id_query(clean_and_set_limits):
         f"max_id mismatch, expected {created_order_limits_obj.id} received {order_limits_max_id.max_id_val}"
 
 
+@pytest.mark.nightly
 def test_get_market_depths_query(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_start_status_, symbol_overview_obj_list, top_of_book_list_,
-        market_depth_basemodel_list, last_trade_fixture_list):
+        market_depth_basemodel_list, last_trade_fixture_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
 
     pair_strat_n_http_client_tuple_list = []
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-
+        expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
         activated_pair_start, executor_http_client = (
             create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_start_status_, symbol_overview_obj_list,
@@ -2763,13 +3120,18 @@ def test_get_market_depths_query(
                  f"received: {market_depth_obj.cumulative_avg_px}")
 
 
+@pytest.mark.nightly
 def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                  expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                                  last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-                                 buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec,
-                                 buy_fill_journal_, sell_fill_journal_, expected_strat_brief_):
+                                 buy_order_, sell_order_, max_loop_count_per_side,
+                                 buy_fill_journal_, sell_fill_journal_, expected_strat_brief_,
+                                 refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     created_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -2841,18 +3203,21 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
                                      expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
                                      last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
                                      buy_order_, sell_order_, max_loop_count_per_side,
                                      buy_fill_journal_, sell_fill_journal_,
-                                     expected_strat_brief_):
+                                     expected_strat_brief_, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
     # explicitly setting waived_min_orders to 10 for this test case
     expected_strat_limits_.cancel_rate.waived_min_orders = 10
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -3114,7 +3479,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                     (f"Unexpected: Mismatched strat_status's residual, "
                      f"expected {residual}, received {strat_status_after_fill.residual}")
                 balance_notional = \
-                    expected_strat_limits_.max_cb_notional - strat_status_after_fill.total_fill_sell_notional
+                    expected_strat_limits_.max_single_leg_notional - strat_status_after_fill.total_fill_sell_notional
                 assert strat_status_after_fill.balance_notional == balance_notional, \
                     (f"Unexpected: Mismatched strat_status's balance_notional, "
                      f"expected {balance_notional}, received {strat_status_after_fill.balance_notional}")
@@ -3162,7 +3527,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                     (f"Unexpected: Mismatched strat_status's residual, "
                      f"expected {residual}, received {strat_status_after_fill.residual}")
                 balance_notional = \
-                    expected_strat_limits_.max_cb_notional - strat_status_after_fill.total_fill_buy_notional
+                    expected_strat_limits_.max_single_leg_notional - strat_status_after_fill.total_fill_buy_notional
                 assert strat_status_after_fill.balance_notional == balance_notional, \
                     (f"Unexpected: Mismatched strat_status's balance_notional, "
                      f"expected {balance_notional}, received {strat_status_after_fill.balance_notional}")
@@ -3203,12 +3568,16 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_unload_reload_strat_from_collection(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
-        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, residual_wait_sec):
+        top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -3327,13 +3696,16 @@ def test_unload_reload_strat_from_collection(
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
+@pytest.mark.nightly
 def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_buy(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
+        expected_order_limits_, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -3359,13 +3731,16 @@ def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_buy(
                        "but got activated likely because of some bug")
 
 
+@pytest.mark.nightly
 def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_sell(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
+        expected_order_limits_, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -3393,10 +3768,12 @@ def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_sell(
                        "but got activated likely because of some bug")
 
 
+@pytest.mark.nightly
 def test_sequenced_fully_consume_same_symbol_strats(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
+        expected_order_limits_, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
@@ -3405,22 +3782,24 @@ def test_sequenced_fully_consume_same_symbol_strats(
     expected_order_limits_.id = 1
     strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
-    expected_strat_limits_.max_cb_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-        residual_wait_sec, Side.BUY)
+        refresh_sec_update_fixture, Side.BUY)
 
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-        residual_wait_sec, Side.BUY)
+        refresh_sec_update_fixture, Side.BUY)
 
 
+@pytest.mark.nightly
 def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
+        refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
@@ -3429,17 +3808,17 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
     expected_order_limits_.id = 1
     strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
-    expected_strat_limits_.max_cb_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-        residual_wait_sec, Side.BUY)
+        refresh_sec_update_fixture, Side.BUY)
 
     try:
         strat_done_after_exhausted_consumable_notional(
             leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
             symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-            residual_wait_sec, Side.BUY, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
+            refresh_sec_update_fixture, Side.BUY, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
     except Exception as e:
         err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
                     "can't activate this strat today")
@@ -3451,10 +3830,12 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
                        "other strat activated, but got activated likely because of some bug")
 
 
+@pytest.mark.nightly
 def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
+        refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
@@ -3463,17 +3844,17 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
     expected_order_limits_.id = 1
     strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
-    expected_strat_limits_.max_cb_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-        residual_wait_sec, Side.SELL, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
+        refresh_sec_update_fixture, Side.SELL, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
 
     try:
         strat_done_after_exhausted_consumable_notional(
             leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
             symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-            residual_wait_sec, Side.SELL)
+            refresh_sec_update_fixture, Side.SELL)
     except Exception as e:
         err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
                     "can't activate this strat today")
@@ -3485,10 +3866,12 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
                        "other strat activated, but got activated likely because of some bug")
 
 
+@pytest.mark.nightly
 def test_sequenced_fully_consume_diff_symbol_strats(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, residual_wait_sec, expected_order_limits_):
+        top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
+        refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
@@ -3497,28 +3880,32 @@ def test_sequenced_fully_consume_diff_symbol_strats(
     expected_order_limits_.id = 1
     strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
-    expected_strat_limits_.max_cb_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-        residual_wait_sec, Side.BUY)
+        refresh_sec_update_fixture, Side.BUY)
 
     buy_symbol = leg1_leg2_symbol_list[1][0]
     sell_symbol = leg1_leg2_symbol_list[1][1]
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_start_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
-        residual_wait_sec, Side.BUY)
+        refresh_sec_update_fixture, Side.BUY)
 
 
+@pytest.mark.nightly
 def test_reactivate_after_pause_strat(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
         top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
-        residual_wait_sec):
+        refresh_sec_update_fixture):
     # creates and activates multiple pair_strats
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
     activated_pair_strat, executor_http_client = (
         create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                 expected_start_status_, symbol_overview_obj_list, top_of_book_list_,
@@ -3560,6 +3947,77 @@ def test_reactivate_after_pause_strat(
         raise Exception(e)
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
+
+
+@pytest.mark.nightly
+def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
+                                   expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+                                   top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
+                                   refresh_sec_update_fixture):
+    # making limits suitable for this test
+    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    residual_wait_sec = 4 * refresh_sec_update_fixture
+
+    active_strat_list: List[PairStratBaseModel] = []
+    for buy_symbol, sell_symbol in leg1_leg2_symbol_list[:2]:
+        activated_pair_strat, executor_web_client = (
+            create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+                                               expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
+                                               market_depth_basemodel_list, top_of_book_list_))
+        active_strat_list.append(activated_pair_strat)
+
+    strat_manager_service_native_web_client.patch_pair_strat_client(
+        jsonable_encoder(PairStratBaseModel(_id=active_strat_list[-1].id, strat_state=StratState.StratState_READY),
+                         by_alias=True, exclude_none=True))
+
+    time.sleep(5)
+
+    for active_strat in active_strat_list:
+
+        if active_strat != active_strat_list[-1]:
+            strat_manager_service_native_web_client.patch_pair_strat_client(
+                jsonable_encoder(PairStratBaseModel(_id=active_strat.id, strat_state=StratState.StratState_PAUSED),
+                                 by_alias=True, exclude_none=True))
+
+            time.sleep(5)
+            strat_manager_service_native_web_client.patch_pair_strat_client(
+                jsonable_encoder(PairStratBaseModel(_id=active_strat.id, strat_state=StratState.StratState_DONE),
+                                 by_alias=True, exclude_none=True))
+
+            time.sleep(5)
+        strat_key = get_strat_key_from_pair_strat(active_strat)
+        strat_collection = strat_manager_service_native_web_client.get_strat_collection_client(1)
+        strat_collection.loaded_strat_keys.remove(strat_key)
+        strat_collection.buffered_strat_keys.append(strat_key)
+
+        strat_manager_service_native_web_client.put_strat_collection_client(strat_collection)
+        time.sleep(2)
+
+        pair_strat = strat_manager_service_native_web_client.get_pair_strat_client(active_strat.id)
+        assert not pair_strat.is_partially_running, \
+            "Mismatch: is_partially_running must be False after strat unload"
+        assert not pair_strat.is_executor_running, \
+            "Mismatch: is_executor_running must be False after strat unload"
+
+    # loading strat to get it deleted by clean_n_set_limits of another tests
+    for index, active_strat in enumerate(active_strat_list):
+        strat_key = get_strat_key_from_pair_strat(active_strat)
+        strat_collection = strat_manager_service_native_web_client.get_strat_collection_client(1)
+        strat_collection.loaded_strat_keys.append(strat_key)
+        strat_collection.buffered_strat_keys.remove(strat_key)
+
+        strat_manager_service_native_web_client.put_strat_collection_client(strat_collection)
+        time.sleep(residual_wait_sec)   # waiting for strat to get loaded completely
+
+        pair_strat = strat_manager_service_native_web_client.get_pair_strat_client(active_strat.id)
+        executor_http_client = StratExecutorServiceHttpClient.set_or_get_if_instance_exists(
+            pair_strat.host, pair_strat.port)
+        buy_symbol = active_strat.pair_strat_params.strat_leg1.sec.sec_id
+        sell_symbol = active_strat.pair_strat_params.strat_leg2.sec.sec_id
+        run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list, executor_http_client)
+    time.sleep(residual_wait_sec)
 
 
 def _test_delete_all_test_db():

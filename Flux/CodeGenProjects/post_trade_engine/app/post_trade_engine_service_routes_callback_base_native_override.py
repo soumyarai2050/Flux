@@ -542,6 +542,9 @@ class PostTradeEngineServiceRoutesCallbackBaseNativeOverride(PostTradeEngineServ
                               "not ready yet")
         elif "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))" in str(exception):
             logging.exception("pair_strat_engine service connection error")
+        elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
+              "it from responding to requests" in str(exception) and "status_code: 503" in str(exception)):
+            logging.exception("pair_strat_engine service connection error")
         else:
             return False
         return True

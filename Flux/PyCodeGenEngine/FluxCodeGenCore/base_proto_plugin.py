@@ -144,6 +144,7 @@ class BaseProtoPlugin(ABC):
     executor_option_cache_as_dict_with_key_field: ClassVar[str] = "CacheAsDictWithKeyField"
     flux_msg_small_sized_collection: ClassVar[str] = "FluxMsgSmallSizedCollection"
     flux_fld_PK: ClassVar[str] = "FluxFldPk"
+    flux_enum_cmnt: ClassVar[str] = "FluxEnumCmnt"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: ClassVar[str] = "ProtoPackageName"  # to be used in models as proto_package_name variable name
@@ -272,13 +273,14 @@ class BaseProtoPlugin(ABC):
             return val_str.strip()
 
     @staticmethod
-    def get_simple_option_value_from_proto(proto_entity: protogen.Message | protogen.Field | protogen.File,
-                                           option_name: str, is_repeated: bool | None = None) -> (List | str | int |
-                                                                                                  bool | float | None):
+    def get_simple_option_value_from_proto(
+            proto_entity: protogen.Message | protogen.Field | protogen.File | protogen.Enum,
+            option_name: str, is_repeated: bool | None = None) -> (List | str | int | bool | float | None):
         """
         Returns List if option is_repeated else value, returns None if option is not set
         """
-        if isinstance(proto_entity, protogen.Message) or isinstance(proto_entity, protogen.Field):
+        if (isinstance(proto_entity, protogen.Message) or isinstance(proto_entity, protogen.Field) or
+                isinstance(proto_entity, protogen.Enum)):
             option_type = BaseProtoPlugin.get_simple_option_type(proto_entity.parent_file, option_name)
         elif isinstance(proto_entity, protogen.File):
             option_type = BaseProtoPlugin.get_simple_option_type(proto_entity, option_name)
@@ -312,12 +314,13 @@ class BaseProtoPlugin(ABC):
                     return None
 
     @staticmethod
-    def _get_complex_option_value_from_proto(option_string: str, option_name: str | None = None,
-                                             proto_entity:
-                                             protogen.Message | protogen.Field | protogen.File | None = None,
-                                             option_type: protogen.Message | None = None) -> Dict:
+    def _get_complex_option_value_from_proto(
+            option_string: str, option_name: str | None = None,
+            proto_entity: protogen.Message | protogen.Field | protogen.File | protogen.Enum | None = None,
+            option_type: protogen.Message | None = None) -> Dict:
         if option_type is None:
-            if isinstance(proto_entity, protogen.Message) or isinstance(proto_entity, protogen.Field):
+            if (isinstance(proto_entity, protogen.Message) or isinstance(proto_entity, protogen.Field) or
+                    isinstance(proto_entity, protogen.Enum)):
                 option_type = BaseProtoPlugin.get_complex_option_type(proto_entity.parent_file, option_name)
             elif isinstance(proto_entity, protogen.File):
                 option_type = BaseProtoPlugin.get_complex_option_type(proto_entity, option_name)
@@ -385,9 +388,9 @@ class BaseProtoPlugin(ABC):
         return output_dict
 
     @staticmethod
-    def get_complex_option_value_from_proto(proto_entity: protogen.Message | protogen.Field | protogen.File,
-                                            option_name: str,
-                                            is_option_repeated: bool | None = None) -> List[Dict] | Dict:
+    def get_complex_option_value_from_proto(
+            proto_entity: protogen.Message | protogen.Field | protogen.File | protogen.Enum, option_name: str,
+            is_option_repeated: bool | None = None) -> List[Dict] | Dict:
         """
         Interface to get option values from proto model file
         :param proto_entity: proto entity of which option value is to be found

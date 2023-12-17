@@ -10,7 +10,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
     getHoverTextType, getValueFromReduxStoreFromXpath, floatToInt,
-    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray
+    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase
 } from '../utils';
 import { DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
@@ -26,7 +26,6 @@ const Cell = (props) => {
     const {
         mode,
         rowindex,
-        collection,
         xpath,
         dataxpath,
         disabled,
@@ -36,7 +35,9 @@ const Cell = (props) => {
         buttonDisable
     } = props;
 
+    const collection = cloneDeep(props.collection);
     const state = useSelector(state => state);
+    const { schema } = useSelector(state => state.schema);
     const [active, setActive] = useState(false);
     const [open, setOpen] = useState(false);
     const [oldValue, setOldValue] = useState(null);
@@ -187,6 +188,18 @@ const Cell = (props) => {
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
             } : {};
+
+            if (collection.dynamic_autocomplete) {
+                const widgetName = toCamelCase(collection.autocomplete.split('.')[0]);
+                const dynamicValuePath = collection.autocomplete.substring(collection.autocomplete.indexOf('.') + 1);
+                const dynamicValue = _.get(state[widgetName]['modified' + capitalizeCamelCase(widgetName)], dynamicValuePath);
+                if (schema.autocomplete.hasOwnProperty(dynamicValue)) {
+                    collection.options = schema.autocomplete[dynamicValue];
+                    if (!collection.options.includes(collection.value)) {
+                        collection.value = null;
+                    }
+                }
+            }
 
             return (
                 <TableCell className={classes.cell_input_field} align='center' size='small' onKeyDown={onKeyDown} onBlur={onFocusOut} onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>

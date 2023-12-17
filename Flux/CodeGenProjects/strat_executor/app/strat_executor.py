@@ -68,7 +68,7 @@ class StratExecutor:
         self.strat_cache: StratCache = strat_cache
         self.leg1_fx: float | None = None
 
-        self._portfolio_status_update_date_time: DateTime | None = None
+        self._system_control_update_date_time: DateTime | None = None
         self._strat_brief_update_date_time: DateTime | None = None
         self._order_snapshots_update_date_time: DateTime | None = None
         self._order_journals_update_date_time: DateTime | None = None
@@ -99,8 +99,6 @@ class StratExecutor:
     def check_order_eligibility(self, side: Side, check_notional: float) -> bool:
         strat_brief, self._strat_brief_update_date_time = \
             self.strat_cache.get_strat_brief(self._strat_brief_update_date_time)
-        portfolio_status, self._portfolio_status_update_date_time = \
-            self.trading_data_manager.trading_cache.get_portfolio_status(self._portfolio_status_update_date_time)
         if side == Side.BUY:
             if strat_brief.pair_buy_side_trading_brief.consumable_notional - check_notional > 0:
                 return True
@@ -409,7 +407,7 @@ class StratExecutor:
                               f"{self.strat_cache.get_key()}, strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
                 checks_passed |= OrderControl.ORDER_CONTROL_MAX_OPEN_ORDERS_FAIL
 
-            # max_open_cb_notional check
+            # max_open_single_leg_notional check
             if order_usd_notional > strat_brief.pair_sell_side_trading_brief.consumable_open_notional:
                 logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} order, "
                               f"breaches available consumable open notional, expected less than: "
@@ -417,9 +415,9 @@ class StratExecutor:
                               f" {order_usd_notional}")
                 checks_passed |= OrderControl.ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL
 
-            # covers: max cb notional, max open cb notional & max net filled notional
+            # covers: max single_leg notional, max open cb notional & max net filled notional
             # ( TODO Urgent: validate and add this description to log detail section ;;;)
-            # Checking max_cb_notional
+            # Checking max_single_leg_notional
             if order_usd_notional > strat_brief.pair_sell_side_trading_brief.consumable_notional:
                 logging.error(f"blocked generated SELL order, breaches available consumable notional, expected less "
                               f"than: {strat_brief.pair_sell_side_trading_brief.consumable_notional}, order needs: "
@@ -449,7 +447,7 @@ class StratExecutor:
                               f"{self.strat_cache.get_key()}, strat_brief: {get_strat_brief_log_key(strat_brief)}")
                 checks_passed |= OrderControl.ORDER_CONTROL_MAX_OPEN_ORDERS_FAIL
 
-            # max_open_cb_notional check
+            # max_open_single_leg_notional check
             if order_usd_notional > strat_brief.pair_buy_side_trading_brief.consumable_open_notional:
                 logging.error(f"blocked symbol_side_key: {get_symbol_side_key([(system_symbol, side)])} order, "
                               f"breaches available consumable open notional, order needs: "
@@ -1097,15 +1095,15 @@ class StratExecutor:
         else:
             return -1  # in progress
 
-    def _get_latest_portfolio_status(self) -> PortfolioStatusBaseModel | None:
-        portfolio_status: PortfolioStatusBaseModel | None = None
-        portfolio_status_tuple = self.trading_data_manager.trading_cache.get_portfolio_status()
-        if portfolio_status_tuple is None:
-            logging.warning("no portfolio status found yet - strat will not trigger until portfolio status arrives")
+    def _get_latest_system_control(self) -> SystemControlBaseModel | None:
+        system_control: SystemControlBaseModel | None = None
+        system_control_tuple = self.trading_data_manager.trading_cache.get_system_control()
+        if system_control_tuple is None:
+            logging.warning("no kill_switch found yet - strat will not trigger until kill_switch arrives")
             return None
         else:
-            portfolio_status, self._portfolio_status_update_date_time = portfolio_status_tuple
-        return portfolio_status
+            system_control, self._system_control_update_date_time = system_control_tuple
+        return system_control
 
     def is_strat_ready_for_next_opportunity(self, log_error: bool = False) -> bool:
         open_order_count: int = self.strat_cache.get_open_order_count_from_cache()
@@ -1151,8 +1149,8 @@ class StratExecutor:
                     return 1  # indicates explicit shutdown requested from server
 
                 # 1. check if portfolio status has updated since we last checked
-                portfolio_status: PortfolioStatusBaseModel | None = self._get_latest_portfolio_status()
-                if portfolio_status is None:
+                system_control: SystemControlBaseModel | None = self._get_latest_system_control()
+                if system_control is None:
                     continue
 
                 # 2. get pair-strat: no checking if it's updated since last checked (required for TOB extraction)
@@ -1243,7 +1241,7 @@ class StratExecutor:
                     continue
 
                 # 6. If kill switch is enabled - don't act, just return
-                if portfolio_status.kill_switch:
+                if system_control.kill_switch:
                     logging.debug("not-progressing: kill switch enabled")
                     continue
 
@@ -1262,13 +1260,13 @@ class StratExecutor:
                                                                           self._new_orders_processed_slice:final_slice]
                         self._new_orders_processed_slice = final_slice
                         for new_order in unprocessed_new_orders:
-                            if portfolio_status and not portfolio_status.kill_switch:
+                            if system_control and not system_control.kill_switch:
                                 self._check_tob_n_place_non_systematic_order(new_order, pair_strat, strat_brief,
                                                                              order_limits, top_of_books)
                                 continue
                             else:
                                 # kill switch in force - drop the order
-                                logging.error(f"Portfolio_status kill switch's is enabled, dropping non-systematic "
+                                logging.error(f"kill switch is enabled, dropping non-systematic "
                                               f"new-order request;;;new order: {new_order} "
                                               "non-systematic new order call")
                                 continue

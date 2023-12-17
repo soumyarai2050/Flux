@@ -45,6 +45,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         self.__auto_complete_data_cache: List[Tuple[protogen.Field, str]] = []
         self.__case_style_convert_method: Callable[[str], str] | None = None
         self.auto_complete_data: Dict | None = None
+        self.message_list: List[protogen.Message] = []
         self.root_msg_list: List[protogen.Message] = []
         self.__is_req_autocomplete: bool = False
 
@@ -71,6 +72,7 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
                 # config list, avoid messages from it
         # else not required: core_or_util_files key is not in yaml dict config
 
+        self.message_list.extend(message_list)
         for message in set(message_list):
             if (self.is_option_enabled(message, JsonSampleGenPlugin.flux_msg_json_root) or
                     self.is_option_enabled(message, JsonSampleGenPlugin.flux_msg_json_root_time_series)):
@@ -165,14 +167,14 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
         # handling accessing and replacing list name to the value in option_value
         new_option_value = self.__handle_replacement_of_autocomplete_list_wth_value(option_value)
         output_str = ""
-        for field_value_pair in new_option_value[1:-1].split(","):
+        for field_value_pair in new_option_value.split(","):
             field_name, value = field_value_pair.split("=")
             if self.__response_field_case_style == "camel":
                 field_name_case_styled = convert_to_camel_case(field_name)
             else:
                 field_name_case_styled = field_name
             output_str += " " * (indent_space_count + 2) + f'"{field_name_case_styled}": "{value}"'
-            if field_value_pair != new_option_value[1:-1].split(",")[-1]:
+            if field_value_pair != new_option_value.split(",")[-1]:
                 output_str += ",\n"
             else:
                 output_str += "\n"
@@ -241,6 +243,16 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
                 raise Exception(err_str)
         # else not required: If no field of any message has autocomplete option then avoiding file's content load
 
+    def _get_random_value_from_auto_complete_list(self, list_name: str):
+        if list_name in self.auto_complete_data["autocomplete"]:
+            list_name_data: List[str] = self.auto_complete_data["autocomplete"][list_name]
+            random_value = choice(list_name_data)
+            return random_value
+        else:
+            err_str = f"autocomplete file has no key {list_name}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
     def __handle_replacement_of_autocomplete_list_wth_value(self, option_value: str) -> str:
         option_fields = option_value.split(",")
         new_option_value = ""
@@ -249,14 +261,38 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
                 field_name, list_name = option_field.strip().split(":")
                 list_name = list_name.replace('"', '').strip()
 
-                if list_name in self.auto_complete_data["autocomplete"]:
-                    list_name_data: List[str] = self.auto_complete_data["autocomplete"][list_name]
-                    random_value = choice(list_name_data)
-                    new_option_value += f"{field_name}={random_value}"
+                random_value = self._get_random_value_from_auto_complete_list(list_name)
+                new_option_value += f"{field_name}={random_value}"
+            if "~" in option_field:
+                # print(f"option_field: {option_field.strip('~')}")
+                field_name, msg_fld_ref = option_field.strip().split("~")
+                for msg in self.message_list:
+                    if msg.proto.name == msg_fld_ref.split(".")[0]:
+                        break
                 else:
-                    err_str = f"autocomplete file has no key {list_name}"
-                    logging.exception(err_str)
-                    raise Exception(err_str)
+                    raise Exception(f"message with name {msg_fld_ref.split('.')[0]} not found in list of all messages")
+
+                found_enum: protogen.Enum | None = None
+                for fld_name in msg_fld_ref.split(".")[1:]:
+                    for fld in msg.fields:
+                        if fld.proto.name == fld_name:
+                            msg = fld.message
+                            break
+                    else:
+                        raise Exception(
+                            f"field with name {fld_name} not found in list of field of message {msg.proto.name}")
+
+                    if fld.enum is not None:
+                        found_enum = fld.enum
+                        break
+
+                if found_enum is not None:
+                    random_val = choice(found_enum.values)
+                else:
+                    raise Exception("can't find enum in any msg's fld mentioned in ref value in sec_id key in "
+                                    "autocorrect option value")
+                new_option_value += f"{field_name}={random_val.proto.name}"
+                pass
             else:
                 new_option_value += option_field.strip()
 

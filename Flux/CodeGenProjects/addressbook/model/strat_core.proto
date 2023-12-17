@@ -73,3 +73,8 @@ enum StratMode{
   StratMode_Relaxed = 1;
   StratMode_Aggressive = 2;
 }
+
+enum StratType {
+	Premium = 1;
+	AH = 2;
+}

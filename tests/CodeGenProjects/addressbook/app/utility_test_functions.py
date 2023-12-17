@@ -311,9 +311,9 @@ def update_expected_strat_brief_for_buy(loop_count: int, total_loop_count: int,
         expected_symbol_side_snapshot.total_cxled_qty
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_orders = 4
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_notional = \
-        expected_strat_limits.max_cb_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
+        expected_strat_limits.max_single_leg_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_open_notional = \
-        expected_strat_limits.max_open_cb_notional - open_notional
+        expected_strat_limits.max_open_single_leg_notional - open_notional
     total_security_size: int = \
         static_data.get_security_float_from_ticker(expected_order_snapshot_obj.order_brief.security.sec_id)
     expected_strat_brief_obj.pair_buy_side_trading_brief.consumable_concentration = \
@@ -362,9 +362,9 @@ def update_expected_strat_brief_for_sell(loop_count: int, total_loop_count: int,
         expected_symbol_side_snapshot.total_cxled_qty
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_orders = 4
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_notional = \
-        expected_strat_limits.max_cb_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
+        expected_strat_limits.max_single_leg_notional - expected_symbol_side_snapshot.total_fill_notional - open_notional
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_open_notional = \
-        expected_strat_limits.max_open_cb_notional - open_notional
+        expected_strat_limits.max_open_single_leg_notional - open_notional
     total_security_size: int = \
         static_data.get_security_float_from_ticker(expected_order_snapshot_obj.order_brief.security.sec_id)
     expected_strat_brief_obj.pair_sell_side_trading_brief.consumable_concentration = \
@@ -561,10 +561,10 @@ def check_placed_buy_order_computes_before_all_sells(loop_count: int, total_orde
 
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
     else:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
     strat_status_obj_list = executor_web_client.get_all_strat_status_client()
     if len(strat_status_obj_list) == 1:
@@ -751,10 +751,10 @@ def check_placed_buy_order_computes_after_sells(loop_count: int, total_order_cou
 
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
     else:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
     strat_status_obj_list = executor_web_client.get_all_strat_status_client()
     if len(strat_status_obj_list) == 1:
@@ -967,10 +967,10 @@ def check_fill_receive_for_placed_buy_order_before_sells(loop_count: int, total_
                                                   residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
     else:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
     strat_status_obj_list = executor_web_client.get_all_strat_status_client()
     if len(strat_status_obj_list) == 1:
@@ -1152,10 +1152,10 @@ def check_fill_receive_for_placed_buy_order_after_all_sells(loop_count: int, tot
 
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
     else:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
     strat_status_obj_list = executor_web_client.get_all_strat_status_client()
     if len(strat_status_obj_list) == 1:
@@ -1340,10 +1340,10 @@ def check_placed_sell_order_computes_before_buys(loop_count: int, total_loop_cou
 
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
     else:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
     strat_status_obj_list = executor_web_client.get_all_strat_status_client()
     if len(strat_status_obj_list) == 1:
@@ -1516,10 +1516,10 @@ def check_placed_sell_order_computes_after_all_buys(loop_count: int, total_loop_
 
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
     else:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
     strat_status_obj_list = executor_web_client.get_all_strat_status_client()
     if len(strat_status_obj_list) == 1:
@@ -1735,10 +1735,10 @@ def check_fill_receive_for_placed_sell_order_before_buys(
         expected_strat_status.residual = Residual(security=security, residual_notional=residual_notional)
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
     else:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
     strat_status_obj_list = executor_web_client.get_all_strat_status_client()
     if len(strat_status_obj_list) == 1:
@@ -1885,10 +1885,10 @@ def check_fill_receive_for_placed_sell_order_after_all_buys(
             single_sell_order_px) * (loop_count - 1))
     if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_buy_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
     else:
         expected_strat_status.balance_notional = \
-            expected_strat_limits.max_cb_notional - expected_strat_status.total_fill_sell_notional
+            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
 
     strat_status_obj_list = executor_web_client.get_all_strat_status_client()
     if len(strat_status_obj_list) == 1:
@@ -2249,7 +2249,7 @@ def create_n_activate_strat(leg1_symbol: str, leg2_symbol: str,
          f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
     print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    return updated_pair_strat, executor_web_client
+    return activated_pair_strat, executor_web_client
 
 
 # @@@ deprecated: strat_collection is now handled by pair_strat override itself
@@ -2372,19 +2372,13 @@ def renew_strat_collection():
 def clean_executors_and_today_activated_symbol_side_lock_file():
     existing_pair_strat = strat_manager_service_native_web_client.get_all_pair_strat_client()
     for pair_strat in existing_pair_strat:
-        if not pair_strat.is_executor_running:
-            err_str_ = ("strat exists but is not running, can't delete strat when not running, "
-                        "delete it manually")
-            logging.error(err_str_)
-            raise Exception(err_str_)
-
         pair_strat = PairStratBaseModel(_id=pair_strat.id, strat_state=StratState.StratState_DONE)
         strat_manager_service_native_web_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True,
                                                                         exclude_none=True))
         # removing today_activated_symbol_side_lock_file
-        command_n_control_obj: CommandNControlBaseModel = CommandNControlBaseModel(command_type=CommandType.CLEAR_STRAT,
+        admin_control_obj: AdminControlBaseModel = AdminControlBaseModel(command_type=CommandType.CLEAR_STRAT,
                                                                                    datetime=DateTime.utcnow())
-        strat_manager_service_native_web_client.create_command_n_control_client(command_n_control_obj)
+        strat_manager_service_native_web_client.create_admin_control_client(admin_control_obj)
 
         strat_manager_service_native_web_client.delete_pair_strat_client(pair_strat.id)
         time.sleep(2)
@@ -2408,6 +2402,14 @@ def create_n_verify_portfolio_status(portfolio_status_obj: PortfolioStatusBaseMo
         strat_manager_service_native_web_client.create_portfolio_status_client(portfolio_status_obj))
     assert created_portfolio_status == portfolio_status_obj, \
         f"Mismatch portfolio_status: expected {portfolio_status_obj}, received {created_portfolio_status}"
+
+
+def create_n_verify_system_control(system_control: SystemControlBaseModel):
+    system_control.id = 1
+    created_system_control = (
+        strat_manager_service_native_web_client.create_system_control_client(system_control))
+    assert created_system_control == system_control, \
+        f"Mismatch portfolio_status: expected {system_control}, received {created_system_control}"
 
 
 def verify_portfolio_status(total_loop_count: int, symbol_pair_count: int,
@@ -2620,7 +2622,7 @@ def get_px_in_usd(px: float):
 
 
 def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_count: int,
-                               residual_test_wait: int, buy_order_: OrderJournalBaseModel,
+                               refresh_sec: int, buy_order_: OrderJournalBaseModel,
                                sell_order_: OrderJournalBaseModel,
                                buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
                                expected_buy_order_snapshot_: OrderSnapshotBaseModel,
@@ -2633,6 +2635,9 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
                                symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                market_depth_basemodel_list: List[MarketDepthBaseModel],
                                is_non_systematic_run: bool = False):
+
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    residual_test_wait = 4 * refresh_sec
     active_strat, executor_web_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
@@ -2854,7 +2859,7 @@ def handle_test_buy_sell_order(buy_symbol: str, sell_symbol: str, total_loop_cou
 
 
 def handle_test_sell_buy_order(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
-                               residual_test_wait: int, buy_order_: OrderJournalBaseModel,
+                               refresh_sec: int, buy_order_: OrderJournalBaseModel,
                                sell_order_: OrderJournalBaseModel,
                                buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
                                expected_buy_order_snapshot_: OrderSnapshotBaseModel,
@@ -2867,6 +2872,8 @@ def handle_test_sell_buy_order(leg1_symbol: str, leg2_symbol: str, total_loop_co
                                symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                market_depth_basemodel_list: List[MarketDepthBaseModel],
                                is_non_systematic_run: bool = False):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    residual_test_wait = 4 * refresh_sec
     active_strat, executor_web_client = (
         create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
@@ -3231,31 +3238,26 @@ def handle_rej_order_test(buy_symbol, sell_symbol, expected_strat_limits_,
             sell_rej_last_id = last_id
     return buy_rej_last_id, sell_rej_last_id
 
+
 def verify_cxl_rej(last_cxl_order_id: str | None, last_cxl_rej_order_id: str | None,
                    check_order_event: OrderEventType, symbol: str,
-                   executor_web_client: StratExecutorServiceHttpClient) -> Tuple[str, str]:
-    if check_order_event == OrderEventType.OE_CXL_REJ:
+                   executor_web_client: StratExecutorServiceHttpClient,
+                   expected_reverted_order_status: OrderStatusType) -> Tuple[str, str]:
+    if check_order_event == "REJ":
         # internally checks order_journal is not None else raises assert exception internally
         latest_cxl_rej_order_journal = \
-            get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_REJ, symbol,
-                                                           executor_web_client,
-                                                           last_order_id=last_cxl_rej_order_id)
+            get_latest_order_journal_with_events_and_symbol([OrderEventType.OE_CXL_INT_REJ,
+                                                             OrderEventType.OE_CXL_BRK_REJ,
+                                                             OrderEventType.OE_CXL_EXH_REJ], symbol,
+                                                            executor_web_client,
+                                                            last_order_id=last_cxl_rej_order_id)
         last_cxl_rej_order_id = latest_cxl_rej_order_journal.order.order_id
 
         order_snapshot = get_order_snapshot_from_order_id(latest_cxl_rej_order_journal.order.order_id,
                                                           executor_web_client)
-        if order_snapshot.order_brief.qty > order_snapshot.filled_qty:
-            assert order_snapshot.order_status == OrderStatusType.OE_ACKED, \
-                "Unexpected order_snapshot.order_status: expected OrderStatusType.OE_ACKED, " \
-                f"received {order_snapshot.order_status}"
-        elif order_snapshot.order_brief.qty < order_snapshot.filled_qty:
-            assert order_snapshot.order_status == OrderStatusType.OE_OVER_FILLED, \
-                "Unexpected order_snapshot.order_status: expected OrderStatusType.OE_OVER_FILLED, " \
-                f"received {order_snapshot.order_status}"
-        else:
-            assert order_snapshot.order_status == OrderStatusType.OE_FILLED, \
-                "Unexpected order_snapshot.order_status: expected OrderStatusType.OE_FILLED, " \
-                f"received {order_snapshot.order_status}"
+        assert order_snapshot.order_status == expected_reverted_order_status, \
+            f"Unexpected order_snapshot.order_status: expected {expected_reverted_order_status}, " \
+            f"received {order_snapshot.order_status}"
 
     # checks order_journal is not None else raises assert exception internally
     latest_cxl_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL_ACK, symbol,
@@ -3659,13 +3661,15 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
 def strat_done_after_exhausted_consumable_notional(
         leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
-        top_of_book_list_, residual_wait_sec, side_to_check: Side, leg_1_side: Side | None = None,
+        top_of_book_list_, refresh_sec, side_to_check: Side, leg_1_side: Side | None = None,
         leg_2_side: Side | None = None):
 
     if leg_1_side is None or leg_2_side is None:
         leg_1_side = Side.BUY
         leg_2_side = Side.SELL
 
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    residual_wait_sec = 4 * refresh_sec
     created_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -3751,14 +3755,15 @@ def get_mongo_server_uri():
 
 
 def clean_today_activated_ticker_dict():
-    command_n_control_obj: CommandNControlBaseModel = CommandNControlBaseModel(command_type=CommandType.CLEAR_STRAT, datetime=DateTime.utcnow())
-    strat_manager_service_native_web_client.create_command_n_control_client(command_n_control_obj)
+    admin_control_obj: AdminControlBaseModel = AdminControlBaseModel(command_type=CommandType.CLEAR_STRAT,
+                                                                     datetime=DateTime.utcnow())
+    strat_manager_service_native_web_client.create_admin_control_client(admin_control_obj)
 
 
 def clear_cache_in_model():
-    command_n_control_obj: CommandNControlBaseModel = CommandNControlBaseModel(command_type=CommandType.RESET_STATE,
-                                                                               datetime=DateTime.utcnow())
-    strat_manager_service_native_web_client.create_command_n_control_client(command_n_control_obj)
+    admin_control_obj: AdminControlBaseModel = AdminControlBaseModel(command_type=CommandType.RESET_STATE,
+                                                                     datetime=DateTime.utcnow())
+    strat_manager_service_native_web_client.create_admin_control_client(admin_control_obj)
     post_trade_engine_service_http_client.reload_cache_query_client()
 
 
@@ -3771,7 +3776,7 @@ def append_csv_file(file_name: str, records: List[List[any]]):
 
 
 def handle_test_buy_sell_pair_order(buy_symbol: str, sell_symbol: str, total_loop_count: int,
-                                    residual_test_wait: int, buy_order_: OrderJournalBaseModel,
+                                    refresh_sec: int, buy_order_: OrderJournalBaseModel,
                                     sell_order_: OrderJournalBaseModel,
                                     buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
                                     expected_buy_order_snapshot_: OrderSnapshotBaseModel,
@@ -3784,6 +3789,8 @@ def handle_test_buy_sell_pair_order(buy_symbol: str, sell_symbol: str, total_loo
                                     symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                     market_depth_basemodel_list: List[MarketDepthBaseModel],
                                     is_non_systematic_run: bool = False):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    residual_test_wait = 4 * refresh_sec
     active_strat, executor_web_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,
@@ -4004,19 +4011,21 @@ def handle_test_buy_sell_pair_order(buy_symbol: str, sell_symbol: str, total_loo
 
 
 def handle_test_sell_buy_pair_order(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
-                               residual_test_wait: int, buy_order_: OrderJournalBaseModel,
-                               sell_order_: OrderJournalBaseModel,
-                               buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
-                               expected_buy_order_snapshot_: OrderSnapshotBaseModel,
-                               expected_sell_order_snapshot_: OrderSnapshotBaseModel,
-                               expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
-                               pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
-                               expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
-                               expected_portfolio_status_: PortfolioStatusBaseModel, top_of_book_list_: List[Dict],
-                               last_trade_fixture_list: List[Dict],
-                               symbol_overview_obj_list: List[SymbolOverviewBaseModel],
-                               market_depth_basemodel_list: List[MarketDepthBaseModel],
-                               is_non_systematic_run: bool = False):
+                                    refresh_sec: int, buy_order_: OrderJournalBaseModel,
+                                    sell_order_: OrderJournalBaseModel,
+                                    buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
+                                    expected_buy_order_snapshot_: OrderSnapshotBaseModel,
+                                    expected_sell_order_snapshot_: OrderSnapshotBaseModel,
+                                    expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
+                                    pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
+                                    expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
+                                    expected_portfolio_status_: PortfolioStatusBaseModel, top_of_book_list_: List[Dict],
+                                    last_trade_fixture_list: List[Dict],
+                                    symbol_overview_obj_list: List[SymbolOverviewBaseModel],
+                                    market_depth_basemodel_list: List[MarketDepthBaseModel],
+                                    is_non_systematic_run: bool = False):
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    residual_test_wait = 4 * refresh_sec
     active_strat, executor_web_client = (
         create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list,

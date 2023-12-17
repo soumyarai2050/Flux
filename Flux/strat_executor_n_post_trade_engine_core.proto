@@ -14,10 +14,12 @@ enum OrderEventType{
   OE_CXL = 3;
   OE_CXL_ACK = 4;
   OE_UNSOL_CXL = 5;
-  OE_CXL_REJ = 6;
-  OE_INT_REJ = 7;
-  OE_BRK_REJ = 8;
-  OE_EXH_REJ = 9;
+  OE_CXL_INT_REJ = 6;
+  OE_CXL_BRK_REJ = 7;
+  OE_CXL_EXH_REJ = 8;
+  OE_INT_REJ = 9;
+  OE_BRK_REJ = 10;
+  OE_EXH_REJ = 11;
 }
 
 enum OrderStatusType{
@@ -147,8 +149,8 @@ message PairSideTradingBrief{
   required Side side = 2;
   required string last_update_date_time = 3 [(FluxFldValIsDateTime) = true];
   optional float consumable_open_orders = 4 [(FluxFldHelp) = "max_open_orders_per_side - open_orders for this symbol side"];
-  optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_cb_notional - filled_notional - open_notional"];
-  optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_open_cb_notional - open_notional"];
+  optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_single_leg_notional - filled_notional - open_notional"];
+  optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_open_single_leg_notional - open_notional"];
   optional int64 consumable_concentration = 7 [(FluxFldHelp) = "(total_trading_security_size/100*max_concentration) - (open_qty + filled_qty)"];
   optional float participation_period_order_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all order qty in the MarketTradeVolumeParticipation.applicable_period_seconds irrespective of how the order fared in the market: open, filled, cancelled; if applicable_period_seconds is 0, directly use SymbolSideSnapshot.total_qty"];
   optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
@@ -216,7 +218,7 @@ message StratBrief{
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional PairSideTradingBrief pair_buy_side_trading_brief = 2;
   optional PairSideTradingBrief pair_sell_side_trading_brief = 3;
-  optional float consumable_nett_filled_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_net_filled_notional - Absolute (filled_cb_notional - filled_egt_notional)"];
+  optional float consumable_nett_filled_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_net_filled_notional - Absolute (filled_leg1_notional - filled_leg2_notional)"];
 //  optional float total_open_buy_notional
 }
 

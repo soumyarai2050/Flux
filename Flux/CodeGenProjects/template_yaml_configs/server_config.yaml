@@ -4,13 +4,15 @@ symbol_configs:
     fill_percent: 100
     total_fill_count: 1
     ack_percent: 100
+    force_fill_full: False
 
     # to simulate rej functionality
     simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
     simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
 
     # to simulate cxl-rej functionality
-    simulate_cxl_rej_orders: False
+    simulate_new_to_cxl_rej_orders: False
+    simulate_ack_to_cxl_rej_orders: False
 
     # to avoid cxl ack after cxl req, if not True cxl req itself will trigger cxl ack
     avoid_cxl_ack_after_cxl_req: False
@@ -28,13 +30,15 @@ symbol_configs:
     fill_percent: 100
     total_fill_count: 1
     ack_percent: 100
+    force_fill_full: False
 
     # to simulate rej functionality
     simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
     simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
 
     # to simulate cxl-rej functionality
-    simulate_cxl_rej_orders: False
+    simulate_new_to_cxl_rej_orders: False
+    simulate_ack_to_cxl_rej_orders: False
 
     # to simulate unsolicited cxl functionality
     simulate_ack_unsolicited_cxl_orders: False
@@ -49,13 +53,15 @@ symbol_configs:
     fill_percent: 100
     total_fill_count: 1
     ack_percent: 100
+    force_fill_full: False
 
     # to simulate rej functionality
     simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
     simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
 
     # to simulate cxl-rej functionality
-    simulate_cxl_rej_orders: False
+    simulate_new_to_cxl_rej_orders: False
+    simulate_ack_to_cxl_rej_orders: False
 
     # to simulate unsolicited cxl functionality
     simulate_ack_unsolicited_cxl_orders: False
@@ -70,13 +76,15 @@ symbol_configs:
     fill_percent: 100
     total_fill_count: 1
     ack_percent: 100
+    force_fill_full: False
 
     # to simulate rej functionality
     simulate_new_to_reject_orders: False   # to simulate orders with new and reject order_event
     simulate_ack_to_reject_orders: False   # to simulate orders with ack and reject order_event
 
     # to simulate cxl-rej functionality
-    simulate_cxl_rej_orders: False
+    simulate_new_to_cxl_rej_orders: False
+    simulate_ack_to_cxl_rej_orders: False
 
     # to simulate unsolicited cxl functionality
     simulate_ack_unsolicited_cxl_orders: False

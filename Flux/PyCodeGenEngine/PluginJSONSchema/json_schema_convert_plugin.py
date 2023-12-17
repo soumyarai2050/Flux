@@ -454,12 +454,25 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                 self.get_simple_option_value_from_proto(field_or_message_obj,
                                                                         JsonSchemaConvertPlugin.flux_fld_val_min)
                             option_value = f'{option_value}, Min Value: {min_val}'
-
                     # else not required: if option is not flux_fld_help then avoiding check
 
                     if option in JsonSchemaConvertPlugin.options_having_msg_fld_names:
                         option_value = self.__handle_options_value_case_having_msg_fld_name(option_value, option)
-                    # else not required: if option is not in options_having_msg_fld_names then avoid
+                    elif option == JsonSchemaConvertPlugin.flux_fld_auto_complete:
+                        autocomplete_option_val = \
+                            self.get_simple_option_value_from_proto(field_or_message_obj,
+                                                                    JsonSchemaConvertPlugin.flux_fld_auto_complete)
+                        if autocomplete_option_val.startswith("sec_id~"):
+                            sec_id_val = autocomplete_option_val.split(",")[0].split("~")[-1]
+                            msg_name_in_option_val = sec_id_val.split(".")[0]
+                            msg_name_in_option_val_snake_cased = (
+                                convert_camel_case_to_specific_case(msg_name_in_option_val))
+                            option_value = autocomplete_option_val.replace(msg_name_in_option_val,
+                                                                           msg_name_in_option_val_snake_cased)
+                        # else not required: msg/fld name not in value of sec_id since ~ signifies use of
+                        # msg/fld in auto_complete as sec_id value
+                    # else not required: no handling required if option is not in options_having_msg_fld_names
+                    # or option is not flux_fld_auto_complete with msg/fld name in value of sec_id
 
                     # converting flux_option into json attribute name
                     flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)

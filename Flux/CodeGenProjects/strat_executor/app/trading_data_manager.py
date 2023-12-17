@@ -4,7 +4,7 @@ from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.strat_executor.app.trading_cache import *
 from Flux.CodeGenProjects.strat_executor.app.strat_cache import StratCache
 from Flux.CodeGenProjects.strat_executor.app.strat_executor_service_helper import (
-    get_symbol_side_key, get_fills_journal_log_key, get_order_journal_log_key)
+    get_fills_journal_log_key, get_order_journal_log_key)
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import is_ongoing_strat
 from Flux.CodeGenProjects.strat_executor.app.trading_link import is_test_run
 from Flux.CodeGenProjects.pair_strat_engine.generated.StratExecutor.strat_manager_service_ws_data_manager import \
@@ -13,7 +13,6 @@ from Flux.CodeGenProjects.strat_executor.generated.StratExecutor.strat_executor_
     StratExecutorServiceDataManager)
 from Flux.CodeGenProjects.strat_executor.app.get_pair_strat_n_executor_client import *
 from Flux.CodeGenProjects.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
-from Flux.CodeGenProjects.strat_executor.generated.FastApi.strat_executor_service_http_client import StratExecutorServiceHttpClient
 
 port = os.environ.get("PORT")
 if port is None or len(port) == 0:
@@ -67,7 +66,7 @@ class TradingDataManager(StratManagerServiceDataManager, StratExecutorServiceDat
 
         # selecting which ws connections are required
         self.order_limits_ws_get_all_cont.register_to_run()
-        self.portfolio_status_ws_get_all_cont.register_to_run()
+        self.system_control_ws_get_all_cont.register_to_run()
         # overriding pair strat ws_get_all_const to filter by id
         pair_strat_obj = self.strat_cache.get_pair_strat()[0]
         self.pair_strat_ws_get_all_cont = self.pair_strat_ws_get_by_id_client(False, pair_strat_obj.id)

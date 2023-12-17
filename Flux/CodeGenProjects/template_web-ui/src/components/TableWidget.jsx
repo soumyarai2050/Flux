@@ -314,7 +314,7 @@ const TableWidget = (props) => {
         // let originalRows = getTableRowsFromData(props.collections, props.originalData, props.xpath);
         const url = props.url ? props.url : API_ROOT_URL;
         const storedData = await axios.get(`${url}/get-all-${props.name}`);
-        let originalRows = getTableRowsFromData(props.collections, storedData, props.xpath);
+        let originalRows = getTableRowsFromData(props.collections, storedData.data, props.xpath);
         originalRows.forEach(row => {
             delete row['data-id'];
         })

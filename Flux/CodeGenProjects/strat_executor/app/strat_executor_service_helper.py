@@ -174,8 +174,8 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
     market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=10, depth_levels=3)
     residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=30_000, residual_mark_seconds=4)
     strat_limits: StratLimits = StratLimits(max_open_orders_per_side=5,
-                                            max_cb_notional=get_default_max_notional(),
-                                            max_open_cb_notional=30_000,
+                                            max_single_leg_notional=get_default_max_notional(),
+                                            max_open_single_leg_notional=30_000,
                                             max_net_filled_notional=160_000,
                                             max_concentration=10,
                                             limit_up_down_volume_participation_rate=1,
@@ -200,7 +200,7 @@ def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
                                total_cxl_sell_qty=0.0, avg_cxl_buy_px=0.0, avg_cxl_sell_px=0.0,
                                total_cxl_buy_notional=0.0, total_cxl_sell_notional=0.0,
                                total_cxl_exposure=0.0, average_premium=0.0,
-                               balance_notional=strat_limits_obj.max_cb_notional,
+                               balance_notional=strat_limits_obj.max_single_leg_notional,
                                strat_status_update_seq_num=0)
     return strat_status
 
