@@ -30,9 +30,13 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
 
-        ui_config_file_path = (
-                PurePath(__file__).parent.parent.parent / "CodeGenProjects" /
-                self.project_name / "data" / "ui_config.yaml")
+        project_dir = os.getenv("PROJECT_DIR")
+        if project_dir is None or not project_dir:
+            err_str = f"env var 'PROJECT_DIR' received as {project_dir}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
+        ui_config_file_path = PurePath(project_dir) / "data" / "ui_config.yaml"
         ui_coordinates_override_msg_dict: Dict[str, Dict[str, str]] = {}
         if os.path.exists(ui_config_file_path):
             ui_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ui_config_file_path))

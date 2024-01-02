@@ -23,3 +23,7 @@
 .dialog_text {
     margin: 10px 0px !important;
 }
+
+.no_scroll {
+    overflow: hidden;
+}

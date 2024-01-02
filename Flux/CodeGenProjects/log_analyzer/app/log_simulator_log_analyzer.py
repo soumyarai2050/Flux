@@ -180,6 +180,7 @@ class LogSimulatorLogAnalyzer(AppLogAnalyzer):
 
             callback_method: Callable = getattr(executor_web_client, method_name)
             callback_method(**kwargs)
+            logging.info(f"Called {method_name} with kwargs: {kwargs}")
 
         except Exception as e:
             alert_brief: str = f"_process_trade_simulator_message failed in log analyzer"

@@ -16,6 +16,10 @@
     overflow: auto;
 }
 
+.no_scroll {
+    overflow: hidden;
+}
+
 .edit {
     /* background-color: beige; */
 }

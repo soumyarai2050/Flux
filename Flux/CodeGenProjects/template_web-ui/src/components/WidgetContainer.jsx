@@ -71,6 +71,13 @@ const WidgetContainer = (props) => {
     }
 
     const backgroundColor = theme.palette.primary.dark;
+    let widgetBodyClasses = `${classes.widget_body}`
+    if (props.mode === Modes.EDIT_MODE) {
+        widgetBodyClasses += ` ${classes.edit}`
+    }
+    if (props.scrollLock) {
+        widgetBodyClasses += ` ${classes.no_scroll}`
+    }
 
     return (
         <Fragment>
@@ -96,7 +103,7 @@ const WidgetContainer = (props) => {
                     truncateDateTime={props.truncateDateTime}
                 />
             }
-            <Box style={{ height: `calc(100% - 42px - ${height}px` }} className={`${classes.widget_body} ${props.mode === Modes.EDIT_MODE ? classes.edit : ''}`}>
+            <Box style={{ height: `calc(100% - 42px - ${height}px` }} className={widgetBodyClasses}>
                 {props.children}
             </Box>
         </Fragment >
@@ -115,13 +122,15 @@ WidgetContainer.propTypes = {
     onSave: PropTypes.func,
     children: PropTypes.any,
     lineBreakStart: PropTypes.bool,
-    lineBreakEnd: PropTypes.bool
+    lineBreakEnd: PropTypes.bool,
+    scrollLock: PropTypes.bool,
 }
 
 WidgetContainer.defaultProps = {
     commonkeys: [],
     lineBreakStart: true,
-    lineBreakEnd: true
+    lineBreakEnd: true,
+    scrollLock: true,
 }
 
 export default WidgetContainer;

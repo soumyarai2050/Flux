@@ -455,12 +455,11 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
 
                 for (const path in autocompleteDict) {
                     if (propname === path || xpath.endsWith(path)) {
-                        if (!schema.autocomplete.hasOwnProperty(autocompleteDict[path])) {
-                            if (autocompleteDict[path] === 'server_populate') {
-                                delete object[propname];
-                            } else {
-                                object[propname] = autocompleteDict[path];
-                            }
+                        const [value, indicator] = autocompleteDict[path];
+                        if (indicator === 'server_populate') {
+                            delete object[propname];
+                        } else if (indicator === 'assign') {
+                            object[propname] = value;
                         }
                     }
                 }
@@ -1113,7 +1112,7 @@ function createTree(tree, currentjson, propname, count, collections) {
                 tree[propname].push(node);
                 let xpath = currentjson[0][_.keys(currentjson[0]).filter(k => k.startsWith('xpath_'))[0]];
                 xpath = xpath ? xpath.substring(0, xpath.lastIndexOf('.')) : xpath;
-                node['data-id'] = xpath;
+                node['data-id'] = currentjson[0].hasOwnProperty(DB_ID) ? currentjson[0][DB_ID] : xpath;
                 createTree(tree[propname], currentjson[0], 0, count, collections);
                 if (currentjson.length > 1 && count.delete > 0) {
                     count.delete -= 1;

@@ -44,7 +44,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
     def handle_import_output(self, message: protogen.Message, layout_type: str) -> str:
         output_str = "/* react and third-party library imports */\n"
         if layout_type == JsxFileGenPlugin.non_root_type or layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-            output_str += "import React, { Fragment, memo, useEffect } from 'react';\n"
+            output_str += "import React, { Fragment, memo, useEffect, useState } from 'react';\n"
         else:
             output_str += "import React, { Fragment, useState, useEffect, useCallback, useRef, memo, useMemo } " \
                           "from 'react';\n"
@@ -192,16 +192,16 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "import ChartWidget from '../components/ChartWidget';\n"
             else:
                 output_str += "import TreeWidget from '../components/TreeWidget';\n"
-        if layout_type == JsxFileGenPlugin.root_type or \
-                layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
-            output_str += "import { Icon } from '../components/Icon';\n"
         if layout_type != JsxFileGenPlugin.non_root_type and layout_type != JsxFileGenPlugin.abbreviated_dependent_type:
             if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                 output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation, " \
-                              "CollectionSwitchPopup } from '../components/Popup';\n\n"
+                              "CollectionSwitchPopup } from '../components/Popup';\n"
             else:
                 output_str += "import { ConfirmSavePopup, WebsocketUpdatePopup, FormValidation } " \
-                              "from '../components/Popup';\n\n"
+                              "from '../components/Popup';\n"
+        output_str += "import { FullScreenModalOptional } from '../components/Modal';\n"
+        output_str += "import { Fullscreen, CloseFullscreen } from '@mui/icons-material';\n"
+        output_str += "import { Icon } from '../components/Icon';\n\n"
         if layout_type in [JsxFileGenPlugin.simple_abbreviated_type, JsxFileGenPlugin.parent_abbreviated_type]:
             output_str += "const getAllWsWorker = new Worker(new URL('../workers/getAllWsHandler.js', " \
                           "import.meta.url));\n"
@@ -229,8 +229,9 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += '            disabled={mode !== Modes.EDIT_MODE}\n'
             output_str += '            filters={props.filters}\n'
             output_str += '            onFiltersChange={props.onFiltersChange}\n'
-            output_str += '            onButtonToggle={onButtonToggle}\n'
-            output_str += '        />\n'
+            output_str += '            onButtonToggle={onButtonToggle}\n>\n'
+            output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
+            output_str += "        </DynamicMenu>\n"
             output_str += '    )\n\n'
             output_str += "    let cleanedRows = [];\n"
             output_str += "    if ([Layouts.PIVOT_TABLE, Layouts.CHART].includes(widgetOption.view_layout)) {\n"
@@ -277,23 +278,42 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                                                                f"length === 0 && _.keys(modified{message_name}).length === 0 &&\n"
             output_str += "                <Icon name='Create' title='Create' " \
                           "onClick={onCreate}><Add fontSize='small' /></Icon>}\n"
+            output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
             output_str += "        </DynamicMenu>\n"
             output_str += "    )\n\n"
         elif layout_type == JsxFileGenPlugin.abbreviated_dependent_type:
-            output_str = "    let menu = <DynamicMenu name={props.name} disabled={mode !== Modes.EDIT_MODE} " \
-                         "currentSchema={currentSchema} collections=" \
-                         "{collections} commonKeyCollections={commonKeyCollections} data={" \
-                         f"modified{message_name}" \
-                         "} onButtonToggle={onButtonToggle} />;\n"
+            output_str = "    let menu = (\n"
+            output_str += "        <DynamicMenu \n"
+            output_str += "            name={props.name}\n"
+            output_str += "            disabled={mode !== Modes.EDIT_MODE}\n"
+            output_str += "            currentSchema={currentSchema}\n"
+            output_str += "            collections={collections}\n"
+            output_str += "            commonKeyCollections={commonKeyCollections}\n"
+            output_str += "            data={modified" + f"{message_name}" + "}\n"
+            output_str += "            onButtonToggle={onButtonToggle}>\n"
+            output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
+            output_str += "        </DynamicMenu>\n"
+            output_str += "    )\n\n"
         else:
             root_msg_name = self.root_message.proto.name
-            output_str = "    let menu = <DynamicMenu name={props.name} disabled={mode !== Modes.EDIT_MODE} " \
-                         "currentSchema={currentSchema} xpath={currentSchemaXpath} collections=" \
-                         "{collections} commonKeyCollections={commonKeyCollections}" \
-                         " data={_.get(modified" + f"{root_msg_name}" + \
-                         ", currentSchemaXpath)} onButtonToggle={onButtonToggle} />;\n"
+            output_str = "    let menu = (\n"
+            output_str += "        <DynamicMenu \n"
+            output_str += "            name={props.name}\n"
+            output_str += "            disabled={mode !== Modes.EDIT_MODE}\n"
+            output_str += "            currentSchema={currentSchema}\n"
+            output_str += "            xpath={currentSchemaXpath}\n"
+            output_str += "            collections={collections}\n"
+            output_str += "            commonKeyCollections={commonKeyCollections}\n"
+            output_str += "            data={_.get(modified" + f"{root_msg_name}" + ", currentSchemaXpath)}\n"
+            output_str += "            onButtonToggle={onButtonToggle}>\n"
+            output_str += "            {maximize ? <Icon name='Minimize' title='Minimize' onClick={onMinimize}><CloseFullscreen fontSize='small' /></Icon> : <Icon name='Maximize' title='Maximize' onClick={onMaximize}><Fullscreen fontSize='small' /></Icon>}\n"
+            output_str += "        </DynamicMenu>\n"
+            output_str += "    )\n\n"
         output_str += "    return (\n"
-        output_str += "        <Fragment>\n"
+        output_str += "        <FullScreenModalOptional\n"
+        output_str += "            id={props.id}\n"
+        output_str += "            open={maximize}\n"
+        output_str += "            onClose={onMinimize}>\n"
         output_str += "            {widgetOption.view_layout === Layouts.TABLE_LAYOUT ? (\n"
         output_str += "                <TableWidget\n"
         output_str += "                    headerProps={{\n"
@@ -339,6 +359,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "                    data={modified" + f"{root_msg_name}" + "}\n"
                 output_str += "                    originalData={" + f"{root_message_name_camel_cased}" + "}\n"
                 output_str += "                    index={selected" + f"{root_msg_name}Id" + "}\n"
+        output_str += "                    scrollLock={props.scrollLock}\n"
         output_str += "                    collections={collections}\n"
         output_str += "                    rows={rows}\n"
         output_str += "                    tableColumns={tableColumns}\n"
@@ -361,7 +382,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                    onColumnOrdersChange={onColumnOrdersChange}\n"
         if layout_type != JsxFileGenPlugin.repeated_root_type:
             output_str += "                    forceUpdate={forceUpdate}\n"
-        if layout_type == JsxFileGenPlugin.repeated_root_type:
+        if layout_type in [JsxFileGenPlugin.repeated_root_type, JsxFileGenPlugin.root_type]:
             # if repeated and from other file
             widget_ui_option_value = JsxFileGenPlugin.get_complex_option_value_from_proto(
                 message, JsxFileGenPlugin.flux_msg_widget_ui_data_element)
@@ -373,6 +394,10 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 if (self.current_proto_file_name is not None and
                         self.current_proto_file_name not in message.parent_file.proto.name):
                     output_str += "                    url={url}\n"
+        if layout_type == JsxFileGenPlugin.root_type:
+            output_str += "                    widgetType='root'\n"
+        elif layout_type == JsxFileGenPlugin.repeated_root_type:
+            output_str += "                    widgetType='repeatedRoot'\n"
         output_str += "                />\n"
         if layout_type == JsxFileGenPlugin.repeated_root_type:
             output_str += "            ) : widgetOption.view_layout === Layouts.PIVOT_TABLE ? (\n"
@@ -417,6 +442,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     output_str += "                    data={modified" + f"{root_msg_name}" + "}\n"
                     output_str += "                    originalData={" + f"{root_message_name_camel_cased}" + "}\n"
                     output_str += "                    index={selected" + f"{root_msg_name}Id" + "}\n"
+            output_str += "                    scrollLock={props.scrollLock}\n"
             output_str += "                    mode={mode}\n"
             output_str += "                    onUpdate={onUpdate}\n"
             output_str += "                    error={error}\n"
@@ -453,7 +479,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += "                onClose={onClosePopup}\n"
             output_str += "                src={discardedChanges}\n"
             output_str += "            />\n"
-        output_str += "        </Fragment>\n"
+        output_str += "        </FullScreenModalOptional>\n"
         output_str += "    )\n"
         output_str += "}\n"
         return output_str
@@ -491,6 +517,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                   f"useSelector(state => state.{other_file_dependent_msg_name_camel_cased}.mode);\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    /* local react states */\n"
+                output_str += "    const [maximize, setMaximize] = useState(false);\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
                 output_str += "    const [formValidation, setFormValidation] = useState({});\n"
                 output_str += "    const [openConfirmSavePopup, setOpenConfirmSavePopup] = useState(false);\n"
@@ -529,6 +556,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                   f"useSelector(state => state.{other_file_dependent_msg_name_camel_cased}.mode);\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
                 output_str += "    /* local react states */\n"
+                output_str += "    const [maximize, setMaximize] = useState(false);\n"
                 output_str += "    const [mode, setMode] = useState(Modes.READ_MODE);\n"
                 output_str += "    const [formValidation, setFormValidation] = useState({});\n"
                 if not option_dict.get(JsxFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
@@ -554,6 +582,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += "        userChanges, loading, error, mode, formValidation, forceUpdate\n"
                 output_str += "    } = useSelector(state => " + f"state.{message_name_camel_cased});\n"
                 output_str += "    const { schema, schemaCollections } = useSelector(state => state.schema);\n"
+                output_str += "    const [maximize, setMaximize] = useState(false);\n"
             case JsxFileGenPlugin.simple_abbreviated_type | JsxFileGenPlugin.parent_abbreviated_type:
                 output_str += "    /* states from redux store */\n"
                 output_str += "    const {\n"
@@ -592,6 +621,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                                   f"state.{dependent_to_linked_abb_msg_camel_cased}.mode);\n"
                 output_str += "    const { schema, schemaCollections } = useSelector((state) => state.schema);\n"
                 output_str += "    /* local react states */\n"
+                output_str += "    const [maximize, setMaximize] = useState(false);\n"
                 output_str += "    const [searchValue, setSearchValue] = useState('');\n"
                 if layout_type == JsxFileGenPlugin.parent_abbreviated_type:
                     output_str += "    const [openCollectionSwitchPopup, setOpenCollectionSwitchPopup] = " \
@@ -1658,6 +1688,13 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "                <h1>Connection lost. Please refresh...</h1>\n"
         output_str += "            </WidgetContainer>\n"
         output_str += "        )\n"
+        output_str += "    }\n\n"
+
+        output_str += "    const onMaximize = () => {\n"
+        output_str += "        setMaximize(true);\n"
+        output_str += "    }\n\n"
+        output_str += "    const onMinimize = () => {\n"
+        output_str += "        setMaximize(false);\n"
         output_str += "    }\n\n"
 
         output_str += "    const onChangeLayout = (layoutType) => {\n"

@@ -53,6 +53,7 @@ function Layout(props) {
     const [openLoadLayout, setOpenLoadLayout] = useState(false); // open close load layout popup
     const [searchValue, setSearchValue] = useState(''); // load layout by profile search input
     const [profileId, setProfileId] = useState(''); // save layout by profile input
+    # @@protoc_insertion_point(add_widget_scroll_lock)
     const layoutsRef = useRef(defaultLayouts);
     const layoutsById = useRef(defaultLayoutsById);
     const getAllWsDict = useRef({}); // stores get-all websocket updates
@@ -370,6 +371,23 @@ function Layout(props) {
         setLayoutsById();
         setUpdateCounter(prevCounter => prevCounter + 1);
     }, [])
+
+    const onWidgetClick = (widgetName) => {
+        const updatedScrollLock = cloneDeep(scrollLock);
+        if (updatedScrollLock[widgetName]) {
+            Object.keys(updatedScrollLock).forEach(key => {
+                updatedScrollLock[key] = true;
+            })
+            updatedScrollLock[widgetName] = false;
+        }
+        setScrollLock(updatedScrollLock);
+    }
+
+    const onWidgetDoubleClick = (widgetName) => {
+        const updatedScrollLock = cloneDeep(scrollLock);
+        updatedScrollLock[widgetName] = true;
+        setScrollLock(updatedScrollLock);
+    }
 
     const storedCookie = sessionStorage.getItem(COOKIE_NAME);
     if (storedCookie && !uiLayout.widget_ui_data_elements) {

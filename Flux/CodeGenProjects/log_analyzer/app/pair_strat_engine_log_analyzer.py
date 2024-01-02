@@ -3,6 +3,7 @@ import time
 import re
 from threading import Thread
 from queue import Queue
+from typing import Set
 
 os.environ["DBType"] = "beanie"
 # Project imports
@@ -16,7 +17,7 @@ from Flux.CodeGenProjects.pair_strat_engine.generated.Pydentic.strat_manager_ser
     PairStratBaseModel
 from Flux.CodeGenProjects.log_analyzer.app.log_analyzer_service_helper import *
 from Flux.CodeGenProjects.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    strat_manager_service_http_client, is_ongoing_strat)
+    strat_manager_service_http_client, is_ongoing_strat, Side)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
     performance_benchmark_service_http_client, RawPerformanceDataBaseModel)
 
@@ -36,7 +37,7 @@ strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
 
 # Updating LogDetail to have strat_id_finder_callable
 class StratLogDetail(LogDetail):
-    strat_id_find_callable: Callable[[str], int] | None
+    strat_id_find_callable: Callable[[str], int] | None = None
 
 
 class PairStratDbUpdateDataContainer(BaseModel):
@@ -503,8 +504,10 @@ class PairStratEngineLogAnalyzer(AppLogAnalyzer):
                                                             by_alias=True, exclude_none=True))
                 break
             except Exception as e:
-                logging.exception(f"_send_strat_alerts failed;;;exception: {e}")
-                time.sleep(30)
+                alert_details: str = f"_send_strat_alerts failed;;;exception: {e}"
+                logging.exception(f"{alert_brief};;; {alert_details}")
+                self._send_alerts(severity=self._get_severity("error"), alert_brief=alert_brief,
+                                  alert_details=alert_details)
 
     def _get_error_dict(self, log_prefix: str, log_message: str) -> \
             Dict[str, str] | None:

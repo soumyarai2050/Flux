@@ -115,9 +115,14 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             message_name = message.proto.name
             message_name_case_styled = self.case_style_convert_method(message_name)
             output_str += "{"+f"layoutsById.current.hasOwnProperty('{message_name_case_styled}') &&\n"
-            output_str += "    <Paper key='"+f"{message_name_case_styled}' id='{message_name_case_styled}'" + \
-                          " className={classes.widget} data-grid={layoutsById.current." + \
-                          f"{message_name_case_styled}" + "}>\n"
+            output_str += "    <Paper \n"
+            output_str += "        key='" + f"{message_name_case_styled}'\n"
+            output_str += "        id='" + f"{message_name_case_styled}'\n"
+            output_str += "        className={`${classes.widget} ${scrollLock." + \
+                          f"{message_name_case_styled} ? classes.no_scroll : ''" + "}`}\n"
+            output_str += "        onClick={() => onWidgetClick('" + f"{message_name_case_styled}')" + "}\n"
+            output_str += "        onDoubleClick={() => onWidgetDoubleClick('" + f"{message_name_case_styled}')" + "}\n"
+            output_str += "        data-grid={layoutsById.current." + f"{message_name_case_styled}" + "}>\n"
             output_str += f'        <{message.proto.name}\n'
             output_str += f'            name="{message_name_case_styled}"\n'
             output_str += "            options={"+f"layoutsById.current.{message_name_case_styled}.widget_ui_data"+"}\n"
@@ -129,9 +134,19 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
             output_str += '            onOverrideChange={onOverrideChange}\n'
             output_str += "            onFiltersChange={onFiltersChange}\n"
             output_str += "            onColumnOrdersChange={onColumnOrdersChange}\n"
+            output_str += "            scrollLock={scrollLock." + f"{message_name_case_styled}" + "}\n"
             output_str += f'        />\n'
             output_str += f'    </Paper>\n'
             output_str += '}\n'
+        return output_str
+
+    def handle_widget_scroll_lock(self, file: protogen.File):
+        output_str = "const [scrollLock, setScrollLock] = useState({\n"
+        for index, message in enumerate(self.layout_msg_list):
+            message_name = message.proto.name
+            message_name_case_styled = self.case_style_convert_method(message_name)
+            output_str += f"    {message_name_case_styled}: true,\n"
+        output_str += "})\n"
         return output_str
 
     def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
@@ -153,9 +168,10 @@ class JsxLayoutGenPlugin(BaseJSLayoutPlugin):
         return {
             output_file_name: {
                 "add_imports": self.handle_imports(file),
+                "add_widget_scroll_lock": self.handle_widget_scroll_lock(file),
                 "load_abbreviated_widget_filter_list": self.load_abbreviated_widget_filter_list(file),
                 "add_root_in_jsx_layout": self.handle_root_msg_addition_to_layout_templ(file),
-                "add_show_widget": self.handle_show_widget(file)
+                "add_show_widget": self.handle_show_widget(file),
             }
         }
 

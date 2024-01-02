@@ -312,9 +312,11 @@ const TableWidget = (props) => {
 
     const exportToExcel = useCallback(async () => {
         // let originalRows = getTableRowsFromData(props.collections, props.originalData, props.xpath);
+        const widgetType = props.widgetType === 'repeatedRoot' ? props.widgetType : 'root';
         const url = props.url ? props.url : API_ROOT_URL;
-        const storedData = await axios.get(`${url}/get-all-${props.name}`);
-        let originalRows = getTableRowsFromData(props.collections, storedData.data, props.xpath);
+        const res = await axios.get(`${url}/get-all-${props.name}`);
+        const storedData = widgetType === 'root' && res.data.length > 0 ? res.data[0] : res.data;
+        let originalRows = getTableRowsFromData(props.collections, storedData, props.xpath);
         originalRows.forEach(row => {
             delete row['data-id'];
         })
@@ -457,7 +459,8 @@ const TableWidget = (props) => {
             onSave={props.headerProps.onSave}
             commonkeys={commonkeys}
             truncateDateTime={props.truncateDateTime}
-            supportedLayouts={props.headerProps.supportedLayouts}>
+            supportedLayouts={props.headerProps.supportedLayouts}
+            scrollLock={props.scrollLock}>
 
             {getFilteredCells().length > 0 && rows.length > 0 &&
                 <Fragment>

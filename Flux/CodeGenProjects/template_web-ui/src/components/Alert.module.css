@@ -8,8 +8,10 @@
 }
 
 .snackbar {
-    position: relative !important;
-    left: 10px !important;
+    /* position fixed to top of the parent component */
+    position: fixed !important;
+    top: 15% !important;
+    right: 0 !important;
 }
 
 .abbreviated_json {
