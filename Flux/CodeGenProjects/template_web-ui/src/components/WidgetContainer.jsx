@@ -1,4 +1,4 @@
-import React, { Fragment, useRef, useState } from 'react';
+import React, { Fragment, useEffect, useRef, useState } from 'react';
 import _ from 'lodash';
 import { Typography, Box, ToggleButtonGroup, ToggleButton, ClickAwayListener, Tooltip } from '@mui/material';
 import { Save, Cached, Edit, AccountTree, GridView, TableChartSharp, PivotTableChartSharp, FormatListNumberedSharp, BarChart } from '@mui/icons-material';
@@ -12,7 +12,33 @@ import { useTheme } from '@emotion/react';
 const WidgetContainer = (props) => {
     const commonkeyRef = useRef(null);
     const [showLayoutOptions, setShowLayoutOptions] = useState(false);
+    const [isBouncing, setIsBouncing] = useState(false);
+    const scrollContainerRef = useRef(null);
     const theme = useTheme();
+
+    const handleScroll = () => {
+        const element = scrollContainerRef.current;
+        const scrollTop = element.scrollTop;
+        const maxScrollTop = element.scrollHeight - element.clientHeight;
+
+        if (scrollTop === 0 || scrollTop > (maxScrollTop * 0.95)) {
+            // Scrolling at the top or bottom, apply bounce class
+            setIsBouncing(true);
+        } else {
+            // Not at the top or bottom, remove bounce class
+            setIsBouncing(false);
+        }
+    }
+
+    useEffect(() => {
+        const element = scrollContainerRef.current;
+        element.addEventListener('scroll', handleScroll);
+
+        return () => {
+            element.removeEventListener('scroll', handleScroll);
+        };
+    }, []);
+
 
     let modeMenu = '';
     if (props.onSave && props.mode === Modes.EDIT_MODE) {
@@ -71,18 +97,21 @@ const WidgetContainer = (props) => {
     }
 
     const backgroundColor = theme.palette.primary.dark;
-    let widgetBodyClasses = `${classes.widget_body}`
+    let widgetBodyClasses = `${classes.widget_body}`;
     if (props.mode === Modes.EDIT_MODE) {
-        widgetBodyClasses += ` ${classes.edit}`
+        widgetBodyClasses += ` ${classes.edit}`;
     }
     if (props.scrollLock) {
-        widgetBodyClasses += ` ${classes.no_scroll}`
+        widgetBodyClasses += ` ${classes.no_scroll}`;
+    }
+    if (isBouncing) {
+        widgetBodyClasses += ` ${classes.bounce}`;
     }
 
     return (
         <Fragment>
             <Typography variant='h6'>
-                <div className={classes.widget_header} style={{background: backgroundColor }}>
+                <div className={classes.widget_header} style={{ background: backgroundColor }}>
                     <span>{props.title}</span>
                     <span>{props.centerText}</span>
                     <div className={classes.menu_container}>
@@ -103,7 +132,7 @@ const WidgetContainer = (props) => {
                     truncateDateTime={props.truncateDateTime}
                 />
             }
-            <Box style={{ height: `calc(100% - 42px - ${height}px` }} className={widgetBodyClasses}>
+            <Box style={{ height: `calc(100% - 42px - ${height}px` }} ref={scrollContainerRef} className={widgetBodyClasses}>
                 {props.children}
             </Box>
         </Fragment >

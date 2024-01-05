@@ -46,6 +46,7 @@ Modal.propTypes = {
 Modal.defaultProps = {
     children: <></>,
     fullScreen: false,
+    id: 'modal',
 }
 
 const FullScreenModal = Modal;
@@ -92,4 +93,5 @@ FullScreenModalOptional.propTypes = {
 
 FullScreenModalOptional.defaultProps = {
     children: <></>,
+    id: 'fullScreenModal',
 }

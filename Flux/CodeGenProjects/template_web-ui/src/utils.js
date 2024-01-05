@@ -3140,3 +3140,22 @@ export function isWebSocketAlive(webSocket) {
     }
     return false;
 }
+
+export function getReducerArrrayFromCollections(collections) {
+    const reducerArray = [];
+    collections
+        .filter(col => typeof col.min === DataTypes.STRING || typeof col.max === DataTypes.STRING)
+        .map(col => {
+            const dynamicListenProperties = ['min', 'max', 'dynamic_autocomplete'];
+            dynamicListenProperties.forEach(property => {
+                if (col.hasOwnProperty(property) && typeof col[property] === DataTypes.STRING) {
+                    const reducerName = toCamelCase(col[property].split('.')[0]);
+                    if (!reducerArray.includes(reducerName)) {
+                        reducerArray.push(reducerName);
+                    }
+                }
+            })
+        });
+    return reducerArray;
+
+}

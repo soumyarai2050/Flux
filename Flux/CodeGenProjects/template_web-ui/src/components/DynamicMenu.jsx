@@ -1,9 +1,9 @@
-import React, { Fragment, useState } from 'react';
+import React, { Fragment, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { DataTypes } from '../constants';
-import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType, getValueFromReduxStoreFromXpath, getAlertBubbleCount, getAlertBubbleColor, getFilterDict, getFiltersFromDict } from '../utils';
+import { getColorTypeFromValue, getShapeFromValue, getSizeFromValue, toCamelCase, capitalizeCamelCase, getColorTypeFromPercentage, getValueFromReduxStore, normalise, getHoverTextType, getValueFromReduxStoreFromXpath, getAlertBubbleCount, getAlertBubbleColor, getFilterDict, getFiltersFromDict, getReducerArrrayFromCollections } from '../utils';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
@@ -15,9 +15,22 @@ import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, B
 import classes from './DynamicMenu.module.css';
 
 const DynamicMenu = (props) => {
-    const state = useSelector(state => state);
+    // const state = useSelector(state => state);
     const [showFilter, setShowFilter] = useState(false);
     const [filter, setFilter] = useState(getFilterDict(props.filters));
+    const reducerArray = useMemo(() => getReducerArrrayFromCollections(props.collections), [props.collections]);
+    const reducerDict = useSelector(state => {
+        const selected = {};
+        reducerArray.forEach(reducerName => {
+            const fieldName = 'modified' + capitalizeCamelCase(reducerName);
+            selected[reducerName] = {
+                [fieldName]: state[reducerName]?.[fieldName],
+            }
+        })
+        return selected;
+    }, (prev, curr) => {
+        return JSON.stringify(prev) === JSON.stringify(curr);
+    })
 
     const onClick = (e, action, xpath, value, source) => {
         if (action === 'flux_toggle') {
@@ -119,12 +132,12 @@ const DynamicMenu = (props) => {
                     let valueFieldName = collection.key;
                     let min = collection.min;
                     if (typeof (min) === DataTypes.STRING) {
-                        min = getValueFromReduxStoreFromXpath(state, min);
+                        min = getValueFromReduxStoreFromXpath(reducerDict, min);
                     }
                     let max = collection.max;
                     if (typeof (max) === DataTypes.STRING) {
                         maxFieldName = max.substring(max.lastIndexOf(".") + 1);
-                        max = getValueFromReduxStoreFromXpath(state, max);
+                        max = getValueFromReduxStoreFromXpath(reducerDict, max);
                     }
                     let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 

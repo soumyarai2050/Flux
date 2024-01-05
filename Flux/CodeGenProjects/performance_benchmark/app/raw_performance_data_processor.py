@@ -1,9 +1,9 @@
 # standard imports
-import logging
 from typing import List, Dict, Any, Callable
-import asyncio
 from queue import Queue
 import os
+import logging
+import asyncio
 
 os.environ["DBType"] = "beanie"
 # project imports
@@ -38,33 +38,33 @@ class RawPerformanceDataProcessor:
 
     @classmethod
     def run(cls):
-        # if cls.asyncio_loop is None:
-        #     logging.exception("asyncio_loop class data member found as None, must be set by caller before calling "
-        #                       "run - exiting RawPerformanceDataProcessor.run()")
-        #     return None
-        #
-        # cls.initialize_underlying_http_callables()
-        #
-        # run_coro = cls.load_existing_processed_performance_analysis()
-        # future = asyncio.run_coroutine_threadsafe(run_coro, cls.asyncio_loop)
-        #
-        # # block for task to finish
-        # try:
-        #     future.result()
-        # except Exception as e:
-        #     err_str_ = (f"load_existing_processed_performance_analysis failed with exception: {e} - "
-        #                 f"exiting RawPerformanceDataProcessor.run()")
-        #     logging.exception(err_str_)
-        #     return None
-        #
-        # while 1:
-        #     new_raw_performance_data = cls.new_raw_performance_data_queue.get()
+        if cls.asyncio_loop is None:
+            logging.exception("asyncio_loop class data member found as None, must be set by caller before calling "
+                              "run - exiting RawPerformanceDataProcessor.run()")
+            return None
 
-        import pandas as pd
-        raw_perf_data = performance_benchmark_service_http_client.get_all_raw_performance_data_client()
-        df = pd.DataFrame([r.__dict__ for r in raw_perf_data])
-        print(type(df))
-        print(df)
+        cls.initialize_underlying_http_callables()
+
+        run_coro = cls.load_existing_processed_performance_analysis()
+        future = asyncio.run_coroutine_threadsafe(run_coro, cls.asyncio_loop)
+
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            err_str_ = (f"load_existing_processed_performance_analysis failed with exception: {e} - "
+                        f"exiting RawPerformanceDataProcessor.run()")
+            logging.exception(err_str_)
+            return None
+
+        while 1:
+            new_raw_performance_data = cls.new_raw_performance_data_queue.get()
+
+        # import pandas as pd
+        # raw_perf_data = performance_benchmark_service_http_client.get_all_raw_performance_data_client()
+        # df = pd.DataFrame([r.__dict__ for r in raw_perf_data])
+        # print(type(df))
+        # print(df)
 
 
 RawPerformanceDataProcessor.run()

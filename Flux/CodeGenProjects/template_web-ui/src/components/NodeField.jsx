@@ -1,17 +1,31 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { ColorTypes, DataTypes, Modes } from '../constants';
 import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, Tooltip } from '@mui/material';
 import { Error } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints } from '../utils';
+import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getReducerArrrayFromCollections, capitalizeCamelCase } from '../utils';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './NodeField.module.css';
+import { cloneDeep } from 'lodash';
 
 const NodeField = (props) => {
-    const state = useSelector(state => state);
+    // const state = useSelector(state => state);
+    const reducerArray = useMemo(() => getReducerArrrayFromCollections([props.data]), [props.data]);
+    const reducerDict = useSelector(state => {
+        const selected = {};
+        reducerArray.forEach(reducerName => {
+            const fieldName = 'modified' + capitalizeCamelCase(reducerName);
+            selected[reducerName] = {
+                [fieldName]: state[reducerName]?.[fieldName],
+            }
+        })
+        return selected;
+    }, (prev, curr) => {
+        return JSON.stringify(prev) === JSON.stringify(curr);
+    })
     const validationError = useRef(null);
     const [inputValue, setInputValue] = useState(props.data.value);
     const [focus, setFocus] = useState(false);
@@ -187,17 +201,18 @@ const NodeField = (props) => {
         // min constrainsts for numeric field if set.
         let min = props.data.min;
         if (typeof (min) === DataTypes.STRING) {
-            min = getValueFromReduxStoreFromXpath(state, min);
+            min = getValueFromReduxStoreFromXpath(reducerDict, min);
         }
 
         // max constrainsts for numeric field if set.
         let max = props.data.max;
         if (typeof (max) === DataTypes.STRING) {
-            max = getValueFromReduxStoreFromXpath(state, max);
+            max = getValueFromReduxStoreFromXpath(reducerDict, max);
         }
 
-        let value = props.data.value ? props.data.value : props.data.value === 0 ? 0 : '';
-        if (props.data.displayType == DataTypes.INTEGER) {
+        // let value = props.data.value ? props.data.value : props.data.value === 0 ? 0 : props.data.value === -0 ? -0 : '';
+        let value = cloneDeep(inputValue);
+        if (props.data.displayType == DataTypes.INTEGER && props.data.value !== -0) {
             if (value !== '') {
                 value = floatToInt(value);
             }
@@ -235,7 +250,7 @@ const NodeField = (props) => {
                 disabled={disabled}
                 thousandSeparator=','
                 // isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
-                onValueChange={(values, sourceInfo) => props.data.onTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value, props.data.dataxpath,
+                onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value, props.data.dataxpath,
                     validateConstraints(props.data, values.value, min, max))}
                 variant='outlined'
                 decimalScale={decimalScale}

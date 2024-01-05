@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import _, { cloneDeep, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
@@ -10,7 +10,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
     getHoverTextType, getValueFromReduxStoreFromXpath, floatToInt,
-    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase
+    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrrayFromCollections
 } from '../utils';
 import { DataTypes, Modes } from '../constants';
 import AbbreviatedJson from './AbbreviatedJson';
@@ -36,7 +36,20 @@ const Cell = (props) => {
     } = props;
 
     const collection = cloneDeep(props.collection);
-    const state = useSelector(state => state);
+    // const state = useSelector(state => state);
+    const reducerArray = useMemo(() => getReducerArrrayFromCollections([props.collection]), [props.collection]);
+    const reducerDict = useSelector(state => {
+        const selected = {};
+        reducerArray.forEach(reducerName => {
+            const fieldName = 'modified' + capitalizeCamelCase(reducerName);
+            selected[reducerName] = {
+                [fieldName]: state[reducerName]?.[fieldName],
+            }
+        })
+        return selected;
+    }, (prev, curr) => {
+        return JSON.stringify(prev) === JSON.stringify(curr);
+    })
     const { schema } = useSelector(state => state.schema);
     const [active, setActive] = useState(false);
     const [open, setOpen] = useState(false);
@@ -192,7 +205,7 @@ const Cell = (props) => {
             if (collection.dynamic_autocomplete) {
                 const widgetName = toCamelCase(collection.autocomplete.split('.')[0]);
                 const dynamicValuePath = collection.autocomplete.substring(collection.autocomplete.indexOf('.') + 1);
-                const dynamicValue = _.get(state[widgetName]['modified' + capitalizeCamelCase(widgetName)], dynamicValuePath);
+                const dynamicValue = getValueFromReduxStoreFromXpath(reducerDict, dynamicValuePath);
                 if (schema.autocomplete.hasOwnProperty(dynamicValue)) {
                     collection.options = schema.autocomplete[dynamicValue];
                     if (!collection.options.includes(collection.value)) {
@@ -302,13 +315,13 @@ const Cell = (props) => {
             // min constrainsts for numeric field if set.
             let min = collection.min;
             if (typeof (min) === DataTypes.STRING) {
-                min = getValueFromReduxStoreFromXpath(state, min);
+                min = getValueFromReduxStoreFromXpath(reducerDict, min);
             }
 
             // max constrainsts for numeric field if set.
             let max = collection.max;
             if (typeof (max) === DataTypes.STRING) {
-                max = getValueFromReduxStoreFromXpath(state, max);
+                max = getValueFromReduxStoreFromXpath(reducerDict, max);
             }
 
             validationError.current = validateConstraints(collection, value, min, max);
@@ -505,13 +518,13 @@ const Cell = (props) => {
         let valueFieldName = props.name;
         let min = collection.min;
         if (typeof (min) === DataTypes.STRING) {
-            min = getValueFromReduxStoreFromXpath(state, min);
+            min = getValueFromReduxStoreFromXpath(reducerDict, min);
         }
 
         let max = collection.max;
         if (typeof (max) === DataTypes.STRING) {
             maxFieldName = max.substring(max.lastIndexOf(".") + 1);
-            max = getValueFromReduxStoreFromXpath(state, max);
+            max = getValueFromReduxStoreFromXpath(reducerDict, max);
         }
         let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 
@@ -593,12 +606,12 @@ const Cell = (props) => {
 
     let min = collection.min;
     if (typeof (min) === DataTypes.STRING) {
-        min = getValueFromReduxStoreFromXpath(state, min);
+        min = getValueFromReduxStoreFromXpath(reducerDict, min);
     }
 
     let max = collection.max;
     if (typeof (max) === DataTypes.STRING) {
-        max = getValueFromReduxStoreFromXpath(state, max);
+        max = getValueFromReduxStoreFromXpath(reducerDict, max);
     }
     validationError.current = validateConstraints(collection, value, min, max);
 

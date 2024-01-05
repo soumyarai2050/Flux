@@ -1,6 +1,6 @@
 from Flux.CodeGenProjects.performance_benchmark.generated.Pydentic.performance_benchmark_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import (
-    YAMLConfigurationManager, get_symbol_side_key)
+    YAMLConfigurationManager)
 from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_client import (
     PerformanceBenchmarkServiceHttpClient)
 

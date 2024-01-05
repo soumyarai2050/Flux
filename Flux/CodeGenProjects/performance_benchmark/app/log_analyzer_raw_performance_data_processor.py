@@ -5,8 +5,7 @@ import os
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.raw_performance_data_processor import (RawPerformanceDataProcessor,
                                                                                  MongoConnectionReqs)
-from FluxPythonUtils.scripts.utility_functions import (YAMLConfigurationManager,
-                                                       get_primary_native_host_n_port_from_config_dict)
+from FluxPythonUtils.scripts.utility_functions import (YAMLConfigurationManager)
 os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
     performance_benchmark_service_http_client)

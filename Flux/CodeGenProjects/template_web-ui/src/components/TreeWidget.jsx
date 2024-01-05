@@ -60,15 +60,17 @@ const TreeWidget = (props) => {
         }
         if (type === DataTypes.NUMBER) {
             if (value !== null) {
-                value = value * 1;
+                value = Number(value);
             }
         }
-        let updatedData = cloneDeep(props.data);
-        _.set(updatedData, dataxpath, value);
-        props.onUpdate(updatedData);
-        props.onUserChange(xpath, value);
-        if (props.onFormUpdate) {
-            props.onFormUpdate(xpath, validationRes);
+        if (!isNaN(value) && value !== -0) {
+            const updatedData = cloneDeep(props.data);
+            _.set(updatedData, dataxpath, value);
+            props.onUpdate(updatedData);
+            props.onUserChange(xpath, value);
+            if (props.onFormUpdate) {
+                props.onFormUpdate(xpath, validationRes);
+            }
         }
     }
 
@@ -203,7 +205,7 @@ const TreeWidget = (props) => {
             )}
             <Icon className={classes.icon} name="Show" title='Show' onClick={() => setOpenShowDropdown(true)}><Visibility fontSize='small' /></Icon>
             <Select
-                style={{display: openShowDropdown ? 'inherit' : 'none'}}
+                style={{ display: openShowDropdown ? 'inherit' : 'none' }}
                 className={classes.dropdown}
                 size='small'
                 open={openShowDropdown}

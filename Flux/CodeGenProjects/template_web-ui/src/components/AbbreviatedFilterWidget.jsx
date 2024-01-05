@@ -361,6 +361,7 @@ function AbbreviatedFilterWidget(props) {
                     commonkeys={commonKeys}
                     layout={props.headerProps.layout}
                     supportedLayouts={props.headerProps.supportedLayouts}
+                    scrollLock={props.scrollLock}
                     onChangeLayout={props.headerProps.onChangeLayout}>
                     <Fragment>
                         {!props.bufferListFieldAttrs.hide && (
@@ -547,6 +548,7 @@ function AbbreviatedFilterWidget(props) {
                     onReload={props.headerProps.onReload}
                     layout={props.headerProps.layout}
                     supportedLayouts={props.headerProps.supportedLayouts}
+                    scrollLock={props.scrollLock}
                     onChangeLayout={props.headerProps.onChangeLayout}>
                     {rows.length > 0 && <PivotTable pivotData={rows} />}
                 </WidgetContainer>
