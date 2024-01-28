@@ -20,8 +20,8 @@ from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_spe
                                                        YAMLConfigurationManager)
 
 
-flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
-flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
+root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+root_flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(root_flux_core_config_yaml_path))
 
 
 class JsonSchemaConvertPlugin(BaseProtoPlugin):
@@ -116,6 +116,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         self.__add_autocomplete_dict: bool = False
         self._proto_project_name_to_msg_list_dict: Dict[str, List[protogen.Message]] = {}
         self._current_project_name: str | None = None
+        self._current_project_model_file: protogen.File | None = None
 
     def __proto_data_type_to_json(self, field: protogen.Field) -> Tuple[str, str]:
         underlying_type = field.kind.name.lower()
@@ -176,8 +177,25 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     def __load_json_layout_and_non_layout_messages_in_dicts(self, file: protogen.File):
         message_list: List[protogen.Message] = file.messages
 
+        message_list.sort(key=lambda message_: message_.proto.name)     # sorting by name
+
         # Adding messages from core proto files having json_root option
-        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        project_dir = os.getenv("PROJECT_DIR")
+        if project_dir is None or not project_dir:
+            err_str = f"env var DBType received as {project_dir}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
+        core_or_util_files: List[str] = root_flux_core_config_yaml_dict.get("core_or_util_files")
+
+        if "ProjectGroup" in project_dir:
+            project_group_flux_core_config_yaml_path = PurePath(project_dir).parent.parent / "flux_core.yaml"
+            project_group_flux_core_config_yaml_dict = (
+                YAMLConfigurationManager.load_yaml_configurations(str(project_group_flux_core_config_yaml_path)))
+            project_grp_core_or_util_files = project_group_flux_core_config_yaml_dict.get("core_or_util_files")
+            if project_grp_core_or_util_files:
+                core_or_util_files.extend(project_grp_core_or_util_files)
+
         if core_or_util_files is not None:
             for dependency_file in file.dependencies:
                 if dependency_file.proto.name in core_or_util_files:
@@ -944,16 +962,16 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                                             indent_count)
 
         # Also checking if msg is from another project used in this project
-        is_from_not_this_project: bool = True
+        is_not_from_this_project: bool = True
         other_project_name: str | None = None
         for project_name, message_list in self._proto_project_name_to_msg_list_dict.items():
             if project_name != self._current_project_name:
                 if message in message_list:
-                    is_from_not_this_project: bool = False
+                    is_not_from_this_project: bool = False
                     other_project_name = project_name
                     break
 
-        if not is_from_not_this_project:
+        if not is_not_from_this_project:
             proto_model_name = widget_ui_data_option_value_dict.get(
                     JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_name_field)
             dynamic_url = widget_ui_data_option_value_dict.get(
@@ -969,7 +987,16 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 json_msg_str += (" " * indent_count) + f'"project_name": "{other_project_name}",\n'
                 json_msg_str += (" " * indent_count) + f'"dynamic_url": true\n'
             else:
-                other_project_config_file_path = (PurePath(__file__).parent.parent.parent / "CodeGenProjects" /
+                # checking project name in project group
+                # current_project_model_path = self._current_project_model_file.
+
+                current_project_dir = os.getenv("PROJECT_DIR")
+                if current_project_dir is None or not current_project_dir:
+                    err_str = f"Env var PROJECT_DIR received as {current_project_dir}"
+                    logging.exception(err_str)
+                    raise Exception(err_str)
+
+                other_project_config_file_path = (PurePath(current_project_dir).parent /
                                                   other_project_name / "data" / "config.yaml")
                 other_project_config_yaml_dict = (
                     YAMLConfigurationManager.load_yaml_configurations(str(other_project_config_file_path)))
@@ -1074,6 +1101,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 self.__load_json_layout_and_non_layout_messages_in_dicts(f)
             file = file[0]  # since first file will be this project's proto file
             self._current_project_name = file.proto.package
+            self._current_project_model_file = file
         else:
             self.__load_json_layout_and_non_layout_messages_in_dicts(file)
         # Performing Recursion to messages (including nested type) to get json layout, non-layout and enums and

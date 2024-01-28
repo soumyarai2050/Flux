@@ -1,5 +1,6 @@
 import _, { cloneDeep } from 'lodash';
 import { DB_ID, DataTypes } from './constants';
+import { SortComparator } from './utility/sortComparator';
 
 const FLOAT_POINT_PRECISION = 2;
 
@@ -57,7 +58,6 @@ export function floatToInt(value) {
             }
         }
     }
-
     return value;
 }
 
@@ -166,31 +166,9 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
     return rows;
 }
 
-export function getActiveRows(rows, page, pageSize, order, orderBy) {
-    return stableSort(rows, getComparator(order, orderBy))
+export function getActiveRows(rows, page, pageSize, sortOrders) {
+    return stableSort(rows, SortComparator.getInstance(sortOrders))
         .slice(page * pageSize, page * pageSize + pageSize);
-}
-
-export function getComparator(order, orderBy) {
-    return order === 'desc'
-        ? (a, b) => descendingComparator(a, b, orderBy)
-        : (a, b) => -descendingComparator(a, b, orderBy);
-}
-
-export function descendingComparator(a, b, orderBy) {
-    if (a[orderBy] === undefined || a[orderBy] === null) {
-        return -1;
-    }
-    if (b[orderBy] === undefined || b[orderBy] === null) {
-        return 1;
-    }
-    if (b[orderBy] < a[orderBy]) {
-        return -1;
-    }
-    if (b[orderBy] > a[orderBy]) {
-        return 1;
-    }
-    return 0;
 }
 
 export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {

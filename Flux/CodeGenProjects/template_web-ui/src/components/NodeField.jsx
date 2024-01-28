@@ -96,6 +96,7 @@ const NodeField = (props) => {
     let colorClass = classes[color];
 
     let nodeFieldRemove = props.data['data-remove'] ? classes.remove : '';
+    const placeholder = props.data.placeholder ? props.data.placeholder : !props.data.required ? 'optional' : null;
 
     if (props.data.customComponentType === 'autocomplete') {
         let value = props.data.value ? props.data.value : null;
@@ -131,7 +132,7 @@ const NodeField = (props) => {
                         {...params}
                         name={props.data.key}
                         error={validationError.current !== null}
-                        placeholder={props.data.placeholder}
+                        placeholder={placeholder}
                         InputProps={{
                             ...params.InputProps,
                             ...inputProps
@@ -254,7 +255,7 @@ const NodeField = (props) => {
                     validateConstraints(props.data, values.value, min, max))}
                 variant='outlined'
                 decimalScale={decimalScale}
-                placeholder={props.data.placeholder}
+                placeholder={placeholder}
                 InputProps={inputProps}
                 inputProps={{
                     style: { padding: '6px 10px' },
@@ -320,7 +321,7 @@ const NodeField = (props) => {
                 onChange={(e) => handleTextChange(e, props.data.type, props.data.xpath, e.target.value, props.data.dataxpath,
                     validateConstraints(props.data, e.target.value))}
                 variant='outlined'
-                placeholder={props.data.placeholder}
+                placeholder={placeholder}
                 InputProps={inputProps}
                 inputProps={{
                     ref: inputRef,

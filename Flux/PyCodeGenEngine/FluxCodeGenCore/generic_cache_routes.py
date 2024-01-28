@@ -1,21 +1,18 @@
 # system imports
-import os
 from typing import Any, Final, Type, List, Tuple, Dict
-import logging
 
 # other package imports
 from fastapi import HTTPException
-from beanie.odm.documents import DocType, InsertManyResult
-from fastapi.encoders import jsonable_encoder
+from beanie.odm.documents import DocType
+from beanie import Document
 
 # project specific imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
-from FluxPythonUtils.scripts.utility_functions import compare_n_patch_dict, convert_camel_case_to_specific_case, \
-    compare_n_patch_list
+from FluxPythonUtils.scripts.utility_functions import compare_n_patch_dict, convert_camel_case_to_specific_case
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_beanie_routes import generic_perf_benchmark, \
     assign_missing_ids_n_handle_date_time_type
-from Flux.CodeGenProjects.pair_strat_engine.generated.FastApi.strat_manager_service_http_client import \
+from Flux.CodeGenProjects.TradeEngine.ProjectGroup.pair_strat_engine.generated.FastApi.strat_manager_service_http_client import \
     StratManagerServiceHttpClient
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_beanie_routes import get_beanie_host_n_port, \
     underlying_generic_patch_all_http, _generic_put_all_http
@@ -115,7 +112,7 @@ async def _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj, pyda
 async def generic_put_http(pydantic_class_type, project_name: str, stored_pydantic_obj, pydantic_obj_updated,
                            filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None, has_links: bool = False):
     updated_obj = await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
-                                                pydantic_obj_updated, pydantic_obj_updated.dict(by_alias=True),
+                                                pydantic_obj_updated, pydantic_obj_updated.model_dump(by_alias=True),
                                                 filter_agg_pipeline,
                                                 update_agg_pipeline, has_links)
     # saving to db
@@ -150,11 +147,11 @@ async def generic_put_all_http(pydantic_class_type, project_name: str, stored_py
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
-async def generic_patch_http(pydantic_class_type, project_name: str, stored_pydantic_obj, pydantic_obj_update_json,
+async def generic_patch_http(pydantic_class_type, project_name: str, stored_pydantic_obj: Document, pydantic_obj_update_json,
                              filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None, has_links: bool = False):
     assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json,
                                                ignore_handling_datetime=True)
-    updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.dict(by_alias=True),
+    updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.model_dump(by_alias=True),
                                                      pydantic_obj_update_json)
     updated_obj = await _underlying_patch_n_put(pydantic_class_type, stored_pydantic_obj,
                                                 pydantic_obj_update_json, updated_pydantic_obj_dict,

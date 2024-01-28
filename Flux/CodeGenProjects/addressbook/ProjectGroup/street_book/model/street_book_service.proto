@@ -1,0 +1,446 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+import "ui_option_utils.proto";
+import "projects_core.proto";
+import "trade_core.proto";
+import "dashboards_n_market_data_n_street_book_core.proto";
+import "street_book_core.proto";
+import "pair_strat_engine_n_street_book_core.proto";
+import "market_data_n_street_book_core.proto";
+import "street_book_n_post_trade_engine_core.proto";
+
+package street_book;
+
+message SymbolSideSnapshot{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_symbol_side_snapshot_from_symbol_side",
+      AggregateVarName: "get_symbol_side_snapshot_from_symbol_side",
+      QueryParams: "security_id",
+      QueryParams: "side",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str",
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_symbol_side_snapshot_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    LogKeySequence: "id",
+    IsRepeated: true
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 8,
+    y: 50,
+    w: 10,
+    h: 8,
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_model_name: "PairStrat",
+    depends_on_other_model_for_dynamic_url: true
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required Security security = 2;
+  required Side side = 3;
+  optional float avg_px = 4;
+  optional int64 total_qty = 5;
+  optional int64 total_filled_qty = 6;
+  optional float avg_fill_px = 7;
+  optional float total_fill_notional = 8 [(FluxFldDisplayType) = "int"];
+  optional int64 last_update_fill_qty = 9;
+  optional float last_update_fill_px = 10;
+  optional int64 total_cxled_qty = 11;
+  optional float avg_cxled_px = 12;
+  optional float total_cxled_notional = 13 [(FluxFldDisplayType) = "int"];
+  optional string last_update_date_time = 14 [(FluxFldValIsDateTime) = true];
+  optional int32 order_count = 15 [(FluxFldNoCommonKey) = true];
+}
+
+// Widget - 5
+message FillsJournal{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 0,
+    y: 58,
+    w: 18,
+    h: 16,
+    is_repeated: True,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_model_name: "PairStrat",
+    depends_on_other_model_for_dynamic_url: true
+  };
+  option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
+  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_symbol_side_underlying_account_cumulative_fill_qty",
+      AggregateVarName: "get_symbol_side_underlying_account_cumulative_fill_qty",
+      QueryParams: "symbol",
+      QueryParams: "side",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str"
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_notify_fills_journal_update",
+      QueryParams: "symbols",
+      QueryParamsDataType: "List[str]",
+      QueryType: WS
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "fill_symbol-fill_side",
+    LogKeySequence: "fill_id"
+    IsRepeated: true
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional string order_id = 2;
+  optional float fill_px = 3;
+  optional int64 fill_qty = 4;
+  optional float fill_notional = 5 [(FluxFldDisplayType) = "int"];
+  optional string fill_symbol = 6 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true];
+  optional Side fill_side = 7;
+  required string underlying_account = 8;
+  optional string fill_date_time = 9 [(FluxFldValIsDateTime) = true];
+  required string fill_id = 10;
+  optional int64 underlying_account_cumulative_fill_qty = 11[(FluxFldHide) = "True"]; // used by executor query at strat start
+}
+
+message StratStatus{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 4,
+    y: 23,
+    w: 7,
+    h: 8,
+    alert_bubble_source: "PairStrat.strat_status.strat_alerts",
+    alert_bubble_color: "PairStrat.strat_status.strat_alerts.severity",
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_model_name: "PairStrat",
+    depends_on_other_model_for_id: true,
+    depends_on_other_model_for_dynamic_url: true
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "id",
+    IsRepeated: false,
+  };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "update_residuals",
+    QueryParams: "security_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "residual_qty",
+    QueryParamsDataType: "int"
+  };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "put_strat_to_snooze",
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+
+  optional int64 total_buy_qty = 3 [(FluxFldHelp) = "sum of all buy order qty in order brief of strat order snapshot"];
+  optional int64 total_sell_qty = 4 [(FluxFldHelp) = "sum of all sell order qty in order brief of strat order snapshot"];
+  optional int64 total_order_qty = 5 [(FluxFldHide) = "True", (FluxFldHelp) = "sum of above total_buy_qty + total_sell_qty"];
+
+  optional int64 total_open_buy_qty = 6 [(FluxFldHelp) = "sum of all open buy order qty: StratOrderSnapshot-s order_brief.qty minus its filled_qty provided its state is ack or unack"];
+  optional int64 total_open_sell_qty = 7 [(FluxFldHelp) = "sum of all open sell order qty: StratOrderSnapshot-s order_brief.qty minus its filled_qty provided its state is ack or unack"];
+  optional float avg_open_buy_px = 8 [(FluxFldHelp) = "total_open_buy_notional / total_open_buy_qty"];
+  optional float avg_open_sell_px = 9 [(FluxFldHelp) = "total_open_sell_notional / total_open_sell_qty"];
+  optional float total_open_buy_notional = 10 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all StratOrderSnapshot-s [open_buy_qty X price]"];
+  optional float total_open_sell_notional = 11 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all StratOrderSnapshot-s [open_sell_qty X price]"];
+  optional float total_open_exposure = 12 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_open_buy_notional - total_open_sell_notional"];
+
+  optional int64 total_fill_buy_qty = 13 [(FluxFldHelp) = "sum of all fill buy order qty from StratOrderSnapshot"];
+  optional int64 total_fill_sell_qty = 14 [(FluxFldHelp) = "sum of all fill sell order qty from StratOrderSnapshot"];
+  optional float avg_fill_buy_px = 15 [(FluxFldHelp) = "total_fill_buy_notional / total_fill_buy_qty"];
+  optional float avg_fill_sell_px = 16 [(FluxFldHelp) = "total_fill_sell_notional / total_fill_sell_qty"];
+  optional float total_fill_buy_notional = 17 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill buy notional from StratOrderSnapshot"];
+  optional float total_fill_sell_notional = 18 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill sell notional from StratOrderSnapshot"];
+  optional float total_fill_exposure = 19 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_fill_buy_notional - total_fill_sell_notional"];
+
+  optional int64 total_cxl_buy_qty = 20 [(FluxFldHelp) = "sum of all cxl buy order qty from StratOrderSnapshot"];
+  optional int64 total_cxl_sell_qty = 21 [(FluxFldHelp) = "sum of all cxl sell order qty from StratOrderSnapshot"];
+  optional float avg_cxl_buy_px = 22 [(FluxFldHelp) = "total_cxl_buy_notional / total_cxl_buy_qty"];
+  optional float avg_cxl_sell_px = 23 [(FluxFldHelp) = "total_cxl_sell_notional / total_cxl_sell_qty"];
+  optional float total_cxl_buy_notional = 24 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all cxl buy notional from StratOrderSnapshot"];
+  optional float total_cxl_sell_notional = 25 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all cxl sell notional from StratOrderSnapshot"];
+  optional float total_cxl_exposure = 26 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_cxl_buy_notional - total_cxl_sell_notional"];
+
+  // these are specific to CB-EQT strat - move to derived later
+  optional float average_premium = 27 [(FluxFldNumberFormat) = "%"];
+  optional Residual residual = 28;
+  optional float balance_notional = 29 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true];
+  optional int64 strat_status_update_seq_num = 30 [(FluxFldHide) = "True"];
+  optional string last_update_date_time = 31 [(FluxFldValIsDateTime) = true];
+}
+
+message StratLimits{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 7,
+    y: 0,
+    w: 11,
+    h: 12,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_model_name: "PairStrat",
+    depends_on_other_model_for_id: true,
+    depends_on_other_model_for_dynamic_url: true
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: false,
+    IsTopLvlModel: false,
+    ExecutorKeyCounts: 1,
+    ExecutorKeySequence: "id",
+    IsRepeated: false
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  optional int32 max_open_orders_per_side = 2 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open orders allowed per side for this strat"];
+  optional float max_single_leg_notional = 3 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000", (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
+  optional float max_open_single_leg_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
+  optional float max_net_filled_notional = 5  [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "absolute [buy fill - sell fill] maximum notional allowed for this strat"];
+  optional float max_concentration = 6 [(FluxFldValMax) = "10", (FluxFldHelp) = "max symbol specific concentration % (w.r.t. market total for the symbol)"];
+  optional float limit_up_down_volume_participation_rate = 7 [(FluxFldValMax) = "30", (FluxFldHelp) = "At limit up down: % participation allowed against open interest on specific side of outstanding queue"];
+  optional CancelRate cancel_rate = 8 [(FluxFldHelp) = "Allowed cxl size (side agnostic) as % of (open + executed + cxlled) volume (per broker per symbol) within configured interval; no time window implies SOD: window-start & checking-time as end"];
+  optional MarketTradeVolumeParticipation market_trade_volume_participation = 9 [(FluxFldHelp) = "% participation against market traded volume within configured interval (sent with top of the book); no time window implies SOD: window-start & checking-time as end"];
+  optional OpenInterestParticipation market_depth = 10 [(FluxFldHelp) = "% participation against open interest on specific side across specified depth levels"];
+  optional ResidualRestriction residual_restriction = 11 [(FluxFldHelp) = "Max executed unhedged notional"];
+  // same as portfolio eligible_brokers except filtered by server [strat specific symbol(s)] + user allowed to mod down
+  repeated Broker eligible_brokers = 12 [(FluxFldHelp) = "SOD / Locate / PTH limits"];
+  optional int64 strat_limits_update_seq_num = 13 [(FluxFldHide) = "True"];
+}
+
+message NewOrder{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeySequence: "security.sec_id-side"
+    IsRepeated: true
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required Security security = 2;
+  required Side side = 3;
+  optional float px = 4;
+  optional int64 qty = 5;
+}
+
+message CancelOrder{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+    PatchOp: AggregateType_UNSPECIFIED,
+  };
+  option (FluxMsgExecutorOptions) = {
+    IsWebSocketModel: true,
+    EnableNotifyAll: true,
+    IsTopLvlModel: false,
+    ExecutorKeySequence: "security.sec_id-side",
+    IsRepeated: true,
+    CacheAsDictWithKeyField: "order_id"
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string order_id = 2;
+  required Security security = 3;
+  required Side side = 4;
+  optional bool cxl_confirmed = 5 [(FluxFldHide) = "True"];
+}
+
+message UnderlyingAccountNCumFillQty{
+  required string underlying_account = 1;
+  required int64 cumulative_qty = 2;
+}
+
+message UnderlyingAccountCumFillQty{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_underlying_account_cumulative_fill_qty",
+      QueryParams: "symbol",
+      QueryParams: "side",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str"
+  };
+  repeated UnderlyingAccountNCumFillQty underlying_account_n_cumulative_fill_qty = 1;
+}
+
+message ExecutorCheckSnapshot{
+  option (FluxMsgJsonQuery) = {
+      QueryName: "get_executor_check_snapshot",
+      QueryParams: "symbol",
+      QueryParams: "side",
+      QueryParams: "last_n_sec",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "str",
+      QueryParamsDataType: "int"
+  };
+  optional int32 last_n_sec_trade_qty = 1;
+  optional int32 last_n_sec_order_qty = 2;
+}
+
+message LastNSecMarketTradeVol{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_last_n_sec_total_trade_qty",
+    AggregateVarName: "get_last_n_sec_total_trade_qty",
+    QueryParams: "symbol",
+    QueryParams: "last_n_sec",
+    QueryParamsDataType: "str",
+    QueryParamsDataType: "int"
+  };
+  optional int64 last_n_sec_trade_vol = 1;
+}
+
+message TradeSimulatorProcessNewOrder{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "trade_simulator_place_new_order",
+    QueryParams: "px",
+    QueryParamsDataType: "float",
+    QueryParams: "qty",
+    QueryParamsDataType: "int",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "trading_sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "system_sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str",
+    QueryParams: "exchange",
+    QueryParamsDataType: "str | None = None"
+  };
+  required bool resp = 1;
+}
+
+message TradeSimulatorProcessCxlOrder{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "trade_simulator_place_cxl_order",
+    QueryParams: "order_id",
+    QueryParamsDataType: "str",
+    QueryParams: "side",
+    QueryParamsDataType: "Side | None = None",
+    QueryParams: "trading_sec_id",
+    QueryParamsDataType: "str | None = None",
+    QueryParams: "system_sec_id",
+    QueryParamsDataType: "str | None = None",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str | None = None"
+  };
+  required bool resp = 1;
+}
+
+message TradeSimulatorProcessOrderAck{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "trade_simulator_process_order_ack",
+    QueryParams: "order_id",
+    QueryParamsDataType: "str",
+    QueryParams: "px",
+    QueryParamsDataType: "float",
+    QueryParams: "qty",
+    QueryParamsDataType: "int",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str"
+  };
+  required bool resp = 1;
+}
+
+message TradeSimulatorProcessFill{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "trade_simulator_process_fill",
+    QueryParams: "order_id",
+    QueryParamsDataType: "str",
+    QueryParams: "px",
+    QueryParamsDataType: "float",
+    QueryParams: "qty",
+    QueryParamsDataType: "int",
+    QueryParams: "side",
+    QueryParamsDataType: "Side",
+    QueryParams: "sec_id",
+    QueryParamsDataType: "str",
+    QueryParams: "underlying_account",
+    QueryParamsDataType: "str"
+  };
+  required bool resp = 1;
+}
+
+message TradeSimulatorReloadConfig{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "trade_simulator_reload_config"
+  };
+  required bool resp = 1;
+}
+
+message HandleStratActivate{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_strat_activate"
+  };
+  required bool resp = 1;
+}
+
+
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage{
+  optional ButtonType temp = 1;
+  optional Severity temp2 = 2;
+  optional DummyEnumDMS temp3 = 3;
+  optional DummyEnumMS temp4 = 4;
+  optional CommandType temp5 = 5;
+  optional DummyEnumSO temp6 = 6;
+}

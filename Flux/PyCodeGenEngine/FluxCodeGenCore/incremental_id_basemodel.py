@@ -2,7 +2,7 @@ import logging
 from typing import ClassVar, Dict, Any
 from threading import Lock
 from re import sub
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from pendulum import DateTime
 from beanie import PydanticObjectId
 import os
@@ -80,9 +80,7 @@ class BareBaseModel(BaseModel):
 
 
 class CamelBaseModel(BaseModel):
-    class Config:
-        alias_generator = to_camel
-        allow_population_by_field_name =  True
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class CamelCacheBaseModel(CacheBaseModel, CamelBaseModel):

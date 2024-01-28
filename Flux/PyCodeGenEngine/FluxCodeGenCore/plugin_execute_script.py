@@ -122,7 +122,7 @@ class PluginExecuteScript:
                 proto_file_path_list.extend(
                     [os.path.join(dir_path, "model", proto_file)
                      for proto_file in os.listdir(os.path.join(dir_path, "model"))
-                     if "options" not in proto_file and proto_file.endswith(self.model_file_suffix)])
+                     if "flux_options" not in proto_file and proto_file.endswith(self.model_file_suffix)])
         else:
             proto_file_path_list = [os.path.join(self.base_dir_path, "model", proto_file)
                                     for proto_file in os.listdir(os.path.join(self.base_dir_path, "model"))
@@ -138,16 +138,25 @@ class PluginExecuteScript:
             raise Exception(err_str)
         # else not required: plugin_output_dir is present, continue further
         proto_files_dir_paths_list: List[str] = []
+        root_path = os.getenv("FLUX_CODE_GEN_ENGINE_PATH")
+        if root_path is None:
+            err_str = f"Env Var 'FLUX_CODE_GEN_ENGINE_PATH' received as {plugin_output_dir}"
+            logging.exception(err_str)
+            raise Exception(err_str)
         if isinstance(self.base_dir_path, list):
             for dir_path in self.base_dir_path:
                 proto_files_dir_paths_list.append(str(PurePath(dir_path) / "model"))
-                root_path = os.path.abspath(os.path.join(dir_path, "..", ".."))
                 if root_path not in proto_files_dir_paths_list:
                     proto_files_dir_paths_list.append(root_path)
+                project_grp_root = os.path.abspath(os.path.join(dir_path, "..", ".."))
+                if project_grp_root not in proto_files_dir_paths_list:
+                    proto_files_dir_paths_list.append(project_grp_root)
+
         else:
             proto_files_dir_paths_list.extend([
                 os.path.join(self.base_dir_path, "model"),
-                os.path.abspath(os.path.join(self.base_dir_path, "..", ".."))
+                os.path.abspath(os.path.join(self.base_dir_path, "..", "..")),  # project group's base dir
+                os.path.abspath(root_path)
             ])
         insertion_imports_dir_path = self.current_script_dir_path
 
@@ -191,5 +200,5 @@ class PluginExecuteScript:
         # Removing plugin comment from output generated files if present
         self.remove_insertion_points_from_generated_output(plugin_out_dir)
 
-        # Removing used imports from insertion_imports file
+        # # Removing used imports from insertion_imports file
         self.clear_used_imports_from_file()

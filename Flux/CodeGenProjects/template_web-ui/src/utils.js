@@ -1,15 +1,15 @@
-import _, { cloneDeep } from 'lodash';
+import _, { cloneDeep, isObject } from 'lodash';
 import {
     ColorPriority, ColorTypes, DataTypes, HoverTextType, Modes, ShapeType, SizeType,
-    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH
+    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL
 } from './constants';
 import Node from './components/Node';
 import HeaderField from './components/HeaderField';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import * as workerUtils from './workerUtils';
-export const { applyFilter, applyGetAllWebsocketUpdate, descendingComparator, floatToInt, getAbbreviatedRows,
-    getActiveRows, getComparator, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
+export const { applyFilter, applyGetAllWebsocketUpdate, floatToInt, getAbbreviatedRows,
+    getActiveRows, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
     roundNumber, stableSort
 } = workerUtils;
 dayjs.extend(utc);
@@ -95,6 +95,52 @@ const timeIt = (target, property, descriptor) => {
 
 export function setTreeState(xpath, state) {
     treeState[xpath] = state;
+}
+
+const fluxOptions = []
+
+function addFieldAttributes(object, attributes) {
+    /* 
+    function to add field level flux option on collection object.
+    params:
+        object: collection object
+        attributes: attribute (flux option) dict set on the field
+    */
+    fluxOptions.forEach(({ propertyName, usageName }) => {
+        if (attributes.hasOwnProperty(propertyName)) {
+            if (isObject(attributes[propertyName])) {
+                if (attributes.hasOwnProperty(object.key)) {
+                    object[usageName] = attributes[propertyName][object.key];
+                } // else not required - attribute not set on the object
+            } else {
+                object[usageName] = attributes[propertyName];
+                // additional handling for ui component fields
+                switch (propertyName) {
+                    case 'button':
+                        object.type = 'button';
+                        object.color = attributes.button.value_color_map;
+                        break;
+                    case 'progress_bar':
+                        object.type = 'progressBar';
+                        object.color = attributes.progress_bar.value_color_map;
+                        break;
+                    case 'mapping_src':
+                    case 'mapping_underlying_meta_field':
+                        object[usageName] = object[usageName][0];
+                        break;
+                }
+            }
+        } // else not required - flux option not found in attribute list
+    })
+}
+
+function addMessageAttributes(object, attributes, message) {
+    
+    fluxOptions.forEach(({ propertyName, usageName }) => {
+        if (attributes.hasOwnProperty(propertyName)) {
+            
+        }
+    })
 }
 
 function getAutocompleteDict(autocompleteValue) {
@@ -186,6 +232,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
             collection.xpath = xpath ? xpath + '.' + k : k;
+            collection.path = collection.xpath.replaceAll('[0]', '');
             collection.required = currentSchema.required.filter(p => p === k).length > 0 ? true : false;
             let parentxpath = xpath ? xpath !== callerProps.parent ? xpath : null : null;
             if (parentxpath) {
@@ -1345,12 +1392,17 @@ export function getAbbreviatedKeyFromId(keyArray, abbreviated, id) {
     return abbreviatedKey;
 }
 
-export function getAlertBubbleCount(data, alertBubbleSourceXpath) {
-    let alertBubbleCount = 0;
-    if (_.get(data, alertBubbleSourceXpath)) {
-        alertBubbleCount = _.get(data, alertBubbleSourceXpath).length;
+export function getAlertBubbleCount(data, bubbleSourcePath) {
+    let bubbleCount = 0;
+    const bubbleSource = _.get(data, bubbleSourcePath);
+    if (bubbleSource) {
+        if (typeof bubbleSource === DataTypes.NUMBER) {
+            bubbleCount = bubbleSource;
+        } else if (Array.isArray(bubbleSource)) {
+            bubbleCount = bubbleSource.length;
+        }
     }
-    return alertBubbleCount;
+    return bubbleCount;
 }
 
 export function getColorTypeFromValue(collection, value) {
@@ -1420,19 +1472,26 @@ export function getPriorityColorType(colorTypesSet) {
     }
 }
 
-export function getAlertBubbleColor(data, collections, alertBubbleSourceXpath, alertBubbleColorXpath) {
-    let alertBubbleColorKey = alertBubbleColorXpath.split('.').pop();
-    let collection = collections.filter(col => col.key === alertBubbleColorKey)[0];
-    let alertBubbleColorRelativePath = alertBubbleColorXpath.replace(alertBubbleSourceXpath, '');
-    let alertBubbleColorTypes = new Set();
-    if (_.get(data, alertBubbleSourceXpath) && _.get(data, alertBubbleSourceXpath).length > 0) {
-        for (let i = 0; i < _.get(data, alertBubbleSourceXpath).length; i++) {
-            let value = _.get(data, alertBubbleSourceXpath + '[' + i + ']' + alertBubbleColorRelativePath);
-            let colorType = getColorTypeFromValue(collection, value);
-            alertBubbleColorTypes.add(colorType);
-        }
+export function getAlertBubbleColor(data, collections, bubbleSourcePath, bubbleColorSourcePath) {
+    // let alertBubbleColorKey = alertBubbleColorXpath.split('.').pop();
+    // let collection = collections.filter(col => col.key === alertBubbleColorKey)[0];
+    // let alertBubbleColorRelativePath = alertBubbleColorXpath.replace(alertBubbleSourceXpath, '');
+    // let alertBubbleColorTypes = new Set();
+    // if (_.get(data, alertBubbleSourceXpath) && _.get(data, alertBubbleSourceXpath).length > 0) {
+    //     for (let i = 0; i < _.get(data, alertBubbleSourceXpath).length; i++) {
+    //         let value = _.get(data, alertBubbleSourceXpath + '[' + i + ']' + alertBubbleColorRelativePath);
+    //         let colorType = getColorTypeFromValue(collection, value);
+    //         alertBubbleColorTypes.add(colorType);
+    //     }
+    // }
+    // return getPriorityColorType(alertBubbleColorTypes);
+    const collection = collections.find(col => col.tableTitle === bubbleColorSourcePath);
+    if (collection) {
+        const value = _.get(data, bubbleColorSourcePath);
+        const colorType = getColorTypeFromValue(collection, value);
+        return colorType;
     }
-    return getPriorityColorType(alertBubbleColorTypes);
+    return ColorTypes.DEFAULT;
 }
 
 export function getObjectWithLeastId(objectArray) {
@@ -2240,11 +2299,6 @@ export function getRowsFromAbbreviatedItems(items, itemsData, itemFieldPropertie
     return rows;
 }
 
-// export function getActiveRows(rows, page, pageSize, order, orderBy) {
-//     return stableSort(rows, getComparator(order, orderBy))
-//         .slice(page * pageSize, page * pageSize + pageSize);
-// }
-
 export function compareNCheckNewArrayItem(obj1, obj2) {
     for (const key in obj1) {
         if (obj1[key] instanceof Array && obj2[key] instanceof Array) {
@@ -2300,10 +2354,6 @@ export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = fal
             }
         }
     }
-}
-
-export function isObject(value) {
-    return value !== null && typeof value === DataTypes.OBJECT;
 }
 
 export function getWidgetOptionById(widgetOptions, id, isIdBound = false) {
@@ -3013,6 +3063,8 @@ export function getServerUrl(widgetSchema, linkedObj, runningField) {
         } else {
             return `http://${host}:${port}/${project_name}`;
         }
+    } else {
+        return API_ROOT_URL;
     }
     return null;
 }

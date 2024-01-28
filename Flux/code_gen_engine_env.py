@@ -79,17 +79,21 @@ class CodeGenEngineEnvManager:
         self.plugin_output_dir = self.base_output_dir / plugin_name[len("PLUGIN"):]
         os.environ["PLUGIN_OUTPUT_DIR"] = str(self.plugin_output_dir)
 
+        root_pb2_dir = PurePath(os.environ.get("FLUX_CODE_GEN_ENGINE_PATH")) / "PyCodeGenEngine" / "FluxCodeGenCore" / "ProtoGenPy"
+
         # Add required path to sys.path & export them
         sys.path.append(str(self.py_code_gen_core_path))
         sys.path.append(str(self.base_output_dir))
         sys.path.append(str(self.plugin_output_dir))
         sys.path.append(str(self.plugin_dir))
         sys.path.append(str(self.code_gen_root.parent))
+        sys.path.append(str(root_pb2_dir))
 
         # prepare & export PYTHONPATH
-        self.python_path += ":" + str(self.py_code_gen_core_path) + ":" + str(self.base_output_dir) + \
-                            ":" + str(self.plugin_output_dir) + ":" + \
-                            str(self.plugin_dir / "PluginFastApi") + ":" + str(self.code_gen_root.parent)
+        self.python_path += (":" + str(self.py_code_gen_core_path) + ":" + str(self.base_output_dir) +
+                             ":" + str(self.plugin_output_dir) + ":" +
+                             str(self.plugin_dir / "PluginFastApi") + ":" + str(self.code_gen_root.parent) +
+                             ":" + str(root_pb2_dir))
         os.environ["PYTHONPATH"] = str(self.python_path)
 
         # Setting user provided env variables
@@ -114,7 +118,7 @@ class CodeGenEngineEnvManager:
     def get_instance(cls) -> 'CodeGenEngineEnvManager':
         with cls.get_instance_mutex:
             if cls.code_gen_engine_env_manager is None:
-                cls.code_gen_engine_env_manager = CodeGenEngineEnvManager()
+                cls.code_gen_engine_env_manager = cls()
                 return cls.code_gen_engine_env_manager
             else:
                 #  Does exist - return cached

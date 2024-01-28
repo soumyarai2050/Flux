@@ -9,7 +9,7 @@ import axios from 'axios';
 import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp, Help } from '@mui/icons-material';
 import { utils, writeFileXLSX } from 'xlsx';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
-import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, stableSort, getComparator, getTableRowsFromData, sortColumns } from '../utils';
+import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, getTableRowsFromData, sortColumns, getActiveRows } from '../utils';
 import { API_ROOT_URL, DataTypes, DB_ID, Modes } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
@@ -20,6 +20,7 @@ import { Icon } from './Icon';
 import { AlertErrorMessage } from './Alert';
 import classes from './TableWidget.module.css';
 import CopyToClipboard from './CopyToClipboard';
+import { PageCache, PageSizeCache, SortOrderCache } from '../utility/attributeCache';
 
 const TableWidget = (props) => {
     const [rowTrees, setRowTrees] = useState([]);
@@ -33,10 +34,9 @@ const TableWidget = (props) => {
     const [openSettings, setOpenSettings] = useState(false);
     const [settingsArchorEl, setSettingsArcholEl] = useState();
     const [hide, setHide] = useState(true);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
-    const [page, setPage] = useState(0);
-    const [order, setOrder] = React.useState('asc');
-    const [orderBy, setOrderBy] = React.useState('');
+    const [rowsPerPage, setRowsPerPage] = useState(PageSizeCache.getPageSize(props.name));
+    const [page, setPage] = useState(PageCache.getPage(props.name));
+    const [sortOrders, setSortOrders] = useState(SortOrderCache.getSortOrder(props.name));
     const [openModalPopup, setOpenModalPopup] = useState(false);
     const [selectAll, setSelectAll] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
@@ -94,11 +94,15 @@ const TableWidget = (props) => {
 
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
+        PageCache.setPage(props.name, newPage);
     };
 
     const handleChangeRowsPerPage = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
+        const size = parseInt(event.target.value, 10);
+        setRowsPerPage(size);
+	PageSizeCache.setPageSize(props.name, size);
         setPage(0);
+        PageCache.setPage(props.name, 0);
     };
 
     const onSelectAll = (e) => {
@@ -118,12 +122,30 @@ const TableWidget = (props) => {
         setHeadCells(updatedHeadCells);
     }
 
-    const handleRequestSort = (event, property) => {
-        const isAsc = orderBy === property && order === 'asc';
-        setOrder(isAsc ? 'desc' : 'asc');
-        setOrderBy(property);
+    const handleRequestSort = (event, property, retainSortLevel = false) => {
+        let updatedSortOrders = cloneDeep(sortOrders);
+        if (!retainSortLevel) {
+            updatedSortOrders = updatedSortOrders.filter(o => o.orderBy === property);
+        }
+        const sortOrder = updatedSortOrders.find(o => o.orderBy === property);
+        if (sortOrder) {
+            // sort level already exists for this property
+            sortOrder.sortType = sortOrder.sortType === 'asc' ? 'desc' : 'asc';
+        } else {
+            // add a new sort level
+            updatedSortOrders.push({ orderBy: property, sortType: 'asc' });
+        }
+        setSortOrders(updatedSortOrders);
+        SortOrderCache.setSortOrder(props.name, updatedSortOrders);
         setPage(0);
-    };
+        PageCache.setPage(props.name, 0);
+    }
+
+    const handleRemoveSort = (property) => {
+        const updatedSortOrders = sortOrders.filter(o => o.orderBy !== property);
+        setSortOrders(updatedSortOrders);
+        SortOrderCache.setSortOrder(props.name, updatedSortOrders);
+    }
 
     const onSave = () => {
         props.onUpdate(data);
@@ -471,14 +493,13 @@ const TableWidget = (props) => {
                             <TableHead
                                 headCells={getFilteredCells()}
                                 mode={props.mode}
-                                order={order}
-                                orderBy={orderBy}
+                                sortOrders={sortOrders}
                                 onRequestSort={handleRequestSort}
+                                onRemoveSort={handleRemoveSort}
                                 copyColumnHandler={copyColumnHandler}
                             />
                             <TableBody>
-                                {stableSort(rows, getComparator(order, orderBy))
-                                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                                {getActiveRows(rows, page, rowsPerPage, sortOrders)
                                     .map((row, index) => {
                                         let tableRowClass = '';
                                         if (row['data-add']) {

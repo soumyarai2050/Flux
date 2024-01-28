@@ -316,9 +316,6 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         else:
             option_val_dict = self.get_complex_option_value_from_proto(message,
                                                                        FastapiWsRoutesFileHandler.flux_msg_json_root_time_series)
-            # checking if time series option mistakenly has update or delete also set
-            # if so, notifying user by raising exception
-            self._check_valid_route_op_in_time_series_model(message, option_val_dict)
 
         shared_mutex_list = self._get_list_of_shared_lock_for_message(message)
 

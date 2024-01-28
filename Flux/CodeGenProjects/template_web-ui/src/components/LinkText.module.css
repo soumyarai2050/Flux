@@ -1,0 +1,10 @@
+.link {
+    max-width: 150px;
+    display: inline-flex;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--blue-400) !important;
+    text-decoration: underline;
+    cursor: pointer;
+}

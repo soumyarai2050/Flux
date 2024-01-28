@@ -1,6 +1,7 @@
 #pragma once
 
 #include <google/protobuf/util/json_util.h>
+#include <absl/status/status.h>
 
 #include "quill/Quill.h"
 #include "string_util.h"
@@ -30,13 +31,13 @@ namespace FluxCppCore {
         [[nodiscard]] static inline bool decode_model(RootModelType &r_model_obj, const std::string &kr_json) {
             google::protobuf::util::JsonParseOptions options;
             decode_options(options);
-            google::protobuf::util::Status status = google::protobuf::util::JsonStringToMessage(kr_json, &r_model_obj,
+            absl::Status status = google::protobuf::util::JsonStringToMessage(kr_json, &r_model_obj,
                                                                                                 options);
-            if (status.code() == google::protobuf::util::StatusCode::kOk) {
+            if (status.code() == absl::StatusCode::kOk) {
                 return true;
             } else {
-                LOG_ERROR(c_p_logger_, "Failed Decoding {};;; error: {};;; json: {}", RootModelType::GetDescriptor()->name(),
-                          status.message().ToString(), kr_json);
+                LOG_ERROR(c_p_logger_, "Failed Decoding {};;; error: {};;; json: {}",
+                          RootModelType::GetDescriptor()->name(), status.message(), kr_json);
                 return false;
             }
         }
@@ -45,15 +46,15 @@ namespace FluxCppCore {
         encode_model(const RootModelType &kr_model_obj, std::string &r_json_out, const bool whitespace = false) {
             google::protobuf::util::JsonPrintOptions options;
             encode_options(options, whitespace);
-            google::protobuf::util::Status status = google::protobuf::util::MessageToJsonString(kr_model_obj,
+            absl::Status status = google::protobuf::util::MessageToJsonString(kr_model_obj,
                                                                                                 &r_json_out,
                                                                                                 options);
-            if (status.code() == google::protobuf::util::StatusCode::kOk)
+            if (status.code() == absl::StatusCode::kOk)
                 return true;
             else {
-                LOG_ERROR(c_p_logger_, "Failed Encoding {};;; error: {};;; {}: {}", RootModelType::GetDescriptor()->name(),
-                          status.message().ToString(), RootModelType::GetDescriptor()->name(),
-                          kr_model_obj.DebugString());
+                LOG_ERROR(c_p_logger_, "Failed Encoding {};;; error: {};;; {}: {}",
+                          RootModelType::GetDescriptor()->name(), status.message(),
+                          RootModelType::GetDescriptor()->name(), kr_model_obj.DebugString());
                 return false;
             }
         }
@@ -69,10 +70,10 @@ namespace FluxCppCore {
                           const bool whitespace = false) {
             google::protobuf::util::JsonPrintOptions options;
             encode_options(options, whitespace);
-            google::protobuf::util::Status status = google::protobuf::util::MessageToJsonString(kr_model_list_obj,
+            absl::Status status = google::protobuf::util::MessageToJsonString(kr_model_list_obj,
                                                                                                 &r_list_json_out,
                                                                                                 options);
-            if (status.code() == google::protobuf::util::StatusCode::kOk) {
+            if (status.code() == absl::StatusCode::kOk) {
                 size_t pos = r_list_json_out.find(":[{");
                 if (pos != std::string::npos) {
                     //refer to example_comments.txt for before substr and after substr
@@ -81,9 +82,9 @@ namespace FluxCppCore {
                 } // else not required: when we try to encode empty string we'll not find `:[{` as substr
                 return true;
             } else {
-                LOG_ERROR(c_p_logger_, "Failed Encoding {};;; error: {};;; {}: {}", RootModelListType::GetDescriptor()->name(),
-                          status.message().ToString(), RootModelListType::GetDescriptor()->name(),
-                          kr_model_list_obj.DebugString());
+                LOG_ERROR(c_p_logger_, "Failed Encoding {};;; error: {};;; {}: {}",
+                          RootModelListType::GetDescriptor()->name(), status.message(),
+                          RootModelListType::GetDescriptor()->name(), kr_model_list_obj.DebugString());
                 return false;
             }
         }
@@ -104,14 +105,13 @@ namespace FluxCppCore {
             if (pos == std::string::npos && r_list_json.back() != ']')
                 r_list_json = "[" + r_list_json + "]";
             r_list_json = "{\"" + msg_name + "\":" + r_list_json + '}';
-            google::protobuf::util::Status status = google::protobuf::util::JsonStringToMessage(r_list_json,
-                                                                                                &r_model_list_obj_out,
-                                                                                                options);
-            if (status.code() == google::protobuf::util::StatusCode::kOk) {
+            absl::Status status = google::protobuf::util::JsonStringToMessage(r_list_json,
+                                                                              &r_model_list_obj_out, options);
+            if (status.code() == absl::StatusCode::kOk) {
                 return true;
             } else {
-                LOG_ERROR(c_p_logger_, "Failed Decoding {};;; error: {};;; list_json: {}", RootModelListType::GetDescriptor()->name(),
-                          status.message().ToString(), r_list_json);
+                LOG_ERROR(c_p_logger_, "Failed Decoding {};;; error: {};;; list_json: {}",
+                          RootModelListType::GetDescriptor()->name(), status.message(), r_list_json);
                 return false;
             }
 

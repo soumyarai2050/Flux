@@ -38,37 +38,63 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
     def _handle_field_cardinality(self, field: protogen.Field) -> str:
         field_type = self.proto_to_py_datatype(field)
 
+        is_pendulum_datetime: bool = False
+        if field_type == BeanieModelPlugin.pendulum_datetime_type:
+            # Putting SkipJsonSchema in pendulum.dateTime field: swagger ui raises error due to issue
+            # while calling model_json_schema interface implicitly if Class contains any field of
+            # pendulum.DateTime type (arbitrary attribute)
+            # - Putting SkipJsonSchema[None] with all pendulum_datetime fields (repeated, required and optional)
+            # - putting it on required also otherwise putting like SkipJsonSchema[pendulum.DateTime] completely removes
+            #   field from swagger ui (and could potentially raise some exception while using some
+            #   json_schema interface)
+            is_pendulum_datetime = True
+
         match field.cardinality.name.lower():
             case "optional":
-                if self.is_field_indexed_option_enabled(field):
-                    output_str = f"{field.proto.name}: Indexed({field_type}) | None"
-                elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
-                    output_str = f"{field.proto.name}: Link[{field_type}] | None"
-                else:
-                    output_str = f"{field.proto.name}: {field_type} | None"
-            case "repeated":
-                if self.is_field_indexed_option_enabled(field):
-                    if self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
-                        output_str = f"{field.proto.name}: Indexed(List[{field_type}])"
-                    else:
-                        output_str = f"{field.proto.name}: Indexed(List[{field_type}]) | None"
-                elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
-                    if self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
-                        output_str = f"{field.proto.name}: List[Link[{field_type}]]"
-                    else:
-                        output_str = f"{field.proto.name}: List[Link[{field_type}]] | None"
-                else:
-                    if self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
-                        output_str = f"{field.proto.name}: List[{field_type}]"
-                    else:
-                        output_str = f"{field.proto.name}: List[{field_type}] | None"
-            case "required":
-                if self.is_field_indexed_option_enabled(field):
-                    output_str = f"{field.proto.name}: Indexed({field_type})"
-                elif self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
+                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
                     output_str = f"{field.proto.name}: Link[{field_type}]"
                 else:
                     output_str = f"{field.proto.name}: {field_type}"
+
+                if is_pendulum_datetime:
+                    output_str += f" | SkipJsonSchema[None]"
+                else:
+                    output_str += f" | None"
+            case "repeated":
+                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
+                    if self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
+                        output_str = f"{field.proto.name}: List[Link[{field_type}]]"
+
+                        if is_pendulum_datetime:
+                            output_str += f" | SkipJsonSchema[None]"
+                    else:
+                        output_str = f"{field.proto.name}: List[Link[{field_type}]]"
+
+                        if is_pendulum_datetime:
+                            output_str += f" | SkipJsonSchema[None]"
+                        else:
+                            output_str += f" | None"
+                else:
+                    if self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
+                        output_str = f"{field.proto.name}: List[{field_type}]"
+
+                        if is_pendulum_datetime:
+                            output_str += f" | SkipJsonSchema[None]"
+                    else:
+                        output_str = f"{field.proto.name}: List[{field_type}]"
+
+                        if is_pendulum_datetime:
+                            output_str += f" | SkipJsonSchema[None]"
+                        else:
+                            output_str += f" | None"
+            case "required":
+                if self.is_bool_option_enabled(field, BeanieModelPlugin.flux_fld_collection_link):
+                    output_str = f"{field.proto.name}: Link[{field_type}]"
+                else:
+                    output_str = f"{field.proto.name}: {field_type}"
+
+                if is_pendulum_datetime:
+                    output_str += f" | SkipJsonSchema[None]"
             case other:
                 err_str = f"unsupported field cardinality {other}"
                 logging.exception(err_str)
@@ -78,7 +104,16 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
 
     def handle_field_output(self, field: protogen.Field) -> str:
         output_str = self._handle_field_cardinality(field)
-        has_alias = False
+
+        is_optional = False
+        if field.cardinality.name.lower() == "optional":
+            is_optional = True
+        elif field.cardinality.name.lower() == "repeated":
+            if not self.is_option_enabled(field, BeanieModelPlugin.flux_fld_is_required):
+                is_optional = True
+        # else not required: is_required = False
+
+        has_alias: bool
         if (has_alias := self.is_option_enabled(field, BeanieModelPlugin.flux_fld_alias)) or \
                 field.location.leading_comments or field.proto.default_value:
             output_str += f' = Field('
@@ -106,9 +141,15 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
                 if has_alias or leading_comments:
                     output_str += ", "
                 output_str += f"default={BeanieModelPlugin.get_field_default_value(field)}"
+            elif is_optional:
+                if has_alias or leading_comments:
+                    output_str += ", "
+                output_str += f"default=None"
 
             output_str += ')\n'
         else:
+            if is_optional:
+                output_str += " = None"
             output_str += "\n"
 
         return output_str
@@ -204,6 +245,10 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
         output_str += self._handle_reentrant_lock(message)
 
         output_str += self._handle_cache_n_ws_connection_manager_data_members_override(message, is_msg_root)
+        if self.is_option_enabled(message, BeanieModelPlugin.flux_msg_json_root_time_series):
+            output_str += "    is_time_series: ClassVar[bool] = True\n"
+        else:
+            output_str += "    is_time_series: ClassVar[bool] = False\n"
 
         for field in message.fields:
             if field.proto.name == CachedPydanticModelPlugin.default_id_field_name:
@@ -222,17 +267,21 @@ class BeanieModelPlugin(CachedPydanticModelPlugin):
             return ""
 
     def handle_imports(self) -> str:
-        output_str = "from beanie import Indexed, Document, PydanticObjectId, Link, TimeSeriesConfig, Granularity\n"
-        output_str += "from pydantic import BaseModel, Field, validator\n"
-        output_str += "import pendulum\n"
+        output_str = "# standard imports\n"
         output_str += "from typing import List, ClassVar, Dict\n"
+        output_str += "import datetime\n\n"
+        output_str += "# 3rd party imports\n"
+        output_str += "from beanie import Indexed, Document, PydanticObjectId, Link, TimeSeriesConfig, Granularity\n"
+        output_str += "from pydantic import BaseModel, Field, field_validator, RootModel\n"
+        output_str += "import pendulum\n"
+        output_str += "from pydantic.json_schema import SkipJsonSchema\n"
 
         if self.enum_list:
             if self.enum_type == "int_enum":
                 output_str += "from enum import IntEnum\n"
             elif self.enum_type == "str_enum":
                 output_str += "from enum import auto\n"
-                output_str += "from fastapi_utils.enums import StrEnum\n"
+                output_str += "from fastapi_restful.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
 
         ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",

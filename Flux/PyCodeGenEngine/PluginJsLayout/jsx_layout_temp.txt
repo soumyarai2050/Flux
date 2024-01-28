@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import _, { cloneDeep } from 'lodash';
+import _, { cloneDeep, isObject } from 'lodash';
 import {
     getAllUILayout, createUILayout, updateUILayout,
     setUILayoutArrayWs, setUILayout, setSelectedUILayoutId
@@ -10,7 +10,7 @@ import { HashLoader } from 'react-spinners';
 import { DashboardCustomize, SaveAs } from '@mui/icons-material';
 import { Dialog, DialogContent, DialogActions, DialogContentText, TextField, Button, DialogTitle, Autocomplete, Paper, Box } from '@mui/material';
 import { DB_ID, API_ROOT_URL, COOKIE_NAME } from '../constants';
-import { getIconText, isObject } from '../utils';
+import { getIconText } from '../utils';
 import { defaultLayouts } from '../projectSpecificUtils';
 # @@protoc_insertion_point(add_imports)
 import SideDrawer from './SideDrawer';

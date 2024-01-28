@@ -19,7 +19,7 @@ fi
 cd - # back in script folder
 
 cd ../../../PyCodeGenEngine/FluxCodeGenCore
-python gen_core_proto_pb2.py
+python gen_core_proto_compile.py
 cd - # back in script folder
 mkdir -p  ../log
 mkdir -p ../generated
@@ -31,7 +31,6 @@ python gen_beanie_model.py
 python gen_beanie_fastapi.py
 python gen_js_layouts.py
 python gen_json_schema.py
-python gen_executor_files.py
 # cpp plugins
 python gen_cpp_db_codec.py
 python gen_cpp_constants.py

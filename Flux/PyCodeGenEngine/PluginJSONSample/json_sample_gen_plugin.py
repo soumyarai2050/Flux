@@ -22,8 +22,8 @@ from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_spe
                                                        YAMLConfigurationManager)
 
 
-flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
-flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
+root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+root_flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(root_flux_core_config_yaml_path))
 
 
 class JsonSampleGenPlugin(BaseProtoPlugin):
@@ -61,9 +61,25 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
 
     def __load_root_json_msg(self, file: protogen.File):
         message_list: List[protogen.Message] = file.messages
+        message_list.sort(key=lambda message_: message_.proto.name)     # sorting by name
 
         # Adding messages from core proto files having json_root option
-        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        project_dir = os.getenv("PROJECT_DIR")
+        if project_dir is None or not project_dir:
+            err_str = f"env var DBType received as {project_dir}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
+        core_or_util_files: List[str] = root_flux_core_config_yaml_dict.get("core_or_util_files")
+
+        if "ProjectGroup" in project_dir:
+            project_group_flux_core_config_yaml_path = PurePath(project_dir).parent.parent / "flux_core.yaml"
+            project_group_flux_core_config_yaml_dict = (
+                YAMLConfigurationManager.load_yaml_configurations(str(project_group_flux_core_config_yaml_path)))
+            project_grp_core_or_util_files = project_group_flux_core_config_yaml_dict.get("core_or_util_files")
+            if project_grp_core_or_util_files:
+                core_or_util_files.extend(project_grp_core_or_util_files)
+
         if core_or_util_files is not None:
             for dependency_file in file.dependencies:
                 if dependency_file.proto.name in core_or_util_files:

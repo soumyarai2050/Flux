@@ -157,7 +157,7 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
                     dependency_msg_list.append(dependency_msg)
                     dependency_dict[dependency_msg.proto.name] = dependency_msg
                 dependency_enum_list.append(dependency.enums)
-                output_content += f'import "{dependency_name}";\n\n'
+                # output_content += f'import "{dependency_name}";\n\n'
 
         dependency_file_msg_name_list = []
 
@@ -258,6 +258,7 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
 
                 output_content += "}\n\n"
 
+        # print(f"---------------------------------------------{nested_enum_list}------")
         output_content += self.generate_enum_value(nested_enum_list)
         # for i in nested_enum_list:
         #     print(f"------------------------{i.proto.name}")

@@ -2,8 +2,7 @@ from typing import Dict, Set, List, Any, ClassVar, Tuple, Callable
 from fastapi import WebSocket, WebSocketDisconnect
 import logging
 import asyncio
-from pydantic import BaseModel
-from pydantic.main import ModelMetaclass
+from pydantic import ConfigDict, BaseModel
 
 # Project imports
 from FluxPythonUtils.scripts.async_rlock import AsyncRLock
@@ -14,10 +13,8 @@ class WSData(BaseModel):
     filter_callable: Callable[..., Any] | None = None
     filter_callable_kwargs: Dict[Any, Any] | None = None,
     projection_agg_pipeline_callable: Callable[..., Any] | None = None
-    projection_model: ModelMetaclass | None = None
-
-    class Config:
-        arbitrary_types_allowed = True
+    projection_model: BaseModel | None = None
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class WSConnectionManager:

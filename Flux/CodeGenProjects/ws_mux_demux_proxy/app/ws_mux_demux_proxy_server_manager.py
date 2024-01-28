@@ -9,7 +9,7 @@ import requests
 
 # 3rd party imports
 from fastapi import WebSocket, WebSocketDisconnect, HTTPException
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from fastapi.encoders import jsonable_encoder
 
 # project imports
@@ -110,7 +110,5 @@ class WSContainer(BaseModel):
     ws_mux_demux_proxy_server_manager: WSMuxDemuxProxyServerManager  # reader
     ws_connection_manager: PathWSConnectionManager  # writer
     max_update_id: int
-
-    class Config:
-        arbitrary_types_allowed = True  # required to use WebSocket as field type since it is arbitrary type
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 

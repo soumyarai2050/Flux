@@ -63,7 +63,7 @@ const TreeWidget = (props) => {
                 value = Number(value);
             }
         }
-        if (!isNaN(value) && value !== -0) {
+        if (type === DataTypes.STRING || (type === DataTypes.NUMBER && !isNaN(value))) {
             const updatedData = cloneDeep(props.data);
             _.set(updatedData, dataxpath, value);
             props.onUpdate(updatedData);

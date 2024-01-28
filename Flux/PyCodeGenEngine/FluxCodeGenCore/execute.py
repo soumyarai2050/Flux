@@ -6,7 +6,7 @@ from pathlib import PurePath
 from enum import auto
 
 # 3rd party imports
-from fastapi_utils.enums import StrEnum
+from fastapi_restful.enums import StrEnum
 
 
 class ProtoGenOutputTypes(StrEnum):
@@ -51,16 +51,16 @@ class Execute:
             proto_path_str = ""
             for proto_import_path in proto_import_path_list:
                 # Avoiding extra space after last proto_path in proto_path_str
+                proto_path_str += f"--proto_path={proto_import_path} "
                 if proto_import_path != proto_import_path_list[-1]:
-                    proto_path_str += f"--proto_path={proto_import_path} "
-                else:
-                    proto_path_str += f"--proto_path={proto_import_path}"
+                    proto_path_str += " "
 
             proto_files_str = " ".join(proto_file_paths_list)
 
             if output_type == ProtoGenOutputTypes.Proto_Gen_Py or output_type == ProtoGenOutputTypes.Proto_Gen_Both:
                 # executing cmd for python output
-                protoc_cmd = f"protoc {proto_path_str} --python_out={PurePath(out_dir) / dir_names[0]} {proto_files_str}"
+                protoc_cmd = \
+                    f"protoc {proto_path_str} --python_out={PurePath(out_dir) / dir_names[0]} {proto_files_str}"
                 os.system(protoc_cmd)
 
             if output_type == ProtoGenOutputTypes.Proto_Gen_Cc or output_type == ProtoGenOutputTypes.Proto_Gen_Both:
@@ -108,13 +108,9 @@ class Execute:
                 for proto_file_path in proto_file_paths_list:
                     proto_path_str = ""
                     for proto_import_path in proto_import_path_list:
-                        # Avoiding extra space after last proto_path in proto_path_str
-                        if proto_import_path != proto_import_path_list[-1]:
-                            proto_path_str += f"--proto_path={proto_import_path} "
-                        else:
-                            proto_path_str += f"--proto_path={proto_import_path}"
+                        proto_path_str += f"--proto_path={proto_import_path} "
 
-                    protoc_cmd = (f"protoc {proto_path_str} --plugin=protoc-gen-plugin={plugin_path} "
+                    protoc_cmd = (f"protoc {proto_path_str}--plugin=protoc-gen-plugin={plugin_path} "
                                   f"--plugin_out={out_dir} {proto_file_path}")
                     os.system(protoc_cmd)
             else:

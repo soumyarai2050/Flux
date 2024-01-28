@@ -148,6 +148,7 @@ class BaseProtoPlugin(ABC):
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: ClassVar[str] = "ProtoPackageName"  # to be used in models as proto_package_name variable name
+    pendulum_datetime_type: ClassVar[str] = "pendulum.DateTime"
     proto_type_to_py_type_dict: ClassVar[Dict[str, str]] = {
         "int32": "int",
         "int64": "int",
@@ -262,6 +263,11 @@ class BaseProtoPlugin(ABC):
         if proto_type.lower() == "string":
             val_str = val_str.strip()
             value = val_str.removeprefix('"').removesuffix('"')   # cleaning data
+            # explicitly checking if any str type bools are found - converting to bool if found
+            if value.lower() == "true":
+                return True
+            elif value.lower() == "false":
+                return False
             return value
         elif proto_type.lower() == "int32" or proto_type.lower() == "int32":
             return parse_to_int(val_str)
@@ -511,6 +517,21 @@ class BaseProtoPlugin(ABC):
             logging.exception(err_str)
             raise Exception(err_str)
 
+    @staticmethod
+    def import_path_from_path_str(path_str: str, import_file_name: str):
+        if (project_root_dir := os.getenv("PROJECT_ROOT")) is not None and len(project_root_dir):
+            if path_str.startswith("/"):
+                pydantic_path = path_str.removeprefix(project_root_dir)
+            else:
+                raise Exception(f"invalid absolute path: {path_str}")
+            if pydantic_path.startswith("/"):
+                pydantic_path = pydantic_path[1:]
+            return f'{".".join(pydantic_path.split(os.sep))}.{import_file_name}'
+        else:
+            err_str = f"Env var 'PROJECT_ROOT' received as {project_root_dir}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
     def proto_to_py_datatype(self, field: protogen.Field) -> str:
         match field.kind.name.lower():
             case "message":
@@ -519,7 +540,7 @@ class BaseProtoPlugin(ABC):
                 return field.enum.proto.name
             case other:
                 if self.is_bool_option_enabled(field, BaseProtoPlugin.flux_fld_val_is_datetime):
-                    return "pendulum.DateTime"
+                    return BaseProtoPlugin.pendulum_datetime_type
                 else:
                     return BaseProtoPlugin.proto_type_to_py_type_dict[field.kind.name.lower()]
 

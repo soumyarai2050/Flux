@@ -1,16 +1,16 @@
-# FluxCodeGenEngine
+# Useful Sources
 
-### Google Protoc with Python
-
-## Documentation
+## Documentations
 
 * [Protocol Buffers](https://developers.google.com/protocol-buffers)<br>
 * [Protocol Buffer Basics: Python](https://developers.google.com/protocol-buffers/docs/pythontutorial)
 * [Proto 2](https://developers.google.com/protocol-buffers/docs/proto)
 * [Proto 3](https://developers.google.com/protocol-buffers/docs/proto3)
-* [pymongo change stream] https://www.mongodb.com/developer/languages/python/python-change-streams/
-* [FastAPI + Pydantic + MongoDB] https://github.com/David-Lor/FastAPI-Pydantic-Mongo_Sample_CRUD_API
-* [Pydantic FastAPI - why we need alias=_id] https://www.mongodb.com/community/forums/t/why-do-we-need-alias-id-in-pydantic-model-of-fastapi/170728/3
+* [pymongo change stream](https://www.mongodb.com/developer/languages/python/python-change-streams/)
+* [FastAPI + Pydantic + MongoDB](https://github.com/David-Lor/FastAPI-Pydantic-Mongo_Sample_CRUD_API)
+* [Pydantic FastAPI - why we need alias=_id](https://www.mongodb.com/community/forums/t/why-do-we-need-alias-id-in-pydantic-model-of-fastapi/170728/3)
+* [Python Shared Memory](https://docs.python.org/3/library/multiprocessing.shared_memory.html)
+* [Python Shared Structures Module](https://github.com/fuzziqersoftware/sharedstructures)
 
 ## Tutorials
 * [how to implement protobuf in python](https://www.javatpoint.com/how-to-implement-protobuf-in-python)

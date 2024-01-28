@@ -12,7 +12,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
-from Flux.PyCodeGenEngine.PluginStratExecutor.strat_executor_plugin import StratExecutorPlugin
+from Flux.CodeGenProjects.TradeEngine.ProjectGroupPlugins.PluginStratExecutor.strat_executor_plugin import StratExecutorPlugin
 
 
 class CppProjectIncludePlugin(BaseProtoPlugin):
@@ -27,7 +27,7 @@ class CppProjectIncludePlugin(BaseProtoPlugin):
     def header_generate_handler(package_name: str):
         output_content: str = ""
         output_content += "#pragma once\n\n"
-        output_content += f'#include "../../CodeGenProjects/{package_name}/generated/CppUtilGen' \
+        output_content += f'#include "../../../{package_name}/generated/CppUtilGen' \
                           f'/{package_name}_constants.h"\n\n'
         return output_content
 

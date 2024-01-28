@@ -15,8 +15,8 @@ import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, YAMLConfigurationManager
 
-flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
-flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
+root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+root_flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(root_flux_core_config_yaml_path))
 
 
 class CppDbHandlerPlugin(BaseProtoPlugin):
@@ -44,7 +44,22 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
     def dependency_message_proto_msg_handler(self, file: protogen.File):
         # Adding messages from core proto files having json_root option
-        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
+        project_dir = os.getenv("PROJECT_DIR")
+        if project_dir is None or not project_dir:
+            err_str = f"env var DBType received as {project_dir}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
+        core_or_util_files: List[str] = root_flux_core_config_yaml_dict.get("core_or_util_files")
+
+        if "ProjectGroup" in project_dir:
+            project_group_flux_core_config_yaml_path = PurePath(project_dir).parent.parent / "flux_core.yaml"
+            project_group_flux_core_config_yaml_dict = (
+                YAMLConfigurationManager.load_yaml_configurations(str(project_group_flux_core_config_yaml_path)))
+            project_grp_core_or_util_files = project_group_flux_core_config_yaml_dict.get("core_or_util_files")
+            if project_grp_core_or_util_files:
+                core_or_util_files.extend(project_grp_core_or_util_files)
+
         if core_or_util_files is not None:
             for dependency_file in file.dependencies:
                 dependency_file_name: str = dependency_file.proto.name
@@ -72,14 +87,13 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
     def headers_generate_handler(file_name: str, class_name: str):
         output_content: str = ""
         output_content += "#pragma once\n\n"
-        # j+Csh04P15QLolwboE9xsA001fPuo8VAE-pb1OOU0+4M4M0jE-mPfDCQZ
         # output_content += "#include <mutex>\n"
         # output_content += "#include <unordered_map>\n\n"
         # output_content += f'#include "../../cpp_app/include/{class_name}_mongo_db_handler.h"\n'
         # output_content += f'#include "../CppUtilGen/{class_name}_key_handler.h"\n'
         # output_content += f'#include "../../FluxCppCore/include/market_data_json_codec.h"\n'
         # output_content += f'#include "../CppUtilGen/{class_name}_max_id_handler.h"\n'
-        output_content += f'#include "../../FluxCppCore/include/json_codec.h"\n'
+        output_content += f'#include "../../../../../../FluxCppCore/include/json_codec.h"\n'
         output_content += f'#include "../ProtoGenCc/{file_name}.pb.h"\n\n'
         return output_content
 
@@ -255,7 +269,6 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 for field in message_field.message.fields:
                     field_name1 = convert_camel_case_to_specific_case(field.proto.name)
                     field_cardinality = field.cardinality.name.lower()
-                    # LZUWDOV6ISYpiG-S7CaGYUN3assS9xeUkqPD7elDTEv9GLG1yPWcYd
                     # if field_cardinality == "required":
                     output += "\t" * num_of_tabs + f"{message_field_name}_document.append(FluxCppCore::kvp({field_name1}_fld_name, " \
                                                    f"{parent_field}_doc.{message_field_name}().{field_name1}()));\n"
@@ -410,7 +423,6 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                 for field in message_field.message.fields:
                     field_name1 = convert_camel_case_to_specific_case(field.proto.name)
                     field_cardinality = field.cardinality.name.lower()
-                    # Q7ecC-x-dVXLcorn+fPIfrXqkidxMHUvJJINGCAd8tfLhiRUfqCoi6x+
                     # if field_cardinality == "required":
                     output += "\t" * num_of_tabs + f"{message_field_name}_document.append(FluxCppCore::kvp({field_name1}_fld_name, " \
                                                    f"{parent_field}_doc.{message_field_name}().{field_name1}()));\n"
@@ -446,7 +458,6 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                message_name_snake_cased: str, package_name: str, field: protogen.Field, parent_feild: str):
         output = ""
         initial_parent_field: str = field.proto.name
-        # WnrLdfWAHxtyihghkeS5yCmY6LyqnBMbcf5lfceLsHazdjnZNCbPrCvZc
         # field_name: str = field.proto.name
         # print(f".............{field.parent.proto.name}...............")
         for message_field in field_type_message.fields:
@@ -554,7 +565,6 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                    parent_feild: str):
         output = ""
         initial_parent_field: str = field.proto.name
-        # 5Coy]3IhZJl-ULje+D8c4Q53WXUYAKw8YdODGUu0VCpcC7RfSB0GUd1uA
         # field_name: str = field.proto.name
         # print(f".............{field.parent.proto.name}...............")
         for message_field in field_type_message.fields:
@@ -790,7 +800,6 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
                                               f"FluxCppCore::StringUtil::convert_utc_string_to_b_date("\
                                                f"r_{message_name_snake_cased}_list_obj.{message_name_snake_cased}(i)." \
                                               f"{field_name}())));\n"
-                    # at+4iH1j6iJECmU1wU7uY7Jt5Exr7M7foYXMuJVBZX3yc32W8vIdoFO4+
                     # else:
                     #     if field_type == "required":
                     #         output_content += "\t\t\t\tif (IsUpdateOrPatch::DB_FALSE == is_update_or_patch) {\n"

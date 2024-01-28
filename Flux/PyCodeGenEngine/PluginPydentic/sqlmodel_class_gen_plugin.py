@@ -84,7 +84,7 @@ class SQLModelModelPlugin(CachedPydanticModelPlugin):
                 output_str += "from enum import IntEnum\n"
             elif self.enum_type == "str_enum":
                 output_str += "from enum import auto\n"
-                output_str += "from fastapi_utils.enums import StrEnum\n"
+                output_str += "from fastapi_restful.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
         output_str += "from typing import List\n\n\n"
         return output_str

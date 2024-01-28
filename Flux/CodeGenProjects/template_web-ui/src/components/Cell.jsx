@@ -20,6 +20,7 @@ import classes from './Cell.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import CopyToClipboard from './CopyToClipboard';
+import LinkText from './LinkText';
 dayjs.extend(utc);
 
 const Cell = (props) => {
@@ -190,6 +191,7 @@ const Cell = (props) => {
         }
         return <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`} align={textAlign} size='medium' data-xpath={xpath} data-dataxpath={dataxpath}>{value}{numberSuffix}</TableCell>
     }
+    const placeholder = collection.placeholder ? collection.placeholder : !required ? 'optional' : null;
 
     if (mode === Modes.EDIT_MODE && active && !disabled) {
         if (collection.autocomplete) {
@@ -239,7 +241,7 @@ const Cell = (props) => {
                                 {...params}
                                 name={collection.key}
                                 error={validationError.current !== null}
-                                placeholder={collection.placeholder}
+                                placeholder={placeholder}
                                 InputProps={{
                                     ...params.InputProps,
                                     ...inputProps
@@ -359,7 +361,7 @@ const Cell = (props) => {
                             validateConstraints(collection, values.value, min, max))}
                         variant='outlined'
                         decimalScale={decimalScale}
-                        placeholder={collection.placeholder}
+                        placeholder={placeholder}
                         autoFocus
                         // ref={inputRef}
                         InputProps={inputProps}
@@ -427,7 +429,7 @@ const Cell = (props) => {
                         value={value}
                         disabled={disabled}
                         // ref={inputRef}
-                        placeholder={collection.placeholder}
+                        placeholder={placeholder}
                         onChange={(e) => handleTextChange(e, type, xpath, e.target.value, dataxpath,
                             validateConstraints(collection, e.target.value))}
                         variant='outlined'
@@ -623,6 +625,11 @@ const Cell = (props) => {
     if (typeof value === DataTypes.NUMBER) {
         value = value.toLocaleString();
     }
+    let text, linkText = null;
+    if (collection.type === DataTypes.DATE_TIME && collection.displayType === 'time') {
+        linkText = value;
+        text = linkText ? dayjs.utc(linkText).format('HH:mm:ss.SSS') : null;
+    }
     let dataModified = previousValue !== currentValue;
 
     if (mode === Modes.EDIT_MODE && dataModified) {
@@ -643,7 +650,8 @@ const Cell = (props) => {
     } else {
         return (
             <TableCell className={`${classes.cell} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`} align={textAlign} size='medium' onClick={onFocusIn} data-xpath={xpath} data-dataxpath={dataxpath}>
-                {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
+                {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> :
+                    value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
                 {validationError.current && (
                     <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }} disableInteractive><Error color='error' /></Tooltip>
                 )}

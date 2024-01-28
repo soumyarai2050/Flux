@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../CodeGenProjects/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
-#include "../../CodeGenProjects/market_data/generated/CppUtilGen/market_data_key_handler.h"
+#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppCodec/market_data_mongo_db_codec.h"
+#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/CppUtilGen/market_data_key_handler.h"
 #include "mongo_db_handler.h"
 #include "json_codec.h"
 
@@ -359,11 +359,12 @@ namespace FluxCppCore {
             return result;
         }
 
-        static auto get_root_model_name() {
-            return RootModelType::GetDescriptor()->name();
+        auto get_root_model_name() const {
+            auto meta_data = root_model_type_.GetMetadata();
+            return meta_data.descriptor->name();
         }
 
-        bool IsInitialized(const RootModelType &kr_root_model_obj) const{
+        bool IsInitialized(const RootModelType &kr_root_model_obj) const {
             // return true, if the object is initialized and has all the required fields (false otherwise)
             if (!kr_root_model_obj.IsInitialized()) {
                 LOG_ERROR(m_p_logger_, "Required fields is not initialized in {};;; obj: {}",
@@ -398,6 +399,7 @@ namespace FluxCppCore {
         std::shared_ptr<FluxCppCore::MongoDBHandler> m_sp_mongo_db;
         quill::Logger* m_p_logger_;
         mongocxx::collection m_mongo_db_collection;
+        RootModelType root_model_type_;
         static inline int32_t c_cur_unused_max_id = 1;
     };
 

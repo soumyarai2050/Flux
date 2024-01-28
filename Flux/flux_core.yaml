@@ -4,10 +4,4 @@ options_files:
   - "ui_option_utils.proto"
 core_or_util_files:
   - "projects_core.proto"
-  - "trade_core.proto"
   - "flux_utils.proto"
-  - "dashboards_n_pair_strat_engine_core.proto"
-  - "dashboards_n_market_data_n_strat_executor_core.proto"
-  - "pair_strat_engine_n_strat_executor_core.proto"
-  - "market_data_n_strat_executor_core.proto"
-  - "strat_executor_n_post_trade_engine_core.proto"

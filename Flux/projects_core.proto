@@ -9,6 +9,7 @@ enum DummyEnumP{
 
 // , ERROR, WARNING, INFO, DEBUG, UNSPECIFIED
 enum Severity{
+  // Sequence must be in descending order of priority excluding unspecified - used in aggregates based on priority
   Severity_UNSPECIFIED = 0;  // GRAY
   Severity_CRITICAL = 1; // RED FLASHING
   Severity_ERROR = 2; // RED

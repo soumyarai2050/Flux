@@ -25,14 +25,14 @@ import { utils, writeFileXLSX } from 'xlsx';
 import ChartWidget from './ChartWidget';
 import CopyToClipboard from './CopyToClipboard';
 import SkeletonField from './SkeletonField';
+import { PageCache, PageSizeCache, SortOrderCache } from '../utility/attributeCache';
 
 
 function AbbreviatedFilterWidget(props) {
     const worker = useMemo(() => new Worker(new URL("../workers/abbreviatedRowsHandler.js", import.meta.url)), []);
-    const [order, setOrder] = useState('asc');
-    const [orderBy, setOrderBy] = useState('');
-    const [rowsPerPage, setRowsPerPage] = useState(25);
-    const [page, setPage] = useState(0);
+    const [sortOrders, setSortOrders] = useState(SortOrderCache.getSortOrder(props.name));
+    const [rowsPerPage, setRowsPerPage] = useState(PageSizeCache.getPageSize(props.name));
+    const [page, setPage] = useState(PageCache.getPage(props.name));
     const [rows, setRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
     const [openSettings, setOpenSettings] = useState(false);
@@ -67,12 +67,11 @@ function AbbreviatedFilterWidget(props) {
                 loadedProps: props.loadListFieldAttrs,
                 page,
                 pageSize: rowsPerPage,
-                order,
-                orderBy,
+                sortOrders,
                 filters: props.filters
             });
         }
-    }, [items, props.itemsMetadataDict, page, rowsPerPage, order, orderBy, props.filters])
+    }, [items, props.itemsMetadataDict, page, rowsPerPage, sortOrders, props.filters])
 
     useEffect(() => {
         if (window.Worker) {
@@ -128,12 +127,29 @@ function AbbreviatedFilterWidget(props) {
         }
     }
 
-    const handleRequestSort = (event, property) => {
-        props.onRefreshItems();
-        const isAsc = orderBy === property && order === 'asc';
-        setOrder(isAsc ? 'desc' : 'asc');
-        setOrderBy(property);
+    const handleRequestSort = (event, property, retainSortLevel = false) => {
+        let updatedSortOrders = cloneDeep(sortOrders);
+        if (!retainSortLevel) {
+            updatedSortOrders = updatedSortOrders.filter(o => o.orderBy === property);
+        }
+        const sortOrder = updatedSortOrders.find(o => o.orderBy === property);
+        if (sortOrder) {
+            // sort level already exists for this property
+            sortOrder.sortType = sortOrder.sortType === 'asc' ? 'desc' : 'asc';
+        } else {
+            // add a new sort level
+            updatedSortOrders.push({orderBy: property, sortType: 'asc'});
+        }
+        setSortOrders(updatedSortOrders);
+        SortOrderCache.setSortOrder(props.name, updatedSortOrders);
         setPage(0);
+        PageCache.setPage(props.name, 0);
+    }
+
+    const handleRemoveSort = (property) => {
+        const updatedSortOrders = sortOrders.filter(o => o.orderBy !== property);
+        setSortOrders(updatedSortOrders);
+        SortOrderCache.setSortOrder(props.name, updatedSortOrders);
     }
 
     const onRowSelect = (id) => {
@@ -144,11 +160,15 @@ function AbbreviatedFilterWidget(props) {
 
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
+        PageCache.setPage(newPage);
     };
 
     const handleChangeRowsPerPage = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
+        const size = parseInt(event.target.value, 10);
+        setRowsPerPage(size);
+        PageSizeCache.setPageSize(props.name, size);
         setPage(0);
+        PageCache.setPage(0);
     };
 
     const onSettingsOpen = (e) => {
@@ -400,9 +420,9 @@ function AbbreviatedFilterWidget(props) {
                                             suffixCells={props.bufferListFieldAttrs.hide ? 0 : 1}
                                             headCells={filteredHeadCells}
                                             mode={Modes.READ_MODE}
-                                            order={order}
-                                            orderBy={orderBy}
+                                            sortOrders={sortOrders}
                                             onRequestSort={handleRequestSort}
+                                            onRemoveSort={handleRemoveSort}
                                             copyColumnHandler={copyColumnHandler}
                                             collectionView={true}
                                         />

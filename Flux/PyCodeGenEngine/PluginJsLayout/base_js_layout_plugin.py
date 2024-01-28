@@ -228,6 +228,43 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                                 return dependent_model_name
         return None
 
+    def _get_abb_option_vals_cleaned_message_n_field_list(self, field: protogen.Field) -> List[str]:
+        abbreviated_option_val = (
+            BaseJSLayoutPlugin.get_simple_option_value_from_proto(field, BaseJSLayoutPlugin.flux_fld_abbreviated))
+        abbreviated_option_val_check_str_list: List[str] = []
+        if "^" in abbreviated_option_val:
+            abbreviated_option_val_caret_sep = abbreviated_option_val.split("^")
+            for abbreviated_option_val_caret_sep_line in abbreviated_option_val_caret_sep:
+                if "-" in abbreviated_option_val_caret_sep:
+                    abbreviated_option_val_caret_sep_hyphen_sep = (
+                        abbreviated_option_val_caret_sep_line.split("-"))
+                    for abbreviated_option_val_caret_sep_hyphen_sep_line in (
+                            abbreviated_option_val_caret_sep_hyphen_sep):
+                        if ":" in abbreviated_option_val_caret_sep_hyphen_sep_line:
+                            mapping_key, mapping_value = (
+                                abbreviated_option_val_caret_sep_hyphen_sep_line.split(":"))
+                            abbreviated_option_val_check_str_list.append(mapping_value)
+                        else:
+                            abbreviated_option_val_check_str_list.append(
+                                abbreviated_option_val_caret_sep_hyphen_sep_line)
+                else:
+                    if ":" in abbreviated_option_val_caret_sep_line:
+                        mapping_key, mapping_value = abbreviated_option_val_caret_sep_line.split(":")
+                        abbreviated_option_val_check_str_list.append(mapping_value)
+                    else:
+                        abbreviated_option_val_check_str_list.append(
+                            abbreviated_option_val_caret_sep_line)
+        return abbreviated_option_val_check_str_list
 
-# - plimits - olimits
-# url line in both alerts
+    def _get_msg_names_list_used_in_abb_option_val(self, message: protogen.Message) -> List[str]:
+        msg_list = []
+        for field in message.fields:
+            if self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_abbreviated):
+                msg_n_field_list: List[str] = self._get_abb_option_vals_cleaned_message_n_field_list(field)
+
+                for msg_n_field_str in msg_n_field_list:
+                    msg_name = msg_n_field_str.split(".")[0]
+                    if msg_name not in msg_list:
+                        msg_list.append(msg_name)
+
+        return msg_list

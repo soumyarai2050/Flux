@@ -129,7 +129,7 @@ def generic_http_delete_all_client(url: str, return_copy_obj: bool | None = True
 
 async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Callable, query_args: Dict | None = None):
     class PydanticClassTypeList(BaseModel):
-        __root__: List[pydantic_type]
+        root: List[pydantic_type]
 
     if query_args:
         url = url + "?" + urllib.parse.urlencode(query_args)
@@ -158,11 +158,11 @@ async def generic_ws_get_all_client(url: str, pydantic_type, user_callback: Call
                 break
             if data is not None:
                 data = json.loads(data)
-                pydantic_obj_list: PydanticClassTypeList = PydanticClassTypeList(__root__=data)
+                pydantic_obj_list: PydanticClassTypeList = PydanticClassTypeList(root=data)
                 user_callback(pydantic_obj_list)
                 data = None
                 try:
-                    for pydantic_obj in pydantic_obj_list.__root__:
+                    for pydantic_obj in pydantic_obj_list.root:
                         # print(pydantic_obj)
                         logging.debug(pydantic_obj)
                 except KeyError:

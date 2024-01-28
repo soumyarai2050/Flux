@@ -10,7 +10,7 @@ from enum import auto
 
 # 3rd party imports
 import protogen
-from fastapi_utils.enums import StrEnum
+from fastapi_restful.enums import StrEnum
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import parse_to_int, YAMLConfigurationManager
@@ -21,10 +21,34 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 from FluxPythonUtils.scripts.utility_functions import convert_to_capitalized_camel_case
 
+root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+root_flux_core_config_yaml_dict = (
+    YAMLConfigurationManager.load_yaml_configurations(str(root_flux_core_config_yaml_path)))
+root_core_proto_files: List[str] = []
+option_files = root_flux_core_config_yaml_dict.get("options_files")
+core_or_util_files = root_flux_core_config_yaml_dict.get("core_or_util_files")
+if option_files is not None and option_files:
+    root_core_proto_files.extend(option_files)
+if core_or_util_files is not None and core_or_util_files:
+    root_core_proto_files.extend(core_or_util_files)
 
-flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
-flux_core_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(flux_core_config_yaml_path))
+project_dir = os.getenv("PROJECT_DIR")
+if project_dir is None or not project_dir:
+    err_str = f"env var DBType received as {project_dir}"
+    logging.exception(err_str)
+    raise Exception(err_str)
 
+project_grp_core_proto_files = []
+if "ProjectGroup" in project_dir:
+    project_group_flux_core_config_yaml_path = PurePath(project_dir).parent.parent / "flux_core.yaml"
+    project_group_flux_core_config_yaml_dict = (
+        YAMLConfigurationManager.load_yaml_configurations(str(project_group_flux_core_config_yaml_path)))
+    option_files = project_group_flux_core_config_yaml_dict.get("options_files")
+    core_or_util_files = project_group_flux_core_config_yaml_dict.get("core_or_util_files")
+    if option_files is not None and option_files:
+        project_grp_core_proto_files.extend(option_files)
+    if core_or_util_files is not None and core_or_util_files:
+        project_grp_core_proto_files.extend(core_or_util_files)
 
 class IdType(StrEnum):
     NO_ID = auto()
@@ -103,6 +127,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message],
                                                  avoid_non_roots: bool | None = None):
+        message_list.sort(key=lambda message_: message_.proto.name)     # sorting by name
+
         for message in message_list:
             if ((is_json_root := self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root)) or
                     self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series)):
@@ -193,54 +219,63 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
             if not has_id_field:
                 output_str += f"    {BasePydanticModelPlugin.default_id_field_name}: " \
                               f"{BasePydanticModelPlugin.default_id_type_var_name} | None = " \
-                              f"Field(alias='_id')\n"
+                              f"Field(None, alias='_id')\n"
             # else not required: if id field is present already then will be handled in next for loop
 
         for field in message.fields:
             if field.proto.name == BasePydanticModelPlugin.default_id_field_name:
                 if message in self.root_message_list:
                     output_str += f"    {field.proto.name}: {self.proto_to_py_datatype(field)} | None = " \
-                                  f"Field(alias='_id')\n"
+                                  f"Field(None, alias='_id')\n"
                 continue
             # else not required: If message is not root type then avoiding id field in optional version so that
             # it's id can be generated if not provided inside root message
             if field.message is not None:
-                field_type = f"{field.message.proto.name}Optional"
+                if field.cardinality.name.lower() == "repeated":
+                    output_str += (f"    {field.proto.name}: List[{field.message.proto.name}Optional] | "
+                                   f"List[{field.message.proto.name}] | None = None\n")
+                else:
+                    output_str += (f"    {field.proto.name}: {field.message.proto.name}Optional | "
+                                   f"{field.message.proto.name} | None = None\n")
             else:
                 field_type = self.proto_to_py_datatype(field)
-            if field.cardinality.name.lower() == "repeated":
-                output_str += f"    {field.proto.name}: List[{field_type}] | None = None\n"
-            else:
-                output_str += f"    {field.proto.name}: {field_type} | None = None\n"
+                if field.cardinality.name.lower() == "repeated":
+                    output_str += f"    {field.proto.name}: List[{field_type}] | None = None\n"
+                else:
+                    output_str += f"    {field.proto.name}: {field_type} | None = None\n"
 
         return output_str
 
-    def _add_config_class(self) -> str:
-        output_str = "    class Config:\n"
-        output_str += "        allow_population_by_field_name = True\n"
+    def _add_config_attribute(self) -> str:
+        output_str = "    model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)\n"
         return output_str
 
-    def handle_message_all_optional_field(self, message: protogen.Message) -> str:
+    def handle_message_all_optional_field(self, message: protogen.Message,
+                                          datetime_field_list: List[protogen.Field] | None = None) -> str:
         message_name = message.proto.name
         output_str = f"class {message_name}Optional({message_name}):\n"
         has_id_field = BasePydanticModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
 
         output_str += self._underlying_handle_none_default_fields(message, has_id_field)
         if has_id_field:
+            output_str += self._add_config_attribute()
+        for dt_field in datetime_field_list:
             output_str += "\n"
-            output_str += self._add_config_class()
+            output_str += self.add_datetime_validator(dt_field)
         output_str += "\n\n"
         return output_str
 
-    def handle_dummy_message_gen(self, message: protogen.Message) -> str:
+    def handle_dummy_message_gen(self, message: protogen.Message,
+                                 datetime_field_list: List[protogen.Field] | None = None) -> str:
         message_name = message.proto.name
         output_str = f"class {message_name}BaseModel(BaseModel):\n"
         has_id_field = BasePydanticModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
         output_str += self._underlying_handle_none_default_fields(message, has_id_field)
+        output_str += self._add_config_attribute()
         output_str += "\n"
-        output_str += self._add_config_class()
-        output_str += "\n"
-        output_str += self._add_datetime_validator(message)
+        for dt_field in datetime_field_list:
+            output_str += "\n"
+            output_str += self.add_datetime_validator(dt_field)
         output_str += "\n"
         return output_str
 
@@ -323,21 +358,6 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                               f"'{message.proto.name}']] = " + "{}\n"
             output_str += self._handle_ws_connection_manager_data_members_override(message)
         # else not required: Avoid cache override if message is not root
-        return output_str
-
-    def _add_datetime_validator(self, message: protogen.Message) -> str:
-        output_str = ""
-        for field in message.fields:
-            if self.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_date_time_format):
-                output_str += "    @validator('date', pre=True)\n"
-                output_str += "    def time_validate(cls, v):\n"
-                date_time_format = \
-                    self.get_simple_option_value_from_proto(field,
-                                                            BasePydanticModelPlugin.flux_fld_date_time_format)
-                output_str += f"        return validate_pendulum_datetime(v, {date_time_format})\n"
-                break
-            # else not required: if date_time option is not set to any field of message then
-            # avoiding datetime validation
         return output_str
 
     def handle_projection_models_output(self, message: protogen.Message):
@@ -433,8 +453,8 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
 
                 # List class of container class
                 output_str += (f'class {message.proto.name}ProjectionContainerFor'
-                               f'{field_names_str_camel_cased}List(BaseModel):\n')
-                output_str += (f'    __root__: List[{message.proto.name}ProjectionContainerFor'
+                               f'{field_names_str_camel_cased}List(RootModel):\n')
+                output_str += (f'    root: List[{message.proto.name}ProjectionContainerFor'
                                f'{field_names_str_camel_cased}]\n\n\n')
 
         return output_str
@@ -443,24 +463,11 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                                                            auto_gen_id_type: IdType) -> str:
         output_str = ""
         # Making class able to be populated with field name
-        if auto_gen_id_type not in ["NO_ID", "DEFAULT"]:
-            output_str += "\n"
-            output_str += self._add_config_class()
-        datetime_validator_str = self._add_datetime_validator(message)
-        if datetime_validator_str:
-            output_str += "\n"
-            output_str += datetime_validator_str
+        output_str += self._add_config_attribute()
 
         if self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
             option_value_dict = (
                 self.get_complex_option_value_from_proto(message, BasePydanticModelPlugin.flux_msg_json_root_time_series))
-            time_series_version = option_value_dict.get(BasePydanticModelPlugin.flux_json_root_ts_mongo_version_field)
-            if time_series_version != 5.0:
-                err_str = (f"Time Series is supported with mongo version 5.0 only, received version: "
-                           f"{time_series_version} in {BasePydanticModelPlugin.flux_msg_json_root_time_series} "
-                           f"option for message {message.proto.name}")
-                logging.exception(err_str)
-                raise Exception(err_str)
 
             # getting time_field
             for field in message.fields:
@@ -509,20 +516,62 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                 output_str += f'            granularity={granularity_str}'
             if expire_after_sec:
                 output_str += ",\n"
-                output_str += f'            expire_after_seconds={expire_after_sec}\n'
+                output_str += f'            expire_after_seconds={expire_after_sec}'
+            output_str += "\n"
             output_str += '        )\n'
+
+        index_field_list: List[protogen.Field] = []
+        datetime_field_list: List[protogen.Field] = []
+        for field in message.fields:
+            if self.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_index):
+                index_field_list.append(field)
+            if self.is_option_enabled(field, BasePydanticModelPlugin.flux_fld_val_is_datetime):
+                datetime_field_list.append(field)
+
+        if index_field_list:
+            if not self.is_option_enabled(message, BasePydanticModelPlugin.flux_msg_json_root_time_series):
+                output_str += "\n"
+                output_str += "    class Settings:\n"
+            output_str += "        indexes = [\n"
+            for fld in index_field_list:
+                output_str += f'            "{fld.proto.name}"'
+                if fld != index_field_list[-1]:
+                    output_str += ',\n'
+                else:
+                    output_str += "\n"
+                output_str += "        ]\n"
+
+        for dt_field in datetime_field_list:
+            output_str += "\n"
+            output_str += self.add_datetime_validator(dt_field)
 
         output_str += "\n\n"
 
         # Adding other versions for root pydantic class
-        output_str += self.handle_message_all_optional_field(message)
+        output_str += self.handle_message_all_optional_field(message, datetime_field_list)
         if message in self.root_message_list+list(self.query_message_list):
-            output_str += self.handle_dummy_message_gen(message)
+            output_str += self.handle_dummy_message_gen(message, datetime_field_list)
         # If message is not root then no need to add message with optional fields
 
         # handling projections
         output_str += self.handle_projection_models_output(message)
 
+        return output_str
+
+    def add_datetime_validator(self, datetime_field: protogen.Field) -> str:
+        output_str = ""
+        output_str += f"    @field_validator('{datetime_field.proto.name}', mode='before')\n"
+        output_str += "    @classmethod\n"
+        output_str += f"    def handle_{datetime_field.proto.name}(cls, v):\n"
+        date_time_format = None
+        if self.is_option_enabled(datetime_field, BasePydanticModelPlugin.flux_fld_date_time_format):
+            date_time_format = \
+                self.get_simple_option_value_from_proto(datetime_field,
+                                                        BasePydanticModelPlugin.flux_fld_date_time_format)
+        if date_time_format:
+            output_str += f"        return validate_pendulum_datetime(v, {date_time_format})\n"
+        else:
+            output_str += f"        return validate_pendulum_datetime(v)\n"
         return output_str
 
     @abstractmethod
@@ -533,25 +582,54 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
     def handle_imports(self) -> str:
         raise NotImplementedError
 
-    def list_model_content(self) -> str:
+    def list_model_content(self, file: protogen.File) -> str:
         output_str = ""
         for message in self.root_message_list:
-            output_str += f'class {message.proto.name}BaseModelList(BaseModel):\n'
-            output_str += f'    __root__: List[{message.proto.name}BaseModel]\n\n\n'
+            if message in file.messages:
+                output_str += f'class {message.proto.name}BaseModelList(RootModel):\n'
+                output_str += f'    root: List[{message.proto.name}BaseModel]\n\n\n'
         return output_str
 
-    def handle_pydantic_class_gen(self) -> str:
+    def handle_pydantic_class_gen(self, file: protogen.File, is_main_file: bool | None = None) -> str:
+        if is_main_file is None:
+            is_main_file = False
+
         output_str = self.handle_imports()
+
+        if file.dependencies:
+            output_str += "# Project imports\n"
+            for file_ in file.dependencies:
+                if file_.proto.name != "flux_options.proto":
+                    if file_.proto.name in root_core_proto_files:
+                        gen_model_import_path = (
+                            self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
+                                                          f"Pydantic.{file_.generated_filename_prefix}_beanie_model"))
+                    elif file_.proto.name in project_grp_core_proto_files:
+                        project_grp_root_dir = PurePath(project_dir).parent.parent / "Pydantic"
+                        gen_model_import_path = (
+                            self.import_path_from_path_str(str(project_grp_root_dir),
+                                                           f"{file_.generated_filename_prefix}_beanie_model"))
+                    else:
+                        gen_model_import_path = (
+                            self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
+                                                          f"{file_.generated_filename_prefix}_beanie_model"))
+                    output_str += f"from {gen_model_import_path} import *\n"
+            output_str += "\n\n"
+
         output_str += f"{BasePydanticModelPlugin.default_id_type_var_name} = {self.default_id_field_type}\n"
-        output_str += f'{BasePydanticModelPlugin.proto_package_var_name} = "{self.proto_package_name}"\n\n'
-        for enum in self.enum_list:
+        if is_main_file:
+            output_str += f'{BasePydanticModelPlugin.proto_package_var_name} = "{self.proto_package_name}"\n\n'
+
+        for enum in file.enums:
             output_str += self.handle_enum_output(enum, self.enum_type)
+
         for message in self.ordered_message_list:
-            output_str += self.handle_message_output(message)
+            if message in file.messages:
+                output_str += self.handle_message_output(message)
 
-        output_str += self.list_model_content()
+        output_str += self.list_model_content(file)
 
-        # adding class to be used by max if query for models having int type of id
+        # adding class to be used by query to get max_id of any model
         output_str += f"class MaxId(BaseModel):\n"
         output_str += f"    max_id_val: int\n\n"
 
@@ -628,41 +706,33 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
         self.proto_package_name = str(file.proto.package)
         self.model_import_file_name = f'{self.proto_file_name}_model_imports'
 
+    def get_dependency_protogen_files(self, file: protogen.File,
+                                      all_dependency_protogen_file_list: List[protogen.File]) -> None:
+        for file_ in file.dependencies:
+            if file_.proto.name != "flux_options.proto" and file_ not in all_dependency_protogen_file_list:
+                if file_.dependencies:
+                    self.get_dependency_protogen_files(file_, all_dependency_protogen_file_list)
+                all_dependency_protogen_file_list.append(file_)
+                self.load_root_and_non_root_messages_in_dicts(file_.messages)
+
     def output_file_generate_handler(self, file: protogen.File):
+        # time.sleep(10)
         self.assign_required_data_members(file)
         self.load_root_and_non_root_messages_in_dicts(file.messages)
 
-        core_or_util_files = flux_core_config_yaml_dict.get("core_or_util_files")
-        if core_or_util_files is not None:
-            for dependency_file in file.dependencies:
-                dependency_file_name: str = dependency_file.proto.name
-                if dependency_file_name in core_or_util_files:
-                    if dependency_file_name == "projects_core.proto":
-                        self.load_root_and_non_root_messages_in_dicts(dependency_file.messages)
-                    else:
-                        if dependency_file_name.endswith("_core.proto"):
-                            dependency_file_name_suffix_removed = dependency_file_name[:-len("_core.proto")]
-                            project_name_list_from_dependency_file_name = (
-                                dependency_file_name_suffix_removed.split("_n_"))
-                            if self.proto_package_name in project_name_list_from_dependency_file_name:
-                                self.load_root_and_non_root_messages_in_dicts(dependency_file.messages,
-                                                                              avoid_non_roots=True)
-                            else:
-                                continue
-                        else:
-                            continue
-                # else not required: if dependency file name not in core_or_util_files
-                # config list, avoid messages from it
-        # else not required: core_or_util_files key is not in yaml dict config
-
-        self.sort_message_order()
-
         output_dict = {
-            # Adding pydantic model file
-            self.model_file_name + ".py": self.handle_pydantic_class_gen(),
-
             # Adding model import file
             self.model_import_file_name + ".py": self.handle_model_import_file_gen()
         }
+
+        all_dependency_protogen_file_list: List[protogen.File] = []
+        self.get_dependency_protogen_files(file, all_dependency_protogen_file_list)
+        self.sort_message_order()
+
+        # Adding pydantic model file
+        output_dict[self.model_file_name + ".py"] = self.handle_pydantic_class_gen(file, is_main_file=True)
+        for file_ in all_dependency_protogen_file_list:
+            file_name = f"{file_.generated_filename_prefix}_beanie_model.py"
+            output_dict[file_name] = self.handle_pydantic_class_gen(file_)
 
         return output_dict

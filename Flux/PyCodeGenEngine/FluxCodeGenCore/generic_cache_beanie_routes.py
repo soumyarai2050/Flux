@@ -70,13 +70,14 @@ async def _underlying_beanie_patch_n_put(document, document_obj_updated, request
 
 @http_except_n_log_error(status_code=500)
 async def generic_cache_beanie_put(document, document_obj_updated):
-    request_obj = {'$set': document_obj_updated.dict().items()}
+    request_obj = {'$set': document_obj_updated.model_dump().items()}
     return await _underlying_beanie_patch_n_put(document, document_obj_updated, request_obj, True)
 
 
 @http_except_n_log_error(status_code=500)
 async def generic_cache_beanie_patch(document, document_obj_updated):
-    req_dict_without_none_val = {k: v for k, v in document_obj_updated.dict(exclude_unset=True, exclude_none=True).items()}
+    req_dict_without_none_val = {k: v for k, v in document_obj_updated.model_dump(exclude_unset=True,
+                                                                                  exclude_none=True).items()}
     request_obj = {'$set': req_dict_without_none_val.items()}
     return await _underlying_beanie_patch_n_put(document, document_obj_updated, request_obj, False)
 
@@ -103,5 +104,5 @@ async def generic_cache_beanie_delete(document, document_obj_id):
 @http_except_n_log_error(status_code=500)
 async def generic_cache_beanie_index(document, field_name: str, index_value):
     fetched_document_obj_list = [obj for obj in list(document.get_all_cached_obj().values())
-                                 if obj.dict()[field_name] == index_value]
+                                 if obj.model_dump()[field_name] == index_value]
     return fetched_document_obj_list

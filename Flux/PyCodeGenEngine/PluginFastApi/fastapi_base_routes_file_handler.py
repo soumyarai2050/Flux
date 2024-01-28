@@ -175,23 +175,6 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
             output_str += f"{lock_name} = AsyncRLock()\n"
         return output_str
 
-    def _check_valid_route_op_in_time_series_model(self, message: protogen.Message, option_val_dict: Dict):
-        unsupported_ops = [
-            FastapiBaseRoutesFileHandler.flux_json_root_update_field,
-            FastapiBaseRoutesFileHandler.flux_json_root_update_all_field,
-            FastapiBaseRoutesFileHandler.flux_json_root_patch_field,
-            FastapiBaseRoutesFileHandler.flux_json_root_patch_all_field,
-            FastapiBaseRoutesFileHandler.flux_json_root_delete_field
-        ]
-        for unsupported_op in unsupported_ops:
-            if unsupported_op in option_val_dict:
-                err_str = (f"Mongo Version 5.0 as set in "
-                           f"{FastapiBaseRoutesFileHandler.flux_msg_json_root_time_series} "
-                           f"option in message {message.proto.name} doesn't support "
-                           f"{unsupported_op}, unsupported ops: {unsupported_ops}")
-                logging.exception(err_str)
-                raise Exception(err_str)
-
     def handle_base_routes_file_gen(self) -> str:
         # running pre-requisite method to set shared lock option info
         self._get_messages_having_links()

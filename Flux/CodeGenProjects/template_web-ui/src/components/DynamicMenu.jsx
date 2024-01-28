@@ -57,7 +57,7 @@ const DynamicMenu = (props) => {
         } else {
             setFilter({
                 ...filter,
-                [collection.xpath]: value
+                [collection.path]: value
             })
         }
     }
@@ -111,8 +111,8 @@ const DynamicMenu = (props) => {
             if (filter[collection.key]) {
                 return filter[collection.key];
             }
-        } else if (filter[collection.xpath]) {
-            return filter[collection.xpath];
+        } else if (filter[collection.path]) {
+            return filter[collection.path];
         }
         return '';
     }

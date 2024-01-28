@@ -96,7 +96,7 @@ class PydanticModelPlugin(BasePydanticModelPlugin):
         return output_str
 
     def handle_imports(self) -> str:
-        output_str = "from pydantic import Field, BaseModel, validator\n"
+        output_str = "from pydantic import Field, BaseModel, field_validator\n"
         output_str += "import pendulum\n"
         output_str += "from typing import Dict, List, ClassVar, Any\n"
         output_str += "from threading import Lock, RLock\n"
@@ -109,7 +109,7 @@ class PydanticModelPlugin(BasePydanticModelPlugin):
                 output_str += "from enum import IntEnum\n"
             elif self.enum_type == "str_enum":
                 output_str += "from enum import auto\n"
-                output_str += "from fastapi_utils.enums import StrEnum\n"
+                output_str += "from fastapi_restful.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
 
         incremental_id_camel_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",

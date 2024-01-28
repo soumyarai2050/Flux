@@ -551,7 +551,7 @@ function ChartWidget(props) {
                 </Box>
             </Box>
             <FullScreenModal
-                id={selectedIndex}
+                id={props.name}
                 open={open}
                 onClose={onClose}
                 onSave={onSave}

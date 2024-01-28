@@ -98,6 +98,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             # else not required: avoiding other kinds than message or enum
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
+        message_list.sort(key=lambda message_: message_.proto.name)     # sorting by name
+
         for message in message_list:
             if ((is_json_root := self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root)) or
                     self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_json_root_time_series)):

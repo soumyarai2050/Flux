@@ -24,6 +24,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         self.shared_lock_name_to_pydentic_class_dict: Dict[str, List[protogen.Message]] = {}
         self.shared_lock_name_message_list: List[protogen.Message] = []
         self.message_to_link_messages_dict: Dict[protogen.Message, List[protogen.Message]] = {}
+        self._msg_already_generated_str_formatted_int_fields_handler_list: List[protogen.Message] = []
 
     def _get_list_of_shared_lock_for_message(self, message: protogen.Message) -> List[str]:
         shared_lock_name_list = []
@@ -259,6 +260,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + f"    {message_name_snake_cased}_updated = " \
                                            f"await callback_class.update_{message_name_snake_cased}_pre(" \
                                            f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_updated)\n"
+        output_str += " " * indent_count + f"    if {message_name_snake_cased}_updated is None:\n"
+        output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
+                                            f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
+                                            f"None instead of updated {message_name_snake_cased}_updated  ')\n")
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
                                             f"'avoid_{message_name_snake_cased}_db_update'):\n")
         indent_count += 4
@@ -466,9 +471,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_obj = await generic_read_by_id_http(" \
                                            f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                                            f"obj_id, has_links={msg_has_links})\n"
-        output_str += " " * indent_count + f"    {message_name_snake_cased}_update_req_json = " \
-                                           f"await callback_class.partial_update_{message_name_snake_cased}_pre(" \
-                                           f"stored_{message_name_snake_cased}_obj, {message_name_snake_cased}_update_req_json)\n"
+        output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_req_json = "
+                                            f"await callback_class.partial_update_{message_name_snake_cased}_pre("
+                                            f"stored_{message_name_snake_cased}_obj, "
+                                            f"{message_name_snake_cased}_update_req_json)\n")
+        output_str += " " * indent_count + f"    if {message_name_snake_cased}_update_req_json is None:\n"
+        output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
+                                            f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
+                                            f"None instead of updated {message_name_snake_cased}_update_req_json ')\n")
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
                       (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
@@ -564,6 +574,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         return int_field_list
 
     def _handle_str_int_val_callable_generation(self, message: protogen.Message) -> str:
+        if message in self._msg_already_generated_str_formatted_int_fields_handler_list:
+            # if handler function is already generated for this model for either patch or patch_all then
+            # avoiding duplicate function creation
+            return ""
+        # else not required: generating if not generated for this model already
+
         message_name = message.proto.name
         message_name_camel_cased = convert_camel_case_to_specific_case(message_name)
         int_field_list: List[str] = self._get_int_field_list(message)
@@ -602,6 +618,11 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                             output_str += " " * (indent_count*4) + f"if {field} is not None:\n"
                             indent_count += 1
                             last_field_name = field
+
+            # adding msg to cache to be checked for another call from patch or patch_all to avoid
+            # duplicate function creation
+            self._msg_already_generated_str_formatted_int_fields_handler_list.append(message)
+
         return output_str
 
     def handle_underlying_PATCH_all_gen(self, **kwargs) -> str:
@@ -1102,9 +1123,6 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         else:
             option_val_dict = self.get_complex_option_value_from_proto(message,
                                                                        FastapiHttpRoutesFileHandler.flux_msg_json_root_time_series)
-            # checking if time series option mistakenly has update or delete also set
-            # if so, notifying user by raising exception
-            self._check_valid_route_op_in_time_series_model(message, option_val_dict)
 
         shared_mutex_list = self._get_list_of_shared_lock_for_message(message)
 

@@ -55,6 +55,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         self.dependent_message_list: List[protogen.Message] = []
         self.independent_message_list: List[protogen.Message] = []
         self.repeated_layout_msg_name_list: List[str] = []
+        self.abbreviated_message_list: List[protogen.Message] = []
         self.current_message_is_dependent: bool | None = None  # True if dependent else false
         if (ui_layout_msg_name := os.getenv("UILAYOUT_MESSAGE_NAME")) is not None and len(ui_layout_msg_name):
             self.__ui_layout_msg_name = ui_layout_msg_name
@@ -109,6 +110,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                         if ":" in dependent_message_name:
                             dependent_message_name = dependent_message_name.split(":")[-1]
                         self.dependent_to_abbreviated_relation_msg_name_dict[dependent_message_name] = message.proto.name
+                        self.abbreviated_message_list.append(message)
                         break
                 # else not required: Avoid if field doesn't contain abbreviated option
             else:
@@ -211,6 +213,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         else:
             if (message_name in self.repeated_layout_msg_name_list and
                     JsSliceFileGenPlugin.is_option_enabled(message, JsSliceFileGenPlugin.flux_msg_ui_get_all_limit)):
+                output_str += "    const { uiLimit } = payload;\n"
                 output_str += "    return axios.get(`${API_ROOT_URL}/" + (f"get-all-{message_name_snake_cased}?limit_obj_count="
                                                                           "${uiLimit}`)\n")
             else:
@@ -329,7 +332,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
             message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
         if (not self.current_message_is_dependent and (message_name not in self.repeated_layout_msg_name_list) and
-                not option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field)):
+                not option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field)
+                and not self.if_msg_used_in_abb_option_value(message)):
             output_str += f"            state.selected{message_name}Id = null;\n"
         output_str += "        },\n"
         output_str += f"        [getAll{message_name}.fulfilled]: (state, action) => " + "{\n"
@@ -346,7 +350,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             else:
                 output_str += f"            state.{message_name_camel_cased}Array = action.payload;\n"
             if message_name != self.__ui_layout_msg_name:
-                if not option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
+                if (not option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field) and
+                        not self.if_msg_used_in_abb_option_value(message)):
                     output_str += "            if (action.payload.length === 0) {\n"
                     output_str += f"                state.{message_name_camel_cased} = " \
                                   f"initialState.{message_name_camel_cased};\n"
@@ -611,7 +616,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += f"        set{message_name}ArrayWs: (state, action) => " + "{\n"
                 option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
                     message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                if option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field):
+
+                if (option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field) or
+                        self.if_msg_used_in_abb_option_value(message)):
                     output_str += "            const { data, collections} = action.payload;\n"
                     output_str += f"            state.{message_name_camel_cased}Array = data;\n"
                 else:
@@ -863,6 +870,15 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += " }" + f" = {message_name_camel_cased}Slice.actions;\n"
 
         return output_str
+
+    def if_msg_used_in_abb_option_value(self, message: protogen.Message):
+        for abb_message in self.abbreviated_message_list:
+            msg_used_in_abb_option_list: List[str] = self._get_msg_names_list_used_in_abb_option_val(abb_message)
+            for msg_name in msg_used_in_abb_option_list:
+                if (msg_name == message.proto.name and
+                        msg_name not in self.dependent_to_abbreviated_relation_msg_name_dict.keys()):
+                    return True
+        return False
 
     def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
         # Loading root messages to data member

@@ -34,12 +34,23 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         return output_str
 
     def handle_field_output(self, field) -> str:
-
         output_str = self._handle_field_cardinality(field)
+        is_optional = False
+        if field.cardinality.name.lower() == "optional":
+            is_optional = True
+        elif field.cardinality.name.lower() == "repeated":
+            if not self.is_option_enabled(field, CachedPydanticModelPlugin.flux_fld_is_required):
+                is_optional = True
+        # else not required: is_required = False
         if leading_comments := field.location.leading_comments:
             comments = ", ".join(leading_comments.split("\n"))
-            output_str += f' = Field(description="{comments}")\n'
+            output_str += f' = Field(description="{comments}"'
+            if is_optional:
+                output_str += "default=None"
+            output_str += ")\n"
         else:
+            if is_optional:
+                output_str += " = None"
             output_str += "\n"
 
         return output_str
@@ -135,8 +146,10 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
         return output_str
 
     def handle_imports(self) -> str:
-        output_str = "from pydantic import Field, BaseModel, validator, TimeSeriesConfig, Granularity\n"
+        output_str = ("from pydantic import Field, BaseModel, field_validator, RootModel, "
+                      "TimeSeriesConfig, Granularity\n")
         output_str += "import pendulum\n"
+        output_str += "import datetime\n"
         output_str += "from typing import Dict, List, ClassVar, Any\n"
         ws_connection_manager_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
                                                                    "ws_connection_manager")
@@ -147,7 +160,7 @@ class CachedPydanticModelPlugin(BasePydanticModelPlugin):
                 output_str += "from enum import IntEnum\n"
             elif self.enum_type == "str_enum":
                 output_str += "from enum import auto\n"
-                output_str += "from fastapi_utils.enums import StrEnum\n"
+                output_str += "from fastapi_restful.enums import StrEnum\n"
             # else not required: if enum type is not proper then it would be already handled in init
 
         incremental_id_base_model_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",

@@ -42,7 +42,7 @@ class AppLogAnalyzer(LogAnalyzer, ABC):
                 "debug": "Severity_DEBUG"
             })
 
-    def _get_severity(self, error_type: str) -> str:
+    def get_severity(self, error_type: str) -> str:
         error_type = error_type.lower()
         if error_type in self.severity_map:
             return self.severity_map[error_type]

@@ -48,6 +48,7 @@ class SQLModelFastApiPlugin(CacheFastApiPlugin):
             # else not required: avoiding other kinds than message or enum
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message]):
+        message_list.sort(key=lambda message_: message_.proto.name)     # sorting by name
         for message in message_list:
             if self.is_option_enabled(message, SQLModelFastApiPlugin.flux_msg_json_root):
                 if message not in self.root_message_list:
