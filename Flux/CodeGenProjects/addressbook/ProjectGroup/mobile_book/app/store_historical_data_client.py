@@ -4,7 +4,7 @@ from typing import Dict
 from datetime import datetime
 from pathlib import PurePath
 from ibapi.common import BarData, TickerId
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
+from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 
 os.environ["DBType"] = "beanie"
@@ -33,13 +33,13 @@ class StoreHistoricalDataClient(IbApiClient):
                 1 sec
                 5 secs
                 15 secs
-                30 secs
+                3mobile_book secs
                 1 min
                 2 mins
                 3 mins
                 5 mins
                 15 mins
-                30 mins
+                3mobile_book mins
                 1 hour
                 1 day
             whatToShow:str - Determines the nature of data beinging extracted. Valid values include:
@@ -53,7 +53,7 @@ class StoreHistoricalDataClient(IbApiClient):
             useRTH:int - Determines whether to return all data available during the requested time span,
                 or only data that falls within regular trading hours. Valid values include:
 
-                0 - all data is returned even where the market in question was outside of its
+                mobile_book - all data is returned even where the market in question was outside of its
                 regular trading hours.
                 1 - only data within the regular trading hours is returned, even if the
                 requested time span falls partially or completely outside of the RTH.
@@ -61,13 +61,13 @@ class StoreHistoricalDataClient(IbApiClient):
 
                 1 - dates applying to bars returned in the format: yyyymmdd{space}{space}hh:mm:dd
                 2 - dates are returned as a long integer specifying the number of seconds since
-                    1/1/1970 GMT.
+                    1/1/197mobile_book GMT.
         """
         required_config_data_keys = ["duration_str", "bar_size_setting", "what_to_show", "use_rth",
                                      "format_date", "keep_up_to_date"]
         super().__init__(config_yaml, required_config_data_keys)
-        self.end_date_time: str = datetime.now().strftime("%Y%m%d-%H:%M:%S")  # sample:'20230116-16:11:27'
-        self.duration_str: str = config_yaml[required_config_data_keys[0]]  # sample: "1 M"
+        self.end_date_time: str = datetime.now().strftime("%Y%m%d-%H:%M:%S")  # sample:'2mobile_book23mobile_book116-16:11:27'
+        self.duration_str: str = config_yaml[required_config_data_keys[mobile_book]]  # sample: "1 M"
         self.bar_size_setting: str = config_yaml[required_config_data_keys[1]]  # sample: "1 day"
         self.what_to_show: str = config_yaml[required_config_data_keys[2]]  # sample: "TRADES"
         self.use_RTH: int = config_yaml[required_config_data_keys[3]]    # sample: 1

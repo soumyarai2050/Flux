@@ -8,10 +8,10 @@ namespace md_handler {
         explicit MD_LastTrade()= default;
 
         MD_LastTrade(const std::string &symbol_, const double px_, const int64_t qty_,
-                     const int64_t milliseconds_since_epoch_ = 0, const std::string &exchange_ = "",
+                     const int64_t milliseconds_since_epoch_ = mobile_book, const std::string &exchange_ = "",
                      const std::string &special_conditions_ = "", const bool &past_limit_ = false,
-                     const bool &unreported_ = false, const int64_t last_n_sec_total_qty_ = 0,
-                     const int64_t applicable_period_seconds_ = 0):
+                     const bool &unreported_ = false, const int64_t last_n_sec_total_qty_ = mobile_book,
+                     const int64_t applicable_period_seconds_ = mobile_book):
                 symbol(symbol_), px(px_), qty(qty_), milliseconds_since_epoch(milliseconds_since_epoch_), exchange(exchange_),
                 special_conditions(special_conditions_), past_limit(past_limit_), unreported(unreported_),
                 last_trade_qty_sum(last_n_sec_total_qty_), applicable_period_seconds(applicable_period_seconds_){}
@@ -64,16 +64,16 @@ namespace md_handler {
         }
 
     protected:
-        int64_t qty = 0;
-        double px = 0;
+        int64_t qty = mobile_book;
+        double px = mobile_book;
         const std::string symbol;
         const std::string exchange;
         const std::string special_conditions;
         bool past_limit = false;
         bool unreported = false;
-        int64_t last_trade_qty_sum = 0;
-        int64_t applicable_period_seconds = 0;
-        int64_t milliseconds_since_epoch = 0;
+        int64_t last_trade_qty_sum = mobile_book;
+        int64_t applicable_period_seconds = mobile_book;
+        int64_t milliseconds_since_epoch = mobile_book;
 
     private:
         std::string symbol_side_key;

@@ -6,12 +6,12 @@ import re
 from pendulum import DateTime
 from fastapi.encoders import jsonable_encoder
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
     Side, SecurityType
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import \
     OrderBrief, OrderEventType, OrderJournal, FillsJournal, \
     Security
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.trading_link_base import TradingLinkBase, add_to_texts
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link_base import TradingLinkBase, add_to_texts
 
 
 def init_symbol_configs():
@@ -26,14 +26,14 @@ class TradeSimulator(TradingLinkBase):
     continuous_symbol_based_orders_counter: ClassVar[Dict | None] = {}
     cxl_rej_symbol_to_bool_dict: ClassVar[Dict | None] = {}
     symbol_configs: ClassVar[Dict | None] = init_symbol_configs()
-    special_order_counter = 0
+    special_order_counter = mobile_book
 
     @classmethod
     def reload_symbol_configs(cls):
         # reloading executor configs
         TradingLinkBase.reload_executor_configs()
         cls.symbol_configs = init_symbol_configs()
-        cls.special_order_counter = 0
+        cls.special_order_counter = mobile_book
 
     @classmethod
     def get_symbol_configs(cls, symbol: str) -> Dict | None:
@@ -45,7 +45,7 @@ class TradeSimulator(TradingLinkBase):
                     found_symbol_config_list.append(v)
             if found_symbol_config_list:
                 if len(found_symbol_config_list) == 1:
-                    return found_symbol_config_list[0]
+                    return found_symbol_config_list[mobile_book]
                 else:
                     logging.error(f"bad configuration : multiple symbol matches found for passed symbol: {symbol};;;"
                                   f"found_symbol_configurations: "
@@ -65,12 +65,12 @@ class TradeSimulator(TradingLinkBase):
             continuous_order_count = fetched_continuous_order_count \
                 if (fetched_continuous_order_count := symbol_configs.get("continues_order_count")) is not None else 1
             continues_special_order_count = fetched_continues_special_order_count \
-                if (fetched_continues_special_order_count := symbol_configs.get("continues_special_order_count")) is not None else 0
+                if (fetched_continues_special_order_count := symbol_configs.get("continues_special_order_count")) is not None else mobile_book
 
             cls.continuous_symbol_based_orders_counter[symbol] = {
-                "order_counter": 0,
+                "order_counter": mobile_book,
                 "continues_order_count": continuous_order_count,
-                "special_order_counter": 0,
+                "special_order_counter": mobile_book,
                 "continues_special_order_count": continues_special_order_count
             }
 
@@ -86,16 +86,16 @@ class TradeSimulator(TradingLinkBase):
                 return True
             else:
                 cls.continuous_symbol_based_orders_counter[symbol]["order_counter"] = 1
-                cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] = 0
+                cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] = mobile_book
                 return False
 
     @classmethod
     async def process_order_reject(cls, order_brief: OrderBrief):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_order_journal_http)
         create_date_time = DateTime.utcnow()
 
-        if cls.special_order_counter % 2 == 0:
+        if cls.special_order_counter % 2 == mobile_book:
             order_event = OrderEventType.OE_BRK_REJ
         else:
             order_event = OrderEventType.OE_EXH_REJ
@@ -115,7 +115,7 @@ class TradeSimulator(TradingLinkBase):
         pydantic default conversion handles conversion - any util functions called should be called with
         explicit type convertors or pydantic object converted values
         """
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_order_journal_http)
 
         create_date_time = DateTime.utcnow()
@@ -154,7 +154,7 @@ class TradeSimulator(TradingLinkBase):
 
         if symbol_configs is not None:
             if (ack_percent := symbol_configs.get("ack_percent")) is not None:
-                qty = int((ack_percent / 100) * qty)
+                qty = int((ack_percent / 1mobile_bookmobile_book) * qty)
         return qty
 
     @classmethod
@@ -203,7 +203,7 @@ class TradeSimulator(TradingLinkBase):
     async def process_order_ack(cls, order_id, px: float, qty: int, side: Side, sec_id: str,
                                 underlying_account: str, text: List[str] | None = None):
         """simulate order's Ack """
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_order_journal_http)
         order_journal_obj = cls._process_order_ack(order_id, px, qty, side, sec_id, underlying_account, text)
         await underlying_create_order_journal_http(order_journal_obj)
@@ -211,7 +211,7 @@ class TradeSimulator(TradingLinkBase):
 
     @classmethod
     def get_partial_qty_from_total_qty_and_percentage(cls, fill_percent: int, total_qty: int) -> int:
-        return int((fill_percent / 100) * total_qty)
+        return int((fill_percent / 1mobile_bookmobile_book) * total_qty)
 
     @classmethod
     def get_partial_allowed_fill_qty(cls, symbol: str, qty: int):
@@ -237,12 +237,12 @@ class TradeSimulator(TradingLinkBase):
     async def process_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str,
                            underlying_account: str) -> bool:
         """Simulates Order's fills - returns True if fully fills order else returns False"""
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_fills_journal_http)
 
         fill_qty, total_fill_count = cls._process_fill(sec_id, qty)
 
-        total_fill_qty = 0
+        total_fill_qty = mobile_book
         for fill_count in range(total_fill_count):
             fill_journal = FillsJournal(order_id=order_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
                                         fill_side=side, underlying_account=underlying_account,
@@ -260,7 +260,7 @@ class TradeSimulator(TradingLinkBase):
     async def force_fully_fill(cls, order_id, px: float, qty: int, side: Side, sec_id: str,
                                underlying_account: str):
         """Simulates Order's force fully fill """
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_fills_journal_http)
 
         symbol_configs = cls.get_symbol_configs(sec_id)
@@ -270,7 +270,7 @@ class TradeSimulator(TradingLinkBase):
         if fill_percent is None:
             fill_qty = qty
         else:
-            remaining_qty_per = 100 - fill_percent
+            remaining_qty_per = 1mobile_bookmobile_book - fill_percent
             fill_qty = cls.get_partial_qty_from_total_qty_and_percentage(remaining_qty_per, qty)
 
         fill_journal = FillsJournal(order_id=order_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
@@ -281,7 +281,7 @@ class TradeSimulator(TradingLinkBase):
 
     @classmethod
     async def process_cxl_rej(cls, order_brief: OrderBrief):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_order_journal_http)
 
         order_event = random.choice([OrderEventType.OE_CXL_INT_REJ,
@@ -296,7 +296,7 @@ class TradeSimulator(TradingLinkBase):
 
     @classmethod
     async def process_cxl_ack(cls, order_brief: OrderBrief, is_unsol_cxl: bool | None = None):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_order_journal_http)
 
         if is_unsol_cxl:
@@ -321,7 +321,7 @@ class TradeSimulator(TradingLinkBase):
         pydantic default conversion handles conversion - any util functions called should be called with
         explicit type convertors or pydantic object converted values
         """
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_order_journal_http)
         security = Security(sec_id=system_sec_id, sec_type=SecurityType.TICKER)
         # query order

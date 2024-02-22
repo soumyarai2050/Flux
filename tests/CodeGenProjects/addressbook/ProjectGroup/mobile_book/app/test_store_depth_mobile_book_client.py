@@ -1,7 +1,7 @@
 from decimal import Decimal
 from FluxPythonUtils.scripts.utility_functions import configure_logger
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.store_depth_mobile_book_client import StoreDepthMobileBookClient
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.mobile_book_service_web_client import MobileBookServiceWebClient
+from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.store_depth_mobile_book_client import StoreDepthMobileBookClient
+from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.generated.mobile_book_service_web_client import MobileBookServiceWebClient
 
 
 class TestStoreDepthMobileBookClient:

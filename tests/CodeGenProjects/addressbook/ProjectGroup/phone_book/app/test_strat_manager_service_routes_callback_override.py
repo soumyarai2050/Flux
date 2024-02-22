@@ -9,11 +9,11 @@ import random
 import traceback
 
 # project imports
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_strat_key_from_pair_strat
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import AlertOptional
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
+from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import get_strat_key_from_pair_strat
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import AlertOptional
+from Flux.CodeGenProjects.addressbook.ProjectGroup.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
 
 strat_manager_service_beanie_web_client: StratManagerServiceHttpClient = \
     StratManagerServiceHttpClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_BEANIE_PORT))
@@ -65,11 +65,11 @@ def test_patch_with_missing_id_param(get_missing_id_json):
     # removing all id fields
     del sample_json['_id']
     del sample_json['field1']['_id']
-    del sample_json['field2'][0]['_id']
+    del sample_json['field2'][mobile_book]['_id']
     del sample_json['field2'][1]['_id']
     del sample_json['field2'][2]['_id']
     del sample_json['field3']['_id']
-    del sample_json['field4'][0]['_id']
+    del sample_json['field4'][mobile_book]['_id']
     del sample_json['field4'][1]['_id']
     del sample_json['field4'][2]['_id']
     del sample_json['field6']['_id']
@@ -79,16 +79,16 @@ def test_patch_with_missing_id_param(get_missing_id_json):
     print(sample_json)
     assert sample_json['field1'].get('_id') is not None, \
         "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field1']['_id']"
-    assert sample_json['field2'][0].get('_id') is not None, \
-        "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field2'][0]['_id']"
+    assert sample_json['field2'][mobile_book].get('_id') is not None, \
+        "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field2'][mobile_book]['_id']"
     assert sample_json['field2'][1].get('_id') is not None, \
         "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field2'][1]['_id']"
     assert sample_json['field2'][2].get('_id') is not None, \
         "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field2'][2]['_id']"
     assert sample_json['field3'].get('_id') is not None, \
         "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field3']['_id']"
-    assert sample_json['field4'][0].get('_id') is not None, \
-        "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field4'][0]['_id']"
+    assert sample_json['field4'][mobile_book].get('_id') is not None, \
+        "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field4'][mobile_book]['_id']"
     assert sample_json['field4'][1].get('_id') is not None, \
         "assign_missing_ids_n_handle_date_time_type failed to set sample_json['field4'][1]['_id']"
     assert sample_json['field4'][2].get('_id') is not None, \
@@ -230,8 +230,8 @@ def test_put_all(clean_and_set_limits, web_client):
 def test_patch_all(clean_and_set_limits, web_client):
     for index, return_value_type in enumerate([True, None, False]):
         portfolio_limits_objects_list = [
-            PortfolioLimitsBaseModel(id=2 + (index * 3), max_open_baskets=20),
-            PortfolioLimitsBaseModel(id=3 + (index * 3), max_open_baskets=30),
+            PortfolioLimitsBaseModel(id=2 + (index * 3), max_open_baskets=2mobile_book),
+            PortfolioLimitsBaseModel(id=3 + (index * 3), max_open_baskets=3mobile_book),
             PortfolioLimitsBaseModel(id=4 + (index * 3), max_open_baskets=45)
         ]
 
@@ -479,7 +479,7 @@ def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_
     """
     This test case contains check of update aggregate feature available in beanie part, put and patch http calls.
     """
-    counter = 0
+    counter = mobile_book
     for index in range(5):
         sample_model = pydantic_basemodel(_id=index+1, sample="sample", date=DateTime.utcnow(), num=index+1)
         created_obj: pydantic_basemodel = (
@@ -490,7 +490,7 @@ def test_update_agg_feature_in_post_put_patch_http_call(static_data_, clean_and_
             (f"Mismatched: aggregated update must have updated created_obj.cum_sum_of_num: {created_obj.cum_sum_of_num} "
              f"to {counter} after post operation")
 
-        if index > 0:
+        if index > mobile_book:
             last_obj = strat_manager_service_native_web_client.get_sample_model_client(index)
             last_obj.num += 1
             counter += 1    # updating counter for comparison
@@ -523,8 +523,8 @@ def _place_sanity_orders(buy_symbol, sell_symbol, pair_strat_,
                          expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
                          last_trade_fixture_list, market_depth_basemodel_list,
                          top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture):
-    expected_strat_limits_.max_open_orders_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 111360
+    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
+    expected_strat_limits_.residual_restriction.max_residual = 11136mobile_book
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -541,7 +541,7 @@ def _place_sanity_orders(buy_symbol, sell_symbol, pair_strat_,
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         executor_web_client.trade_simulator_reload_config_query_client()
@@ -552,7 +552,7 @@ def _place_sanity_orders(buy_symbol, sell_symbol, pair_strat_,
         buy_ack_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[mobile_book])
 
             ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
                                                                                buy_symbol, executor_web_client,
@@ -595,8 +595,8 @@ def test_place_sanity_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
                              last_trade_fixture_list, market_depth_basemodel_list,
                              top_of_book_list_, buy_order_, sell_order_,
                              max_loop_count_per_side, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     _place_sanity_orders(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
                          symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
@@ -626,8 +626,8 @@ def _place_sanity_complete_buy_orders(buy_symbol, sell_symbol, pair_strat_,
                                       expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
                                       last_trade_fixture_list, market_depth_basemodel_list,
                                       top_of_book_list_, max_loop_count_per_side, refresh_sec_update_fixture):
-    expected_strat_limits_.max_open_orders_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 111360
+    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
+    expected_strat_limits_.residual_restriction.max_residual = 11136mobile_book
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -644,7 +644,7 @@ def _place_sanity_complete_buy_orders(buy_symbol, sell_symbol, pair_strat_,
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 100
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 1mobile_bookmobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         executor_web_client.trade_simulator_reload_config_query_client()
@@ -653,11 +653,11 @@ def _place_sanity_complete_buy_orders(buy_symbol, sell_symbol, pair_strat_,
 
         # Placing buy orders
         buy_ack_order_id = None
-        px = 10
-        qty = 90
+        px = 1mobile_book
+        qty = 9mobile_book
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
-            # run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0])
+            # run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[mobile_book])
 
             buy_order: NewOrderBaseModel = place_new_order(buy_symbol, Side.BUY, px, qty, executor_web_client)
 
@@ -689,7 +689,7 @@ def _place_sanity_complete_sell_orders(buy_symbol, sell_symbol, created_pair_str
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 100
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 1mobile_bookmobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         executor_web_client.trade_simulator_reload_config_query_client()
@@ -698,7 +698,7 @@ def _place_sanity_complete_sell_orders(buy_symbol, sell_symbol, created_pair_str
 
         # Placing sell orders
         sell_ack_order_id = None
-        px = 110
+        px = 11mobile_book
         qty = 7
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
@@ -743,14 +743,14 @@ def test_place_sanity_parallel_complete_orders(
             buy_symbol_, sell_symbol_, created_pair_strat, executor_web_client = future.result()
             temp_list.append((buy_symbol_, sell_symbol_, created_pair_strat, executor_web_client))
 
-    px = 10
-    qty = 90
+    px = 1mobile_book
+    qty = 9mobile_book
     portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(1)
-    assert portfolio_status.overall_buy_notional == 10 * 10 * qty * get_px_in_usd(px), \
-        (f"Mismatched: overall_buy_notional must be {10 * 10 * qty * get_px_in_usd(px)}, found "
+    assert portfolio_status.overall_buy_notional == 1mobile_book * 1mobile_book * qty * get_px_in_usd(px), \
+        (f"Mismatched: overall_buy_notional must be {1mobile_book * 1mobile_book * qty * get_px_in_usd(px)}, found "
          f"{portfolio_status.overall_buy_notional}")
-    assert portfolio_status.overall_buy_fill_notional == 10 * 10 * qty * get_px_in_usd(px), \
-        (f"Mismatched: overall_buy_fill_notional must be {10 * 10 * qty * get_px_in_usd(px)}, "
+    assert portfolio_status.overall_buy_fill_notional == 1mobile_book * 1mobile_book * qty * get_px_in_usd(px), \
+        (f"Mismatched: overall_buy_fill_notional must be {1mobile_book * 1mobile_book * qty * get_px_in_usd(px)}, "
          f"found {portfolio_status.overall_buy_fill_notional}")
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(temp_list)) as executor:
@@ -763,14 +763,14 @@ def test_place_sanity_parallel_complete_orders(
             if future.exception() is not None:
                 raise Exception(future.exception())
 
-    px = 110
+    px = 11mobile_book
     qty = 7
     portfolio_status = strat_manager_service_native_web_client.get_portfolio_status_client(1)
-    assert portfolio_status.overall_sell_notional == 10 * 10 * qty * get_px_in_usd(px), \
-        (f"Mismatched: overall_sell_notional must be {10 * 10 * qty * get_px_in_usd(px)}, found "
+    assert portfolio_status.overall_sell_notional == 1mobile_book * 1mobile_book * qty * get_px_in_usd(px), \
+        (f"Mismatched: overall_sell_notional must be {1mobile_book * 1mobile_book * qty * get_px_in_usd(px)}, found "
          f"{portfolio_status.overall_sell_notional}")
-    assert portfolio_status.overall_sell_fill_notional == 10 * 10 * qty * get_px_in_usd(px), \
-        (f"Mismatched: overall_sell_fill_notional must be {10 * 10 * qty * get_px_in_usd(px)}, "
+    assert portfolio_status.overall_sell_fill_notional == 1mobile_book * 1mobile_book * qty * get_px_in_usd(px), \
+        (f"Mismatched: overall_sell_fill_notional must be {1mobile_book * 1mobile_book * qty * get_px_in_usd(px)}, "
          f"found {portfolio_status.overall_sell_fill_notional}")
     return created_pair_strat, executor_web_client
 
@@ -784,7 +784,7 @@ def test_place_sanity_parallel_complete_orders(
 #                                            symbol_overview_obj_list: List[SymbolOverviewBaseModel],
 #                                            market_depth_basemodel_list: List[MarketDepthBaseModel],
 #                                            top_of_book_list_: List[Dict]):
-#     order_counts = 10
+#     order_counts = 1mobile_book
 #     active_strat, executor_web_client = (
 #         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
 #                                            expected_strat_status_, symbol_overview_obj_list,
@@ -795,7 +795,7 @@ def test_place_sanity_parallel_complete_orders(
 #         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
 #         print(f"LastTrades created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 #         # Running TopOfBook (this triggers expected buy order)
-#         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[0], False)
+#         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[mobile_book], False)
 #
 #         # Sell Order
 #         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_web_client)
@@ -803,7 +803,7 @@ def test_place_sanity_parallel_complete_orders(
 #         # Running TopOfBook (this triggers expected buy order)
 #         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client, top_of_book_list_[1], False)
 #
-#         time.sleep(10)
+#         time.sleep(1mobile_book)
 #
 #
 # def test_place_sanity_orders_with_sleep_delays(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
@@ -826,21 +826,21 @@ def test_place_sanity_parallel_complete_orders(
 
 # def test_create_sanity_last_trade(static_data_, clean_and_set_limits, last_trade_fixture_list):
 #     symbols = ["CB_Sec_1", "CB_Sec_2", "CB_Sec_3", "CB_Sec_4"]
-#     px_portions = [(40, 55), (56, 70), (71, 85), (86, 100)]
-#     total_loops = 600
+#     px_portions = [(4mobile_book, 55), (56, 7mobile_book), (71, 85), (86, 1mobile_bookmobile_book)]
+#     total_loops = 6mobile_bookmobile_book
 #     loop_wait = 1   # sec
 #
 #     for _ in range(total_loops):
 #         current_time = DateTime.utcnow()
 #         for index, symbol in enumerate(symbols):
 #             px_portion = px_portions[index]
-#             qty = random.randint(1000, 2000)
-#             qty = qty + 400
+#             qty = random.randint(1mobile_bookmobile_bookmobile_book, 2mobile_bookmobile_bookmobile_book)
+#             qty = qty + 4mobile_bookmobile_book
 #
-#             last_trade_obj = LastTradeBaseModel(**last_trade_fixture_list[0])
+#             last_trade_obj = LastTradeBaseModel(**last_trade_fixture_list[mobile_book])
 #             last_trade_obj.symbol_n_exch_id.symbol = symbol
 #             last_trade_obj.arrival_time = current_time
-#             last_trade_obj.px = random.randint(px_portion[0], px_portion[1])
+#             last_trade_obj.px = random.randint(px_portion[mobile_book], px_portion[1])
 #             last_trade_obj.qty = qty
 #
 #             market_data_web_client.create_last_trade_client(last_trade_obj)
@@ -852,31 +852,31 @@ def test_place_sanity_parallel_complete_orders(
 #     dash_ids: List[str] = []
 #     dash_by_id_dict: Dict[int, DashBaseModel] = {}
 #     # create all dashes
-#     for index in range(1000):
+#     for index in range(1mobile_bookmobile_bookmobile_book):
 #         dash_obj: DashBaseModel = DashBaseModel(**dash_)
 #         dash_obj.rt_dash.leg1.sec.sec_id = f"CB_Sec_{index + 1}"
 #         stored_leg1_vwap = dash_obj.rt_dash.leg1.vwap
-#         dash_obj.rt_dash.leg1.vwap = stored_leg1_vwap + random.randint(0, 30)
-#         dash_obj.rt_dash.leg1.vwap_change = (dash_obj.rt_dash.leg1.vwap - stored_leg1_vwap ) * 100 / stored_leg1_vwap
+#         dash_obj.rt_dash.leg1.vwap = stored_leg1_vwap + random.randint(mobile_book, 3mobile_book)
+#         dash_obj.rt_dash.leg1.vwap_change = (dash_obj.rt_dash.leg1.vwap - stored_leg1_vwap ) * 1mobile_bookmobile_book / stored_leg1_vwap
 #         dash_obj.rt_dash.leg2.sec.sec_id = f"EQT_Sec_{index + 1}"
 #         stored_leg2_vwap = dash_obj.rt_dash.leg2.vwap
-#         dash_obj.rt_dash.leg2.vwap = stored_leg2_vwap + random.randint(0, 10) / 10
-#         dash_obj.rt_dash.leg2.vwap_change = (dash_obj.rt_dash.leg2.vwap - stored_leg2_vwap) * 100 / stored_leg2_vwap
+#         dash_obj.rt_dash.leg2.vwap = stored_leg2_vwap + random.randint(mobile_book, 1mobile_book) / 1mobile_book
+#         dash_obj.rt_dash.leg2.vwap_change = (dash_obj.rt_dash.leg2.vwap - stored_leg2_vwap) * 1mobile_bookmobile_book / stored_leg2_vwap
 #         stored_premium = dash_obj.rt_dash.mkt_premium
-#         dash_obj.rt_dash.mkt_premium = stored_premium + random.randint(0, 10) * 0.1
-#         dash_obj.rt_dash.mkt_premium_change = (dash_obj.rt_dash.mkt_premium - stored_premium) * 100 / stored_premium
+#         dash_obj.rt_dash.mkt_premium = stored_premium + random.randint(mobile_book, 1mobile_book) * mobile_book.1
+#         dash_obj.rt_dash.mkt_premium_change = (dash_obj.rt_dash.mkt_premium - stored_premium) * 1mobile_bookmobile_book / stored_premium
 #         stored_dash_obj: DashBaseModel = market_data_web_client.create_dash_client(dash_obj)
 #         dash_by_id_dict[stored_dash_obj.id] = stored_dash_obj
 #         dash_ids.append(str(stored_dash_obj.id))
 #
 #     # create dash filters and dashboards
 #     dash_filters_ids: List[str] = []
-#     for index in range(10):
+#     for index in range(1mobile_book):
 #         dash_filters_obj: DashFiltersBaseModel = DashFiltersBaseModel(**dash_filter_)
 #         dash_filters_obj.dash_name = f"Dashboard {index + 1}"
 #         stored_dash_filters_obj = market_data_web_client.create_dash_filters_client(dash_filters_obj)
 #         dash_filters_ids.append(str(stored_dash_filters_obj.id))
-#         max_dashes: int = random.randint(100, 3_000)
+#         max_dashes: int = random.randint(1mobile_bookmobile_book, 3_mobile_bookmobile_bookmobile_book)
 #         dash_collection_obj = DashCollectionBaseModel(id=stored_dash_filters_obj.id,
 #                                                       dash_name=stored_dash_filters_obj.dash_name,
 #                                                       loaded_dashes=dash_ids[:max_dashes],
@@ -886,9 +886,9 @@ def test_place_sanity_parallel_complete_orders(
 #                                                                  buffered_dash_filters=[])
 #     market_data_web_client.create_dash_filters_collection_client(dash_filters_collection_obj)
 #
-#     total_loops = 600
-#     loop_wait = 10  # sec
-#     volume = 1_000
+#     total_loops = 6mobile_bookmobile_book
+#     loop_wait = 1mobile_book  # sec
+#     volume = 1_mobile_bookmobile_bookmobile_book
 #
 #     def gen_bar_data_by_leg(leg: DashLegOptional, start_time: pendulum.DateTime, is_eqt = False) -> BarDataBaseModel:
 #         bar_data = BarDataBaseModel(**bar_data_)
@@ -896,16 +896,16 @@ def test_place_sanity_parallel_complete_orders(
 #         bar_data.end_time = start_time.add(seconds=1)
 #         bar_data.symbol_n_exch_id.symbol = leg.sec.sec_id
 #         bar_data.symbol_n_exch_id.exch_id = leg.exch_id
-#         random_increment = random.randint(0, 10)
+#         random_increment = random.randint(mobile_book, 1mobile_book)
 #         if is_eqt:
-#             random_increment *= 0.1
+#             random_increment *= mobile_book.1
 #         bar_data.vwap = leg.vwap + random_increment
-#         bar_data.vwap_change = (bar_data.vwap - leg.vwap) * 100 / leg.vwap
-#         volume_change = random.randint(0, 1_000)
+#         bar_data.vwap_change = (bar_data.vwap - leg.vwap) * 1mobile_bookmobile_book / leg.vwap
+#         volume_change = random.randint(mobile_book, 1_mobile_bookmobile_bookmobile_book)
 #         bar_data.volume = volume + volume_change
 #         if not is_eqt:
-#             bar_data.premium = 10 + random.randint(0, 10) * 0.1
-#             bar_data.premium_change = (bar_data.premium - 10) * 100 / 10
+#             bar_data.premium = 1mobile_book + random.randint(mobile_book, 1mobile_book) * mobile_book.1
+#             bar_data.premium_change = (bar_data.premium - 1mobile_book) * 1mobile_bookmobile_book / 1mobile_book
 #         return bar_data
 #
 #     for _ in range(total_loops):
@@ -913,7 +913,7 @@ def test_place_sanity_parallel_complete_orders(
 #         pending_bars = []
 #         pending_dashes = []
 #         for index, dash in enumerate(dash_by_id_dict.values()):
-#             if index > 100:
+#             if index > 1mobile_bookmobile_book:
 #                 break
 #             # create bars for leg1 and leg2
 #             leg1_bar_data = gen_bar_data_by_leg(dash.rt_dash.leg1, current_time)
@@ -964,10 +964,10 @@ def test_buy_sell_order_multi_pair_serialized(static_data_, clean_and_set_limits
                                               expected_portfolio_limits_, max_loop_count_per_side,
                                               leg1_leg2_symbol_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:int(len(leg1_leg2_symbol_list) / 2)]
-    overall_buy_notional = 0
-    overall_sell_notional = 0
-    overall_buy_fill_notional = 0
-    overall_sell_fill_notional = 0
+    overall_buy_notional = mobile_book
+    overall_sell_notional = mobile_book
+    overall_buy_fill_notional = mobile_book
+    overall_sell_fill_notional = mobile_book
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = (
             handle_test_buy_sell_order(leg1_symbol, leg2_symbol, max_loop_count_per_side,
@@ -1000,10 +1000,10 @@ def test_buy_sell_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             market_depth_basemodel_list, expected_order_limits_,
                                             expected_portfolio_limits_, max_loop_count_per_side,
                                             leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    overall_buy_notional = 0
-    overall_sell_notional = 0
-    overall_buy_fill_notional = 0
-    overall_sell_fill_notional = 0
+    overall_buy_notional = mobile_book
+    overall_sell_notional = mobile_book
+    overall_buy_fill_notional = mobile_book
+    overall_sell_fill_notional = mobile_book
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_order, leg1_symbol, leg2_symbol, max_loop_count_per_side,
                                    refresh_sec_update_fixture, copy.deepcopy(buy_order_),
@@ -1046,10 +1046,10 @@ def test_sell_buy_order_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             market_depth_basemodel_list, expected_order_limits_,
                                             expected_portfolio_limits_, max_loop_count_per_side,
                                             leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    overall_buy_notional = 0
-    overall_sell_notional = 0
-    overall_buy_fill_notional = 0
-    overall_sell_fill_notional = 0
+    overall_buy_notional = mobile_book
+    overall_sell_notional = mobile_book
+    overall_buy_fill_notional = mobile_book
+    overall_sell_fill_notional = mobile_book
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_sell_buy_order, leg1_symbol, leg2_symbol, max_loop_count_per_side,
                                    refresh_sec_update_fixture, copy.deepcopy(buy_order_),
@@ -1097,10 +1097,10 @@ def test_buy_sell_non_systematic_order_multi_pair_serialized(static_data_, clean
                                                              expected_portfolio_limits_, max_loop_count_per_side,
                                                              leg1_leg2_symbol_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:int(len(leg1_leg2_symbol_list) / 2)]
-    overall_buy_notional = 0
-    overall_sell_notional = 0
-    overall_buy_fill_notional = 0
-    overall_sell_fill_notional = 0
+    overall_buy_notional = mobile_book
+    overall_sell_notional = mobile_book
+    overall_buy_fill_notional = mobile_book
+    overall_sell_fill_notional = mobile_book
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = (
             handle_test_buy_sell_order(leg1_symbol, leg2_symbol, max_loop_count_per_side,
@@ -1136,10 +1136,10 @@ def test_buy_sell_non_systematic_order_multi_pair_parallel(static_data_, clean_a
                                                            market_depth_basemodel_list, expected_order_limits_,
                                                            expected_portfolio_limits_, max_loop_count_per_side,
                                                            leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    overall_buy_notional = 0
-    overall_sell_notional = 0
-    overall_buy_fill_notional = 0
-    overall_sell_fill_notional = 0
+    overall_buy_notional = mobile_book
+    overall_sell_notional = mobile_book
+    overall_buy_fill_notional = mobile_book
+    overall_sell_fill_notional = mobile_book
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_order, buy_symbol, sell_symbol, max_loop_count_per_side,
                                    refresh_sec_update_fixture, copy.deepcopy(buy_order_),
@@ -1187,7 +1187,7 @@ def test_buy_sell_pair_order(
     triggers buy & sell pair order (single buy order followed by single sell order) for max_loop_count_per_side times
     """
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:1]
-    leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[0]
+    leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[mobile_book]
     overall_buy_notional, overall_sell_notional, overall_buy_fill_notional, overall_sell_fill_notional = (
         handle_test_buy_sell_pair_order(
             leg1_symbol, leg2_symbol, max_loop_count_per_side,
@@ -1221,7 +1221,7 @@ def test_sell_buy_pair_order(
     triggers buy & sell pair order (single buy order followed by single sell order) for max_loop_count_per_side times
     """
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:1]
-    leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[0]
+    leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[mobile_book]
     overall_buy_notional, overall_sell_notional, overall_buy_fill_notional, overall_sell_fill_notional = (
         handle_test_sell_buy_pair_order(
             leg1_symbol, leg2_symbol, max_loop_count_per_side,
@@ -1244,8 +1244,8 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
                                         expected_strat_limits_, expected_strat_status_,
                                         symbol_overview_obj_list, last_trade_fixture_list,
                                         market_depth_basemodel_list, top_of_book_list_, refresh_sec_update_fixture):
-    leg1_symbol = leg1_leg2_symbol_list[0][0]
-    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    leg2_symbol = leg1_leg2_symbol_list[mobile_book][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_web_client = (
@@ -1256,7 +1256,7 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
 
     # positive test
     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[mobile_book])
 
     # internally checks order_journal existence
     order_journal: OrderJournal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -1279,7 +1279,7 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
         assert False, f"Can't find portfolio alert saying '{check_str}'"
 
     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[mobile_book])
     # internally checking buy order
     order_journal = \
         get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -1302,8 +1302,8 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                                             last_trade_fixture_list, market_depth_basemodel_list,
                                             top_of_book_list_, buy_order_, sell_order_,
                                             refresh_sec_update_fixture):
-    leg1_symbol = leg1_leg2_symbol_list[0][0]
-    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    leg2_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_web_client = (
@@ -1359,8 +1359,8 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
                             expected_strat_limits_, expected_strat_status_,
                             symbol_overview_obj_list, last_trade_fixture_list,
                             market_depth_basemodel_list, top_of_book_list_, refresh_sec_update_fixture):
-    leg1_symbol = leg1_leg2_symbol_list[0][0]
-    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    leg2_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -1378,7 +1378,7 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
 
     time.sleep(2)
     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[mobile_book])
     # internally checking buy order
     order_journal = \
         get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -1410,10 +1410,10 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     # empty sell tob to align tob pattern - self._top_of_books_update_date_time in strat_executor doesn't get updated
     # when kill switch is enabled, to make is aligned with last_update_time placing non-order triggering tob once
     # kill switch revoked
-    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0], avoid_order_trigger=True)
+    run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[mobile_book], avoid_order_trigger=True)
 
     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_web_client)
-    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[0])
+    run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_web_client, top_of_book_list_[mobile_book])
 
     # internally checks order_journal existence
     order_journal: OrderJournal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -1546,7 +1546,7 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
@@ -1555,7 +1555,7 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
             # buy fills check
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 order_id = None
-                total_partial_filled_qty = 0
+                total_partial_filled_qty = mobile_book
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     order_id, partial_filled_qty = \
                         underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, leg1_symbol,
@@ -1616,7 +1616,7 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 10
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 1mobile_book
                 config_dict["symbol_configs"][symbol]["total_fill_count"] = 5
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -1662,8 +1662,8 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
                        expected_strat_status_, symbol_overview_obj_list,
                        last_trade_fixture_list, market_depth_basemodel_list,
                        top_of_book_list_, buy_order_, sell_order_, refresh_sec_update_fixture):
-        buy_symbol = leg1_leg2_symbol_list[0][0]
-        sell_symbol = leg1_leg2_symbol_list[0][1]
+        buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+        sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
         expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
         created_pair_strat, executor_http_client = (
@@ -1679,7 +1679,7 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
@@ -1688,10 +1688,10 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             # buy fills check
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
             loop_count = 1
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book],
                                 avoid_order_trigger=True)
-            px = 100
-            qty = 90
+            px = 1mobile_bookmobile_book
+            qty = 9mobile_book
             place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
             time.sleep(2)  # delay for order to get placed
 
@@ -1708,7 +1708,7 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
                                                                             f"OrderStatusType.OE_ACKED received " \
                                                                             f"{order_snapshot.order_status}"
 
-            # processing remaining 50% fills
+            # processing remaining 5mobile_book% fills
             executor_http_client.trade_simulator_process_fill_query_client(
                 ack_order_journal.order.order_id, ack_order_journal.order.px,
                 ack_order_journal.order.qty, ack_order_journal.order.side,
@@ -1744,8 +1744,8 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
     """
     Test case when order_snapshot is in OE_ACKED and fill is triggered to make it over_filled
     """
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_http_client = (
@@ -1761,7 +1761,7 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 60
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 6mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1770,7 +1770,7 @@ def test_over_fill_case_1(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         # buy fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
         time.sleep(2)  # delay for order to get placed
 
         ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -1849,8 +1849,8 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
     """
     Test case when order_snapshot is in OE_FILLED and fill is triggered to make it over_filled
     """
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     created_pair_strat, executor_http_client = (
@@ -1866,7 +1866,7 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 100
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 1mobile_bookmobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1875,7 +1875,7 @@ def test_over_fill_case_2(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         # buy fills check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
         time.sleep(5)  # delay for order to get placed
 
         ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -1959,8 +1959,8 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        # explicitly setting waived_min_orders to 1mobile_book for this test case
+        expected_strat_limits_.cancel_rate.waived_min_orders = 1mobile_book
         created_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
@@ -1974,7 +1974,7 @@ def test_ack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
                 config_dict["symbol_configs"][symbol]["simulate_ack_to_reject_orders"] = True
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -2007,8 +2007,8 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        # explicitly setting waived_min_orders to 1mobile_book for this test case
+        expected_strat_limits_.cancel_rate.waived_min_orders = 1mobile_book
         created_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
@@ -2022,7 +2022,7 @@ def test_unack_to_rej_orders(static_data_, clean_and_set_limits, leg1_leg2_symbo
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
                 config_dict["symbol_configs"][symbol]["simulate_new_to_reject_orders"] = True
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -2071,7 +2071,7 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_ack_to_cxl_rej_orders"] = True
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
@@ -2080,17 +2080,17 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 continues_order_count, continues_special_order_count = get_continuous_order_configs(check_symbol,
                                                                                                     config_dict)
-                order_count = 0
-                special_order_count = 0
+                order_count = mobile_book
+                special_order_count = mobile_book
                 last_cxl_order_id = None
                 last_cxl_rej_order_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
                     if check_symbol == leg1_symbol:
-                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0])
+                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[mobile_book])
                     else:
                         run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1])
-                    time.sleep(10)  # delay for order to get placed and trigger cxl
+                    time.sleep(1mobile_book)  # delay for order to get placed and trigger cxl
 
                     if order_count < continues_order_count:
                         check_order_event = OrderEventType.OE_CXL_ACK
@@ -2102,7 +2102,7 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
                         else:
                             check_order_event = OrderEventType.OE_CXL_ACK
                             order_count = 1
-                            special_order_count = 0
+                            special_order_count = mobile_book
 
                     # internally contains assert statements
                     last_cxl_order_id, last_cxl_rej_order_id = verify_cxl_rej(last_cxl_order_id, last_cxl_rej_order_id,
@@ -2148,7 +2148,7 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_new_to_cxl_rej_orders"] = True
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
 
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -2158,17 +2158,17 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 continues_order_count, continues_special_order_count = get_continuous_order_configs(check_symbol,
                                                                                                     config_dict)
-                order_count = 0
-                special_order_count = 0
+                order_count = mobile_book
+                special_order_count = mobile_book
                 last_cxl_order_id = None
                 last_cxl_rej_order_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
                     if check_symbol == leg1_symbol:
-                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0])
+                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[mobile_book])
                     else:
                         run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1])
-                    time.sleep(10)  # delay for order to get placed and trigger cxl
+                    time.sleep(1mobile_book)  # delay for order to get placed and trigger cxl
 
                     if order_count < continues_order_count:
                         check_order_event = OrderEventType.OE_CXL_ACK
@@ -2180,7 +2180,7 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
                         else:
                             check_order_event = OrderEventType.OE_CXL_ACK
                             order_count = 1
-                            special_order_count = 0
+                            special_order_count = mobile_book
 
                     # internally contains assert statements
                     last_cxl_order_id, last_cxl_rej_order_id = verify_cxl_rej(last_cxl_order_id, last_cxl_rej_order_id,
@@ -2225,7 +2225,7 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
                 config_dict["symbol_configs"][symbol]["force_fully_fill"] = True
                 config_dict["symbol_configs"][symbol]["simulate_ack_to_cxl_rej_orders"] = True
 
@@ -2237,25 +2237,25 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 continues_order_count, continues_special_order_count = get_continuous_order_configs(check_symbol,
                                                                                                     config_dict)
-                order_count = 0
-                special_order_count = 0
+                order_count = mobile_book
+                special_order_count = mobile_book
                 last_cxl_order_id = None
                 last_cxl_rej_order_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
                     if check_symbol == leg1_symbol:
-                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0],
+                        run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[mobile_book],
                                             avoid_order_trigger=True)
-                        px = 100
-                        qty = 90
+                        px = 1mobile_bookmobile_book
+                        qty = 9mobile_book
                         place_new_order(leg1_symbol, Side.BUY, px, qty, executor_http_client)
                     else:
                         run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1],
                                              avoid_order_trigger=True)
-                        px = 110
-                        qty = 70
+                        px = 11mobile_book
+                        qty = 7mobile_book
                         place_new_order(leg2_symbol, Side.SELL, px, qty, executor_http_client)
-                    time.sleep(10)  # delay for order to get placed and trigger cxl
+                    time.sleep(1mobile_book)  # delay for order to get placed and trigger cxl
 
                     if order_count < continues_order_count:
                         check_order_event = OrderEventType.OE_CXL_ACK
@@ -2267,7 +2267,7 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
                         else:
                             check_order_event = OrderEventType.OE_CXL_ACK
                             order_count = 1
-                            special_order_count = 0
+                            special_order_count = mobile_book
 
                     # internally contains assert statements
                     if check_order_event == "REJ":
@@ -2310,8 +2310,8 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
         refresh_sec_update_fixture):
     # creating strat
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     max_loop_count_per_side = 2
     residual_wait_sec = 4 * refresh_sec_update_fixture
     created_pair_strat, executor_http_client = (
@@ -2328,7 +2328,7 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
             config_dict["symbol_configs"][symbol]["avoid_cxl_ack_after_cxl_req"] = True
 
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
@@ -2337,7 +2337,7 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         executor_http_client.trade_simulator_reload_config_query_client()
 
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
 
         cxl_req_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_CXL,
                                                                                buy_symbol, executor_http_client)
@@ -2362,8 +2362,8 @@ def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_
                                        expected_strat_status_, sample_alert, symbol_overview_obj_list,
                                        top_of_book_list_, market_depth_basemodel_list):
     # creating strat
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     total_loop_count = 5
     active_pair_strat, executor_http_client = create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_,
                                                                       expected_strat_limits_, expected_strat_status_,
@@ -2472,15 +2472,15 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
                 f"received {len(underlying_account_cumulative_fill_qty_obj_list)}, received list " \
                 f"{underlying_account_cumulative_fill_qty_obj_list}"
             assert len(
-                underlying_account_cumulative_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty) == 2, \
+                underlying_account_cumulative_fill_qty_obj_list[mobile_book].underlying_account_n_cumulative_fill_qty) == 2, \
                 "length of list field underlying_account_n_cumulative_fill_qty of " \
                 "underlying_account_cumulative_fill_qty_obj mismatched, expected 2 received " \
-                f"{len(underlying_account_cumulative_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty)}"
+                f"{len(underlying_account_cumulative_fill_qty_obj_list[mobile_book].underlying_account_n_cumulative_fill_qty)}"
 
             underlying_account_count = 2
             for loop_count in range(underlying_account_count):
                 underlying_account_n_cum_fill_qty_obj = \
-                    underlying_account_cumulative_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty[
+                    underlying_account_cumulative_fill_qty_obj_list[mobile_book].underlying_account_n_cumulative_fill_qty[
                         loop_count]
                 assert underlying_account_n_cum_fill_qty_obj.underlying_account == \
                        f"{underlying_account_prefix}_{underlying_account_count - loop_count}", \
@@ -2498,12 +2498,12 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
                                   expected_strat_status_, symbol_overview_obj_list,
                                   last_trade_fixture_list, market_depth_basemodel_list,
                                   top_of_book_list_, buy_fill_journal_, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     total_order_count_for_each_side = 5
     expected_strat_limits_ = copy.deepcopy(expected_strat_limits_)
-    expected_strat_limits_.residual_restriction.max_residual = 105000
-    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.residual_restriction.max_residual = 1mobile_book5mobile_bookmobile_bookmobile_book
+    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -2520,7 +2520,7 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -2532,7 +2532,7 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
         order_qty_list = []
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
 
             ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client,
@@ -2547,7 +2547,7 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
 
         order_create_time_list.reverse()
         order_qty_list.reverse()
-        last_n_sec_qty = 0
+        last_n_sec_qty = mobile_book
         for loop_count in range(total_order_count_for_each_side):
             delta = DateTime.utcnow() - order_create_time_list[loop_count]
             last_n_sec = int(math.ceil(delta.total_seconds())) + 1
@@ -2572,7 +2572,7 @@ def test_last_n_sec_order_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
             assert len(executor_check_snapshot_obj) == 1, \
                 f"Received unexpected length of list of executor_check_snapshot_obj from query," \
                 f"expected one obj received {len(executor_check_snapshot_obj)}"
-            assert executor_check_snapshot_obj[0].last_n_sec_order_qty == last_n_sec_qty, \
+            assert executor_check_snapshot_obj[mobile_book].last_n_sec_order_qty == last_n_sec_qty, \
                 f"Order qty mismatched for last {last_n_sec} " \
                 f"secs of {buy_symbol} from {call_date_time} for side {Side.BUY}"
     except AssertionError as e:
@@ -2599,8 +2599,8 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        # explicitly setting waived_min_orders to 1mobile_book for this test case
+        expected_strat_limits_.cancel_rate.waived_min_orders = 1mobile_book
         active_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -2614,7 +2614,7 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
                 config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -2647,8 +2647,8 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        # explicitly setting waived_min_orders to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_min_orders = 10
+        # explicitly setting waived_min_orders to 1mobile_book for this test case
+        expected_strat_limits_.cancel_rate.waived_min_orders = 1mobile_book
         active_pair_strat, executor_http_client = (
             create_pre_order_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
                                                expected_strat_status_, symbol_overview_obj_list,
@@ -2663,7 +2663,7 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+                config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
                 config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_orders"] = True
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -2792,7 +2792,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             # updating yaml_configs according to this test
             for symbol in config_dict["symbol_configs"]:
                 config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-                config_dict["symbol_configs"][symbol]["ack_percent"] = 50
+                config_dict["symbol_configs"][symbol]["ack_percent"] = 5mobile_book
             YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
             # updating simulator's configs
@@ -2803,10 +2803,10 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             acked_order_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
                 run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[0],
+                run_buy_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[mobile_book],
                                     avoid_order_trigger=True)
-                px = 100
-                qty = 90
+                px = 1mobile_bookmobile_book
+                qty = 9mobile_book
                 place_new_order(leg1_symbol, Side.BUY, px, qty, executor_http_client)
                 time.sleep(2)  # delay for order to get placed
 
@@ -2830,8 +2830,8 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                 run_last_trade(leg1_symbol, leg2_symbol, last_trade_fixture_list, executor_http_client)
                 run_sell_top_of_book(leg1_symbol, leg2_symbol, executor_http_client, top_of_book_list_[1],
                                      avoid_order_trigger=True)
-                px = 110
-                qty = 70
+                px = 11mobile_book
+                qty = 7mobile_book
                 place_new_order(leg2_symbol, Side.SELL, px, qty, executor_http_client)
                 time.sleep(2)
 
@@ -2862,8 +2862,8 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
                                expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
                                last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
                                refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
@@ -2874,16 +2874,16 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
     residual_qty = 5
 
     # creating tobs
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], avoid_order_trigger=True)
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book], avoid_order_trigger=True)
 
     # Since both side have same last trade px in test cases
-    buy_last_trade_px = top_of_book_list_[0].get("last_trade").get("px")
+    buy_last_trade_px = top_of_book_list_[mobile_book].get("last_trade").get("px")
     sell_last_trade_px = top_of_book_list_[1].get("last_trade").get("px")
 
-    buy_residual_qty = 0
-    sell_residual_qty = 0
-    buy_residual_notional = 0
-    sell_residual_notional = 0
+    buy_residual_qty = mobile_book
+    sell_residual_qty = mobile_book
+    buy_residual_notional = mobile_book
+    sell_residual_notional = mobile_book
     for loop_count in range(total_loop_count):
         # buy side
         executor_http_client.update_residuals_query_client(buy_symbol, Side.BUY, residual_qty)
@@ -2892,7 +2892,7 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
         strat_brief_list = executor_http_client.get_all_strat_brief_client()
 
         # since only one strat is created in this test
-        strat_brief = strat_brief_list[0]
+        strat_brief = strat_brief_list[mobile_book]
 
         buy_residual_notional = buy_residual_qty * get_px_in_usd(buy_last_trade_px)
         residual_notional = abs(buy_residual_notional - sell_residual_notional)
@@ -2910,7 +2910,7 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
         strat_brief_list = executor_http_client.get_all_strat_brief_client()
 
         # since only one strat is created in this test
-        strat_brief = strat_brief_list[0]
+        strat_brief = strat_brief_list[mobile_book]
 
         sell_residual_notional = sell_residual_qty * get_px_in_usd(sell_last_trade_px)
         residual_notional = abs(buy_residual_notional - sell_residual_notional)
@@ -2928,8 +2928,8 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
                                   last_trade_fixture_list, market_depth_basemodel_list,
                                   top_of_book_list_, buy_order_, sell_order_,
                                   max_loop_count_per_side, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -2947,7 +2947,7 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["simulate_new_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_order_count"] = mobile_book
             config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -2957,7 +2957,7 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         # buy test
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
         loop_count = 1
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
 
         latest_unack_obj = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, buy_symbol,
                                                                           executor_http_client)
@@ -2979,7 +2979,7 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         executor_config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(executor_config_file_path)
 
         if executor_config_dict.get("pause_fulfill_post_order_dod"):
-            assert order_snapshot.filled_qty == 0, f"Mismatch order_snapshot.filled_qty, expected 0, " \
+            assert order_snapshot.filled_qty == mobile_book, f"Mismatch order_snapshot.filled_qty, expected mobile_book, " \
                                                    f"received {order_snapshot.filled_qty}"
             assert order_snapshot.cxled_qty == order_snapshot.order_brief.qty, \
                 f"Mismatch order_snapshot.cxled_qty: expected {order_snapshot.order_brief.qty}, received " \
@@ -2991,8 +2991,8 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
             assert order_snapshot.filled_qty == order_snapshot.order_brief.qty, \
                 (f"Mismatch order_snapshot.filled_qty, expected {order_snapshot.order_brief.qty}, "
                  f"received {order_snapshot.filled_qty}")
-            assert order_snapshot.cxled_qty == 0, \
-                f"Mismatch order_snapshot.cxled_qty: expected 0, received {order_snapshot.cxled_qty}"
+            assert order_snapshot.cxled_qty == mobile_book, \
+                f"Mismatch order_snapshot.cxled_qty: expected mobile_book, received {order_snapshot.cxled_qty}"
             assert order_snapshot.order_status == OrderStatusType.OE_FILLED, \
                 f"Mismatch order_snapshot.order_status: expected OrderStatusType.OE_FILLED, " \
                 f"received {order_snapshot.order_status}"
@@ -3051,7 +3051,7 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
                                                  top_of_book_list_, buy_order_, sell_order_,
                                                  refresh_sec_update_fixture):
 
-    expected_strat_limits_.residual_restriction.max_residual = 0
+    expected_strat_limits_.residual_restriction.max_residual = mobile_book
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -3069,18 +3069,18 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
         executor_http_client.trade_simulator_reload_config_query_client()
 
-        residual_qty = 10
+        residual_qty = 1mobile_book
         executor_http_client.update_residuals_query_client(buy_symbol, Side.BUY, residual_qty)
 
         # placing new non-systematic new_order
-        px = 100
-        qty = 90
+        px = 1mobile_bookmobile_book
+        qty = 9mobile_book
         check_str = "residual notional: .* > max residual"
         assert_fail_message = "Could not find any alert containing message to block orders " \
                               "due to residual notional breach"
@@ -3124,11 +3124,11 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, c
                                                                  last_trade_fixture_list, market_depth_basemodel_list,
                                                                  top_of_book_list_, buy_order_, sell_order_,
                                                                  refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
+    # explicitly setting waived_min_orders to 1mobile_book for this test case
+    expected_strat_limits_.cancel_rate.waived_min_orders = mobile_book
     expected_strat_limits_.cancel_rate.max_cancel_rate = 1
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -3147,7 +3147,7 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_without_fill(static_data_, c
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_order_count"] = mobile_book
             config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -3176,11 +3176,11 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
                                                                   last_trade_fixture_list, market_depth_basemodel_list,
                                                                   top_of_book_list_, buy_order_, sell_order_,
                                                                   refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
+    # explicitly setting waived_min_orders to mobile_book for this test case
+    expected_strat_limits_.cancel_rate.waived_min_orders = mobile_book
     expected_strat_limits_.cancel_rate.max_cancel_rate = 1
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -3188,7 +3188,8 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           market_depth_basemodel_list, top_of_book_list_, leg1_side=Side.SELL,
+                                           leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -3199,7 +3200,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_order_count"] = mobile_book
             config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -3208,7 +3209,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_without_fill(static_data_, 
 
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(
             buy_symbol, sell_symbol, active_pair_strat.id, last_trade_fixture_list,
-            top_of_book_list_, Side.SELL, executor_http_client)
+            top_of_book_list_, Side.SELL, executor_http_client, leg1_side=Side.SELL, leg2_side=Side.BUY)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -3227,11 +3228,11 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clea
                                                               last_trade_fixture_list, market_depth_basemodel_list,
                                                               top_of_book_list_, buy_order_, sell_order_,
                                                               refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
+    # explicitly setting waived_min_orders to 1mobile_book for this test case
+    expected_strat_limits_.cancel_rate.waived_min_orders = mobile_book
     expected_strat_limits_.cancel_rate.max_cancel_rate = 19
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -3249,7 +3250,7 @@ def test_strat_pause_on_less_buy_consumable_cxl_qty_with_fill(static_data_, clea
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 80
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 8mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -3277,18 +3278,19 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, cle
                                                                last_trade_fixture_list, market_depth_basemodel_list,
                                                                top_of_book_list_, buy_order_, sell_order_,
                                                                refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 0
+    # explicitly setting waived_min_orders to 1mobile_book for this test case
+    expected_strat_limits_.cancel_rate.waived_min_orders = mobile_book
     expected_strat_limits_.cancel_rate.max_cancel_rate = 19
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
-                                           market_depth_basemodel_list, top_of_book_list_))
+                                           market_depth_basemodel_list, top_of_book_list_, leg1_side=Side.SELL,
+                                           leg2_side=Side.BUY))
 
     config_file_path = STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -3298,7 +3300,7 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, cle
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 80
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 8mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -3306,7 +3308,8 @@ def test_strat_pause_on_less_sell_consumable_cxl_qty_with_fill(static_data_, cle
 
         handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
             buy_symbol, sell_symbol, active_pair_strat.id, last_trade_fixture_list,
-            top_of_book_list_, Side.SELL, executor_http_client)
+            top_of_book_list_, Side.SELL, executor_http_client, leg1_side=Side.SELL,
+            leg2_side=Side.BUY)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -3328,8 +3331,8 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
 
     sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
            Severity.Severity_INFO, Severity.Severity_DEBUG]
-    counter = 0
-    for i in range(10):
+    counter = mobile_book
+    for i in range(1mobile_book):
         alert = copy.deepcopy(sample_alert)
         alert.id = f"obj_{i}"
         alert.last_update_date_time = DateTime.utcnow()
@@ -3337,7 +3340,7 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
         alert.severity = sev[counter]
         counter += 1
         if counter > 4:
-            counter = 0
+            counter = mobile_book
 
         alert_list.append(alert)
         portfolio_alert_basemodel = PortfolioAlertBaseModel(_id=1, alerts=[alert])
@@ -3361,7 +3364,7 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
     for alert in alert_list:
         alert.last_update_date_time = \
             alert.last_update_date_time.replace(microsecond=
-                                                int(str(alert.last_update_date_time.microsecond)[:3] + "000"))
+                                                int(str(alert.last_update_date_time.microsecond)[:3] + "mobile_bookmobile_bookmobile_book"))
 
     for sorted_alert, expected_alert in zip(agg_sorted_alerts, sorted_alert_list):
         assert sorted_alert.id == expected_alert.id, \
@@ -3373,7 +3376,7 @@ def test_alert_agg_sequence(clean_and_set_limits, sample_alert):
 def test_alert_id(clean_and_set_limits, sample_alert):
     alert_list = []
 
-    for i in range(1000):
+    for i in range(1mobile_bookmobile_bookmobile_book):
         alert = copy.deepcopy(sample_alert)
         alert.id = f"obj_{i}"
         alert.last_update_date_time = DateTime.utcnow()
@@ -3390,7 +3393,7 @@ def test_alert_id(clean_and_set_limits, sample_alert):
     # for alert in alert_list:
     #     alert.last_update_date_time = \
     #         alert.last_update_date_time.replace(microsecond=
-    #                                             int(str(alert.last_update_date_time.microsecond)[:3] + "000"))
+    #                                             int(str(alert.last_update_date_time.microsecond)[:3] + "mobile_bookmobile_bookmobile_book"))
     # for sorted_alert, expected_alert in zip(agg_sorted_alerts, list(reversed(sorted_alert_list))):
     #     assert sorted_alert.id == expected_alert.id, \
     #         f"Alert ID mismatch: expected Alert {expected_alert.id}, received {sorted_alert.id}"
@@ -3432,13 +3435,13 @@ def test_alert_id(clean_and_set_limits, sample_alert):
 #         if latest_file is None:
 #             latest_file = file
 #         else:
-#             latest_file_name = latest_file.split(".")[0]
+#             latest_file_name = latest_file.split(".")[mobile_book]
 #             latest_file_date_time = pendulum.from_format(
 #                 latest_file_name[len(latest_file_name)-len(latest_file_date_time_format):],
 #                 fmt=latest_file_date_time_format
 #             )
 #
-#             current_file_name = file.split(".")[0]
+#             current_file_name = file.split(".")[mobile_book]
 #             current_file_date_time = pendulum.from_format(
 #                 current_file_name[len(current_file_name) - len(latest_file_date_time_format):],
 #                 fmt=latest_file_date_time_format
@@ -3543,13 +3546,13 @@ def test_alert_id(clean_and_set_limits, sample_alert):
 #         received_container_obj_list: List[BarDataProjectionContainerForVwap]
 #
 #         # when no start and end time
-#         for start_time, end_time in [(None, None), (created_objs[0].start_time, None),
+#         for start_time, end_time in [(None, None), (created_objs[mobile_book].start_time, None),
 #                                      (None, created_objs[-1].start_time),
-#                                      (created_objs[0].start_time, created_objs[-1].start_time)]:
+#                                      (created_objs[mobile_book].start_time, created_objs[-1].start_time)]:
 #             received_container_obj_list = (
 #                 market_data_web_client.get_vwap_projection_from_bar_data_query_client(symbol, exch_id,
 #                                                                                       start_time, end_time))
-#             container_obj = received_container_obj_list[0]
+#             container_obj = received_container_obj_list[mobile_book]
 #
 #             # meta data field
 #             assert container_obj.symbol_n_exch_id.symbol == symbol, \
@@ -3622,9 +3625,9 @@ def test_get_market_depths_query(
             ask_pos_to_market_depth_dict[market_depth_.position] = market_depth_
 
     for market_depth_dict in [bid_pos_to_market_depth_dict, ask_pos_to_market_depth_dict]:
-        cum_qty = 0
-        cum_notional = 0
-        cum_avg_px = 0
+        cum_qty = mobile_book
+        cum_notional = mobile_book
+        cum_avg_px = mobile_book
         for pos, market_depth_ in market_depth_dict.items():
             cum_qty += market_depth_.qty
             market_depth_.cumulative_qty = cum_qty
@@ -3686,8 +3689,8 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
                                  buy_order_, sell_order_, max_loop_count_per_side,
                                  buy_fill_journal_, sell_fill_journal_, expected_strat_brief_,
                                  refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -3704,7 +3707,7 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
             config_dict["symbol_configs"][symbol]["avoid_cxl_ack_after_cxl_req"] = True
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -3714,16 +3717,16 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
             # Placing buy orders
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
             if symbol == buy_symbol:
-                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
+                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book],
                                     avoid_order_trigger=True)
-                px = 100
-                qty = 90
+                px = 1mobile_bookmobile_book
+                qty = 9mobile_book
                 place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
             else:
                 run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1],
                                      avoid_order_trigger=True)
-                px = 110
-                qty = 70
+                px = 11mobile_book
+                qty = 7mobile_book
                 place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
 
             ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK,
@@ -3778,13 +3781,13 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                                      buy_fill_journal_, sell_fill_journal_,
                                      expected_strat_brief_, refresh_sec_update_fixture):
     # updating fixture values for this test-case
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     leg1_last_trade_px, leg2_last_trade_px = get_both_leg_last_trade_px()
 
-    # explicitly setting waived_min_orders to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 10
+    # explicitly setting waived_min_orders to 1mobile_book for this test case
+    expected_strat_limits_.cancel_rate.waived_min_orders = 1mobile_book
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     active_pair_strat, executor_http_client = (
@@ -3800,9 +3803,9 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
             config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
+            config_dict["symbol_configs"][symbol]["continues_order_count"] = mobile_book
             config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1  # all orders - unsol_cxl
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -3814,14 +3817,14 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
             print(f"Checking symbol: {symbol}")
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
             if symbol == buy_symbol:
-                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
+                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
             else:
                 run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1])
             time.sleep(2)  # delay for order to get placed
 
             latest_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_UNSOL_CXL,
                                                                                   symbol, executor_http_client)
-            order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-100)
+            order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-1mobile_bookmobile_book)
             for order_snapshot in order_snapshot_list:
                 if order_snapshot.order_brief.order_id == latest_order_journal.order.order_id:
                     order_snapshot_before_fill = order_snapshot
@@ -3848,7 +3851,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                 ("Unexpected: This test created single strat so expected single strat_brief in "
                  f"strat_brief_list , received length: {len(strat_brief_list)}, "
                  f"strat_brief_list: {strat_brief_list}")
-            strat_brief_before_fill = strat_brief_list[0]
+            strat_brief_before_fill = strat_brief_list[mobile_book]
 
             strat_status_before_fill = executor_http_client.get_strat_status_client(active_pair_strat.id)
 
@@ -3860,7 +3863,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
             else:
                 fill_journal_obj = copy.deepcopy(sell_fill_journal_)
 
-            fill_journal_obj.fill_qty = 20
+            fill_journal_obj.fill_qty = 2mobile_book
             if symbol == buy_symbol:
                 executor_http_client.trade_simulator_process_fill_query_client(
                     latest_order_journal.order.order_id, fill_journal_obj.fill_px, fill_journal_obj.fill_qty,
@@ -3873,10 +3876,10 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
             placed_fill_journal_obj = get_latest_fill_journal_from_order_id(latest_order_journal.order.order_id,
                                                                             executor_http_client)
             # OrderSnapshot check
-            order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-100)
+            order_snapshot_list = executor_http_client.get_all_order_snapshot_client(-1mobile_bookmobile_book)
             for order_snapshot in order_snapshot_list:
                 if order_snapshot.order_brief.order_id == placed_fill_journal_obj.order_id:
-                    order_snapshot_after_fill = order_snapshot_list[0]
+                    order_snapshot_after_fill = order_snapshot_list[mobile_book]
                     break
             else:
                 assert False, \
@@ -3948,7 +3951,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                 ("Unexpected: This test created single strat so expected single strat_brief in "
                  f"strat_brief_list , received length: {len(strat_brief_list)}, "
                  f"strat_brief_list: {strat_brief_list}")
-            strat_brief_after_fill = strat_brief_list[0]
+            strat_brief_after_fill = strat_brief_list[mobile_book]
 
             if symbol == buy_symbol:
                 for symbol_side_snapshot in symbol_side_snapshot_list:
@@ -3988,7 +3991,7 @@ def test_fills_after_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_le
                 expected_strat_brief_.pair_buy_side_trading_brief.indicative_consumable_residual = \
                     expected_strat_limits_.residual_restriction.max_residual - \
                     ((expected_strat_brief_.pair_buy_side_trading_brief.residual_qty *
-                      get_px_in_usd(buy_last_trade_px)) - (0 * get_px_in_usd(sell_last_trade_px)))
+                      get_px_in_usd(buy_last_trade_px)) - (mobile_book * get_px_in_usd(sell_last_trade_px)))
                 expected_strat_brief_.pair_buy_side_trading_brief.consumable_open_orders = 5
                 assert expected_strat_brief_ == strat_brief_after_fill, \
                     f"Unexpected: Mismatched strat_brief, expected {expected_strat_brief_}, received {strat_brief_list}"
@@ -4177,8 +4180,8 @@ def test_unload_reload_strat_from_collection(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
         top_of_book_list_, last_trade_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -4195,7 +4198,7 @@ def test_unload_reload_strat_from_collection(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         executor_web_client.trade_simulator_reload_config_query_client()
@@ -4277,13 +4280,13 @@ def test_unload_reload_strat_from_collection(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         executor_http_client.trade_simulator_reload_config_query_client()
 
         # To update tob without triggering any order
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], avoid_order_trigger=True)
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book], avoid_order_trigger=True)
 
         total_order_count_for_each_side = 2
         place_sanity_orders_for_executor(
@@ -4306,8 +4309,8 @@ def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_buy(
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
         expected_order_limits_, refresh_sec_update_fixture):
-    leg1_symbol = leg1_leg2_symbol_list[0][0]
-    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    leg2_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_http_client = (
@@ -4341,8 +4344,8 @@ def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_sell(
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
         expected_order_limits_, refresh_sec_update_fixture):
-    leg1_symbol = leg1_leg2_symbol_list[0][0]
-    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    leg2_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     created_pair_strat, executor_http_client = (
@@ -4378,15 +4381,15 @@ def test_sequenced_fully_consume_same_symbol_strats(
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side,
         expected_order_limits_, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     # updating order_limits
-    expected_order_limits_.min_order_notional = 15000
+    expected_order_limits_.min_order_notional = 15mobile_bookmobile_bookmobile_book
     expected_order_limits_.id = 1
     strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
-    expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 18mobile_bookmobile_bookmobile_book
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
@@ -4404,15 +4407,15 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
         refresh_sec_update_fixture):
-    leg1_symbol = leg1_leg2_symbol_list[0][0]
-    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    leg2_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     # updating order_limits
-    expected_order_limits_.min_order_notional = 15000
+    expected_order_limits_.min_order_notional = 15mobile_bookmobile_bookmobile_book
     expected_order_limits_.id = 1
     strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
-    expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 18mobile_bookmobile_bookmobile_book
     strat_done_after_exhausted_consumable_notional(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
@@ -4440,15 +4443,15 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
         refresh_sec_update_fixture):
-    leg1_symbol = leg1_leg2_symbol_list[0][0]
-    leg2_symbol = leg1_leg2_symbol_list[0][1]
+    leg1_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    leg2_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     # updating order_limits
-    expected_order_limits_.min_order_notional = 15000
+    expected_order_limits_.min_order_notional = 15mobile_bookmobile_bookmobile_book
     expected_order_limits_.id = 1
     strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
-    expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 18mobile_bookmobile_bookmobile_book
     strat_done_after_exhausted_consumable_notional(
         leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
@@ -4476,21 +4479,21 @@ def test_sequenced_fully_consume_diff_symbol_strats(
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, max_loop_count_per_side, expected_order_limits_,
         refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
 
     # updating order_limits
-    expected_order_limits_.min_order_notional = 15000
+    expected_order_limits_.min_order_notional = 15mobile_bookmobile_bookmobile_book
     expected_order_limits_.id = 1
     strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
-    expected_strat_limits_.max_single_leg_notional = 18000
+    expected_strat_limits_.max_single_leg_notional = 18mobile_bookmobile_bookmobile_book
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
         symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list, top_of_book_list_,
         refresh_sec_update_fixture, Side.BUY)
 
-    buy_symbol = leg1_leg2_symbol_list[1][0]
+    buy_symbol = leg1_leg2_symbol_list[1][mobile_book]
     sell_symbol = leg1_leg2_symbol_list[1][1]
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
@@ -4505,8 +4508,8 @@ def test_reactivate_after_pause_strat(
         top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
         refresh_sec_update_fixture):
     # creates and activates multiple pair_strats
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -4523,7 +4526,7 @@ def test_reactivate_after_pause_strat(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         executor_http_client.trade_simulator_reload_config_query_client()
@@ -4559,8 +4562,8 @@ def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2
                                    top_of_book_list_, market_depth_basemodel_list, last_trade_fixture_list,
                                    refresh_sec_update_fixture):
     # making limits suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
+    expected_strat_limits_.residual_restriction.max_residual = 1mobile_book5mobile_bookmobile_bookmobile_book
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -4636,9 +4639,9 @@ def _frequent_update_strat_view_in_strat(buy_symbol, sell_symbol, pair_strat_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
                                            market_depth_basemodel_list, top_of_book_list_))
 
-    loop_count = 2000
+    loop_count = 2mobile_bookmobile_bookmobile_book
     for i in range(loop_count):
-        if i % 2 == 0:
+        if i % 2 == mobile_book:
             strat_view_obj = StratViewBaseModel(_id=created_pair_strat.id, market_premium=i)
         else:
             strat_view_obj = StratViewBaseModel(_id=created_pair_strat.id, balance_notional=i)

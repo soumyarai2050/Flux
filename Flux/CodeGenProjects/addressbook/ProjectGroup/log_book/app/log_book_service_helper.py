@@ -1,8 +1,8 @@
 import datetime
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
     LogBookServiceHttpClient)
 
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent
@@ -48,21 +48,74 @@ def is_log_book_service_up(ignore_error: bool = False) -> bool:
         return False
 
 
+def get_pattern_to_restart_tail_process():
+    pattern = config_yaml_dict.get("pattern_to_restart_tail_process")
+    if pattern is None:
+        pattern = "---"
+    return pattern
+
+
 def log_pattern_to_restart_tail_process(log_file_name: str, restart_time: str | None = None):
-    log_str = f"---{log_file_name}"
+    pattern = get_pattern_to_restart_tail_process()
+    field_sep = get_field_seperator_pattern()
+    log_str = f"{pattern}{log_file_name}"
     if restart_time is not None:
-        log_str += f"~~{restart_time}"
+        log_str += f"{field_sep}{restart_time}"
     logger = logging.getLogger("log_book_cmd_log")
     logger.info(log_str)
+
+
+def get_pattern_to_force_kill_tail_process():
+    pattern = config_yaml_dict.get("pattern_to_force_kill_tail_process")
+    if pattern is None:
+        pattern = "-@-"
+    return pattern
 
 
 def log_pattern_to_force_kill_tail_process(log_file_name: str):
-    log_str = f"-@-{log_file_name}"
+    pattern = get_pattern_to_force_kill_tail_process()
+    log_str = f"{pattern}{log_file_name}"
     logger = logging.getLogger("log_book_cmd_log")
     logger.info(log_str)
+
+
+def get_pattern_to_remove_file_from_created_cache():
+    pattern = config_yaml_dict.get("pattern_to_remove_file_from_created_cache")
+    if pattern is None:
+        pattern = "-*-"
+    return pattern
 
 
 def log_pattern_to_remove_file_from_created_cache(log_file_name: str):
-    log_str = f"-*-{log_file_name}"
+    pattern = get_pattern_to_remove_file_from_created_cache()
+    log_str = f"{pattern}{log_file_name}"
     logger = logging.getLogger("log_book_cmd_log")
     logger.info(log_str)
+
+
+def get_pattern_for_pair_strat_db_updates():
+    pattern = config_yaml_dict.get("pattern_for_pair_strat_db_updates")
+    if pattern is None:
+        pattern = "^^^"
+    return pattern
+
+
+def get_pattern_for_log_simulator():
+    pattern = config_yaml_dict.get("pattern_for_log_simulator")
+    if pattern is None:
+        pattern = "$$$"
+    return pattern
+
+
+def get_field_seperator_pattern():
+    pattern = config_yaml_dict.get("field_seperator")
+    if pattern is None:
+        pattern = "~~"
+    return pattern
+
+
+def get_key_val_seperator_pattern():
+    pattern = config_yaml_dict.get("key_val_seperator")
+    if pattern is None:
+        pattern = "^^"
+    return pattern

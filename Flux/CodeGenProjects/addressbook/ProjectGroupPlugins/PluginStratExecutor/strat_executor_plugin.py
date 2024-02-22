@@ -141,7 +141,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += f"\t\t\t{message_name_snake_cased}_tuple = " \
                        f"self.trading_cache.get_{message_name_snake_cased}()\n"
         content_str += f"\t\t\tif {message_name_snake_cased}_tuple is None or " \
-                       f"{message_name_snake_cased}_tuple[0] is None:\n"
+                       f"{message_name_snake_cased}_tuple[mobile_book] is None:\n"
         content_str += f"\t\t\t\tself.trading_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += "\t\t\t\tkwargs = {'"+f"{message_name_snake_cased}_"+"': "+f"{message_name_snake_cased}_"+"}\n"
         content_str += f"\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
@@ -217,7 +217,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         key_handler_class_name = convert_to_capitalized_camel_case(self.key_handler_file_name)
         content_str += \
             f"from {key_handler_import_path} import {key_handler_class_name}\n"
-        file_name = str(file.proto.name).split(".")[0]
+        file_name = str(file.proto.name).split(".")[mobile_book]
         ws_client_file_name = f"{self.beanie_fastapi_model_dir_name}.{file_name}_ws_client"
         ws_client_import_path = self.import_path_from_os_path("OUTPUT_DIR",
                                                               f"{ws_client_file_name}")
@@ -228,9 +228,9 @@ class StratExecutorPlugin(BaseProtoPlugin):
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         content_str += f'from {model_file_path} import *\n\n\n'
 
-        file_name = str(file.proto.name).split(".")[0]
+        file_name = str(file.proto.name).split(".")[mobile_book]
         file_name_camel_cased = convert_to_capitalized_camel_case(file_name)
-        file_name_camel_cased = file_name_camel_cased[0].upper() + file_name_camel_cased[1:]
+        file_name_camel_cased = file_name_camel_cased[mobile_book].upper() + file_name_camel_cased[1:]
         content_str += f"class {file_name_camel_cased}DataManager({file_name_camel_cased}WSClient):\n"
         content_str += f"\tdef __init__(self, host: str, port: int, strat_cache: {self.base_strat_cache_class_name}):\n"
         content_str += f"\t\tsuper().__init__(host, port)\n"
@@ -266,15 +266,15 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str = f"\t\t{key_str}: str | None = None\n"
         output_str += "\t\tif "
         for key_seq in key_seq_list:
-            if key_seq[0] != "'" and key_seq[-1] != "'":
-                if key_seq != key_seq_list[0]:
+            if key_seq[mobile_book] != "'" and key_seq[-1] != "'":
+                if key_seq != key_seq_list[mobile_book]:
                     output_str += " and "
                 output_str += f"{message_name_snake_cased}.{key_seq} is not None"
             if key_seq == key_seq_list[-1]:
                 output_str += ":\n"
         output_str += f"\t\t\t{key_str} = "
         for key_seq in key_seq_list:
-            if key_seq[0] != "'" and key_seq[-1] != "'":
+            if key_seq[mobile_book] != "'" and key_seq[-1] != "'":
                 output_str += "f'{"+f"{message_name_snake_cased}.{key_seq}"+"}'"
             else:
                 output_str += f"{key_seq}"
@@ -407,7 +407,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str += "from typing import Dict, Tuple, Optional, ClassVar, List\n"
         output_str += "from pendulum import DateTime\n\n"
         output_str += "# project imports\n"
-        file_name = str(file.proto.name).split(".")[0]
+        file_name = str(file.proto.name).split(".")[mobile_book]
         model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
@@ -520,7 +520,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str += "from typing import Tuple, List\n"
         output_str += "from pendulum import DateTime\n\n"
         output_str += "# project imports\n"
-        file_name = str(file.proto.name).split(".")[0]
+        file_name = str(file.proto.name).split(".")[mobile_book]
         model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
@@ -567,7 +567,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str = "# python standard imports\n"
         output_str += "from typing import List, Tuple\n"
         file_class_name = f"{self.file_name_cap_camel_cased}KeyHandler"
-        file_name = str(file.proto.name).split(".")[0]
+        file_name = str(file.proto.name).split(".")[mobile_book]
         model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
@@ -585,7 +585,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         return output_str
 
     def output_file_generate_handler(self, file: protogen.File):
-        self.file_name = str(file.proto.name).split(".")[0]
+        self.file_name = str(file.proto.name).split(".")[mobile_book]
         self.file_name_cap_camel_cased = convert_to_capitalized_camel_case(self.file_name)
         self.set_data_members(file)
 

@@ -10,11 +10,11 @@ os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppLogBook
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.strat_executor.generated.FastApi.strat_executor_service_http_client import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.strat_executor.generated.FastApi.strat_executor_service_http_client import (
     StratExecutorServiceHttpClient)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
     strat_manager_service_http_client, is_ongoing_strat, Side, UpdateType)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
     performance_benchmark_service_http_client, RawPerformanceDataBaseModel)
@@ -24,7 +24,7 @@ LOG_ANALYZER_DATA_DIR = (
 )
 
 debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
-                             len(debug_env) == 0 or debug_env == "0") else True
+                             len(debug_env) == mobile_book or debug_env == "mobile_book") else True
 
 portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs")))
@@ -54,7 +54,7 @@ class PairStratEngineBaseLogBook(AppLogBook):
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
             underlying_partial_update_all_portfolio_alert_http, underlying_partial_update_all_strat_alert_http,
             underlying_read_portfolio_alert_by_id_http, underlying_read_strat_alert_by_id_http)
         cls.underlying_partial_update_all_portfolio_alert_http = underlying_partial_update_all_portfolio_alert_http
@@ -64,11 +64,11 @@ class PairStratEngineBaseLogBook(AppLogBook):
 
     def __init__(self, regex_file: str, log_details: List[LogDetail] | None = None,
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
-                 simulation_mode: bool = False):
+                 simulation_mode: bool = False, log_detail_type: Type[LogDetail] | None = None):
         super().__init__(regex_file, config_yaml_dict, performance_benchmark_service_http_client,
                          RawPerformanceDataBaseModel, log_details=log_details,
                          log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
-                         debug_mode=debug_mode)
+                         debug_mode=debug_mode, log_detail_type=log_detail_type)
         PairStratEngineBaseLogBook.initialize_underlying_http_callables()
         self.simulation_mode = simulation_mode
         self.portfolio_alerts_model_exist: bool = False
@@ -82,6 +82,12 @@ class PairStratEngineBaseLogBook(AppLogBook):
         self.port_to_executor_web_client: Dict[int, StratExecutorServiceHttpClient] = {}
         self.pair_strat_engine_journal_type_update_cache_dict: Dict[str, Queue] = {}
         self.pair_strat_engine_snapshot_type_update_cache_dict: Dict[str, Queue] = {}
+        self.field_sep = get_field_seperator_pattern()
+        self.key_val_sep = get_key_val_seperator_pattern()
+        self.pattern_for_pair_strat_db_updates = get_pattern_for_pair_strat_db_updates()
+        self.pattern_to_restart_tail_process: str = get_pattern_to_restart_tail_process()
+        self.pattern_to_force_kill_tail_process: str = get_pattern_to_force_kill_tail_process()
+        self.pattern_to_remove_file_from_created_cache: str = get_pattern_to_remove_file_from_created_cache()
 
     def _handle_portfolio_alert_queue_err_handler(self, *args):
         err_str_ = f"_handle_portfolio_alert_queue_err_handler failed, passed args: {args}"
@@ -188,19 +194,20 @@ class PairStratEngineBaseLogBook(AppLogBook):
 
     def clean_alert_str(self, alert_str: str) -> str:
         # remove object hex memory path
-        cleaned_alert_str: str = re.sub(r"0x[a-f0-9]*", "", alert_str)
+        cleaned_alert_str: str = re.sub(r"mobile_bookx[a-fmobile_book-9]*", "", alert_str)
         # remove all numeric digits
-        cleaned_alert_str = re.sub(r"-?[0-9]*", "", cleaned_alert_str)
-        cleaned_alert_str = cleaned_alert_str.split("...check the file:")[0]
+        cleaned_alert_str = re.sub(r"-?[mobile_book-9]*", "", cleaned_alert_str)
+        cleaned_alert_str = cleaned_alert_str.split("...check the file:")[mobile_book]
         return cleaned_alert_str
 
     def _create_alert(self, error_dict: Dict) -> List[str]:
-        alert_brief_n_detail_lists: List[str] = error_dict["line"].split(";;;", 1)
+        alert_brief_n_detail_lists: List[str] = (
+            error_dict["line"].split(PairStratEngineBaseLogBook.log_seperator, 1))
         if len(alert_brief_n_detail_lists) == 2:
-            alert_brief = alert_brief_n_detail_lists[0]
+            alert_brief = alert_brief_n_detail_lists[mobile_book]
             alert_details = alert_brief_n_detail_lists[1]
         else:
-            alert_brief = alert_brief_n_detail_lists[0]
+            alert_brief = alert_brief_n_detail_lists[mobile_book]
             alert_details = ". ".join(alert_brief_n_detail_lists[1:])
         alert_brief = self._truncate_str(alert_brief).strip()
         alert_details = self._truncate_str(alert_details).strip()
@@ -212,10 +219,10 @@ class PairStratEngineBaseLogBook(AppLogBook):
             strat_manager_service_http_client.get_pair_strat_from_symbol_side_query_client(
                 sec_id=symbol, side=side)
 
-        if len(pair_strat_list) == 0:
+        if len(pair_strat_list) == mobile_book:
             return None
         elif len(pair_strat_list) == 1:
-            pair_strat_obj: PairStratBaseModel = pair_strat_list[0]
+            pair_strat_obj: PairStratBaseModel = pair_strat_list[mobile_book]
             return pair_strat_obj
 
     def _get_executor_http_client_from_pair_strat(self, port_: int, host_: str) -> StratExecutorServiceHttpClient:
@@ -277,9 +284,10 @@ class PairStratEngineBaseLogBook(AppLogBook):
                     except Exception as e:
                         if not self.should_retry_due_to_server_down(e):
                             alert_brief: str = f"{method_name} failed in pair_strat log analyzer"
-                            alert_details: str = (f"pydantic_class_type: {pydantic_basemodel_type}, "
+                            alert_details: str = (f"{pydantic_basemodel_type = }, "
                                                   f"exception: {e}")
-                            logging.exception(f"{alert_brief};;; {alert_details}")
+                            logging.exception(f"{alert_brief}{PairStratEngineBaseLogBook.log_seperator} "
+                                              f"{alert_details}")
                             self.send_portfolio_alerts(severity=self.get_severity("error"),
                                                        alert_brief=alert_brief,
                                                        alert_details=alert_details)
@@ -287,7 +295,7 @@ class PairStratEngineBaseLogBook(AppLogBook):
             except Exception as e:
                 err_str_brief = f"_pair_strat_db_update_queue_handler failed"
                 err_str_detail = f"exception: {e}"
-                logging.exception(f"{err_str_brief};;; {err_str_detail}")
+                logging.exception(f"{err_str_brief}{PairStratEngineBaseLogBook.log_seperator} {err_str_detail}")
                 self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                            alert_details=err_str_detail)
 
@@ -331,7 +339,7 @@ class PairStratEngineBaseLogBook(AppLogBook):
             else:
                 err_str_brief = ("Can't find _id key in patch kwargs dict - ignoring this update, "
                                  f"pydantic_basemodel_class_type: {pydantic_basemodel_class_type.__name__}, "
-                                 f"kwargs: {kwargs}")
+                                 f"{kwargs = }")
                 logging.exception(f"{err_str_brief}")
                 self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief)
 
@@ -351,7 +359,7 @@ class PairStratEngineBaseLogBook(AppLogBook):
             logging.exception("pair_strat_engine service not up yet, likely server "
                               "restarted but is not ready yet, retrying call ...")
             time.sleep(1)
-        elif ("('Connection aborted.', ConnectionResetError(104, 'Connection reset "
+        elif ("('Connection aborted.', ConnectionResetError(1mobile_book4, 'Connection reset "
               "by peer'))") in str(exception):
             logging.exception(
                 "pair_strat_engine service connection error, retrying call ...")
@@ -381,13 +389,16 @@ class PairStratEngineBaseLogBook(AppLogBook):
                     while 1:
                         try:
                             callback_method(update_json)
+                            logging.info(f"pair_strat_db update call: {callback_method.__name__ = }, "
+                                         f"{update_json = }")
                             break
                         except Exception as e:
                             if not self.should_retry_due_to_server_down(e):
-                                alert_brief: str = f"{method_name} failed in pair_strat log analyzer"
+                                alert_brief: str = f"{method_name = } failed in pair_strat log analyzer"
                                 alert_details: str = (f"pydantic_class_type: {pydantic_basemodel_type}, "
                                                       f"exception: {e}")
-                                logging.exception(f"{alert_brief};;; {alert_details}")
+                                logging.exception(f"{alert_brief}{PairStratEngineBaseLogBook.log_seperator} "
+                                                  f"{alert_details}")
                                 self.send_portfolio_alerts(severity=self.get_severity("error"),
                                                            alert_brief=alert_brief,
                                                            alert_details=alert_details)
@@ -396,7 +407,8 @@ class PairStratEngineBaseLogBook(AppLogBook):
                 err_str_brief = (f"handle_dynamic_queue_for_patch running for pydantic_basemodel_type: "
                                  f"{pydantic_basemodel_type} and update_type: {update_type} failed")
                 err_str_detail = f"exception: {e}"
-                logging.exception(f"{err_str_brief};;; {err_str_detail}")
+                logging.exception(f"{err_str_brief}{PairStratEngineBaseLogBook.log_seperator} "
+                                  f"{err_str_detail}")
                 self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                            alert_details=err_str_detail)
 
@@ -420,38 +432,42 @@ class PairStratEngineBaseLogBook(AppLogBook):
                 while 1:
                     try:
                         patch_all_callback_method(update_json_list)
+                        logging.info(f"pair_strat_db update call: {patch_all_callback_method.__name__ = }, "
+                                     f"{update_json_list = }")
                         break
                     except Exception as e:
                         if not self.should_retry_due_to_server_down(e):
-                            alert_brief: str = f"{method_name} failed in pair_strat log analyzer"
+                            alert_brief: str = f"{method_name = } failed in pair_strat log analyzer"
                             alert_details: str = (f"pydantic_class_type: {pydantic_basemodel_type}, "
                                                   f"exception: {e}")
-                            logging.exception(f"{alert_brief};;; {alert_details}")
+                            logging.exception(f"{alert_brief}{PairStratEngineBaseLogBook.log_seperator} "
+                                              f"{alert_details}")
                             self.send_portfolio_alerts(severity=self.get_severity("error"),
                                                        alert_brief=alert_brief,
                                                        alert_details=alert_details)
                             break
             except Exception as e:
-                err_str_brief = (f"handle_dynamic_queue_for_patch_all running for pydantic_basemodel_type: "
-                                 f"{pydantic_basemodel_type} and update_type: {update_type} failed")
+                err_str_brief = (f"handle_dynamic_queue_for_patch_all running for "
+                                 f"{pydantic_basemodel_type = } and {update_type = } failed")
                 err_str_detail = f"exception: {e}"
-                logging.exception(f"{err_str_brief};;; {err_str_detail}")
+                logging.exception(f"{err_str_brief}{PairStratEngineBaseLogBook.log_seperator} "
+                                  f"{err_str_detail}")
                 self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                            alert_details=err_str_detail)
 
     def process_pair_strat_api_ops(self, message: str):
         try:
-            # remove ^^^ from beginning of message
-            message: str = message[3:]
-            args: List[str] = message.split("~~")
-            pydantic_basemodel_type_name: str = args.pop(0)
-            update_type: str = args.pop(0)
-            method_name: str = args.pop(0)
+            # remove pattern_for_pair_strat_db_updates from beginning of message
+            message: str = message[len(self.pattern_for_pair_strat_db_updates):]
+            args: List[str] = message.split(self.field_sep)
+            pydantic_basemodel_type_name: str = args.pop(mobile_book)
+            update_type: str = args.pop(mobile_book)
+            method_name: str = args.pop(mobile_book)
 
             kwargs: Dict[str, str] = dict()
-            # get method kwargs separated by "^^" if any
+            # get method kwargs separated by key_val_sep if any
             for arg in args:
-                key, value = arg.split("^^")
+                key, value = arg.split(self.key_val_sep)
                 kwargs[key] = value
 
             if "patch_all" in method_name:
@@ -476,7 +492,7 @@ class PairStratEngineBaseLogBook(AppLogBook):
 
                     patch_all_queue.put(kwargs)
                 else:
-                    raise Exception(f"Unsupported update_type: {update_type} for log msg: {message}")
+                    raise Exception(f"Unsupported {update_type = } for log msg: {message}")
             elif "patch" in method_name:
                 if update_type in UpdateType.__members__:
                     update_type: UpdateType = UpdateType(update_type)
@@ -509,15 +525,16 @@ class PairStratEngineBaseLogBook(AppLogBook):
 
         except Exception as e:
             alert_brief: str = f"_process_pair_strat_db_updates failed in log analyzer"
-            alert_details: str = f"message: {message}, exception: {e}"
-            logging.exception(f"{alert_brief};;; {alert_details}")
+            alert_details: str = f"{message = }, exception: {e}"
+            logging.exception(f"{alert_brief}{PairStratEngineBaseLogBook.log_seperator} "
+                              f"{alert_details}")
             self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=alert_brief,
                                        alert_details=alert_details)
 
     # portfolio lvl alerts handling
     def send_portfolio_alerts(self, severity: str, alert_brief: str, alert_details: str | None = None) -> None:
-        logging.debug(f"sending alert with severity: {severity}, alert_brief: {alert_brief}, "
-                      f"alert_details: {alert_details}")
+        logging.debug(f"sending alert with {severity = }, {alert_brief = }, "
+                      f"{alert_details = }")
         while True:
             try:
                 if not self.service_up:
@@ -536,9 +553,9 @@ class PairStratEngineBaseLogBook(AppLogBook):
                                                                 by_alias=True, exclude_none=True))
                 break
             except Exception as e:
-                logging.exception(f"_send_alerts failed;;;exception: {e}")
+                logging.exception(f"_send_alerts failed{PairStratEngineBaseLogBook.log_seperator} exception: {e}")
                 self.service_up = False
-                time.sleep(30)
+                time.sleep(3mobile_book)
 
     def _get_error_dict(self, log_prefix: str, log_message: str) -> \
             Dict[str, str] | None:
@@ -548,9 +565,9 @@ class PairStratEngineBaseLogBook(AppLogBook):
             if match:
                 error_dict: Dict = {
                     'type': error_type,
-                    'line': log_prefix.replace(pattern.search(log_prefix)[0], " ") + log_message
+                    'line': log_prefix.replace(pattern.search(log_prefix)[mobile_book], " ") + log_message
                 }
-                logging.info(f"Error pattern matched, creating alert. error_dict: {error_dict}")
+                logging.info(f"Error pattern matched, creating alert. {error_dict = }")
                 return error_dict
         return None
 
@@ -566,15 +583,29 @@ class PairStratEngineBaseLogBook(AppLogBook):
         self.send_portfolio_alerts(severity=self.get_severity("warning"), alert_brief=brief_msg_str,
                                    alert_details=detail_msg_str)
 
+    def notify_error(self, error_msg: str):
+        log_seperator_index: int = error_msg.find(PairStratEngineBaseLogBook.log_seperator)
+
+        msg_brief: str
+        msg_detail: str | None = None
+        if log_seperator_index != -1:
+            msg_brief = error_msg[:log_seperator_index]
+            msg_detail = error_msg[log_seperator_index+len(PairStratEngineBaseLogBook.log_seperator):]
+        else:
+            msg_brief = error_msg
+
+        self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=msg_brief,
+                                   alert_details=msg_detail)
+
     def handle_log_book_cmd_log_message(self, log_prefix: str, log_message: str,
                                             log_detail: StratLogDetail):
         try:
-            if log_message.startswith("---"):
-                log_message = log_message[3:]  # removing starting chars
-                args: List[str] = log_message.split("~~")
-                log_file_path = args.pop(0)
+            if log_message.startswith(self.pattern_to_restart_tail_process):
+                log_message = log_message[len(self.pattern_to_restart_tail_process):]  # removing starting chars
+                args: List[str] = log_message.split(self.field_sep)
+                log_file_path = args.pop(mobile_book)
                 if len(args):
-                    timestamp = args.pop(0)
+                    timestamp = args.pop(mobile_book)
                 else:
                     timestamp = None
 
@@ -584,8 +615,9 @@ class PairStratEngineBaseLogBook(AppLogBook):
                 log_detail_to_restart.processed_timestamp = timestamp
                 log_detail_to_restart.is_running = False
 
-            elif log_message.startswith("-@-"):
-                log_file_path = log_message[3:]  # removing starting chars, remaining is log_file_name
+            elif log_message.startswith(self.pattern_to_force_kill_tail_process):
+                # removing starting chars, remaining is log_file_name
+                log_file_path = log_message[len(self.pattern_to_force_kill_tail_process):]
 
                 log_detail_to_restart = self.log_file_path_to_log_detail_dict.get(log_file_path)
 
@@ -596,12 +628,13 @@ class PairStratEngineBaseLogBook(AppLogBook):
                 else:
                     logging.info(f"Ignoring Force Kill - Can't find any log_detail for file: {log_file_path} "
                                  f"in dict of file path key: {self.log_file_path_to_log_detail_dict.keys()}")
-            elif log_message.startswith("-*-"):
-                log_file_path = log_message[3:]  # removing starting chars, remaining is log_file_name
+            elif log_message.startswith(self.pattern_to_remove_file_from_created_cache):
+                # removing starting chars, remaining is log_file_name
+                log_file_path = log_message[len(self.pattern_to_remove_file_from_created_cache):]
 
                 if log_file_path not in self.pattern_matched_added_file_path_to_service_dict:
                     logging.info(
-                        f"Can't find {log_file_path} in log analyzer cache dict keys used to avoid repeated file "
+                        f"Can't find {log_file_path = } in log analyzer cache dict keys used to avoid repeated file "
                         f"tail start, pair_strat_engine_log_book.pattern_matched_added_file_path_to_service_dict: "
                         f"{self.pattern_matched_added_file_path_to_service_dict}")
                 else:
@@ -610,6 +643,6 @@ class PairStratEngineBaseLogBook(AppLogBook):
         except Exception as e:
             err_str_brief = f"handle_log_book_cmd_log_message failed"
             err_str_detail = f"exception: {e}"
-            logging.exception(f"{err_str_brief};;; {err_str_detail}")
+            logging.exception(f"{err_str_brief}{PairStratEngineBaseLogBook.log_seperator} {err_str_detail}")
             self.send_portfolio_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                        alert_details=err_str_detail)

@@ -11,9 +11,9 @@ from selenium.common import NoSuchElementException, ElementNotInteractableExcept
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 
-from CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import test_config_file_path, \
+from CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.web_ui_models import *
+from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
+from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import test_config_file_path, \
     strat_manager_service_native_web_client, create_tob
 
 
@@ -52,7 +52,7 @@ def wait(driver: WebDriver) -> WebDriverWait:
 
 
 def get_web_project_url():
-    web_project_url: str = "http://localhost:3020"
+    web_project_url: str = "http://localhost:3mobile_book2mobile_book"
     if os.path.isfile(str(test_config_file_path)):
         test_config = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
         web_project_url = url if (url := test_config.get("web_project_url")) is not None else web_project_url
@@ -108,8 +108,8 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     # get executor client
     # create symbol overviews
     # wait for strat limits, strat status, strat alerts to be created - is_executor_running - add 5 sec sleep
-    host: str = "127.0.0.1"
-    port: int = 8020
+    host: str = "127.mobile_book.mobile_book.1"
+    port: int = 8mobile_book2mobile_book
     strat_manager_service_http_client = StratManagerServiceHttpClient(host, port)
     pair_strat_list: List[PairStratBaseModel] = strat_manager_service_http_client.get_all_pair_strat_client()
 
@@ -140,7 +140,7 @@ def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any]) -> None:
     # strat_status: StratStatusBaseModel = executor_web_client.get_strat_status_client(pair_strat.id)
     override_strat_limit(executor_web_client)
     # TODO LAZY: strat limits, strat status and strat alert is present in ui
-    time.sleep(10)
+    time.sleep(1mobile_book)
 
 
 def verify_supported_search_type(search_type: SearchType = SearchType.NAME) -> bool:
@@ -441,7 +441,7 @@ def validate_strat_limits(widget: WebElement, strat_limits: Dict,  layout: Layou
 
 
 def get_widget_type(widget_schema: Dict) -> WidgetType | None:
-    layout_list = widget_schema['widget_ui_data_element']["widget_ui_data"][0]
+    layout_list = widget_schema['widget_ui_data_element']["widget_ui_data"][mobile_book]
     is_repeated: bool = True if widget_schema["widget_ui_data_element"].get("is_repeated") else False
     is_json_root: bool = True if widget_schema.get("json_root") else False
 
@@ -487,8 +487,8 @@ def get_widgets_by_flux_property(schema_dict: Dict[str, any], widget_type: Widge
 
                 ref_path: str = field_properties["items"]["$ref"]
                 ref_list: List[str] = ref_path.split("/")[1:]
-                child_schema: Dict[str, any] = schema_dict[ref_list[0]][ref_list[1]] if len(ref_list) == 2 \
-                    else schema_dict[ref_list[0]]
+                child_schema: Dict[str, any] = schema_dict[ref_list[mobile_book]][ref_list[1]] if len(ref_list) == 2 \
+                    else schema_dict[ref_list[mobile_book]]
 
                 # Check if flux_property is enabled in the complex type
                 if flux_property in field_properties:
@@ -545,12 +545,12 @@ def get_xpath_from_field_name(schema_dict: Dict[str, any], widget_type: WidgetTy
                     continue
                 ref_path: str = field_properties["items"]["$ref"]
                 ref_list: List[str] = ref_path.split("/")[1:]
-                child_schema: Dict[str, any] = schema_dict[ref_list[0]][ref_list[1]] if len(ref_list) == 2 \
-                    else schema_dict[ref_list[0]]
+                child_schema: Dict[str, any] = schema_dict[ref_list[mobile_book]][ref_list[1]] if len(ref_list) == 2 \
+                    else schema_dict[ref_list[mobile_book]]
                 ret = search_schema_for_field(child_schema)
                 if ret:
                     if field_properties["type"] == DataType.ARRAY:
-                        return f"{field}[0].{ret}"
+                        return f"{field}[mobile_book].{ret}"
                     else:
                         return f"{field}.{ret}"
 
@@ -566,14 +566,14 @@ def get_xpath_from_field_name(schema_dict: Dict[str, any], widget_type: WidgetTy
 
 
 def override_default_limits(order_limits: OrderLimitsBaseModel, portfolio_limits: PortfolioLimitsBaseModel) -> None:
-    updated_order_limits: OrderLimitsBaseModel = OrderLimitsBaseModel(_id=order_limits.id, max_basis_points=150,
-                                                                      max_px_deviation=2, min_order_notional=1_000,
-                                                                      max_order_notional=400000)
+    updated_order_limits: OrderLimitsBaseModel = OrderLimitsBaseModel(_id=order_limits.id, max_basis_points=15mobile_book,
+                                                                      max_px_deviation=2, min_order_notional=1_mobile_bookmobile_bookmobile_book,
+                                                                      max_order_notional=4mobile_bookmobile_bookmobile_bookmobile_bookmobile_book)
     strat_manager_service_native_web_client.patch_order_limits_client(jsonable_encoder(
         updated_order_limits, by_alias=True, exclude_none=True))
 
     updated_portfolio_limits: PortfolioLimitsBaseModel = \
-        PortfolioLimitsBaseModel(_id=portfolio_limits.id, max_open_baskets=200)
+        PortfolioLimitsBaseModel(_id=portfolio_limits.id, max_open_baskets=2mobile_bookmobile_book)
     strat_manager_service_native_web_client.patch_portfolio_limits_client(jsonable_encoder(
         updated_portfolio_limits, by_alias=True, exclude_none=True))
 
@@ -582,9 +582,9 @@ def override_strat_limit(strat_executor_service_http_client: StratExecutorServic
     strat_limit_list: List[StratLimitsBaseModel] = strat_executor_service_http_client.get_all_strat_limits_client()
 
     for strat_limit in strat_limit_list:
-        cancel_rate: CancelRateOptional = CancelRateOptional(max_cancel_rate=20)
+        cancel_rate: CancelRateOptional = CancelRateOptional(max_cancel_rate=2mobile_book)
         market_trade_volume_participation: MarketTradeVolumeParticipationOptional = \
-            MarketTradeVolumeParticipationOptional(max_participation_rate=20)
+            MarketTradeVolumeParticipationOptional(max_participation_rate=2mobile_book)
         updated_strat_limit: StratLimitsBaseModel = \
             StratLimitsBaseModel(_id=strat_limit.id, cancel_rate=cancel_rate,
                                  market_trade_volume_participation=market_trade_volume_participation)
@@ -674,7 +674,7 @@ def show_hidden_fields_in_tree_layout(widget: WebElement, driver: WebDriver) -> 
     click_button_with_name(widget=widget, button_name="Show")
     list_element = driver.find_element(By.XPATH, "//ul[@role='listbox']")
     li_elements = list_element.find_elements(By.TAG_NAME, "li")
-    li_elements[0].click()
+    li_elements[mobile_book].click()
 
 def show_hidden_field_in_review_changes_popup(driver: WebDriver) -> None:
     review_changes_widget = driver.find_element(By.CLASS_NAME, "MuiDialogContent-root")
@@ -693,7 +693,7 @@ def validate_property_that_it_contain_val_min_val_max_or_none(val_max: str, val_
             return str(val_max)
     except ValueError:
         print("Invalid input: must be a numeric value or empty.")
-    return str(1000.5)
+    return str(1mobile_bookmobile_bookmobile_book.5)
 
 
 def is_table_cell_enabled(widget: WebElement, xpath: str) -> bool:
@@ -711,7 +711,7 @@ def is_table_cell_enabled(widget: WebElement, xpath: str) -> bool:
 
 
 def count_fields_in_tree(widget: WebElement) -> List[str]:
-    field_elements = widget.find_elements(By.CLASS_NAME, "Node_node__sh0RD")
+    field_elements = widget.find_elements(By.CLASS_NAME, "Node_node__shmobile_bookRD")
     field_names = []
     for field_element in field_elements:
         field_names.append(field_element.text)
@@ -723,7 +723,7 @@ def get_commonkey_items(widget: WebElement) -> Dict[str, any]:
     # m
     # common_key_widget = driver.find_element(By.XPATH, "/html/body/div/div/div[2]/div[8]/div[1]")
     common_key_widget = widget.find_element(By.XPATH, "//div")
-    # common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__+Oh0d")
+    # common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__+Ohmobile_bookd")
     common_key_item_elements = common_key_widget.find_elements(By.CLASS_NAME, "CommonKeyWidget_item__kftVh")
 
     # common_key_widget = widget.find_element(By.CLASS_NAME, "CommonKeyWidget_container__Ek2YA")
@@ -732,7 +732,7 @@ def get_commonkey_items(widget: WebElement) -> Dict[str, any]:
     common_key_items: Dict[str, any] = {}
     for common_key_item_element in common_key_item_elements:
         common_key_item_txt = common_key_item_element.text.split(":")
-        key = common_key_item_txt[0].replace(" ", "_")
+        key = common_key_item_txt[mobile_book].replace(" ", "_")
         value = common_key_item_txt[1]
         common_key_items[key] = value
     return common_key_items
@@ -768,9 +768,9 @@ def validate_comma_separated_values(driver: WebDriver, widget: WebElement, layou
         common_keys: Dict[str, any] = get_commonkey_items(widget=widget)
         for field_name, input_value in field_name_n_input_value.items():
             value_from_ui: str = common_keys[field_name]
-            # getting common key value without comma and dot to validate, if value= "1,230.0" get "1230" only
+            # getting common key value without comma and dot to validate, if value= "1,23mobile_book.mobile_book" get "123mobile_book" only
             assert (value_from_ui.replace(",", "") ==
-                    input_value.split(".")[0].replace(",", "")), \
+                    input_value.split(".")[mobile_book].replace(",", "")), \
                 f"Value mismatch field_name: {field_name} value_from_ui: {value_from_ui} input_value: {input_value}"
     elif layout == Layout.TREE:
         # remove save later
@@ -780,14 +780,14 @@ def validate_comma_separated_values(driver: WebDriver, widget: WebElement, layou
         switch_layout(widget=widget, layout=Layout.TREE)
         for xpath, input_value in field_name_n_input_value.items():
             value_from_ui: str = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-            assert value_from_ui.replace(",", "") == input_value.split(".")[0].replace(",", "")
+            assert value_from_ui.replace(",", "") == input_value.split(".")[mobile_book].replace(",", "")
     field_name_n_input_value.clear()
 
 
 def get_fld_name_colour_in_tree(widget: WebElement, xpath: str):
     div_xpath: str = get_tree_input_field_xpath(xpath=xpath)
     div_xpath_element = widget.find_element(By.XPATH, div_xpath)
-    element = div_xpath_element.find_element(By.CLASS_NAME, "Node_node__sh0RD")
+    element = div_xpath_element.find_element(By.CLASS_NAME, "Node_node__shmobile_bookRD")
     span_element = element.find_element(By.TAG_NAME, "span")
 
     color = span_element.value_of_css_property("color")
@@ -809,10 +809,10 @@ def get_val_max_from_input_fld(val_max: str, driver: WebDriver, widget_type: Wid
         splitted_list = val_max.split(".")
         if widget_type == widget_type.INDEPENDENT:
             xpath = splitted_list[1]
-            widget_name = splitted_list[0]
+            widget_name = splitted_list[mobile_book]
         if widget_type == widget_type.DEPENDENT:
             xpath = splitted_list[1]
-            widget_name = splitted_list[0]
+            widget_name = splitted_list[mobile_book]
     widget = driver.find_element(By.ID, widget_name)
     if layout == layout.TREE:
         switch_layout(widget=widget, layout=Layout.TREE)
@@ -850,7 +850,7 @@ def get_object_keys_from_dialog_box(widget: WebElement) -> List[str]:
 
 
 def get_common_keys(widget: WebElement) -> List[str]:
-    # common_key_items = widget.find_elements(By.XPATH, '//div[@class="CommonKeyWidget_container__+Oh0d"]')
+    # common_key_items = widget.find_elements(By.XPATH, '//div[@class="CommonKeyWidget_container__+Ohmobile_bookd"]')
     common_key_items = widget.find_elements(By.XPATH, ".//div")
     common_keys_text = []
     # common_keys_text.
@@ -858,7 +858,7 @@ def get_common_keys(widget: WebElement) -> List[str]:
     for key_element in common_key_items:
         try:
             span_element = key_element.find_element(By.TAG_NAME, "span")
-            common_keys_text.append(span_element.text.split(":")[0].split("[")[0])
+            common_keys_text.append(span_element.text.split(":")[mobile_book].split("[")[mobile_book])
         except NoSuchElementException:
             pass
     return common_keys_text
@@ -908,7 +908,7 @@ def expand_all_nested_fld_name_frm_review_changes_dialog(driver: WebDriver) -> N
 
 def get_widget_name_frm_schema(schema_dict, widget_type: WidgetType, flux_property: str) -> List[str]:
     result = get_widgets_by_flux_property(schema_dict=schema_dict, widget_type=widget_type, flux_property=flux_property)
-    assert result[0]
+    assert result[mobile_book]
     name_lst: List[str] = []
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
@@ -1045,7 +1045,7 @@ def delete_tob_md_ld_fj_os_oj() -> None:
 
 
 def scroll_into_view(driver: WebDriver, element: WebElement):
-    driver.execute_script('arguments[0].scrollIntoView(true)', element)
+    driver.execute_script('arguments[mobile_book].scrollIntoView(true)', element)
     time.sleep(Delay.SHORT.value)
 
 
@@ -1064,7 +1064,7 @@ def flux_fld_default_widget(schema_dict: Dict, widget: WebElement, widget_type: 
         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=widget_type,
                                                widget_name=widget_name, field_name=field_name)
         # TODO: REMOVE IF LATER: in strat limits, priority fld contain incorrect default value
-        #  (it's value is:-0 ,but it should be 10)
+        #  (it's value is:-mobile_book ,but it should be 1mobile_book)
         field_value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
         if field_name == "priority" and widget_name == "strat_limits":
             # Skip the assert statement for "priority" field
@@ -1103,8 +1103,8 @@ def flux_fld_sequence_number_in_widget(result: List[WidgetQuery], driver: WebDri
         driver.refresh()
         time.sleep(Delay.SHORT.value)
         i: int = 1
-        sequence_number: int = 0
-        previous_field_sequence_value: int = 0
+        sequence_number: int = mobile_book
+        previous_field_sequence_value: int = mobile_book
         widget_name: str = widget_query.widget_name
         widget: WebElement = driver.find_element(By.ID, widget_name)
 
@@ -1361,7 +1361,7 @@ def convert_schema_dict_to_widget_query(schema_dict: Dict[str, Any]) -> List[Wid
 def update_schema_json(schema_dict: Dict[str, any], update_widget_name: str, update_field_name: str,
                        extend_field_name: str, value: any, project_name: str) -> None:
 
-    project_path: PurePath = code_gen_projects_dir_path / "AddressBook"/ "ProjectGroup" / project_name
+    project_path: PurePath = code_gen_projects_dir_path / "addressbook"/ "ProjectGroup" / project_name
 
     schema_path: PurePath = project_path / "web-ui" / "public" / "schema.json"
 
@@ -1447,16 +1447,16 @@ def input_n_validate_progress_bar(driver: WebDriver, widget: WebElement, field_n
     confirm_save(driver)
     progress_level: str = get_progress_bar_level(widget)
     if input_value_type == "val_min":
-        # if input value is 0 then progress level should be 100
-        assert progress_level == "100"
+        # if input value is mobile_book then progress level should be 1mobile_bookmobile_book
+        assert progress_level == "1mobile_bookmobile_book"
     else:
         # for val max
-        assert progress_level == "0"
+        assert progress_level == "mobile_book"
 
 def set_val_max_input_fld(driver: WebDriver, layout: Layout, input_type: str, schema_dict: Dict[str, any]):
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property="val_max")
-    assert result[0]
+    assert result[mobile_book]
 
     xpath_n_field_names: Dict[str] = {}
     for widget_query in result[1]:
@@ -1520,11 +1520,11 @@ def set_val_min_input_fld(driver: WebDriver, layout: Layout, input_type: str, sc
             field_name: str = field_query.field_name
             xpath = get_xpath_from_field_name(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, widget_name=widget_name,
                                               field_name=field_name)
-            # balance notional field contain "0.0" that's why can parse directly into int
+            # balance notional field contain "mobile_book.mobile_book" that's why can parse directly into int
             if input_type  == "valid":
-                val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0])
+                val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[mobile_book])
             else:
-                val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[0]) - 1
+                val_min: int = int(get_val_min_n_val_max_of_fld(field_query=field_query)[mobile_book]) - 1
             if layout == Layout.TABLE:
                 default_field_value: str = get_default_field_value(widget=widget, layout=Layout.TABLE, xpath=xpath)
             else:
@@ -1549,7 +1549,7 @@ def get_server_populate_fld(driver: WebDriver, schema_dict, layout: Layout, widg
 
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict),
                                           widget_type=WidgetType.INDEPENDENT, flux_property="server_populate")
-    assert result[0]
+    assert result[mobile_book]
 
     # table layout and tree
     if widget_type == WidgetType.INDEPENDENT:
@@ -1581,7 +1581,7 @@ def get_server_populate_fld(driver: WebDriver, schema_dict, layout: Layout, widg
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.DEPENDENT,
                                           flux_property="server_populate")
     print(result)
-    assert result[0]
+    assert result[mobile_book]
 
     # table layout and tree
     # TODO: exch_id field is not present in common_key in pair strat params widget
@@ -1616,7 +1616,7 @@ def set_input_value_for_comma_seperated(driver: WebDriver, schema_dict, layout: 
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property="display_type")
     print(result)
-    assert result[0]
+    assert result[mobile_book]
 
     # TABLE LAYOUT
     field_name_n_input_value: Dict[str, any] = {}

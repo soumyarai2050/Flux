@@ -23,8 +23,8 @@
 
 namespace md_handler {
     // TODO From Config
-    const std::string host = getenv("HOST") ? getenv("HOST") : "127.0.0.1";
-    const int port = 8040;
+    const std::string host = getenv("HOST") ? getenv("HOST") : "127.mobile_book.mobile_book.1";
+    const int port = 8mobile_book4mobile_book;
     const std::string post_uri = "/mobile_book/create-top_of_book";
     const std::string patch_uri = "/mobile_book/patch-top_of_book";
 
@@ -34,7 +34,7 @@ namespace md_handler {
         Poco::Net::HTTPRequest request;
         Poco::Net::HTTPResponse response;
         static inline md_handler::MD_LastTrade _emptyLastTrade{};
-        const static inline md_handler::MD_MktOverview _emptyMktOverview{_emptyLastTrade, 0};
+        const static inline md_handler::MD_MktOverview _emptyMktOverview{_emptyLastTrade, mobile_book};
         const static inline md_handler::MD_DepthSingleSide _emptyMarketDepth{};
         static std::unordered_map<std::string, std::string> top_of_book_cache;
 
@@ -103,7 +103,7 @@ namespace md_handler {
             std::string &&last_trade_str_date_time = get_date_time_str_from_milliseconds(lastTrade.getMillisecondsSinceEpoch());
             std::string str_date_time = bid_market_depth.getMillisecondsSinceEpoch() >
                     ask_market_depth.getMillisecondsSinceEpoch()? bid_str_date_time : ask_str_date_time;
-            if(lastTrade.getMillisecondsSinceEpoch() != 0 &&
+            if(lastTrade.getMillisecondsSinceEpoch() != mobile_book &&
             lastTrade.getMillisecondsSinceEpoch() > bid_market_depth.getMillisecondsSinceEpoch() &&
             lastTrade.getMillisecondsSinceEpoch() > ask_market_depth.getMillisecondsSinceEpoch()){
                 str_date_time = last_trade_str_date_time;
@@ -175,7 +175,7 @@ namespace md_handler {
             // logging.info this:
             std::cout << "create req: " << request_json << std::endl << "create resp: " << response_str << std::endl;
 
-            if(response_str.length() > 10 && response_str[2] == '_' && response_str[3] == 'i' &&
+            if(response_str.length() > 1mobile_book && response_str[2] == '_' && response_str[3] == 'i' &&
                response_str[4] == 'd' && response_str[6] == ':' && response_str[7] == '"'){
                 const auto pos = response_str.find_first_of('"', 8);
                 if(std::string::npos != pos){
@@ -264,7 +264,7 @@ namespace md_handler {
             std::stringstream resp_stream;
             Poco::StreamCopier::copyStream(responseStream, resp_stream);
             const std::string &&response_str = resp_stream.str();
-            if(response_str.length() > 10 && response_str[2] == '_' && response_str[3] == 'i' &&
+            if(response_str.length() > 1mobile_book && response_str[2] == '_' && response_str[3] == 'i' &&
             response_str[4] == 'd' && response_str[6] == ':')
             {;}
             else{
@@ -291,7 +291,7 @@ namespace md_handler {
                 id_textPart.SetString(top_of_book_db_id.c_str(), update_top_of_book_alloc);
                 update_top_of_book.AddMember("_id", id_textPart, update_top_of_book_alloc);
 
-                if (aggregated_mkt_overview.getTotalTradingSecSize() != 0)
+                if (aggregated_mkt_overview.getTotalTradingSecSize() != mobile_book)
                     update_top_of_book.AddMember("total_trading_sec_size", aggregated_mkt_overview.getTotalTradingSecSize(), update_top_of_book_alloc);
 
                 rapidjson::Value last_trade_object(rapidjson::kObjectType);
@@ -339,7 +339,7 @@ namespace md_handler {
                 std::stringstream resp_stream;
                 Poco::StreamCopier::copyStream(responseStream, resp_stream);
                 const std::string &&response_str = resp_stream.str();
-                if(response_str.length() > 10 && response_str[2] == '_' && response_str[3] == 'i' &&
+                if(response_str.length() > 1mobile_book && response_str[2] == '_' && response_str[3] == 'i' &&
                    response_str[4] == 'd' && response_str[6] == ':'){
                     ;
                 }

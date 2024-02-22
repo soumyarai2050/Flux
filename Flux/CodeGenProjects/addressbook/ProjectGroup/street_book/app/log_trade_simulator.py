@@ -3,16 +3,19 @@ import logging
 from typing import List
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import Side
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.trading_link_base import TradingLinkBase
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import Side
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link_base import TradingLinkBase
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_analyzer.app.log_analyzer_service_helper import (
+    get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_log_simulator)
 
 
 log_simulate_logger = logging.getLogger("log_simulator")
 
 
 class LogTradeSimulator(TradingLinkBase):
-    fld_sep: str = "~~"
-    val_sep: str = "^^"
+    fld_sep: str = get_field_seperator_pattern()
+    val_sep: str = get_key_val_seperator_pattern()
+    log_simulator_pattern: str = get_pattern_for_log_simulator()
     """
     Class to log trading link events that needs to be simulated by underlying true simulator
     This helps improve simulator by aligning the process more closely with async trading links
@@ -54,11 +57,13 @@ class LogTradeSimulator(TradingLinkBase):
                           f"px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}{cls.fld_sep}side{cls.val_sep}{side}"
                           f"{cls.fld_sep}trading_sec_id{cls.val_sep}{trading_sec_id}{cls.fld_sep}system_sec_id: "
                           f"{system_sec_id}{cls.fld_sep}account{cls.val_sep}{account}{exchange_str}")
-        log_simulate_logger.info(f"$$$trade_simulator_place_new_order_query_client{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
-                     f"{cls.executor_port}{cls.fld_sep}px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}"
-                     f"{cls.fld_sep}side{cls.val_sep}{side}{cls.fld_sep}trading_sec_id{cls.val_sep}{trading_sec_id}"
-                     f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}{cls.fld_sep}underlying_account"
-                     f"{cls.val_sep}{account}{exchange_str}")
+        log_simulate_logger.info(
+            f"{LogTradeSimulator.log_simulator_pattern}trade_simulator_place_new_order_query_client{cls.fld_sep}"
+            f"{cls.executor_host}{cls.fld_sep}"
+            f"{cls.executor_port}{cls.fld_sep}px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}"
+            f"{cls.fld_sep}side{cls.val_sep}{side}{cls.fld_sep}trading_sec_id{cls.val_sep}{trading_sec_id}"
+            f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}{cls.fld_sep}underlying_account"
+            f"{cls.val_sep}{account}{exchange_str}")
         return True
 
     @classmethod
@@ -69,8 +74,10 @@ class LogTradeSimulator(TradingLinkBase):
         system_sec_id_str: str = f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}" if system_sec_id else ""
         underlying_account_str: str = \
             f"{cls.fld_sep}underlying_account{cls.val_sep}{underlying_account}" if underlying_account else ""
-        log_simulate_logger.info(f"$$$trade_simulator_place_cxl_order_query_client{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
-                     f"{cls.executor_port}{cls.fld_sep}order_id{cls.val_sep}{order_id}{side_str}{trading_sec_id_str}"
-                     f"{system_sec_id_str}"
-                     f"{underlying_account_str}")
+        log_simulate_logger.info(
+            f"{LogTradeSimulator.log_simulator_pattern}trade_simulator_place_cxl_order_query_client"
+            f"{cls.fld_sep}{cls.executor_host}{cls.fld_sep}"
+            f"{cls.executor_port}{cls.fld_sep}order_id{cls.val_sep}{order_id}{side_str}{trading_sec_id_str}"
+            f"{system_sec_id_str}"
+            f"{underlying_account_str}")
         return True

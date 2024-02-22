@@ -8,38 +8,38 @@ from Flux.CodeGenProjects.dept_book.generated.FastApi.dept_book_service_http_cli
     DeptBookServiceHttpClient
 
 dept_book_service_web_client: DeptBookServiceHttpClient = \
-    DeptBookServiceHttpClient.set_or_get_if_instance_exists("127.0.0.1", 8010)
+    DeptBookServiceHttpClient.set_or_get_if_instance_exists("127.mobile_book.mobile_book.1", 8mobile_book1mobile_book)
 
 
 def test_sanity_underlying_time_series(dash_, dash_filter_, bar_data_):
     dash_ids: List[str] = []
     dash_by_id_dict: Dict[int, DashBaseModel] = {}
     # create all dashes
-    for index in range(1000):
+    for index in range(1mobile_bookmobile_bookmobile_book):
         dash_obj: DashBaseModel = DashBaseModel(**dash_)
         dash_obj.rt_dash.leg1.sec.sec_id = f"CB_Sec_{index + 1}"
         stored_leg1_vwap = dash_obj.rt_dash.leg1.vwap
-        dash_obj.rt_dash.leg1.vwap = stored_leg1_vwap + random.randint(0, 30)
-        dash_obj.rt_dash.leg1.vwap_change = (dash_obj.rt_dash.leg1.vwap - stored_leg1_vwap) * 100 / stored_leg1_vwap
+        dash_obj.rt_dash.leg1.vwap = stored_leg1_vwap + random.randint(mobile_book, 3mobile_book)
+        dash_obj.rt_dash.leg1.vwap_change = (dash_obj.rt_dash.leg1.vwap - stored_leg1_vwap) * 1mobile_bookmobile_book / stored_leg1_vwap
         dash_obj.rt_dash.leg2.sec.sec_id = f"EQT_Sec_{index + 1}"
         stored_leg2_vwap = dash_obj.rt_dash.leg2.vwap
-        dash_obj.rt_dash.leg2.vwap = stored_leg2_vwap + random.randint(0, 10) / 10
-        dash_obj.rt_dash.leg2.vwap_change = (dash_obj.rt_dash.leg2.vwap - stored_leg2_vwap) * 100 / stored_leg2_vwap
+        dash_obj.rt_dash.leg2.vwap = stored_leg2_vwap + random.randint(mobile_book, 1mobile_book) / 1mobile_book
+        dash_obj.rt_dash.leg2.vwap_change = (dash_obj.rt_dash.leg2.vwap - stored_leg2_vwap) * 1mobile_bookmobile_book / stored_leg2_vwap
         stored_premium = dash_obj.rt_dash.mkt_premium
-        dash_obj.rt_dash.mkt_premium = stored_premium + random.randint(0, 10) * 0.1
-        dash_obj.rt_dash.mkt_premium_change = (dash_obj.rt_dash.mkt_premium - stored_premium) * 100 / stored_premium
+        dash_obj.rt_dash.mkt_premium = stored_premium + random.randint(mobile_book, 1mobile_book) * mobile_book.1
+        dash_obj.rt_dash.mkt_premium_change = (dash_obj.rt_dash.mkt_premium - stored_premium) * 1mobile_bookmobile_book / stored_premium
         stored_dash_obj: DashBaseModel = dept_book_service_web_client.create_dash_client(dash_obj)
         dash_by_id_dict[stored_dash_obj.id] = stored_dash_obj
         dash_ids.append(str(stored_dash_obj.id))
 
     # create dash filters and dept_book
     dash_filters_ids: List[str] = []
-    for index in range(10):
+    for index in range(1mobile_book):
         dash_filters_obj: DashFiltersBaseModel = DashFiltersBaseModel(**dash_filter_)
         dash_filters_obj.dash_name = f"Dashboard {index + 1}"
         stored_dash_filters_obj = dept_book_service_web_client.create_dash_filters_client(dash_filters_obj)
         dash_filters_ids.append(str(stored_dash_filters_obj.id))
-        max_dashes: int = random.randint(100, 3_000)
+        max_dashes: int = random.randint(1mobile_bookmobile_book, 3_mobile_bookmobile_bookmobile_book)
         dash_collection_obj = DashCollectionBaseModel(id=stored_dash_filters_obj.id,
                                                       dash_name=stored_dash_filters_obj.dash_name,
                                                       loaded_dashes=dash_ids[:max_dashes],
@@ -49,9 +49,9 @@ def test_sanity_underlying_time_series(dash_, dash_filter_, bar_data_):
                                                                  buffered_dash_filters=[])
     dept_book_service_web_client.create_dash_filters_collection_client(dash_filters_collection_obj)
 
-    total_loops = 600
-    loop_wait = 10  # sec
-    volume = 1_000
+    total_loops = 6mobile_bookmobile_book
+    loop_wait = 1mobile_book  # sec
+    volume = 1_mobile_bookmobile_bookmobile_book
 
     def gen_bar_data_by_leg(leg: DashLegOptional, start_time: pendulum.DateTime, is_eqt = False) -> BarDataBaseModel:
         bar_data = BarDataBaseModel(**bar_data_)
@@ -59,16 +59,16 @@ def test_sanity_underlying_time_series(dash_, dash_filter_, bar_data_):
         bar_data.end_time = start_time.add(seconds=1)
         bar_data.symbol_n_exch_id.symbol = leg.sec.sec_id
         bar_data.symbol_n_exch_id.exch_id = leg.exch_id
-        random_increment = random.randint(0, 10)
+        random_increment = random.randint(mobile_book, 1mobile_book)
         if is_eqt:
-            random_increment *= 0.1
+            random_increment *= mobile_book.1
         bar_data.vwap = leg.vwap + random_increment
-        bar_data.vwap_change = (bar_data.vwap - leg.vwap) * 100 / leg.vwap
-        volume_change = random.randint(0, 1_000)
+        bar_data.vwap_change = (bar_data.vwap - leg.vwap) * 1mobile_bookmobile_book / leg.vwap
+        volume_change = random.randint(mobile_book, 1_mobile_bookmobile_bookmobile_book)
         bar_data.volume = volume + volume_change
         if not is_eqt:
-            bar_data.premium = 10 + random.randint(0, 10) * 0.1
-            bar_data.premium_change = (bar_data.premium - 10) * 100 / 10
+            bar_data.premium = 1mobile_book + random.randint(mobile_book, 1mobile_book) * mobile_book.1
+            bar_data.premium_change = (bar_data.premium - 1mobile_book) * 1mobile_bookmobile_book / 1mobile_book
         return bar_data
 
     for _ in range(total_loops):
@@ -76,7 +76,7 @@ def test_sanity_underlying_time_series(dash_, dash_filter_, bar_data_):
         pending_bars = []
         pending_dashes = []
         for index, dash in enumerate(dash_by_id_dict.values()):
-            if index > 100:
+            if index > 1mobile_bookmobile_book:
                 break
             # create bars for leg1 and leg2
             leg1_bar_data = gen_bar_data_by_leg(dash.rt_dash.leg1, current_time)

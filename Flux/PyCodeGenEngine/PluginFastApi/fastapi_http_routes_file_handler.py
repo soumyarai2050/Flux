@@ -95,6 +95,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += mutex_handling_str
         output_str += " " * indent_count + \
                       f"    await callback_class.create_{message_name_snake_cased}_pre({message_name_snake_cased})\n"
+        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+        indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
                       f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
@@ -135,6 +138,11 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"return_obj_copy=return_obj_copy)\n")
         output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased}_obj)\n"
         output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj\n"
+        indent_count -= 4
+        output_str += " " * indent_count + f"    else:\n"
+        indent_count += 4
+        output_str += " " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_post({message_name_snake_cased})\n"
+        output_str += " " * indent_count + f"    return {message_name_snake_cased}\n"
         output_str += "\n"
         return output_str
 
@@ -173,6 +181,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += " " * indent_count + \
                       f"    await callback_class.create_all_{message_name_snake_cased}_pre(" \
                       f"{message_name_snake_cased}_list)\n"
+        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+        indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
                       f"        {message_name_snake_cased}_obj_list = await generic_callable({message.proto.name}, " \
@@ -219,6 +230,11 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"return_obj_copy=return_obj_copy)\n")
         output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_obj_list)\n"
         output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj_list\n"
+        indent_count -= 4
+        output_str += " " * indent_count + f"    else:\n"
+        indent_count += 4
+        output_str += " " * indent_count + f"    await callback_class.create_all_{message_name_snake_cased}_post({message_name_snake_cased}_list)\n"
+        output_str += " " * indent_count + f"    return {message_name_snake_cased}_list\n"
         output_str += "\n"
         return output_str
 
@@ -475,6 +491,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                             f"await callback_class.partial_update_{message_name_snake_cased}_pre("
                                             f"stored_{message_name_snake_cased}_obj, "
                                             f"{message_name_snake_cased}_update_req_json)\n")
+        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+        indent_count += 4
         output_str += " " * indent_count + f"    if {message_name_snake_cased}_update_req_json is None:\n"
         output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
                                             f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
@@ -524,6 +543,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
                                f"{message_name_snake_cased}_update_req_json, has_links={msg_has_links}, "
                                f"return_obj_copy=return_obj_copy)\n")
+        indent_count -= 4
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + (f"        updated_{message_name_snake_cased}_obj = await "
+                                            f"generic_patch_without_db_update_http({message.proto.name}, "
+                                            f"copy.deepcopy(stored_{message_name_snake_cased}_obj), "
+                                            f"{message_name_snake_cased}_update_req_json, "
+                                            f"return_obj_copy=return_obj_copy)\n")
+        indent_count -= 4
         output_str += " " * indent_count + f"    await callback_class.partial_update_{message_name_snake_cased}_post(" \
                                            f"stored_{message_name_snake_cased}_obj, updated_{message_name_snake_cased}_obj)\n"
         output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj\n"
@@ -666,9 +693,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                             f"await callback_class.partial_update_all_{message_name_snake_cased}_pre("
                                             f"stored_{message_name_snake_cased}_obj_list, "
                                             f"{message_name_snake_cased}_update_req_json_list)\n")
+        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
+                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+        indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
-                      f"        updated_{message_name_snake_cased}_obj = await generic_callable(" \
+                      f"        updated_{message_name_snake_cased}_obj_list = await generic_callable(" \
                       f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                       f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
                       f"{message_name_snake_cased}_update_req_json_list, obj_id_list, filter_agg_pipeline, " \
@@ -677,7 +707,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         match aggregation_type:
             case FastapiHttpRoutesFileHandler.aggregation_type_filter:
                 output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj =  await generic_callable(" \
+                              f"        updated_{message_name_snake_cased}_obj_list =  await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
                               f"{message_name_snake_cased}_update_req_json_list, obj_id_list, " \
@@ -688,7 +718,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
                                f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
@@ -699,7 +729,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     self.get_simple_option_value_from_proto(message,
                                                             FastapiHttpRoutesFileHandler.flux_msg_aggregate_query_var_name)
                 output_str += " " * indent_count + \
-                              (f"        updated_{message_name_snake_cased}_obj = await generic_callable("
+                              (f"        updated_{message_name_snake_cased}_obj_list = await generic_callable("
                                f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
                                f"{message_name_snake_cased}_update_req_json_list, obj_id_list, "
@@ -708,16 +738,24 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f"return_obj_copy=return_obj_copy)\n")
             case other:
                 output_str += " " * indent_count + \
-                              f"        updated_{message_name_snake_cased}_obj = await generic_callable(" \
+                              f"        updated_{message_name_snake_cased}_obj_list = await generic_callable(" \
                               f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                               f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), " \
                               f"{message_name_snake_cased}_update_req_json_list, obj_id_list, " \
                               f"has_links={msg_has_links}, return_obj_copy=return_obj_copy)\n"
+        indent_count -= 4
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + (f"        updated_{message_name_snake_cased}_obj_list = await "
+                                            f"generic_patch_all_without_db_update_http({message.proto.name}, "
+                                            f"copy.deepcopy(stored_{message_name_snake_cased}_obj_list), "
+                                            f"{message_name_snake_cased}_update_req_json_list, "
+                                            f"return_obj_copy=return_obj_copy)\n")
+        indent_count -= 4
         output_str += " " * indent_count + (f"    await callback_class.partial_update_all_"
                                             f"{message_name_snake_cased}_post("
                                             f"stored_{message_name_snake_cased}_obj_list, "
-                                            f"updated_{message_name_snake_cased}_obj)\n")
-        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj\n"
+                                            f"updated_{message_name_snake_cased}_obj_list)\n")
+        output_str += " " * indent_count + f"    return updated_{message_name_snake_cased}_obj_list\n"
         output_str += "\n"
         return output_str
 

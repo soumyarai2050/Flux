@@ -1,5 +1,5 @@
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.strat_manager_service_routes_callback_base_native_override import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.strat_manager_service_routes_callback_base_native_override import *
 
 
 class StratManagerServiceRoutesCallbackCacheNativeOverride(StratManagerServiceRoutesCallbackBaseNativeOverride):

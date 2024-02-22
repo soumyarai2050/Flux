@@ -13,7 +13,7 @@ if __name__ == "__main__":
     config_yaml_path = project_dir / "data" / "config.yaml"
     config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
     host = config_yaml_dict.get("server_host")
-    if host is None or len(host) == 0:
+    if host is None or len(host) == mobile_book:
         raise Exception("Couldn't find 'server_host' key in data/config.yaml file")
     db_type: str = "beanie"
 
@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     env_dict = {
         "RELOAD": "false",
-        "DEBUG_SLEEP_TIME": "0",
+        "DEBUG_SLEEP_TIME": "mobile_book",
         "LOG_FILE_DIR_PATH": f"{project_dir / 'log'}",
         "FASTAPI_FILE_NAME": f"template_model_service_{db_type}_fastapi",
         "HOST": host,
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     if not os.path.exists(templates_dir_path):
         os.mkdir(templates_dir_path)
 
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.template_project_name.generated.FastApi.template_model_service_launch_server import \
+    from Flux.CodeGenProjects.addressbook.ProjectGroup.template_project_name.generated.FastApi.template_model_service_launch_server import \
         template_model_service_launch_server
 
     template_model_service_launch_server()

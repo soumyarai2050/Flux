@@ -10,7 +10,7 @@ from ibapi.common import TickerId, TickAttrib
 from ibapi.ticktype import TickTypeEnum, TickType
 
 # Local project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
+from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
 
 os.environ["DBType"] = "beanie"
@@ -22,7 +22,7 @@ class StoreMobileBookClient(IbApiClient):
     def __init__(self, config_yaml: Dict):
         required_config_data_keys = ["generic_tick_list", "snapshot", "regulatory_snapshot"]
         super().__init__(config_yaml, required_config_data_keys)
-        self.generic_tick_list: str = self.config_yaml[required_config_data_keys[0]]  # sample: "233, 221"
+        self.generic_tick_list: str = self.config_yaml[required_config_data_keys[mobile_book]]  # sample: "233, 221"
         self.snapshot: bool = self.config_yaml[required_config_data_keys[1]]  # sample: False
         self.regulatory_snapshot: bool = self.config_yaml[required_config_data_keys[2]]  # sample: False
         self.mobile_book_service_web_client: MobileBookServiceWebClient = MobileBookServiceWebClient()
@@ -36,7 +36,7 @@ class StoreMobileBookClient(IbApiClient):
             Contract for which market data is being requested.
         genericTickList:str - A comma delimited list of generic tick types.
             Tick types can be found in the Generic Tick Types page
-            https://interactivebrokers.github.io/tws-api/classIBApi_1_1EClient.html#a7a19258a3a2087c07c1c57b93f659b63.
+            https://interactivebrokers.github.io/tws-api/classIBApi_1_1EClient.html#a7a19258a3a2mobile_book87cmobile_book7c1c57b93f659b63.
             Prefixing w/ 'mdoff' indicates that top mkt data shouldn't tick.
             You can specify the news source by post-fixing w/ ':<source>.
             Example: "mdoff,292:FLY+BRF"
@@ -44,7 +44,7 @@ class StoreMobileBookClient(IbApiClient):
             have the market data subscription cancel. Do not enter any
             genericTicklist values if you use snapshots.
         regulatorySnapshot: bool - With the US Value Snapshot Bundle for stocks,
-            regulatory snapshots are available for 0.01 USD each.
+            regulatory snapshots are available for mobile_book.mobile_book1 USD each.
         """
         self.reqMobileBookType(StoreMobileBookClient.live_mobile_book)
         for idx, contract in enumerate(self.contracts):

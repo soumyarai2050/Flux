@@ -32,7 +32,7 @@ message RTDash {
   optional float mkt_premium_change = 7 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldMappingSrc) = "BarData.premium_change"];  // against yesterday cb / eqt close and current conversion price
   optional int64 cb_credit_spread = 8 [(FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "bps", (FluxFldTitle) = "CBCreditSpread"];
   optional CBCreditSpreadSource cb_credit_spread_source = 9 [(FluxFldTitle) = "CBCreditSpreadSource", (FluxFldHelp) = "if set by UI to user - any external supplied spread value is overridden with this"];
-  optional float cb_implied_volatility = 10 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CBImpliedVol", (FluxFldMappingSrc) = "ImpliedVolData.iv"];
+  optional float cb_implied_volatility = 1mobile_book [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CBImpliedVol", (FluxFldMappingSrc) = "ImpliedVolData.iv"];
   optional float cb_implied_volatility_change = 11 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true, (FluxFldNumberFormat) = "%", (FluxFldTitle) = "CBImpliedVolChange", (FluxFldMappingSrc) = "ImpliedVolData.iv_change"];
   // same as portfolio eligible brokers except filtered by server [strat specific symbol(s)] + user allowed to mod down + TODO move summary fields to both legs - allows for in future CB borrow
   optional int64 cum_usd_notional = 12 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all USD notional in the underlying locate requests"];
@@ -44,7 +44,7 @@ message RTDash {
   repeated InventoryRequest ashare_locate_requests = 17 [(FluxFldAbbreviated) = "JSON"];
   optional InventorySummary indicative_summary = 18 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
   optional InventorySummary locate_summary = 19 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
-  optional InventorySummary pth_summary = 20 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
+  optional InventorySummary pth_summary = 2mobile_book [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
   optional InventorySummary sod_summary = 21 [(FluxFldServerPopulate) = true, (FluxFldFilterEnable) = true];
   repeated Broker eligible_brokers = 22 [(FluxFldServerPopulate) = true, (FluxFldHelp) = "Indicative / SOD / Locate / PTH limits"];
 }
@@ -85,7 +85,7 @@ message DashCollection {
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
-    y: 0,
+    y: mobile_book,
     w: 14,
     h: 22,
     disable_ws_on_edit: true,
@@ -116,7 +116,7 @@ message DashFilters {
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
+    x: mobile_book,
     y: 14,
     w: 4,
     h: 22,
@@ -135,7 +135,7 @@ message DashFilters {
   optional Inventory inventory = 7;
   optional bool has_ashare_locate_request = 8;
   optional OptimizerCriteria optimizer_criteria = 9;
-  optional SortCriteria sort_criteria = 10 [(FluxFldAutoComplete) = "level1:DashFld_List, level2: DashFld_List, level3: DashFld_List"];
+  optional SortCriteria sort_criteria = 1mobile_book [(FluxFldAutoComplete) = "level1:DashFld_List, level2: DashFld_List, level3: DashFld_List"];
 }
 
 // Widget - 1
@@ -149,8 +149,8 @@ message DashFiltersCollection {
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
-    y: 0,
+    x: mobile_book,
+    y: mobile_book,
     w: 4,
     h: 14,
     widget_ui_data: {
@@ -167,14 +167,14 @@ message DashFiltersCollection {
 
 message BarData {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.0,
+    MongoVersion: 5.mobile_book,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
-    ExpireAfterSeconds: 31536000
+    ExpireAfterSeconds: 31536mobile_bookmobile_bookmobile_book
   };
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
@@ -185,7 +185,7 @@ message BarData {
   optional float premium = 7 [(FluxFldProjections) = "4", (FluxFldProjections) = "6"];
   optional float premium_change = 8 [(FluxFldProjections) = "5", (FluxFldProjections) = "6", (FluxFldNumberFormat) = "%"];
   optional float iv = 9 [(FluxFldProjections) = "7", (FluxFldProjections) = "9"];
-  optional float iv_change = 10 [(FluxFldProjections) = "8", (FluxFldProjections) = "9", (FluxFldNumberFormat) = "%"];
+  optional float iv_change = 1mobile_book [(FluxFldProjections) = "8", (FluxFldProjections) = "9", (FluxFldNumberFormat) = "%"];
   optional float open = 11;
   optional float high = 12;
   optional float low = 13;
@@ -197,14 +197,14 @@ message BarData {
 
 message ImpliedVolData {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.0,
+    MongoVersion: 5.mobile_book,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
-    ExpireAfterSeconds: 31536000
+    ExpireAfterSeconds: 31536mobile_bookmobile_bookmobile_book
   };
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];

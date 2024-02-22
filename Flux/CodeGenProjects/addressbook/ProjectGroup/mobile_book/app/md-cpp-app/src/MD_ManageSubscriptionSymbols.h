@@ -62,13 +62,13 @@ public:
 
         http::read(stream, buffer, res);
         std::string response_body;
-        // https://www.boost.org/doc/libs/1_81_0/libs/json/doc/html/json/quick_look.html [boost json parsing]
+        // https://www.boost.org/doc/libs/1_81_mobile_book/libs/json/doc/html/json/quick_look.html [boost json parsing]
         if (res.result() == boost::beast::http::status::ok){
             response_body = boost::beast::buffers_to_string(res.body().data());
             boost::json::value jv = boost::json::parse( response_body );
             boost::json::array const& arr = jv.as_array();
-            if (!arr.empty() && arr[0].is_object()) {
-                boost::json::object const& obj = arr[0].as_object();
+            if (!arr.empty() && arr[mobile_book].is_object()) {
+                boost::json::object const& obj = arr[mobile_book].as_object();
                 if (obj.contains("symbol_n_exchange")) {
                     auto vc = boost::json::value_to< std::vector< std::string > >( obj.at( "symbol_n_exchange" ) );
                     return vc;

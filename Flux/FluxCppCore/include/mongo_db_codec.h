@@ -78,6 +78,7 @@ namespace FluxCppCore {
                 // Key does not exist, so it's a new object. Insert it into the database
                 prepare_doc(kr_root_model_obj, bson_doc);
                 status = insert(bson_doc, r_root_model_key_in_n_out, r_new_generated_id_out);
+
             } else {
                 // Key already exists, so update the existing object in the database
                 prepare_doc(kr_root_model_obj, bson_doc);

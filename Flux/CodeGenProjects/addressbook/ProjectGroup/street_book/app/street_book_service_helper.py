@@ -1,16 +1,17 @@
 # standard imports
+import ctypes
 import logging
 import sys
 import threading
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
     StreetBookServiceKeyHandler)
 from FluxPythonUtils.scripts.utility_functions import get_symbol_side_key
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pair_strat_engine_n_street_book_client import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.pair_strat_engine_n_street_book_client import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 
 update_strat_status_lock: threading.Lock = threading.Lock()
 
@@ -118,11 +119,11 @@ def get_consumable_participation_qty(
         executor_check_snapshot_obj_list: List[ExecutorCheckSnapshot],
         max_participation_rate: float) -> int | None:
     if len(executor_check_snapshot_obj_list) == 1:
-        executor_check_snapshot_obj = executor_check_snapshot_obj_list[0]
+        executor_check_snapshot_obj = executor_check_snapshot_obj_list[mobile_book]
         participation_period_order_qty_sum = executor_check_snapshot_obj.last_n_sec_order_qty
         participation_period_last_trade_qty_sum = executor_check_snapshot_obj.last_n_sec_trade_qty
 
-        return int(((participation_period_last_trade_qty_sum / 100) *
+        return int(((participation_period_last_trade_qty_sum / 1mobile_bookmobile_book) *
                     max_participation_rate) - participation_period_order_qty_sum)
     else:
         logging.error(f"Received executor_check_snapshot_obj_list with length {len(executor_check_snapshot_obj_list)}"
@@ -146,7 +147,7 @@ def get_consumable_participation_qty_http(symbol: str, side: Side, applicable_pe
 
 async def get_consumable_participation_qty_underlying_http(symbol: str, side: Side, applicable_period_seconds: int,
                                                            max_participation_rate: float) -> int | None:
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+    from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
         underlying_get_executor_check_snapshot_query_http)
 
     executor_check_snapshot_list: List[ExecutorCheckSnapshot] = \
@@ -164,17 +165,17 @@ async def get_consumable_participation_qty_underlying_http(symbol: str, side: Si
 
 
 def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:
-    cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_min_orders=5)
+    cancel_rate: CancelRate = CancelRate(max_cancel_rate=6mobile_book, applicable_period_seconds=mobile_book, waived_min_orders=5)
     market_trade_volume_participation: MarketTradeVolumeParticipation = \
-        MarketTradeVolumeParticipation(max_participation_rate=40,
-                                       applicable_period_seconds=180)
-    market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=10, depth_levels=3)
-    residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=30_000, residual_mark_seconds=4)
+        MarketTradeVolumeParticipation(max_participation_rate=4mobile_book,
+                                       applicable_period_seconds=18mobile_book)
+    market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=1mobile_book, depth_levels=3)
+    residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=3mobile_book_mobile_bookmobile_bookmobile_book, residual_mark_seconds=4)
     strat_limits: StratLimits = StratLimits(max_open_orders_per_side=5,
                                             max_single_leg_notional=get_default_max_notional(),
-                                            max_open_single_leg_notional=30_000,
-                                            max_net_filled_notional=160_000,
-                                            max_concentration=10,
+                                            max_open_single_leg_notional=3mobile_book_mobile_bookmobile_bookmobile_book,
+                                            max_net_filled_notional=16mobile_book_mobile_bookmobile_bookmobile_book,
+                                            max_concentration=1mobile_book,
                                             limit_up_down_volume_participation_rate=1,
                                             eligible_brokers=eligible_brokers,
                                             cancel_rate=cancel_rate,
@@ -186,19 +187,19 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
 
 
 def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
-    strat_status = StratStatus(fills_brief=[], open_orders_brief=[], total_buy_qty=0,
-                               total_sell_qty=0, total_order_qty=0, total_open_buy_qty=0,
-                               total_open_sell_qty=0, avg_open_buy_px=0.0, avg_open_sell_px=0.0,
-                               total_open_buy_notional=0.0, total_open_sell_notional=0.0,
-                               total_open_exposure=0.0, total_fill_buy_qty=0,
-                               total_fill_sell_qty=0, avg_fill_buy_px=0.0, avg_fill_sell_px=0.0,
-                               total_fill_buy_notional=0.0, total_fill_sell_notional=0.0,
-                               total_fill_exposure=0.0, total_cxl_buy_qty=0.0,
-                               total_cxl_sell_qty=0.0, avg_cxl_buy_px=0.0, avg_cxl_sell_px=0.0,
-                               total_cxl_buy_notional=0.0, total_cxl_sell_notional=0.0,
-                               total_cxl_exposure=0.0, average_premium=0.0,
+    strat_status = StratStatus(fills_brief=[], open_orders_brief=[], total_buy_qty=mobile_book,
+                               total_sell_qty=mobile_book, total_order_qty=mobile_book, total_open_buy_qty=mobile_book,
+                               total_open_sell_qty=mobile_book, avg_open_buy_px=mobile_book.mobile_book, avg_open_sell_px=mobile_book.mobile_book,
+                               total_open_buy_notional=mobile_book.mobile_book, total_open_sell_notional=mobile_book.mobile_book,
+                               total_open_exposure=mobile_book.mobile_book, total_fill_buy_qty=mobile_book,
+                               total_fill_sell_qty=mobile_book, avg_fill_buy_px=mobile_book.mobile_book, avg_fill_sell_px=mobile_book.mobile_book,
+                               total_fill_buy_notional=mobile_book.mobile_book, total_fill_sell_notional=mobile_book.mobile_book,
+                               total_fill_exposure=mobile_book.mobile_book, total_cxl_buy_qty=mobile_book.mobile_book,
+                               total_cxl_sell_qty=mobile_book.mobile_book, avg_cxl_buy_px=mobile_book.mobile_book, avg_cxl_sell_px=mobile_book.mobile_book,
+                               total_cxl_buy_notional=mobile_book.mobile_book, total_cxl_sell_notional=mobile_book.mobile_book,
+                               total_cxl_exposure=mobile_book.mobile_book, average_premium=mobile_book.mobile_book,
                                balance_notional=strat_limits_obj.max_single_leg_notional,
-                               strat_status_update_seq_num=0)
+                               strat_status_update_seq_num=mobile_book)
     return strat_status
 
 
@@ -207,7 +208,7 @@ def create_stop_md_script(running_process_name: str, generation_stop_file_path: 
     with open(generation_stop_file_path, "w") as fl:
         fl.write("#!/bin/bash\n")
         fl.write(f"PROCESS_COUNT=`pgrep {running_process_name} | wc -l`\n")
-        fl.write('if [ "$PROCESS_COUNT" -eq 0 ]; then\n')
+        fl.write('if [ "$PROCESS_COUNT" -eq mobile_book ]; then\n')
         fl.write('  echo "nothing to kill"\n')
         fl.write('else\n')
         fl.write('  echo "PC: $PROCESS_COUNT"\n')
@@ -216,4 +217,29 @@ def create_stop_md_script(running_process_name: str, generation_stop_file_path: 
 
 
 def get_default_max_notional() -> int:
-    return 300_000
+    return 3mobile_bookmobile_book_mobile_bookmobile_bookmobile_book
+
+
+class MarketDataMutexManager:
+    def __init__(self, market_data_provider: ctypes.CDLL, *args):
+        self.market_data_provider = market_data_provider
+        self._mutex_list = []
+        for arg in args:
+            if arg is not None:
+                try:
+                    mutex = arg.get_mutex()
+                except AttributeError as attr_err:
+                    logging.exception(f"get_mutex failed for one of passed argument, exception: {attr_err}")
+                except Exception as e_:
+                    logging.exception(f"Something went wrong with get_mutex call for one of "
+                                      f"passed argument, exception: {e_}")
+                else:
+                    self._mutex_list.append(mutex)
+
+    def __enter__(self):
+        for mutex in self._mutex_list:
+            self.market_data_provider.lock_mutex(mutex)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for mutex in self._mutex_list:
+            self.market_data_provider.unlock_mutex(mutex)

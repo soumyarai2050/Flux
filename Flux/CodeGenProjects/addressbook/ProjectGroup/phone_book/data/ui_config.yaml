@@ -1,7 +1,7 @@
 ui_coordinates:
   StratLimits:
     x: 7
-    y: 0
+    y: mobile_book
     w: 11
     h: 12
   PortfolioLimits:
@@ -15,69 +15,69 @@ ui_coordinates:
     w: 7
     h: 8
   StratAlert:
-    x: 0
+    x: mobile_book
     y: 33
     w: 18
     h: 12
   PortfolioAlert:
-    x: 0
+    x: mobile_book
     y: 45
     w: 18
     h: 12
   StratBrief:
-    x: 0
+    x: mobile_book
     y: 57
-    w: 10
-    h: 10
+    w: 1mobile_book
+    h: 1mobile_book
   FxSymbolOverview:
-    x: 10
+    x: 1mobile_book
     y: 57
     w: 8
-    h: 10
+    h: 1mobile_book
   SymbolSideSnapshot:
-    x: 0
+    x: mobile_book
     y: 67
     w: 18
-    h: 10
+    h: 1mobile_book
   SymbolOverview:
-    x: 0
+    x: mobile_book
     y: 77
     w: 18
-    h: 10
+    h: 1mobile_book
   TopOfBook:
-    x: 0
+    x: mobile_book
     y: 87
     w: 18
-    h: 10
+    h: 1mobile_book
   MarketDepth:
-    x: 0
+    x: mobile_book
     y: 97
     w: 18
     h: 14
   LastTrade:
-    x: 0
+    x: mobile_book
     y: 111
     w: 18
     h: 14
   FillsJournal:
-    x: 0
+    x: mobile_book
     y: 125
     w: 18
-    h: 20
+    h: 2mobile_book
   OrderSnapshot:
-    x: 0
+    x: mobile_book
     y: 145
     w: 18
-    h: 20
+    h: 2mobile_book
   OrderJournal:
-    x: 0
+    x: mobile_book
     y: 165
     w: 18
-    h: 20
+    h: 2mobile_book
   ProcessedPerformanceAnalysis:
-    x: 0
+    x: mobile_book
     y: 185
     w: 18
-    h: 20
+    h: 2mobile_book
 
 

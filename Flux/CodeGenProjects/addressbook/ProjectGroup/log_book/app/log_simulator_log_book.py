@@ -8,10 +8,10 @@ os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.scripts.utility_functions import configure_logger, create_logger
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.pair_strat_engine_base_log_book import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.pair_strat_engine_base_log_book import (
     PairStratEngineBaseLogBook, StratLogDetail)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import log_book_service_http_client
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import log_book_service_http_client
 
 LOG_ANALYZER_DATA_DIR = (
     PurePath(__file__).parent.parent / "data"
@@ -21,7 +21,7 @@ portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs")))
 
 debug_mode: bool = False if ((debug_env := os.getenv("LS_LOG_ANALYZER_DEBUG")) is None or
-                             len(debug_env) == 0 or debug_env == "0") else True
+                             len(debug_env) == mobile_book or debug_env == "mobile_book") else True
 
 
 class LogSimulatorLogBook(PairStratEngineBaseLogBook):
@@ -30,6 +30,9 @@ class LogSimulatorLogBook(PairStratEngineBaseLogBook):
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
                  simulation_mode: bool = False):
         super().__init__(regex_file, log_details, log_prefix_regex_pattern_to_callable_name_dict, simulation_mode)
+        self.field_sep = get_field_seperator_pattern()
+        self.key_val_sep = get_key_val_seperator_pattern()
+        self.pattern_for_log_simulator = get_pattern_for_log_simulator()
         logging.info(f"starting log_simulator log analyzer. monitoring logs: {log_details}")
         if self.simulation_mode:
             print("CRITICAL: LogSimulator log analyzer running in simulation mode...")
@@ -74,17 +77,17 @@ class LogSimulatorLogBook(PairStratEngineBaseLogBook):
         try:
             if not self.simulation_mode:
                 raise Exception("Received trade simulator message but log analyzer not running in simulation mode")
-            # remove $$$ from beginning of message
-            message: str = message[3:]
-            args: List[str] = message.split("~~")
-            method_name: str = args.pop(0)
-            host: str = args.pop(0)
-            port: int = parse_to_int(args.pop(0))
+            # remove pattern_for_log_simulator from beginning of message
+            message: str = message[len(self.pattern_for_log_simulator):]
+            args: List[str] = message.split(self.field_sep)
+            method_name: str = args.pop(mobile_book)
+            host: str = args.pop(mobile_book)
+            port: int = parse_to_int(args.pop(mobile_book))
 
             kwargs: Dict[str, str] = dict()
-            # get method kwargs separated by "^^" if any
+            # get method kwargs separated by key_val_sep if any
             for arg in args:
-                key, value = arg.split("^^")
+                key, value = arg.split(self.key_val_sep)
                 kwargs[key] = value
 
             executor_web_client = self._get_executor_http_client_from_pair_strat(port, host)
@@ -101,14 +104,14 @@ class LogSimulatorLogBook(PairStratEngineBaseLogBook):
                                        alert_details=alert_details)
 
     def handle_log_simulator_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail):
+        logging.debug(f"Processing log simulator line: {log_message[:2mobile_bookmobile_book]}...")
         # put in method
-        if log_message.startswith("$$$"):
+        if log_message.startswith(self.pattern_for_log_simulator):
             # handle trade simulator message
-            logging.info(f"Trade simulator message: {log_message}")
+            logging.info(f"Trade simulator message: {log_message = }")
             self._process_trade_simulator_message(log_message)
             return
 
-        logging.debug(f"Processing log simulator line: {log_message[:200]}...")
         error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=log_prefix, log_message=log_message)
         if error_dict is not None:
             severity, alert_brief, alert_details = self._create_alert(error_dict)

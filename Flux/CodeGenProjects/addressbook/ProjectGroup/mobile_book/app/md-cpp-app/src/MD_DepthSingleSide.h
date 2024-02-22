@@ -20,8 +20,8 @@ namespace md_handler {
         }
 
         MD_DepthSingleSide(const int64_t qty_, const double px_, const int8_t position_, std::string symbol_,
-                           std::string side_, int64_t cumulativeQty_ = 0, double cumulativeNotional_ = 0,
-                           double cumulativeAvgPx_ = 0): qty(qty_), px(px_), position(position_), symbol(std::move(symbol_)),
+                           std::string side_, int64_t cumulativeQty_ = mobile_book, double cumulativeNotional_ = mobile_book,
+                           double cumulativeAvgPx_ = mobile_book): qty(qty_), px(px_), position(position_), symbol(std::move(symbol_)),
                         side(std::move(side_)), cumulative_qty(cumulativeQty_), cumulative_notional(cumulativeNotional_),
                         cumulative_avg_px(cumulativeAvgPx_){
             position_symbol_side_key = get_pos_symbol_side_key(position, symbol, side);
@@ -42,14 +42,14 @@ namespace md_handler {
         MD_DepthSingleSide(int8_t position_, std::string side_):position(position_), side(std::move(side_)){}
 
         void reset(){
-            qty = 0;
-            px = 0;
+            qty = mobile_book;
+            px = mobile_book;
             symbol.clear();
             position_symbol_side_key.clear();
-            cumulative_qty = 0;
-            cumulative_notional = 0;
-            cumulative_avg_px = 0;
-            milliseconds_since_epoch = 0;
+            cumulative_qty = mobile_book;
+            cumulative_notional = mobile_book;
+            cumulative_avg_px = mobile_book;
+            milliseconds_since_epoch = mobile_book;
             is_empty = true;
         }
 
@@ -133,15 +133,15 @@ namespace md_handler {
         }
 
     protected:
-        int64_t qty = 0;
-        double px = 0;
+        int64_t qty = mobile_book;
+        double px = mobile_book;
         int8_t position = -1;
         std::string symbol;
         std::string side;
-        int64_t cumulative_qty = 0;
-        double premium = 0;
-        double cumulative_notional = 0;
-        double cumulative_avg_px = 0;
+        int64_t cumulative_qty = mobile_book;
+        double premium = mobile_book;
+        double cumulative_notional = mobile_book;
+        double cumulative_avg_px = mobile_book;
         int64_t milliseconds_since_epoch{};
 
     private:

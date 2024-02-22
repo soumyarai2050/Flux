@@ -44,9 +44,9 @@ message PortfolioLimits{
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 max_open_baskets = 2 [(FluxFldValMin) = "50", (FluxFldHelp) = "max simultaneous open orders allowed per side for this portfolio"];
-  optional float max_open_notional_per_side = 3[(FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000"];
-  optional float max_gross_n_open_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "50000000", (FluxFldHelp) = "aggregated buy+sell: open+executed max allowed notional"];
+  optional int32 max_open_baskets = 2 [(FluxFldValMin) = "5mobile_book", (FluxFldHelp) = "max simultaneous open orders allowed per side for this portfolio"];
+  optional float max_open_notional_per_side = 3[(FluxFldDisplayType) = "int", (FluxFldValMax) = "1mobile_bookmobile_bookmobile_bookmobile_bookmobile_bookmobile_bookmobile_book"];
+  optional float max_gross_n_open_notional = 4 [(FluxFldDisplayType) = "int", (FluxFldValMax) = "5mobile_bookmobile_bookmobile_bookmobile_bookmobile_bookmobile_bookmobile_book", (FluxFldHelp) = "aggregated buy+sell: open+executed max allowed notional"];
   optional RollingMaxOrderCount rolling_max_order_count = 5 [(FluxFldHelp) = "Allowed order count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
   optional RollingMaxOrderCount rolling_max_reject_count = 6 [(FluxFldHelp) = "Allowed rejection count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
   // auto update symbol's availability when allocated/consumed by strat(block strat creation if not enough availability), this has both limit and status in Position
@@ -71,10 +71,10 @@ message FxSymbolOverview{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: 10,
+    x: 1mobile_book,
     y: 57,
     w: 8,
-    h: 10,
+    h: 1mobile_book,
     is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
@@ -97,7 +97,7 @@ message FxSymbolOverview{
   optional float limit_dn_px = 7;
   optional float conv_px = 8;
   optional float closing_px = 9;
-  optional float open_px = 10;
+  optional float open_px = 1mobile_book;
   optional float high = 11;
   optional float low = 12;
   optional int64 volume = 13;

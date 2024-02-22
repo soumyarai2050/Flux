@@ -1079,19 +1079,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return json_msg_str
 
     def __handle_auto_complete_output(self, json_content: Dict) -> str:
-        json_msg_str = '  "autocomplete": {\n'
-        for auto_title, auto_list in json_content["autocomplete"].items():
-            json_msg_str += f'    "{auto_title}": [\n'
-            for auto_value in auto_list:
-                if auto_value != auto_list[-1]:
-                    json_msg_str += f'      "{auto_value}",\n'
-                else:
-                    json_msg_str += f'      "{auto_value}"\n'
-            if auto_title != list(json_content["autocomplete"])[-1]:
-                json_msg_str += f'    ],\n'
-            else:
-                json_msg_str += f'    ]\n'
-        json_msg_str += '  }\n'
+        json_msg_str = f'  "autocomplete": ' + f"{json.dumps(json_content['autocomplete'], indent=4)}\n"
         return json_msg_str
 
     def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):

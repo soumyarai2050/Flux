@@ -24,20 +24,20 @@ NewProjectTitleCaseName=$(echo "$NEW_PROJECT_NAME" |  gsed -E "s/(^|_)([a-z])/ \
 ExistingProjectTitleCaseName=$(echo "$EXISTING_PROJECT_NAME" |  gsed -E "s/(^|_)([a-z])/ \u\2/g" | xargs)  # xargs cleans up extra spaces
 
 
-
+# exclude gen_scripts.sh from search n replace to prevent resource busy error as it is the caller of this script
 echo "replacing any text occurrence of: $EXISTING_PROJECT_NAME with: $NEW_PROJECT_NAME in $PWD recursively"
-find . -type f -exec gsed -i -E "s#$EXISTING_PROJECT_NAME#$NEW_PROJECT_NAME#g" {} +
+find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#$EXISTING_PROJECT_NAME#$NEW_PROJECT_NAME#g" {} +
 echo "replacing any text occurrence of: $EXISTING_SERVICE_NAME with: $NEW_SERVICE_NAME in $PWD recursively"
-find . -type f -exec gsed -i -E "s#$EXISTING_SERVICE_NAME#$NEW_SERVICE_NAME#g" {} +
+find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#$EXISTING_SERVICE_NAME#$NEW_SERVICE_NAME#g" {} +
 echo "replacing any CapitalizedCamelCase text occurrence of: $ExistingProjectCamelCaseName with: $NewProjectCamelCaseName in $PWD recursively"
-find . -type f -exec gsed -i -E "s#$ExistingProjectCamelCaseName#$NewProjectCamelCaseName#g" {} +
+find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#$ExistingProjectCamelCaseName#$NewProjectCamelCaseName#g" {} +
 if [ "$ExistingProjectCamelCaseName" != "$ExistingProjectTitleCaseName" ]; then
   echo "replacing any Title Case Text occurrence of: $ExistingProjectTitleCaseName with: $NewProjectTitleCaseName in $PWD recursively"
-  find . -type f -exec gsed -i -E "s#$ExistingProjectTitleCaseName#$NewProjectTitleCaseName#g" {} +
+  find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#$ExistingProjectTitleCaseName#$NewProjectTitleCaseName#g" {} +
 fi
 
 # updating generated gen_scripts to have code specific to this project group
 echo "replacing any text occurrence of: CodeGenEngineEnvManager with: TradingGenEngineEnv and replacing their import statements in $PWD recursively"
-find . -type f -exec gsed -i -E "s#from Flux.code_gen_engine_env import CodeGenEngineEnvManager#from Flux.CodeGenProjects.AddressBook.trading_gen_engine_env import TradingGenEngineEnv#g" {} +
-find . -type f -exec gsed -i -E "s#CodeGenEngineEnvManager#TradingGenEngineEnv#g" {} +
+find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#from Flux.code_gen_engine_env import CodeGenEngineEnvManager#from Flux.CodeGenProjects.addressbook.trading_gen_engine_env import TradingGenEngineEnv#g" {} +
+find . -type f ! -name "gen_scripts.sh" -exec gsed -i -E "s#CodeGenEngineEnvManager#TradingGenEngineEnv#g" {} +
 

@@ -25,7 +25,7 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, st
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': 1,
                 'projection_models': {
                     'start_time': '$start_time',
@@ -43,14 +43,14 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, st
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': '$_id',
                 'projection_models': 1
             }
         }
     ]
     if id_list is not None:
-        agg_pipeline[0]['$match'] = {
+        agg_pipeline[mobile_book]['$match'] = {
             '_id': {
                 '$in': id_list
             }
@@ -116,7 +116,7 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, ex
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': 1,
                 'projection_models': {
                     'start_time': '$start_time',
@@ -135,14 +135,14 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, ex
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': '$_id',
                 'projection_models': 1
             }
         }
     ]
     if id_list is not None:
-        agg_pipeline[0]['$match'] = {
+        agg_pipeline[mobile_book]['$match'] = {
             '_id': {
                 '$in': id_list
             }
@@ -208,7 +208,7 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: 
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': 1,
                 'projection_models': {
                     'start_time': '$start_time',
@@ -226,14 +226,14 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: 
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': '$_id',
                 'projection_models': 1
             }
         }
     ]
     if id_list is not None:
-        agg_pipeline[0]['$match'] = {
+        agg_pipeline[mobile_book]['$match'] = {
             '_id': {
                 '$in': id_list
             }
@@ -299,7 +299,7 @@ def get_premium_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str,
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': 1,
                 'projection_models': {
                     'start_time': '$start_time',
@@ -317,14 +317,14 @@ def get_premium_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str,
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': '$_id',
                 'projection_models': 1
             }
         }
     ]
     if id_list is not None:
-        agg_pipeline[0]['$match'] = {
+        agg_pipeline[mobile_book]['$match'] = {
             '_id': {
                 '$in': id_list
             }
@@ -390,7 +390,7 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol: s
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': 1,
                 'projection_models': {
                     'start_time': '$start_time',
@@ -409,14 +409,14 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol: s
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': '$_id',
                 'projection_models': 1
             }
         }
     ]
     if id_list is not None:
-        agg_pipeline[0]['$match'] = {
+        agg_pipeline[mobile_book]['$match'] = {
             '_id': {
                 '$in': id_list
             }
@@ -482,7 +482,7 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_i
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': 1,
                 'projection_models': {
                     'start_time': '$start_time',
@@ -500,14 +500,14 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(symbol: str, exch_i
         },
         {
             '$project': {
-                '_id': 0,
+                '_id': mobile_book,
                 'symbol_n_exch_id': '$_id',
                 'projection_models': 1
             }
         }
     ]
     if id_list is not None:
-        agg_pipeline[0]['$match'] = {
+        agg_pipeline[mobile_book]['$match'] = {
             '_id': {
                 '$in': id_list
             }

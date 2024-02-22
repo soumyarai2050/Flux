@@ -1,5 +1,5 @@
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.FastApi.mobile_book_service_routes_callback import MobileBookServiceRoutesCallback
+from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.generated.FastApi.mobile_book_service_routes_callback import MobileBookServiceRoutesCallback
 
 
 class MobileBookServiceRoutesCallbackCacheBareOverride(MobileBookServiceRoutesCallback):

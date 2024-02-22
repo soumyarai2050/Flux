@@ -18,8 +18,8 @@ namespace md_test{
 
 using namespace md_test;
 
-TEST(MobileBookHandlerTestSuite, StartUpTest){ // 12/2/2020 -> 737761
-    EXPECT_EQ(marketDepthCodec.get_md_key_to_db_id_size(), 0);
+TEST(MobileBookHandlerTestSuite, StartUpTest){ // 12/2/2mobile_book2mobile_book -> 737761
+    EXPECT_EQ(marketDepthCodec.get_md_key_to_db_id_size(), mobile_book);
 }
 
 TEST(MobileBookHandlerTestSuite, DeleteManyMarketDepthTest) {
@@ -29,35 +29,35 @@ TEST(MobileBookHandlerTestSuite, DeleteManyMarketDepthTest) {
 
     marketDepthCodec.delete_all_data_from_collection(bid_query);
     auto market_depth_bid_docs_count = marketDepthCodec.count_data_from_collection(bid_query);
-    ASSERT_EQ(market_depth_bid_docs_count, 0);
+    ASSERT_EQ(market_depth_bid_docs_count, mobile_book);
 
     bsoncxx::builder::stream::document ask_query;
     mobile_book_handler::get_symbol_side_query(symbol, "ASK", ask_query);
 
     auto market_depth_ask_docs_count = marketDepthCodec.count_data_from_collection(ask_query);
-    ASSERT_EQ(market_depth_ask_docs_count, 0);
+    ASSERT_EQ(market_depth_ask_docs_count, mobile_book);
 
     // delete all documents in collection and validate
     marketDepthCodec.delete_all_data_from_collection();
     auto market_depth_all_docs_count = marketDepthCodec.count_data_from_collection();
-    ASSERT_EQ(market_depth_all_docs_count, 0);
+    ASSERT_EQ(market_depth_all_docs_count, mobile_book);
 }
 
 TEST(MobileBookHandlerTestSuite, DeleteManyLastTradeTest) {
     // delete all specific symbol and side (defined in bid_query / ask_query ) documents and validate
     lastTradeCodec.delete_all_data_from_collection();
     auto last_trade_docs_count = lastTradeCodec.count_data_from_collection();
-    ASSERT_EQ(last_trade_docs_count, 0);
+    ASSERT_EQ(last_trade_docs_count, mobile_book);
 }
 
 TEST(MobileBookHandlerTestSuite, DeleteManyTopOfBookTest) {
     // delete all specific symbol and side (defined in bid_query / ask_query ) documents and validate
     topOfBookHandler.delete_all_data_from_collection();
     auto top_of_book_docs_count = topOfBookHandler.count_data_from_collection();
-    ASSERT_GE(top_of_book_docs_count, 0);
+    ASSERT_GE(top_of_book_docs_count, mobile_book);
 }
 
-TEST(MobileBookHandlerTestSuite, AggregateMarketDepthTest){ // 12/2/2020 -> 737761
+TEST(MobileBookHandlerTestSuite, AggregateMarketDepthTest){ // 12/2/2mobile_book2mobile_book -> 737761
 
     mobile_book_handler::MarketDepthHandler marketDepthHandler(sp_mongo_db);
     mobile_book::MarketDepthList market_depth_list;
@@ -72,7 +72,7 @@ TEST(MobileBookHandlerTestSuite, AggregateMarketDepthTest){ // 12/2/2020 -> 7377
         market_depth_list.add_market_depth()->CopyFrom(market_depth);
     }
 
-    for (int i = 0; i < market_depth_list.market_depth_size(); ++i) {
+    for (int i = mobile_book; i < market_depth_list.market_depth_size(); ++i) {
         mobile_book::MarketDepth test_data = market_depth_list.market_depth(i);
         marketDepthHandler.handle_md_update(test_data);
     }
@@ -83,7 +83,7 @@ TEST(MobileBookHandlerTestSuite, AggregateMarketDepthTest){ // 12/2/2020 -> 7377
     ASSERT_EQ(market_depth_list.DebugString(), db_data.DebugString());
 }
 
-TEST(MobileBookHandlerTestSuite, AggregateTickByTickAllLastTest){ // 12/2/2020 -> 737761
+TEST(MobileBookHandlerTestSuite, AggregateTickByTickAllLastTest){ // 12/2/2mobile_book2mobile_book -> 737761
 
     mobile_book_handler::LastTradeHandler lastTradeHandler(sp_mongo_db);
     mobile_book::LastTradeList last_trade_list;
@@ -95,7 +95,7 @@ TEST(MobileBookHandlerTestSuite, AggregateTickByTickAllLastTest){ // 12/2/2020 -
         last_trade_list.add_last_trade()->CopyFrom(last_trade);
     }
 
-    for (int i = 0; i < last_trade_list.last_trade_size(); ++i) {
+    for (int i = mobile_book; i < last_trade_list.last_trade_size(); ++i) {
         mobile_book::LastTrade test_data = last_trade_list.last_trade(i);
         lastTradeHandler.handle_last_trade_update(test_data);
     }

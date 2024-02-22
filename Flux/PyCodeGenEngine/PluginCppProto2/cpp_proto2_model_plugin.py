@@ -16,7 +16,8 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
 
-yaml_file_path: PurePath = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
+yaml_file_path: PurePath = PurePath(__file__).parent.parent.parent / "CodeGenProjects" / "TradeEngine" / "flux_core.yaml"
+flux_file_path: PurePath = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
 
 
 class CppProto2ModelPlugin(BaseProtoPlugin):
@@ -29,7 +30,9 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
         self.root_message_list: List[protogen.Message] = []
         self.root_message_name_list: List[str] = []
         self.core_or_util_files: List[str] = []
+        self.flux_core_or_util_files: List[str] = []
         self.options_files: List[str] = []
+        self.flux_options_files: List[str] = []
         self.dependency_file_list = []
         self.file_enum_list = []
 
@@ -51,6 +54,17 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
 
         self.options_files = parsed_yaml.get('options_files', [])
         self.core_or_util_files = parsed_yaml.get('core_or_util_files', [])
+        self.get_data_from_flux_yaml()
+
+    def get_data_from_flux_yaml(self):
+
+        with open(flux_file_path, "r") as yaml_file:
+            parsed_yaml = yaml.safe_load(yaml_file)
+
+        self.flux_options_files = (parsed_yaml.get('options_files', []))
+        self.flux_core_or_util_files = parsed_yaml.get('core_or_util_files', [])
+        # self.options_files.extend(options_files)
+        # self.core_or_util_files.extend(core_or_util_files)
 
     @staticmethod
     def generate_enum_value(enums: List[protogen.Enum]):
@@ -151,13 +165,15 @@ class CppProto2ModelPlugin(BaseProtoPlugin):
 
         for dependency in self.dependency_file_list:
             dependency_name: str = dependency.proto.name
-            if dependency_name not in self.core_or_util_files and dependency_name not in self.options_files:
+            if (dependency_name not in self.core_or_util_files and dependency_name not in self.flux_core_or_util_files
+                    and dependency_name not in self.flux_options_files):
+                # print(f"----------------------------------------{self.flux_options_files}----------------------------------")
                 for dependency_msg in dependency.messages:
                     dependency_list.append(dependency_msg.proto.name)
                     dependency_msg_list.append(dependency_msg)
                     dependency_dict[dependency_msg.proto.name] = dependency_msg
                 dependency_enum_list.append(dependency.enums)
-                # output_content += f'import "{dependency_name}";\n\n'
+                output_content += f'import "{dependency_name}";\n\n'
 
         dependency_file_msg_name_list = []
 

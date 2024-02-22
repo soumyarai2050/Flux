@@ -209,8 +209,8 @@ const Cell = (props) => {
                 const dynamicValuePath = collection.autocomplete.substring(collection.autocomplete.indexOf('.') + 1);
                 const dynamicValue = getValueFromReduxStoreFromXpath(reducerDict, dynamicValuePath);
                 if (schema.autocomplete.hasOwnProperty(dynamicValue)) {
-                    collection.options = schema.autocomplete[dynamicValue];
-                    if (!collection.options.includes(collection.value)) {
+                    collection.options = schema.autocomplete[schema.autocomplete[dynamicValue]];
+                    if (!collection.options.includes(collection.value) && !collection.ormNoUpdate && !collection.serverPopulate) {
                         collection.value = null;
                     }
                 }

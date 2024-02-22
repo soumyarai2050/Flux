@@ -1,22 +1,22 @@
 from threading import Thread
 
 from FluxPythonUtils.scripts.ws_reader import WSReader
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.trading_cache import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import StratCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_cache import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.strat_cache import StratCache
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_fills_journal_log_key, get_order_journal_log_key)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import is_ongoing_strat
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.trading_link import is_test_run
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.StreetBook.strat_manager_service_ws_data_manager import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import is_ongoing_strat
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link import is_test_run
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.StreetBook.strat_manager_service_ws_data_manager import \
     StratManagerServiceDataManager
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_ws_data_manager import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_ws_data_manager import (
     StreetBookServiceDataManager)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pair_strat_engine_n_street_book_client import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.pair_strat_engine_n_street_book_client import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel
 
 port = os.environ.get("PORT")
-if port is None or len(port) == 0:
+if port is None or len(port) == mobile_book:
     err_str = f"Env var 'PORT' received as {port}"
     logging.exception(err_str)
     raise Exception(err_str)
@@ -27,12 +27,13 @@ else:
 class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataManager):
 
     def __init__(self, executor_trigger_method: Callable,
-                 strat_cache: StratCache, ):
+                 strat_cache: StratCache, market_data_container_cache):
         StratManagerServiceDataManager.__init__(self, ps_host, ps_port, strat_cache)
         StreetBookServiceDataManager.__init__(self, host, port, strat_cache)
-        cpp_ws_url: str = f"ws://{host}:8083/"
+        cpp_ws_url: str = f"ws://{host}:8mobile_book83/"
         self.trading_cache: TradingCache = TradingCache()
         self.strat_cache: StratCache = strat_cache
+        self.market_data_container_cache = market_data_container_cache
         self.street_book = None
         self.street_book_thread: Thread | None = None
 
@@ -52,7 +53,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
             raise Exception(err_str)
 
         if is_test_run:
-            err_str_: str = f"strat executor running in test mode, is_test_run: {is_test_run}"
+            err_str_: str = f"strat executor running in test mode, {is_test_run = }"
             print(f"CRITICAL: {err_str_}")
             logging.critical(err_str_)
         # else not required
@@ -69,7 +70,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
         self.order_limits_ws_get_all_cont.register_to_run()
         self.system_control_ws_get_all_cont.register_to_run()
         # overriding pair strat ws_get_all_const to filter by id
-        pair_strat_obj = self.strat_cache.get_pair_strat()[0]
+        pair_strat_obj = self.strat_cache.get_pair_strat()[mobile_book]
         self.pair_strat_ws_get_all_cont = self.pair_strat_ws_get_by_id_client(False, pair_strat_obj.id)
         self.pair_strat_ws_get_all_cont.register_to_run()
         self.fx_symbol_overview_ws_get_all_cont.register_to_run()
@@ -109,12 +110,12 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
                     # this is a new pair strat for processing, start its own thread with new strat executor object
                     self.strat_cache.stopped = False
                     self.street_book, self.street_book_thread = (
-                        self.executor_trigger_method(self, self.strat_cache))
+                        self.executor_trigger_method(self, self.strat_cache, self.market_data_container_cache))
                     # update strat key to python processing thread
                 self.strat_cache.set_pair_strat(pair_strat_)
             if self.strat_status_ws_get_all_cont.notify:
                 self.strat_cache.notify_semaphore.release()
-            logging.debug(f"Updated pair_strat;;; pair_strat: {pair_strat_}")
+            logging.debug(f"Updated pair_strat;;; {pair_strat_ = }")
         else:
             if not self.strat_cache.stopped:
                 # strat_cache is not ongoing but is still running should be stopped
@@ -125,7 +126,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
                     self.strat_cache.stopped = True
                     self.strat_cache.notify_semaphore.release()
                 logging.warning(f"handle_pair_strat_get_by_id_ws: removed cache entry of non ongoing strat;;;"
-                                f"pair_strat: {pair_strat_}")
+                                f"{pair_strat_ = }")
             # else not required: fine if strat cache is non-ongoing and is not running(stopped is True)
 
     def handle_strat_brief_get_all_ws(self, strat_brief_: StratBriefBaseModel | StratBrief, **kwargs):
@@ -134,7 +135,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
         else:
             # don't log strat_brief_key here, it needs both legs (missing here): {get_strat_brief_log_key(strat_brief_)}
             logging.error(f"ignoring strat brief update - missing required pair_buy_side_trading_brief or pair_sell_"
-                          f"side_trading_brief;;;strat_brief: {strat_brief_}")
+                          f"side_trading_brief;;; {strat_brief_ = }")
 
     def underlying_handle_fills_journal_ws(self, **kwargs):
         fills_journal_ = kwargs.get("fills_journal_")
@@ -145,7 +146,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
         if not symbol_side_tuple:
             logging.error(f"Unknown order id: {fills_journal_.order_id} found for fill "
                           f"{get_fills_journal_log_key(fills_journal_)}, avoiding set_has_unack_leg update;;;"
-                          f"fill_journal: {fills_journal_}")
+                          f" {fills_journal_ = }")
             return
         symbol, side = symbol_side_tuple
 
@@ -155,7 +156,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
             self.strat_cache.set_has_unack_leg2(False)
         else:
             logging.error(f"unexpected: fills general with non-matching symbol found in pre-matched strat-cache "
-                          f"with key: {key}, fill journal symbol: {symbol}, fill_journal_key: "
+                          f"with {key = }, fill journal {symbol = }, fill_journal_key: "
                           f"{get_fills_journal_log_key(fills_journal_)}")
 
     def underlying_handle_order_journal_ws(self, **kwargs):
@@ -194,19 +195,19 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
         # interface to update order_journal in crash recovery, Must be used only if required
         with self.strat_cache.re_ent_lock:
             self.strat_cache.set_order_journal(order_journal_)
-        logging.debug(f"Updated order_journal cache in recovery;;; order_journal: {order_journal_}")
+        logging.debug(f"Updated order_journal cache in recovery;;; {order_journal_ = }")
 
     def handle_recovery_cancel_order(self, cancel_order_: CancelOrder | CancelOrderBaseModel):
         # interface to update cancel_order in crash recovery, Must be used only if required
         with self.strat_cache.re_ent_lock:
             self.strat_cache.set_cancel_order(cancel_order_)
-        logging.debug(f"Updated cancel_order cache in recovery;;; cancel_order: {cancel_order_}")
+        logging.debug(f"Updated cancel_order cache in recovery;;; {cancel_order_ = }")
 
     def handle_recovery_new_order(self, new_order_: NewOrder | NewOrderBaseModel):
         # interface to update new_order in crash recovery, Must be used only if required
         with self.strat_cache.re_ent_lock:
             self.strat_cache.set_new_order(new_order_)
-        logging.debug(f"Updated new_order cache in recovery;;; new_order: {new_order_}")
+        logging.debug(f"Updated new_order cache in recovery;;; {new_order_ = }")
 
     def handle_market_depth_get_all_ws(self, market_depth_: MarketDepthBaseModel | MarketDepth, **kwargs):
         if market_depth_.symbol in StratCache.fx_symbol_overview_dict:

@@ -7,14 +7,14 @@ import os
 os.environ["DBType"] = "beanie"
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.market_data.generated.Pydentic.market_data_service_model_imports import LastTradeBaseModel
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.market_data.generated.FastApi.market_data_service_http_client import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.market_data.generated.Pydentic.market_data_service_model_imports import LastTradeBaseModel
+from Flux.CodeGenProjects.addressbook.ProjectGroup.market_data.generated.FastApi.market_data_service_http_client import \
     MarketDataServiceHttpClient
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
+from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
 
 
 def test_last_trade_total_qty_sum(last_trade_fixture_list):
-    max_loop_count = 20
+    max_loop_count = 2mobile_book
     sec_gap_btw_trades = 5
 
     for loop_count in range(max_loop_count):

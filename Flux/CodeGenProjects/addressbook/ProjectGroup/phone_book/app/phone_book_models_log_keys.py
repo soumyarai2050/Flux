@@ -1,6 +1,6 @@
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.strat_manager_service_model_imports import PairStrat, \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.strat_manager_service_model_imports import PairStrat, \
     PairStratBaseModel, PairStratOptional
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StratExecutor.strat_manager_service_key_handler import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.StratExecutor.strat_manager_service_key_handler import \
     StratManagerServiceKeyHandler
 from FluxPythonUtils.scripts.utility_functions import get_symbol_side_key
 

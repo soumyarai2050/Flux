@@ -5,7 +5,7 @@ message (WARNING ${CMAKE_MODULE_PATH})
 find_package(Mongo REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(quill REQUIRED)
-
+find_package(Python REQUIRED COMPONENTS Development)
 
 set(libabsl_ROOT_PATH  /usr/local/lib)
 set(protobuf_lib ${libabsl_ROOT_PATH}/libprotobuf.a)
@@ -69,7 +69,8 @@ message(WARNING ${MONGO_INCLUDE_DIR})
 message(WARNING ${BSON_INCLUDE_DIR})
 
 include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR}
-        ${Protobuf_INCLUDE_DIRS} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore} /usr/local/lib/quill)
+        ${Protobuf_INCLUDE_DIRS} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
+        /usr/local/lib/quill /usr/include/python3.1mobile_book)
 
 set(MD_MODEL ../../generated/CppProto2)
 protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/mobile_book_service.proto)
@@ -83,12 +84,13 @@ set(SRC_FILES
 )
 
 message(SRC_FILES ${SRC_FILES})
-
+message(${Python_LIBRARIES})
 # Create shared library including dependencies
 add_library(mobile_book SHARED ${SRC_FILES})
 
 # Link dependencies to the shared library
 target_link_libraries(mobile_book
+        ${Python_LIBRARIES}
         ${MONGO_LIB}
         ${BSON_LIB}
         ${Protobuf_LIBRARIES}

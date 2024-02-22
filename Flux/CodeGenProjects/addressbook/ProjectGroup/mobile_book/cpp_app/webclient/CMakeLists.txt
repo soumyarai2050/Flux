@@ -11,7 +11,7 @@ set(CppTest ../../generated/generated/CppTest)
 set(CppUtilGen ../../generated/CppUtilGen)
 set(ProtoGenCc ../../generated/ProtoGenCc)
 set(PairStratEngineProtoGenCc ../../../pair_strat_engine/generated/ProtoGenCc)
-set(FluxCppCore ../../../../../Flux/FluxCppCore/include)
+set(FluxCppCore ../../../../../../FluxCppCore/include/)
 
 file(GLOB CppCodec_SRC ${CppCodec}/*)
 file(GLOB CppTest_SRC ${CppTest}/*)

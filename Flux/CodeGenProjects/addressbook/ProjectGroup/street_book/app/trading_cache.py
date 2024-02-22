@@ -1,6 +1,6 @@
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.StreetBook.strat_manager_service_base_trading_cache import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.StreetBook.strat_manager_service_base_trading_cache import \
     StratManagerServiceBaseTradingCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_base_trading_cache import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_base_trading_cache import \
     StreetBookServiceBaseTradingCache
 
 

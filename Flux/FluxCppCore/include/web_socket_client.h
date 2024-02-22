@@ -16,7 +16,7 @@
 #include <boost/asio/deadline_timer.hpp>
 
 #include "json_codec.h"
-#include "../../../../CodeGenProjects/market_data/generated/ProtoGenCc/market_data_service.pb.h"
+#include "../../CodeGenProjects/TradeEngine/ProjectGroup/market_data/generated/ProtoGenCc/market_data_service.pb.h"
 
 namespace beast = boost::beast;
 namespace http = beast::http;

@@ -15,10 +15,12 @@ class AppLogAnalyzer(LogAnalyzer, ABC):
                  raw_performance_data_model_type: Type[BaseModel],
                  log_details: List[LogDetail] | None = None,
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
-                 debug_mode: bool = False):
+                 debug_mode: bool = False,
+                 log_detail_type: Type[LogDetail] | None = None):
         super().__init__(regex_file, config_yaml_dict, performance_benchmark_webclient_object,
                          raw_performance_data_model_type, log_details=log_details,
-                         log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict)
+                         log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
+                         log_detail_type=log_detail_type)
         logging.info(f"starting pair_strat log analyzer. monitoring logs: {log_details}")
         self.severity_map: Dict[str, str] = {
             "error": "Severity_ERROR",

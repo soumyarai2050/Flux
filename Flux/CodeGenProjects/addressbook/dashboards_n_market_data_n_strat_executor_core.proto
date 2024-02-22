@@ -4,7 +4,7 @@ import "flux_options.proto";
 
 
 enum DummyEnumDMS{
-  DUMMY_DMS = 0;
+  DUMMY_DMS = mobile_book;
 }
 
 
@@ -21,7 +21,7 @@ message SymbolOverview{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: 0,
+    x: mobile_book,
     y: 33,
     w: 18,
     h: 11,
@@ -57,7 +57,7 @@ message SymbolOverview{
   optional float limit_dn_px = 7;
   optional float conv_px = 8;
   optional float closing_px = 9;
-  optional float open_px = 10;
+  optional float open_px = 1mobile_book;
   optional float high = 11;
   optional float low = 12;
   optional int64 volume = 13;

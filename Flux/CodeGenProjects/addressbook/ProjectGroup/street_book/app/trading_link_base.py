@@ -5,11 +5,11 @@ from typing import List, ClassVar, final, Dict, Final
 from pendulum import DateTime
 import os
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
     Security, Side
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import \
     OrderBrief, OrderJournal, OrderEventType
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pair_strat_engine_n_street_book_client import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.pair_strat_engine_n_street_book_client import *
 
 
 def add_to_texts(order_brief: OrderBrief, msg: str):
@@ -94,7 +94,7 @@ class TradingLinkBase(ABC):
                                           trading_sec_id: str | None = None, system_sec_id: str | None = None,
                                           underlying_account: str | None = None, msg: str | None = None) -> bool:
         """use for rejects New / Cxl for now - maybe other use cases in future"""
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes import (
             underlying_create_order_journal_http)
 
         security = Security(sec_id=system_sec_id)

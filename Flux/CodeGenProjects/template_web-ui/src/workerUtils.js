@@ -190,15 +190,18 @@ export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
 
 export function applyGetAllWebsocketUpdate(arr, obj, uiLimit) {
     const index = arr.findIndex(o => o[DB_ID] === obj[DB_ID]);
-    let updatedArr = arr.filter(o => o[DB_ID] !== obj[DB_ID]);
-    // if obj is not deleted object
-    if (Object.keys(obj) !== 1) {
-        // if index is not equal to -1, it is updated obj. If updated, replace the obj at the index
-        if (index !== -1) {
-            updatedArr.splice(index, 0, obj);
+    // if index is not equal to -1, object already exists
+    if (index !== -1) {
+        if (Object.keys(obj).length === 1) {
+            // deleted object update. remove the object at the index
+            arr.splice(index, 1);
         } else {
-            updatedArr.push(obj);
+            // replace the object with updated object at the index
+            arr.splice(index, 1, obj);
         }
+    } else {
+        // add the new object to the array
+        arr.push(obj);
     }
-    return updatedArr;
+    return arr;
 }

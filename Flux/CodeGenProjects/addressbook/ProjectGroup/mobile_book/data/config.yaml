@@ -1,19 +1,19 @@
 # ui specific configs
   # ui_port needs code regeneration if changed and it should ideally be symmetric with server port like
-  # if server port is 8020 then ui_port should be 3020
-ui_port: "3040"
+  # if server port is 8mobile_book2mobile_book then ui_port should be 3mobile_book2mobile_book
+ui_port: "3mobile_book4mobile_book"
 
 # server specific configs
-server_host: "127.0.0.1"
-main_server_beanie_port: "8025"
-main_server_cache_port: "8023"
-min_refresh_interval: 20
+server_host: "127.mobile_book.mobile_book.1"
+main_server_beanie_port: "8mobile_book25"
+main_server_cache_port: "8mobile_book23"
+min_refresh_interval: 2mobile_book
 custom_logger_lvls:
   - TIMING: 15
   - JUNK: 5
 
 log_mongo_uri: True
-mongo_server: "mongodb://localhost:27017"
+mongo_server: "mongodb://localhost:27mobile_book17"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
@@ -24,12 +24,12 @@ log_level: "debug"  # log lvl in int or basic log lvl name
 is_test_run: True
 
 symbol_cache_file_name: "SGX_symbols.csv"
-bar_data_fetch_interval: 1D   # Valid intervals: 1m,2m,5m,15m,30m,60m,90m,1h,1d,5d,1wk,1mo,3mo
-bar_data_fetch_period: "max"   # Valid periods: 1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max
+bar_data_fetch_interval: 1D   # Valid intervals: 1m,2m,5m,15m,3mobile_bookm,6mobile_bookm,9mobile_bookm,1h,1d,5d,1wk,1mo,3mo
+bar_data_fetch_period: "max"   # Valid periods: 1d,5d,1mo,3mo,6mo,1y,2y,5y,1mobile_booky,ytd,max
 db: "mobile_book"
 collection: "BarData"
 
 # below 2 configs accept datetime format value or None as string
-bar_data_df_start_datetime: "2018-11-02T16:00:00.000+00:00"
+bar_data_df_start_datetime: "2mobile_book18-11-mobile_book2T16:mobile_bookmobile_book:mobile_bookmobile_book.mobile_bookmobile_bookmobile_book+mobile_bookmobile_book:mobile_bookmobile_book"
 bar_data_df_end_datetime: "none"
 ticker_suffix: ".SI"

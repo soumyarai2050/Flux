@@ -1,12 +1,12 @@
 ui_coordinates:
   SymbolOverview:
-    x: 0
+    x: mobile_book
     y: 36
     w: 18
     h: 14
   PortfolioLimits:
-    x: 0
-    y: 50
+    x: mobile_book
+    y: 5mobile_book
     w: 18
     h: 14
 

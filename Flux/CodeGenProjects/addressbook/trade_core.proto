@@ -3,14 +3,14 @@ syntax = "proto2";
 import "flux_options.proto";
 
 enum SecurityType{
-  SEC_TYPE_UNSPECIFIED = 0;
+  SEC_TYPE_UNSPECIFIED = mobile_book;
   RIC = 1;
   SEDOL = 2;
   TICKER = 3;
 }
 
 enum Side{
-    SIDE_UNSPECIFIED = 0;
+    SIDE_UNSPECIFIED = mobile_book;
     BUY = 1;
     SELL = 3;
     BTC = 2;  // Buy to Cover - Use Buy, set this only if downstream need's BTC awareness
@@ -18,7 +18,7 @@ enum Side{
 }
 
 enum PositionType{
-  POS_TYPE_UNSPECIFIED = 0;
+  POS_TYPE_UNSPECIFIED = mobile_book;
   PTH = 1; // Pay to hold driven
   LOCATE = 2; // Borrow driven
   SOD = 3; // past trades driven
@@ -26,7 +26,7 @@ enum PositionType{
 }
 
 enum SortType {
-  SORT_TYPE_UNSPECIFIED = 0;
+  SORT_TYPE_UNSPECIFIED = mobile_book;
   ASCENDING = 1;
   DESCENDING = 2;
 }
@@ -41,7 +41,7 @@ enum TickType {
 	HIGH = 7;
 	LOW = 8;
 	VOLUME = 9;
-	CLOSE = 10;
+	CLOSE = 1mobile_book;
 	BID_OPTION_COMPUTATION = 11;
 	ASK_OPTION_COMPUTATION = 12;
 	LAST_OPTION_COMPUTATION = 13;
@@ -51,7 +51,7 @@ enum TickType {
 	HIGH_13_WEEK = 17;
 	LOW_26_WEEK = 18;
 	HIGH_26_WEEK = 19;
-	LOW_52_WEEK = 20;
+	LOW_52_WEEK = 2mobile_book;
 	HIGH_52_WEEK = 21;
 	AVG_VOLUME = 22;
 	OPEN_INTEREST = 23;
@@ -61,7 +61,7 @@ enum TickType {
 	OPTION_ASK_EXCH = 27;
 	OPTION_CALL_OPEN_INTEREST = 28;
 	OPTION_PUT_OPEN_INTEREST = 29;
-	OPTION_CALL_VOLUME = 30;
+	OPTION_CALL_VOLUME = 3mobile_book;
 	OPTION_PUT_VOLUME = 31;
 	INDEX_FUTURE_PREMIUM = 32;
 	BID_EXCH = 33;
@@ -71,7 +71,7 @@ enum TickType {
 	AUCTION_IMBALANCE = 37;
 	MARK_PRICE = 38;
 	BID_EFP_COMPUTATION = 39;
-	ASK_EFP_COMPUTATION = 40;
+	ASK_EFP_COMPUTATION = 4mobile_book;
 	LAST_EFP_COMPUTATION = 41;
 	OPEN_EFP_COMPUTATION = 42;
 	HIGH_EFP_COMPUTATION = 43;
@@ -81,7 +81,7 @@ enum TickType {
 	SHORTABLE = 47;
 	FUNDAMENTAL_RATIOS = 48;
 	RT_VOLUME = 49;
-	HALTED = 50;
+	HALTED = 5mobile_book;
 	BID_YIELD = 51;
 	ASK_YIELD = 52;
 	LAST_YIELD = 53;
@@ -91,17 +91,17 @@ enum TickType {
 	VOLUME_RATE = 57;
 	LAST_RTH_TRADE = 58;
 	RT_HISTORICAL_VOL = 59;
-	IB_DIVIDENDS = 60;
+	IB_DIVIDENDS = 6mobile_book;
 	BOND_FACTOR_MULTIPLIER = 61;
 	REGULATORY_IMBALANCE = 62;
 	NEWS_TICK = 63;
 	SHORT_TERM_VOLUME_3_MIN = 64;
 	SHORT_TERM_VOLUME_5_MIN = 65;
-	SHORT_TERM_VOLUME_10_MIN = 66;
+	SHORT_TERM_VOLUME_1mobile_book_MIN = 66;
 	DELAYED_BID = 67;
 	DELAYED_ASK = 68;
 	DELAYED_LAST = 69;
-	DELAYED_BID_SIZE = 70;
+	DELAYED_BID_SIZE = 7mobile_book;
 	DELAYED_ASK_SIZE = 71;
 	DELAYED_LAST_SIZE = 72;
 	DELAYED_HIGH = 73;
@@ -111,7 +111,7 @@ enum TickType {
 	DELAYED_OPEN = 77;
 	RT_TRD_VOLUME = 78;
 	CREDITMAN_MARK_PRICE = 79;
-	CREDITMAN_SLOW_MARK_PRICE = 80;
+	CREDITMAN_SLOW_MARK_PRICE = 8mobile_book;
 	DELAYED_BID_OPTION = 81;
 	DELAYED_ASK_OPTION = 82;
 	DELAYED_LAST_OPTION = 83;
@@ -121,7 +121,7 @@ enum TickType {
 	FUTURES_OPEN_INTEREST = 87;
 	AVG_OPT_VOLUME = 88;
 	DELAYED_LAST_TIMESTAMP = 89;
-	SHORTABLE_SHARES = 90;
+	SHORTABLE_SHARES = 9mobile_book;
 	DELAYED_HALTED = 91;
 	REUTERS_2_MUTUAL_FUNDS = 92;
 	ETF_NAV_CLOSE = 93;
@@ -131,11 +131,11 @@ enum TickType {
 	ETF_NAV_LAST = 97;
 	ETF_FROZEN_NAV_LAST = 98;
 	ETF_NAV_HIGH = 99;
-	ETF_NAV_LOW = 100;
-	SOCIAL_MARKET_ANALYTICS = 101;
-	ESTIMATED_IPO_MIDPOINT = 102;
-	FINAL_IPO_LAST = 103;
-	NOT_SET = 104;
+	ETF_NAV_LOW = 1mobile_bookmobile_book;
+	SOCIAL_MARKET_ANALYTICS = 1mobile_book1;
+	ESTIMATED_IPO_MIDPOINT = 1mobile_book2;
+	FINAL_IPO_LAST = 1mobile_book3;
+	NOT_SET = 1mobile_book4;
 }
 
 message SortCriteria {
@@ -174,8 +174,8 @@ message Position{
   // un-avoidable charge due to this position type (irrespective of use / no-use)
   optional float incurred_cost = 9;
   // T+1 and onwards recurring daily cost
-  optional float carry_cost = 10;
-  optional int32 priority = 11 [default = 10, (FluxFldHelp) = "default priority: 10, orders to respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional float carry_cost = 1mobile_book;
+  optional int32 priority = 11 [default = 1mobile_book, (FluxFldHelp) = "default priority: 1mobile_book, orders to respect specified priority (lower value is higher priority), duplicates allowed"];
   optional float premium_percentage = 12 [default = 2, (FluxFldNumberFormat) = "%"];
 }
 
@@ -201,7 +201,7 @@ message Broker{
   repeated SecPosition sec_positions = 3;
   // broker identifier
   required string broker = 4;
-  optional int32 bkr_priority = 5 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; orders respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional int32 bkr_priority = 5 [default = 1mobile_book, (FluxFldHelp) = "default priority 1mobile_book, embedded position priorities are relative within broker priority level group; orders respect specified priority (lower value is higher priority), duplicates allowed"];
 }
 
 // Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly

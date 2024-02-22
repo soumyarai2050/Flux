@@ -2,11 +2,11 @@
 import subprocess
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_routes_callback import LogBookServiceRoutesCallback
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.pair_strat_engine_log_book import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import StratViewBaseModel
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.FastApi.log_book_service_routes_callback import LogBookServiceRoutesCallback
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.pair_strat_engine_log_book import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import StratViewBaseModel
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
     pair_strat_client_call_log_str, UpdateType, strat_manager_service_http_client)
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert, create_logger
 # standard imports
@@ -49,12 +49,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.service_ready = False
         self.pair_strat_engine_log_book: PairStratEngineLogBook | None = None
         if self.min_refresh_interval is None:
-            self.min_refresh_interval = 30
+            self.min_refresh_interval = 3mobile_book
         create_logger("log_book_cmd_log", logging.DEBUG, str(CURRENT_PROJECT_LOG_DIR),
                       log_book_cmd_log)
 
     def initialize_underlying_http_callables(self):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
+        from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes import (
             underlying_read_portfolio_alert_http, underlying_create_portfolio_alert_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_alert_http = (
             underlying_read_portfolio_alert_http)
@@ -94,7 +94,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
                 if not self.service_up:
                     try:
-                        if is_log_book_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
+                        if is_log_book_service_up(ignore_error=(service_up_no_error_retry_count > mobile_book)):
                             # creating portfolio_alerts model if not exist already
                             run_coro = self.check_n_create_portfolio_alert()
                             future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
@@ -129,8 +129,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         async with PortfolioAlert.reentrant_lock:
             portfolio_alert_list: List[PortfolioAlert] = (
                 await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_alert_http())
-            if len(portfolio_alert_list) == 0:
-                portfolio_alert = PortfolioAlert(_id=1, alerts=[], alert_update_seq_num=0)
+            if len(portfolio_alert_list) == mobile_book:
+                portfolio_alert = PortfolioAlert(_id=1, alerts=[], alert_update_seq_num=mobile_book)
                 await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_alert_http(
                     portfolio_alert)
 
@@ -202,7 +202,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         simulation_mode: bool = config_yaml_dict.get("simulate_log_book", False)
 
         pair_strat_engine_log_book = PairStratEngineLogBook(str(suppress_alert_regex_file), log_details,
-                                                                    simulation_mode=simulation_mode)
+                                                                    simulation_mode=simulation_mode,
+                                                                    log_detail_type=StratLogDetail)
         pair_strat_log_book_thread = Thread(target=pair_strat_engine_log_book.start_analyzer, daemon=True)
         pair_strat_log_book_thread.start()
         return pair_strat_engine_log_book
@@ -220,56 +221,56 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             err_str_ = (f"self.asyncio_loop couldn't set as asyncio.get_running_loop() returned None for "
                         f"{attempt_counts} attempts")
             self.pair_strat_engine_log_book.portfolio_alert_fail_logger.critical(err_str_)
-            raise HTTPException(detail=err_str_, status_code=500)
+            raise HTTPException(detail=err_str_, status_code=5mobile_bookmobile_book)
 
     async def update_portfolio_alert_pre(self, stored_portfolio_alert_obj: PortfolioAlert,
                                          updated_portfolio_alert_obj: PortfolioAlert):
         if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
+            # raise service unavailable 5mobile_book3 exception, let the caller retry
             err_str_ = f"update_portfolio_alert_pre not ready - service is not initialized yet"
             self.pair_strat_engine_log_book.portfolio_alert_fail_logger.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
 
         if updated_portfolio_alert_obj.alert_update_seq_num is None:
-            updated_portfolio_alert_obj.alert_update_seq_num = 0
+            updated_portfolio_alert_obj.alert_update_seq_num = mobile_book
         updated_portfolio_alert_obj.alert_update_seq_num += 1
         return updated_portfolio_alert_obj
 
     async def partial_update_portfolio_alert_pre(self, stored_portfolio_alert_obj: PortfolioAlert,
                                                  updated_portfolio_alert_obj_json: Dict):
         if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
+            # raise service unavailable 5mobile_book3 exception, let the caller retry
             err_str_ = f"partial_update_portfolio_alert_pre not ready - service is not initialized yet"
             self.pair_strat_engine_log_book.portfolio_alert_fail_logger.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
 
         if stored_portfolio_alert_obj.alert_update_seq_num is None:
-            stored_portfolio_alert_obj.alert_update_seq_num = 0
+            stored_portfolio_alert_obj.alert_update_seq_num = mobile_book
         updated_portfolio_alert_obj_json["alert_update_seq_num"] = stored_portfolio_alert_obj.alert_update_seq_num + 1
         return updated_portfolio_alert_obj_json
 
     async def partial_update_all_portfolio_alert_pre(self, stored_portfolio_alert_obj_list: List[PortfolioAlert],
                                                      updated_portfolio_alert_obj_json_list: List[Dict]):
         if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
+            # raise service unavailable 5mobile_book3 exception, let the caller retry
             err_str_ = f"partial_update_all_portfolio_alert_pre not ready - service is not initialized yet"
             self.pair_strat_engine_log_book.portfolio_alert_fail_logger.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
 
         for index, stored_portfolio_alert_obj in enumerate(stored_portfolio_alert_obj_list):
             if stored_portfolio_alert_obj.alert_update_seq_num is None:
-                stored_portfolio_alert_obj.alert_update_seq_num = 0
+                stored_portfolio_alert_obj.alert_update_seq_num = mobile_book
             updated_portfolio_alert_obj_json_list[index]["alert_update_seq_num"] = (
                     stored_portfolio_alert_obj.alert_update_seq_num + 1)
             return updated_portfolio_alert_obj_json_list
 
     async def create_strat_alert_pre(self, strat_alert_obj: StratAlert):
         if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
+            # raise service unavailable 5mobile_book3 exception, let the caller retry
             err_str_ = (f"create_strat_alert_pre not ready - service is not initialized yet, "
                         f"strat_alert id: {strat_alert_obj.id};;; strat_alert: {strat_alert_obj}")
             self.pair_strat_engine_log_book.portfolio_alert_fail_logger.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
 
     async def create_strat_alert_post(self, strat_alert_obj: StratAlert):
         # updating StratView for this strat using log analyzer functionality to update pair_start_engine
@@ -285,13 +286,13 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
     async def update_strat_alert_pre(self, stored_strat_alert_obj: StratAlert, updated_strat_alert_obj: StratAlert):
         if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
+            # raise service unavailable 5mobile_book3 exception, let the caller retry
             err_str_ = f"update_strat_alert_pre not ready - service is not initialized yet"
             self.pair_strat_engine_log_book.portfolio_alert_fail_logger.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
 
         if updated_strat_alert_obj.alert_update_seq_num is None:
-            updated_strat_alert_obj.alert_update_seq_num = 0
+            updated_strat_alert_obj.alert_update_seq_num = mobile_book
         updated_strat_alert_obj.alert_update_seq_num += 1
         return updated_strat_alert_obj
 
@@ -310,14 +311,14 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def partial_update_all_strat_alert_pre(self, stored_strat_alert_obj_list: List[StratAlert],
                                                  updated_strat_alert_obj_json_list: List[Dict]):
         if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
+            # raise service unavailable 5mobile_book3 exception, let the caller retry
             err_str_ = f"partial_update_all_strat_alert_pre not ready - service is not initialized yet"
             self.pair_strat_engine_log_book.portfolio_alert_fail_logger.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
 
         for index, stored_strat_alert_obj in enumerate(stored_strat_alert_obj_list):
             if stored_strat_alert_obj.alert_update_seq_num is None:
-                stored_strat_alert_obj.alert_update_seq_num = 0
+                stored_strat_alert_obj.alert_update_seq_num = mobile_book
             updated_strat_alert_obj_json_list[index]["alert_update_seq_num"] = (
                     stored_strat_alert_obj.alert_update_seq_num + 1)
         return updated_strat_alert_obj_json_list
@@ -339,13 +340,13 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def partial_update_strat_alert_pre(self, stored_strat_alert_obj: StratAlert,
                                              updated_strat_alert_obj_json: Dict):
         if not self.service_ready:
-            # raise service unavailable 503 exception, let the caller retry
+            # raise service unavailable 5mobile_book3 exception, let the caller retry
             err_str_ = f"partial_update_strat_alert_pre not ready - service is not initialized yet"
             self.pair_strat_engine_log_book.portfolio_alert_fail_logger.error(err_str_)
-            raise HTTPException(status_code=503, detail=err_str_)
+            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
 
         if stored_strat_alert_obj.alert_update_seq_num is None:
-            stored_strat_alert_obj.alert_update_seq_num = 0
+            stored_strat_alert_obj.alert_update_seq_num = mobile_book
         updated_strat_alert_obj_json["alert_update_seq_num"] = stored_strat_alert_obj.alert_update_seq_num + 1
         return updated_strat_alert_obj_json
 

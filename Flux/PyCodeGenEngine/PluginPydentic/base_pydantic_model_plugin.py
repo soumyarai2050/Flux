@@ -432,6 +432,9 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     else:
                         output_str += " "*4 + f"{field_name}: {field_type}\n"
 
+                output_str += self._add_config_attribute()
+                output_str += "\n"
+
                 if has_nested_field:
                     output_str += "\n"
                     output_str += " " * 4 + f"class Settings:\n"
@@ -539,7 +542,7 @@ class BasePydanticModelPlugin(BaseProtoPlugin):
                     output_str += ',\n'
                 else:
                     output_str += "\n"
-                output_str += "        ]\n"
+                    output_str += "        ]\n"
 
         for dt_field in datetime_field_list:
             output_str += "\n"

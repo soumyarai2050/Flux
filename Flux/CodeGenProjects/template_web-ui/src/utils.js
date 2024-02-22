@@ -689,8 +689,8 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
                             const dynamicValuePath = node.autocomplete.substring(node.autocomplete.indexOf('.') + 1);
                             const dynamicValue = _.get(data, dynamicValuePath);
                             if (dynamicValue && schema.autocomplete.hasOwnProperty(dynamicValue)) {
-                                node.options = schema.autocomplete[dynamicValue];
-                                if (!node.options.includes(node.value)) {
+                                node.options = schema.autocomplete[schema.autocomplete[dynamicValue]];
+                                if (!node.options.includes(node.value) && callerProps.mode === Modes.EDIT_MODE && !node.ormNoUpdate && !node.serverPopulate) {
                                     node.value = null;
                                 }
                             }

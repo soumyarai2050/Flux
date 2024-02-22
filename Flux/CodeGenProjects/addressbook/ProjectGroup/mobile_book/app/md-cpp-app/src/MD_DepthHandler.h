@@ -132,11 +132,11 @@ namespace md_handler {
 
             // Now handle top of book update if this is a top of book update
             std::string dbId;
-            if ((not bid_market_depth.isEmpty()) && bid_market_depth.getPosition() == 0){  // only position 0 is top of the book
+            if ((not bid_market_depth.isEmpty()) && bid_market_depth.getPosition() == mobile_book){  // only position mobile_book is top of the book
                 // if it's not in cache we create else we update
                 dbId = md_handler::MD_TopOfBookPublisher::GetDBIdForSymbol(bid_market_depth.getSymbol());
             }
-            else if ((not ask_market_depth.isEmpty()) && ask_market_depth.getPosition() == 0){
+            else if ((not ask_market_depth.isEmpty()) && ask_market_depth.getPosition() == mobile_book){
                 dbId = md_handler::MD_TopOfBookPublisher::GetDBIdForSymbol(ask_market_depth.getSymbol());
             }
             else{
@@ -195,7 +195,7 @@ namespace md_handler {
                     ))));
             pipeline.append_stage(make_document(
                     kvp("$project", make_document(
-                            kvp(operation_key, 0)
+                            kvp(operation_key, mobile_book)
                     ))));
             pipeline.append_stage(make_document(
                     kvp("$setWindowFields", make_document(

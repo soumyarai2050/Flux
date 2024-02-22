@@ -14,7 +14,7 @@ if __name__ == "__main__":
     datetime_str: str = datetime.now().strftime("%Y%m%d")
     env_dict = {
         "RELOAD": "false",
-        "DEBUG_SLEEP_TIME": "0",
+        "DEBUG_SLEEP_TIME": "mobile_book",
         "LOG_FILE_DIR_PATH": f"{project_dir / 'log' }",
         "LOG_FILE_NAME": f"template_project_name_{db_type}_logs_{datetime_str}.log",
         "LOG_LEVEL": "debug",
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Importing here to get LOG_FILE_NAME and LOG_LEVEL set before getting logging config triggered in
     # template_model_service_cache_fastapi file
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.template_project_name.generated.FastApi.template_model_service_launch_server import \
+    from Flux.CodeGenProjects.addressbook.ProjectGroup.template_project_name.generated.FastApi.template_model_service_launch_server import \
         template_model_service_launch_server
 
     template_model_service_launch_server()

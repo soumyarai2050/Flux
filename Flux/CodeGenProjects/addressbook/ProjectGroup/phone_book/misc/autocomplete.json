@@ -10,7 +10,7 @@
       "CB_Sec_7",
       "CB_Sec_8",
       "CB_Sec_9",
-      "CB_Sec_10"
+      "CB_Sec_1mobile_book"
     ],
     "EQT_List": [
       "EQT_Sec_1",
@@ -22,25 +22,13 @@
       "EQT_Sec_7",
       "EQT_Sec_8",
       "EQT_Sec_9",
-      "EQT_Sec_10",
+      "EQT_Sec_1mobile_book",
       "EQT_Sec_11",
       "EQT_Sec_12",
       "EQT_Sec_13",
       "EQT_Sec_14"
     ],
-    "Premium": [
-      "CB_Sec_1",
-      "CB_Sec_2",
-      "CB_Sec_3",
-      "CB_Sec_4",
-      "CB_Sec_5",
-      "CB_Sec_6",
-      "CB_Sec_7",
-      "CB_Sec_8",
-      "CB_Sec_9",
-      "CB_Sec_10"
-    ],
-    "AH": [
+    "H_List": [
       "H_List_1",
       "H_List_2",
       "H_List_3",
@@ -50,7 +38,9 @@
       "H_List_7",
       "H_List_8",
       "H_List_9",
-      "H_List_10"
-    ]
+      "H_List_1mobile_book"
+    ],
+    "Premium": "CB_List",
+    "AH": "H_List"
   }
 }

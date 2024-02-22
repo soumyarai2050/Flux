@@ -9,12 +9,12 @@ from typing import Dict, List
 from fastapi.encoders import jsonable_encoder
 
 # Project specific imports
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import (
+from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import (
     create_pre_order_test_requirements, PAIR_STRAT_ENGINE_DIR, log_analyzer_web_client, PortfolioAlertBaseModel,
     StratState, create_pre_order_test_requirements_for_log_analyzer, STRAT_EXECUTOR)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_analyzer.generated.Pydentic.log_analyzer_service_beanie_model import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_analyzer.generated.Pydentic.log_analyzer_service_beanie_model import (
     Severity, AlertOptional, StratAlertBaseModel)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_analyzer.app.phone_book_log_analyzer import StratLogDetail
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_analyzer.app.phone_book_log_analyzer import StratLogDetail
 from FluxPythonUtils.log_analyzer.log_analyzer import LogAnalyzer, LogDetail
 
 PAIR_STRAT_ENGINE_LOG: PurePath = PAIR_STRAT_ENGINE_DIR / "log"
@@ -27,23 +27,23 @@ def generate_log_entry(is_error: bool) -> str:
     current_utc_time = datetime.datetime.utcnow()
 
     # Format the datetime as a string in the desired format
-    timestamp = current_utc_time.strftime("%Y-%m-%d %H:%M:%S") + f",{current_utc_time.microsecond // 1000:03d}"
+    timestamp = current_utc_time.strftime("%Y-%m-%d %H:%M:%S") + f",{current_utc_time.microsecond // 1mobile_bookmobile_bookmobile_book:mobile_book3d}"
 
     log_level = random.choice(['ERROR'])
     file_name = "utility_functions.py"
-    line_number = random.randint(1, 300)
+    line_number = random.randint(1, 3mobile_bookmobile_book)
     severity = random.choice(['Severity_CRITICAL', 'Severity_ERROR', 'Severity_WARNING', 'Severity_INFO',
                               'Severity_DEBUG'])
     alert_brief = "LogSimulator Log analyzer running in simulation mode"
     alert_details = "alert_details: ..."
 
     if is_error:
-        host = "127.0.0.1"
-        port = random.randint(50000, 59999)
+        host = "127.mobile_book.mobile_book.1"
+        port = random.randint(5mobile_bookmobile_bookmobile_bookmobile_book, 59999)
         url = "/strat_executor/get-all-ui_layout"
-        exception_msg = (f"HTTPConnectionPool(host='127.0.0.1', port={port}): Max retries exceeded with url: "
+        exception_msg = (f"HTTPConnectionPool(host='127.mobile_book.mobile_book.1', port={port}): Max retries exceeded with url: "
                          f"/strat_executor/get-all-ui_layout (Caused by NewConnectionError('<urllib3.connection."
-                         f"HTTPConnection object at 0x7f1849013460>: Failed to establish a new connection: "
+                         f"HTTPConnection object at mobile_bookx7f1849mobile_book1346mobile_book>: Failed to establish a new connection: "
                          f"[Errno 111] Connection refused'))")
 
         log_entry = (f"{timestamp} : {log_level} : [utility_functions.py : {line_number}] : "
@@ -63,13 +63,13 @@ def generate_log(severity: Severity, file_name: str, alert: str, is_portfolio_al
     current_utc_time = datetime.datetime.utcnow()
 
     # Format the datetime as a string in the desired format
-    timestamp = current_utc_time.strftime("%Y-%m-%d %H:%M:%S") + f",{current_utc_time.microsecond // 1000:03d}"
+    timestamp = current_utc_time.strftime("%Y-%m-%d %H:%M:%S") + f",{current_utc_time.microsecond // 1mobile_bookmobile_bookmobile_book:mobile_book3d}"
 
     log_level: str = get_log_level_from_severity(severity)
 
     if ";;;" in alert:
         alert_list: List[str] = alert.split(";;;")
-        alert_brief: str = alert_list[0]
+        alert_brief: str = alert_list[mobile_book]
         alert_details: str = alert_list[1]
     else:
         alert_brief: str = alert
@@ -103,11 +103,11 @@ def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat
     pair_start_log_file_name: str = "pair_start_engine_logs_" + date.replace("-", "") + ".log"
     print(pair_start_log_file_name)
 
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     # making limits suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
+    expected_strat_limits_.residual_restriction.max_residual = 1mobile_book5mobile_bookmobile_bookmobile_book
 
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements_for_log_analyzer(buy_symbol, sell_symbol, pair_strat_,
@@ -118,12 +118,12 @@ def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat
 
     pair_start_engine_log_file: str = str(PAIR_STRAT_ENGINE_LOG / pair_start_log_file_name)
     # Generate a list of log entries
-    log_entries = [generate_log_entry(True) for _ in range(10)]
+    log_entries = [generate_log_entry(True) for _ in range(1mobile_book)]
 
     # print(pair_start_engine_log_file)
     subprocess.run(['bash', 'log_file_append.sh', pair_start_engine_log_file, *log_entries])
 
-    time.sleep(10)
+    time.sleep(1mobile_book)
 
     portfolio_alert_list: List[PortfolioAlertBaseModel] = log_analyzer_web_client.get_all_portfolio_alert_client()
 
@@ -134,7 +134,7 @@ def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat
             alert_brief: str = jsonable_encoder(alert.alert_brief, by_alias=True, exclude_none=True)
             alert_list.append(alert_brief.replace(":   :", f": {log_level} :"))
 
-    assert log_entries[-1].split(";;;")[0] in alert_list, (f"log_entry: {log_entries[-1]} not found in "
+    assert log_entries[-1].split(";;;")[mobile_book] in alert_list, (f"log_entry: {log_entries[-1]} not found in "
                                                            f"{alert_list}")
 
     created_pair_strat, executor_web_client = (
@@ -147,7 +147,7 @@ def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat
     pair_start_engine_log_file: str = str(PAIR_STRAT_ENGINE_LOG / pair_start_log_file_name)
 
     print(pair_start_engine_log_file)
-    for _ in range(10):
+    for _ in range(1mobile_book):
         log_entry: str = generate_log_entry(True)
         print(log_entry)
         os.system(f'echo "{log_entry}" >> "{pair_start_engine_log_file}"')
@@ -162,11 +162,11 @@ def test_strat_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, e
     pair_start_log_file_name: str = "pair_start_engine_logs_" + date.replace("-", "") + ".log"
     print(pair_start_log_file_name)
 
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     # making limits suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
+    expected_strat_limits_.residual_restriction.max_residual = 1mobile_book5mobile_bookmobile_bookmobile_book
 
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements_for_log_analyzer(buy_symbol, sell_symbol, pair_strat_,
@@ -178,7 +178,7 @@ def test_strat_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, e
     pair_start_engine_log_file: str = str(PAIR_STRAT_ENGINE_LOG / pair_start_log_file_name)
     # Generate a list of log entries
     file_name: str = "utility_functions.py : 6"
-    alert: str = ("blocked generated BUY order, order px: 115.0 > allowed max_px 9.5, symbol_side_key: "
+    alert: str = ("blocked generated BUY order, order px: 115.mobile_book > allowed max_px 9.5, symbol_side_key: "
                   "%%symbol-side=EQT_Sec_1-BUY%%")
     log_entries = [generate_log(Severity.Severity_ERROR, file_name, alert)]
 
@@ -188,7 +188,7 @@ def test_strat_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, e
     # print(pair_start_engine_log_file)
     subprocess.run(['bash', 'log_file_append.sh', pair_start_engine_log_file, *log_entries])
 
-    time.sleep(10)
+    time.sleep(1mobile_book)
 
     strat_alert_list: List[StratAlertBaseModel] = log_analyzer_web_client.get_all_strat_alert_client()
 
@@ -200,7 +200,7 @@ def test_strat_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, e
             alert_brief: str = jsonable_encoder(alert.alert_brief, by_alias=True, exclude_none=True)
             alert_list.append(alert_brief.replace(":   :", f": {log_level} :"))
 
-    assert log_entries[-1].split(";;;")[0].replace("%%", "") in alert_list, (f"log_entry: "
+    assert log_entries[-1].split(";;;")[mobile_book].replace("%%", "") in alert_list, (f"log_entry: "
                                                                              f"{log_entries[-1]} not found in {alert}")
 
 
@@ -217,11 +217,11 @@ def test_strat_alert_patch_all(clean_and_set_limits, leg1_leg2_symbol_list, pair
                 "strat_executor_" + str(_ + 1) + "_logs_" + date.replace("-", "") + ".log")
         start_executor_log_file_name_list.append(str(STRAT_ENGINE_LOG / start_executor_log_file_name))
     print(f"-----------------------{start_executor_log_file_name_list}--------------")
-    buy_symbol = leg1_leg2_symbol_list[0][0]
-    sell_symbol = leg1_leg2_symbol_list[0][1]
+    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
+    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
     # making limits suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
+    expected_strat_limits_.residual_restriction.max_residual = 1mobile_book5mobile_bookmobile_bookmobile_book
 
     created_pair_strat, executor_web_client = (
         create_pre_order_test_requirements_for_log_analyzer(buy_symbol, sell_symbol, pair_strat_,
@@ -250,22 +250,22 @@ def test_strat_alert_patch_all(clean_and_set_limits, leg1_leg2_symbol_list, pair
 
     # Generate a list of log entries
     file_name: str = "utility_functions.py : 6"
-    alert: str = ("blocked generated BUY order, order px: 115.0 > allowed max_px 9.5, symbol_side_key: "
+    alert: str = ("blocked generated BUY order, order px: 115.mobile_book > allowed max_px 9.5, symbol_side_key: "
                   "%%symbol-side=EQT_Sec_1-BUY%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 
-    file_name: str = "utility_functions.py : 102"
-    alert: str = ("blocked generated BUY order, order px: 120.0 > allowed max_px 0.5, symbol_side_key: "
+    file_name: str = "utility_functions.py : 1mobile_book2"
+    alert: str = ("blocked generated BUY order, order px: 12mobile_book.mobile_book > allowed max_px mobile_book.5, symbol_side_key: "
                   "%%symbol-side=CB_Sec_1-BUY%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 
     file_name: str = "utility_functions.py : 271"
-    alert: str = ("blocked generated BUY order, order px: 15.0 > allowed max_px 4.5, symbol_side_key: "
+    alert: str = ("blocked generated BUY order, order px: 15.mobile_book > allowed max_px 4.5, symbol_side_key: "
                   "%%symbol-side=EQT_Leg_1-BUY%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 
     file_name: str = "utility_functions.py : 71"
-    alert: str = ("blocked generated BUY order, order px: 15.0 > allowed max_px 4.5, symbol_side_key: "
+    alert: str = ("blocked generated BUY order, order px: 15.mobile_book > allowed max_px 4.5, symbol_side_key: "
                   "%%symbol-side=EQT_Leg_1-SELL%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 

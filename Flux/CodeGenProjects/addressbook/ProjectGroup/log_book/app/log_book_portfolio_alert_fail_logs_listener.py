@@ -7,7 +7,7 @@ from typing import List, Dict
 
 os.environ["DBType"] = "beanie"
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import (
     portfolio_alert_fail_log, simulator_portfolio_alert_fail_log)
 from FluxPythonUtils.email_adapter.email_handler import EmailHandler
 from FluxPythonUtils.email_adapter.email_client import EmailClient, EmailUser
@@ -18,7 +18,7 @@ secret_yaml_path = PurePath(__file__).parent.parent / "data" / "secret.yaml"
 if os.path.exists(secret_yaml_path):
     secret_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(secret_yaml_path))
 else:
-    raise Exception(f"Can't find {secret_yaml_path} file - can't fetch email credentials")
+    raise Exception(f"Can't find {secret_yaml_path = } file - can't fetch email credentials")
 
 portfolio_fail_log_path = PurePath(__file__).parent.parent / "log" / portfolio_alert_fail_log
 simulator_portfolio_fail_log_path = PurePath(__file__).parent.parent / "log" / simulator_portfolio_alert_fail_log
@@ -38,7 +38,7 @@ def log_file_size_listener_and_mail_notifier(log_file_path: str, retry_wait_sec:
             time.sleep(retry_wait_sec)
             continue
         else:
-            if os.path.getsize(log_file_path) > 0:
+            if os.path.getsize(log_file_path) > mobile_book:
                 sender_obj: EmailUser = EmailUser(
                             secret_yaml_dict["sender_username"],
                             secret_yaml_dict["sender_email"])
@@ -52,7 +52,7 @@ def log_file_size_listener_and_mail_notifier(log_file_path: str, retry_wait_sec:
                     receiver_users.append(receiver_user)
 
                 mail_subject = "Portfolio Alert handling in log analyzer failed!"
-                mail_body = (f"Unexpected: file {log_file_path} found some log - something that can't be handled "
+                mail_body = (f"Unexpected: {log_file_path = } found some log - something that can't be handled "
                              f"within log analyzer failed, please check {log_file_path}")
                 email_obj: EmailHandler = EmailHandler(sender_obj, receiver_users, subject=mail_subject,
                                                        content=mail_body)

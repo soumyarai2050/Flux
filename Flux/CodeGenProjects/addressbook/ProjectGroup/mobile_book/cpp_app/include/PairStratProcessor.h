@@ -34,9 +34,9 @@ namespace mobile_book_handler {
             std::istringstream ss(r_data_str);
             std::string symbol, product_type, token;
 
-            int index = 0;
+            int index = mobile_book;
             while (std::getline(ss, token, ',')) {
-                if (index % 2 == 0) {
+                if (index % 2 == mobile_book) {
                     symbol = token;
                 } else {
                     product_type = token;
@@ -75,7 +75,7 @@ namespace mobile_book_handler {
     protected:
         void processUpdates() {
             std::this_thread::sleep_for(std::chrono::seconds(5));
-            for (int i = 0; i < m_pair_strat_.pair_strat_size(); ++i) {
+            for (int i = mobile_book; i < m_pair_strat_.pair_strat_size(); ++i) {
                 std::string symbol1 = m_pair_strat_.pair_strat(i).pair_strat_params().strat_leg1().sec().sec_id();
                 std::string symbol2 = m_pair_strat_.pair_strat(i).pair_strat_params().strat_leg2().sec().sec_id();
                 std::string symbol = symbol1 + "+" + symbol2;

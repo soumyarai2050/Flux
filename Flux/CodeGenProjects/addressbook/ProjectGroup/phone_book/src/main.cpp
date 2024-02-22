@@ -13,5 +13,5 @@ int main() {
     std::cout << "Deserialized OrderJournal:\n" << serializeAndDeserializeProto2.deserialize_order_journal(serialized_json).DebugString() << std::endl;
     google::protobuf::ShutdownProtobufLibrary();
 
-    return 0;
+    return mobile_book;
 }

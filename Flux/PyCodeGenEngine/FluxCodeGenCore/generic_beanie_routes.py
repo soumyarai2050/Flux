@@ -426,7 +426,7 @@ async def generic_put_http(pydantic_class_type: Type[DocumentModel], proto_packa
                            return_obj_copy: bool | None = True) -> DocumentModel | bool:
     if stored_pydantic_obj.update_id == pydantic_obj_updated.update_id:
         # this is for cases where fetched object is passed as update object with slight changes. In these cases,
-        # update id since is set as last stored id will not be increases automatically
+        # update id since is set as last stored value will not be increased automatically
         pydantic_obj_updated.update_id = pydantic_class_type.next_update_id()
     return await _underlying_patch_n_put(pydantic_class_type, proto_package_name, stored_pydantic_obj,
                                          pydantic_obj_updated.model_dump(by_alias=True),
@@ -582,6 +582,26 @@ async def generic_patch_http(pydantic_class_type: Type[DocumentModel], proto_pac
                                          filter_agg_pipeline, update_agg_pipeline, has_links, return_obj_copy)
 
 
+@http_except_n_log_error(status_code=500)
+@generic_perf_benchmark
+async def generic_patch_without_db_update_http(
+        pydantic_class_type: Type[DocumentModel],
+        stored_pydantic_obj: DocumentModel, pydantic_obj_update_json,
+        return_obj_copy: bool | None = True) -> DocumentModel | bool:
+    assign_missing_ids_n_handle_date_time_type(pydantic_class_type, pydantic_obj_update_json)
+    try:
+        updated_pydantic_obj_dict = compare_n_patch_dict(stored_pydantic_obj.model_dump(by_alias=True),
+                                                         pydantic_obj_update_json)
+    except Exception as e:
+        err_str = f"compare_n_patch_dict failed: exception: {e}"
+        logging.exception(err_str)
+        raise HTTPException(detail=err_str, status_code=400)
+    if return_obj_copy:
+        return pydantic_class_type(**updated_pydantic_obj_dict)
+    else:
+        return True
+
+
 def underlying_generic_patch_all_http(pydantic_class_type: Type[DocumentModel], stored_pydantic_obj_list: List[DocumentModel],
                                       pydantic_obj_update_json_list: List[Dict],
                                       ignore_datetime_handling: bool | None = None) -> List[Tuple[DocumentModel, Dict]]:
@@ -606,6 +626,22 @@ def underlying_generic_patch_all_http(pydantic_class_type: Type[DocumentModel], 
     compare_n_patch_list(stored_pydantic_obj_json_list, pydantic_obj_update_json_list)
 
     return stored_pydantic_obj_n_updated_obj_dict_tuple_list
+
+
+@http_except_n_log_error(status_code=500)
+@generic_perf_benchmark
+async def generic_patch_all_without_db_update_http(
+        pydantic_class_type: Type[DocumentModel], stored_pydantic_obj_list: List[DocumentModel],
+        pydantic_obj_update_json_list: List[Dict], return_obj_copy: bool | None = True) -> List[DocumentModel] | bool:
+    stored_pydantic_obj_n_updated_obj_dict_tuple_list: List[Tuple[DocumentModel, Dict]] = \
+        underlying_generic_patch_all_http(pydantic_class_type, stored_pydantic_obj_list, pydantic_obj_update_json_list)
+    if return_obj_copy:
+        updated_obj_list: List[DocumentModel] = []
+        for stored_pydantic_obj_, updated_pydantic_obj_dict in stored_pydantic_obj_n_updated_obj_dict_tuple_list:
+            updated_obj_list.append(pydantic_class_type(**updated_pydantic_obj_dict))
+        return updated_obj_list
+    else:
+        return True
 
 
 @http_except_n_log_error(status_code=500)

@@ -6,7 +6,7 @@ from threading import Thread, Semaphore
 
 os.environ["DBType"] = "beanie"
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_routes_callback_base_native_override import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.app.post_book_service_routes_callback_base_native_override import (
     PostBookServiceRoutesCallbackBaseNativeOverride, ContainerObject, OrderJournalBaseModel,
     OrderSnapshotBaseModel, StratBriefBaseModel)
 
@@ -73,15 +73,15 @@ def test_queue_handling(single_strat_single_data, single_strat_multi_data,
 
     # Checking single strat single data
     mock_post_book_override.expected_strat_id_list = [1]
-    order_journal = OrderJournalBaseModel(**single_strat_single_data[0].get("order_journal"))
-    order_snapshot = OrderSnapshotBaseModel(**single_strat_single_data[0].get("order_snapshot"))
-    strat_brief = StratBriefBaseModel(**single_strat_single_data[0].get("strat_brief"))
+    order_journal = OrderJournalBaseModel(**single_strat_single_data[mobile_book].get("order_journal"))
+    order_snapshot = OrderSnapshotBaseModel(**single_strat_single_data[mobile_book].get("order_snapshot"))
+    strat_brief = StratBriefBaseModel(**single_strat_single_data[mobile_book].get("strat_brief"))
     container_obj = MockContainerObject(order_journals=[order_journal],
                                         order_snapshots=[order_snapshot],
                                         strat_brief=strat_brief)
     mock_post_book_override.expected_strat_id_to_container_obj_dict = {1: container_obj}
     # updating queue
-    mock_post_book_override.portfolio_limit_check_queue.put(single_strat_single_data[0])
+    mock_post_book_override.portfolio_limit_check_queue.put(single_strat_single_data[mobile_book])
     mock_post_book_override.wait_semaphore.acquire()
     time.sleep(2)
 

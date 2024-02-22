@@ -1,9 +1,11 @@
 import inspect
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import get_ongoing_pair_strat_filter
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.Pydentic.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.strat_manager_service_http_client import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.aggregate import get_ongoing_pair_strat_filter
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.strat_manager_service_http_client import \
     StratManagerServiceHttpClient
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_analyzer.app.log_analyzer_service_helper import (
+    get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_strat_db_updates)
 from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager, get_symbol_side_key)
 
@@ -54,11 +56,11 @@ def patch_portfolio_status(overall_buy_notional: float | None, overall_sell_noti
                 portfolio_status_list: List[PortfolioStatusBaseModel] = \
                     strat_manager_service_http_client.get_all_portfolio_status_client()
                 logging.debug(f"portfolio_status_list count: {len(portfolio_status_list)}")
-                if 0 == len(portfolio_status_list):  # no portfolio status set yet
+                if mobile_book == len(portfolio_status_list):  # no portfolio status set yet
                     logging.error(f"patch_portfolio_status failed. no portfolio status obj found;;;"
                                   f"update request: {kwargs}")
                 elif 1 == len(portfolio_status_list):
-                    kwargs.update(_id=portfolio_status_list[0].id)
+                    kwargs.update(_id=portfolio_status_list[mobile_book].id)
                     updated_portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(**kwargs)
                     strat_manager_service_http_client.patch_portfolio_status_client(
                         jsonable_encoder(updated_portfolio_status, by_alias=True, exclude_none=True))
@@ -95,10 +97,10 @@ def is_ongoing_strat(pair_strat: PairStrat | PairStratBaseModel) -> bool:
 
 
 def get_new_portfolio_status() -> PortfolioStatus:
-    portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, overall_buy_notional=0,
-                                                        overall_sell_notional=0,
-                                                        overall_buy_fill_notional=0,
-                                                        overall_sell_fill_notional=0)
+    portfolio_status: PortfolioStatus = PortfolioStatus(_id=1, overall_buy_notional=mobile_book,
+                                                        overall_sell_notional=mobile_book,
+                                                        overall_buy_fill_notional=mobile_book,
+                                                        overall_sell_fill_notional=mobile_book)
     return portfolio_status
 
 
@@ -110,24 +112,24 @@ def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None) -> Po
     rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
-    portfolio_limits_obj = PortfolioLimits(_id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
-                                           max_gross_n_open_notional=2_400_000,
+    portfolio_limits_obj = PortfolioLimits(_id=1, max_open_baskets=2mobile_book, max_open_notional_per_side=1mobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+                                           max_gross_n_open_notional=2_4mobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
                                            rolling_max_order_count=rolling_max_order_count,
                                            rolling_max_reject_count=rolling_max_reject_count,
                                            eligible_brokers=eligible_brokers,
-                                           eligible_brokers_update_count=0)
+                                           eligible_brokers_update_count=mobile_book)
     return portfolio_limits_obj
 
 
 def get_new_order_limits() -> OrderLimits:
-    ord_limit_obj: OrderLimits = OrderLimits(_id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
-                                             max_order_qty=500, min_order_notional=100,
-                                             max_order_notional=90_000)
+    ord_limit_obj: OrderLimits = OrderLimits(_id=1, max_basis_points=15mobile_bookmobile_book, max_px_deviation=2mobile_book, max_px_levels=5,
+                                             max_order_qty=5mobile_bookmobile_book, min_order_notional=1mobile_bookmobile_book,
+                                             max_order_notional=9mobile_book_mobile_bookmobile_bookmobile_book)
     return ord_limit_obj
 
 
 def get_new_strat_view_obj(obj_id: int) -> StratView:
-    strat_view_obj: StratView = StratView(_id=obj_id, strat_alert_count=0)
+    strat_view_obj: StratView = StratView(_id=obj_id, strat_alert_count=mobile_book)
     return strat_view_obj
 
 
@@ -148,7 +150,7 @@ def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
 
 # caller must take any locks as required for any read-write consistency - function operates without lock
 async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.strat_manager_service_http_routes import \
+    from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.strat_manager_service_http_routes import \
         underlying_read_pair_strat_http
     read_pair_strat_filter = get_ongoing_pair_strat_filter(sec_id)
     pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
@@ -167,19 +169,19 @@ async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tupl
 
 async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Side) -> PairStrat | None:
     match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
-    if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
+    if len(match_level_1_pair_strats) == mobile_book and len(match_level_2_pair_strats) == mobile_book:
         logging.info(f"No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
         return
     else:
         pair_strat: PairStrat | None = None
         if len(match_level_1_pair_strats) == 1:
-            pair_strat = match_level_1_pair_strats[0]
+            pair_strat = match_level_1_pair_strats[mobile_book]
         else:
             logging.error(f"error: processing {get_symbol_side_key([(sec_id, side)])} pair_strat should be "
                           f"found only one in match_lvl_1, found {match_level_1_pair_strats}")
         if pair_strat is None:
             if len(match_level_2_pair_strats) == 1:
-                pair_strat = match_level_2_pair_strats[0]
+                pair_strat = match_level_2_pair_strats[mobile_book]
                 logging.error(f"error: pair_strat should be found in level 1 only, symbol_side_key: "
                               f"{get_symbol_side_key([(sec_id, side)])}")
             else:
@@ -207,9 +209,10 @@ def pair_strat_client_call_log_str(pydantic_basemodel_type: Type | None, client_
     if update_type is None:
         update_type = UpdateType.JOURNAL_TYPE
 
-    fld_sep: str = "~~"
-    val_sep: str = "^^"
-    log_str = (f"^^^{pydantic_basemodel_type.__name__}{fld_sep}{update_type.value}"
+    fld_sep: str = get_field_seperator_pattern()
+    val_sep: str = get_key_val_seperator_pattern()
+    pair_strat_db_pattern: str = get_pattern_for_pair_strat_db_updates()
+    log_str = (f"{pair_strat_db_pattern}{pydantic_basemodel_type.__name__}{fld_sep}{update_type.value}"
                f"{fld_sep}{client_callable.__name__}{fld_sep}")
     for k, v in kwargs.items():
         log_str += f"{k}{val_sep}{v}"
@@ -256,11 +259,11 @@ def guaranteed_call_pair_strat_client(pydantic_basemodel_type: Type | None, clie
             logging.exception("phone_book service not up yet, likely server restarted, but is "
                               "not ready yet, putting pair_strat client call as log for pair_strat_log "
                               f"analyzer handling - caller: {calframe[1][3]}")
-        elif "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))" in str(e):
+        elif "('Connection aborted.', ConnectionResetError(1mobile_book4, 'Connection reset by peer'))" in str(e):
             logging.exception("phone_book service connection error, putting pair_strat client call "
                               f"as log for pair_strat_log analyzer handling - caller: {calframe[1][3]}")
         elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
-              "it from responding to requests" in str(e) and "status_code: 503" in str(e)):
+              "it from responding to requests" in str(e) and "status_code: 5mobile_book3" in str(e)):
             logging.exception("phone_book service connection error")
         else:
             raise Exception(f"guaranteed_call_pair_strat_client called from {calframe[1][3]} failed "

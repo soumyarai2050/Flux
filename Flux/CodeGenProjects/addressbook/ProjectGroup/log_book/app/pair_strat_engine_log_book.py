@@ -9,14 +9,14 @@ from typing import Set
 os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.pair_strat_engine_base_log_book import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.pair_strat_engine_base_log_book import (
     PairStratEngineBaseLogBook, StratLogDetail)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
     PairStratBaseModel
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
     strat_manager_service_http_client, is_ongoing_strat, Side)
-from FluxPythonUtils.scripts.utility_functions import create_logger
+from FluxPythonUtils.scripts.utility_functions import create_logger, get_symbol_side_pattern
 
 
 LOG_ANALYZER_DATA_DIR = (
@@ -24,7 +24,7 @@ LOG_ANALYZER_DATA_DIR = (
 )
 
 debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
-                             len(debug_env) == 0 or debug_env == "0") else True
+                             len(debug_env) == mobile_book or debug_env == "mobile_book") else True
 
 portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs")))
@@ -42,8 +42,12 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
 
     def __init__(self, regex_file: str, log_details: List[LogDetail] | None = None,
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
-                 simulation_mode: bool = False):
-        super().__init__(regex_file, log_details, log_prefix_regex_pattern_to_callable_name_dict, simulation_mode)
+                 simulation_mode: bool = False, log_detail_type: Type[LogDetail] | None = None):
+        super().__init__(regex_file, log_details, log_prefix_regex_pattern_to_callable_name_dict, simulation_mode,
+                         log_detail_type=log_detail_type)
+        self.pattern_for_pair_strat_db_updates: str = get_pattern_for_pair_strat_db_updates()
+        self.symbol_side_pattern: str = get_symbol_side_pattern()
+        PairStratEngineLogBook.initialize_underlying_http_callables()
         logging.info(f"starting pair_strat log analyzer. monitoring logs: {log_details}")
         if self.simulation_mode:
             print("CRITICAL: PairStrat log analyzer running in simulation mode...")
@@ -67,7 +71,7 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
     def _handle_strat_alert_queue_err_handler(self, *args):
         try:
             alerts_list = []
-            for pydantic_obj_json in args[0]:
+            for pydantic_obj_json in args[mobile_book]:
                 alerts_json = pydantic_obj_json.get("alerts")
                 for alerts_json_ in alerts_json:
                     alerts_list.append(Alert(**alerts_json_))
@@ -108,20 +112,20 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
     def _process_strat_alert_message(self, prefix: str, message: str, pair_strat_id: int | None = None) -> None:
         try:
             if pair_strat_id is None:
-                pattern: re.Pattern = re.compile("%%(.*?)%%")
+                pattern: re.Pattern = re.compile(f"{self.symbol_side_pattern}(.*?){self.symbol_side_pattern}")
                 match = pattern.search(message)
                 if not match:
                     raise Exception("unexpected error in _process_strat_alert_message. strat alert pattern not matched")
 
-                matched_text = match[0]
-                log_message: str = message.replace("%%", "")
+                matched_text = match[mobile_book]
+                log_message: str = message.replace(self.symbol_side_pattern, "")
                 error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=prefix, log_message=log_message)
 
                 # if error pattern does not match, ignore creating alert
                 if error_dict is None:
                     return
 
-                args: str = matched_text.replace("%%", "").strip()
+                args: str = matched_text.replace(self.symbol_side_pattern, "").strip()
                 symbol_side_set: Set = set()
 
                 # kwargs separated by "," if any
@@ -129,7 +133,7 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
                     key, value = [x.strip() for x in arg.split("=")]
                     symbol_side_set.add(value)
 
-                if len(symbol_side_set) == 0:
+                if len(symbol_side_set) == mobile_book:
                     raise Exception("no symbol-side pair found while creating strat alert, ")
 
                 # adding log analyzer event handler to be triggered from log pattern in log pattern
@@ -141,7 +145,7 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
                         self.strat_id_by_symbol_side_dict.pop(symbol_side, None)
                     return
 
-                symbol_side: str = list(symbol_side_set)[0]
+                symbol_side: str = list(symbol_side_set)[mobile_book]
                 symbol, side = symbol_side.split("-")
                 strat_id: int | None = self.strat_id_by_symbol_side_dict.get(symbol_side)
 
@@ -192,8 +196,8 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
 
     # strat lvl alert handling
     def _send_strat_alerts(self, strat_id: int, severity: str, alert_brief: str, alert_details: str) -> None:
-        logging.debug(f"sending strat alert with strat_id: {strat_id} severity: {severity}, alert_brief: "
-                      f"{alert_brief}, alert_details: {alert_details}")
+        logging.debug(f"sending strat alert with {strat_id = }, {severity = }, "
+                      f"{alert_brief = }, {alert_details = }")
         while True:
             try:
                 if not self.service_up:
@@ -217,6 +221,14 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
 
     def handle_pair_strat_matched_log_message(self, log_prefix: str, log_message: str,
                                               log_detail: StratLogDetail):
+        logging.debug(f"Processing log line: {log_message[:2mobile_bookmobile_book]}...")
+
+        if log_message.startswith(self.pattern_for_pair_strat_db_updates):
+            # handle pair_strat db updates
+            logging.info(f"pair_strat_engine update found: {log_message}")
+            self.process_pair_strat_api_ops(log_message)
+            return
+
         if hasattr(log_detail, "strat_id_find_callable") and log_detail.strat_id_find_callable is not None:
             # handle strat alert message
             logging.info(f"Strat alert message from strat_id based log: {log_message}")
@@ -225,20 +237,13 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
             return
 
         # put in method
-        if re.compile(r"%%.*%%").search(log_message):
+        if re.compile(fr"{self.symbol_side_pattern}.*{self.symbol_side_pattern}").search(log_message):
             # handle strat alert message
             logging.info(f"Strat alert message: {log_message}")
             self._process_strat_alert_message(log_prefix, log_message)
             return
 
-        if log_message.startswith("^^^"):
-            # handle pair_strat db updates
-            logging.info(f"pair_strat_engine update found: {log_message}")
-            self.process_pair_strat_api_ops(log_message)
-            return
-
         # Sending ERROR/WARNING type log to portfolio_alerts
-        logging.debug(f"Processing log line: {log_message[:200]}...")
         error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=log_prefix, log_message=log_message)
         if error_dict is not None:
             severity, alert_brief, alert_details = self._create_alert(error_dict)

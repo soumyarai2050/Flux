@@ -24,26 +24,26 @@ class SecurityRecordManager:
 
     def load_security_float(self):
         self._security_float_by_ticker = {
-            "CB_Sec_1": 10_000_000,
-            "CB_Sec_2": 15_000_000,
-            "CB_Sec_3": 18_000_000,
-            "CB_Sec_4": 20_000_000,
-            "CB_Sec_5": 22_000_000,
-            "CB_Sec_6": 10_000_000,
-            "CB_Sec_7": 15_000_000,
-            "CB_Sec_8": 18_000_000,
-            "CB_Sec_9": 20_000_000,
-            "CB_Sec_10": 22_000_000,
-            "EQT_Sec_1": 4_000_000,
-            "EQT_Sec_2": 4_000_000,
-            "EQT_Sec_3": 5_400_000,
-            "EQT_Sec_4": 5_000_000,
-            "EQT_Sec_5": 10_000_000,
-            "EQT_Sec_6": 4_000_000,
-            "EQT_Sec_7": 4_000_000,
-            "EQT_Sec_8": 5_400_000,
-            "EQT_Sec_9": 5_000_000,
-            "EQT_Sec_10": 10_000_000
+            "CB_Sec_1": 1mobile_book_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_2": 15_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_3": 18_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_4": 2mobile_book_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_5": 22_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_6": 1mobile_book_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_7": 15_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_8": 18_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_9": 2mobile_book_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "CB_Sec_1mobile_book": 22_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_1": 4_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_2": 4_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_3": 5_4mobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_4": 5_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_5": 1mobile_book_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_6": 4_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_7": 4_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_8": 5_4mobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_9": 5_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+            "EQT_Sec_1mobile_book": 1mobile_book_mobile_bookmobile_bookmobile_book_mobile_bookmobile_bookmobile_book
         }
 
     def get_security_float_from_ticker(self, ticker: str):

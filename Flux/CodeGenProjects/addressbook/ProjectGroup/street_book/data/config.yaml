@@ -1,20 +1,22 @@
 # ui specific configs
   # ui_port needs code regeneration if changed and it should ideally be symmetric with server port like
-  # if server port is 8020 then ui_port should be 3020
-ui_port: "3050"
+  # if server port is 8mobile_book2mobile_book then ui_port should be 3mobile_book2mobile_book
+ui_port: "3mobile_book5mobile_book"
 
 # server specific configs
-server_host: "127.0.0.1"
-main_server_beanie_port: "8040"
-main_server_cache_port: "8035"
-min_refresh_interval: 20
+server_host: "127.mobile_book.mobile_book.1"
+main_server_beanie_port: "8mobile_book4mobile_book"
+main_server_cache_port: "8mobile_book35"
+min_refresh_interval: 2mobile_book
 custom_logger_lvls:
   - TIMING: 15
   - JUNK: 5
 
 log_mongo_uri: True
-mongo_server: "mongodb://localhost:27017"
+mongo_server: "mongodb://localhost:27mobile_book17"
 avoid_top_of_book_db_update: True  # to be used in routes to bypass db updates if True
+avoid_market_depth_db_update: True  # to be used in routes to bypass db updates if True
+avoid_last_trade_db_update: True  # to be used in routes to bypass db updates if True
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
@@ -29,8 +31,8 @@ strat_alert_config:
   transaction_counts_per_call: 5
   transaction_timeout_secs: 2  # secs
 raw_perf_data_config:
-  transaction_counts_per_call: 500
-  transaction_timeout_secs: 60  # secs
+  transaction_counts_per_call: 5mobile_bookmobile_book
+  transaction_timeout_secs: 6mobile_book  # secs
 
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec

@@ -24,9 +24,9 @@ def test_build_and_clean_web_project(root_dir: PurePath, build_and_clean_web_pro
     list_of_files_generated_in_dir = os.listdir(generated_files_dir_path)
     if all(word in list_of_files_generated_in_dir for word in list_of_generated_files):
         os.chdir(build_and_clean_web_project_path)
-        assert os.system(f'sh clean-web-project.sh') == 0
+        assert os.system(f'sh clean-web-project.sh') == mobile_book
         # os.chdir(build_and_clean_web_project_path)
-        assert os.system(f'sh build_web_project.sh') == 0
+        assert os.system(f'sh build_web_project.sh') == mobile_book
     else:
         os.chdir(build_and_clean_web_project_path)
-        assert os.system(f'sh build_web_project.sh') == 0
+        assert os.system(f'sh build_web_project.sh') == mobile_book

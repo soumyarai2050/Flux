@@ -6,7 +6,7 @@ from pathlib import PurePath
 home_dir_path = PurePath(__file__).parent.parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
 from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
-from Flux.CodeGenProjects.AddressBook.trading_gen_engine_env import TradingGenEngineEnv
+from Flux.CodeGenProjects.addressbook.trading_gen_engine_env import TradingGenEngineEnv
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
 

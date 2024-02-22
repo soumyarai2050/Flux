@@ -15,11 +15,11 @@ if __name__ == "__main__":
     code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
     db_type: str = "cache"
     datetime_str: str = datetime.now().strftime("%Y%m%d")
-    port = 8000 if ((config_port := config_yaml_dict.get(f"{db_type}_port")) is None or
-                    len(config_port) == 0) else parse_to_int(config_port)
+    port = 8mobile_bookmobile_bookmobile_book if ((config_port := config_yaml_dict.get(f"{db_type}_port")) is None or
+                    len(config_port) == mobile_book) else parse_to_int(config_port)
     env_dict = {
         "RELOAD": "false",
-        "DEBUG_SLEEP_TIME": "0",
+        "DEBUG_SLEEP_TIME": "mobile_book",
         "LOG_FILE_DIR_PATH": f"{project_dir / 'log' }",
         "LOG_FILE_NAME": f"template_project_name_{db_type}_logs_{datetime_str}.log",
         "FASTAPI_FILE_NAME": f"template_model_service_{db_type}_fastapi",
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # Importing here to get LOG_FILE_NAME and LOG_LEVEL set before getting logging config triggered in
     # template_model_service_cache_fastapi file
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.template_project_name.generated.FastApi.template_model_service_launch_server import \
+    from Flux.CodeGenProjects.addressbook.ProjectGroup.template_project_name.generated.FastApi.template_model_service_launch_server import \
         template_model_service_launch_server
 
     template_model_service_launch_server()

@@ -619,29 +619,33 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
 
                 if (option_dict.get(JsSliceFileGenPlugin.widget_ui_option_depends_on_other_model_for_id_field) or
                         self.if_msg_used_in_abb_option_value(message)):
-                    output_str += "            const { data, collections} = action.payload;\n"
+                    output_str += "            const { data } = action.payload;\n"
+                    output_str += "            // deleted objects are already filtered in the array received\n"
                     output_str += f"            state.{message_name_camel_cased}Array = data;\n"
                 else:
                     output_str += f"            const dict = action.payload;\n"
-                    output_str += f"            let updatedArray = state.{message_name_camel_cased}Array;\n"
+                    output_str += f"            const updatedArray = state.{message_name_camel_cased}Array;\n"
                     output_str += "            _.values(dict).forEach(v => {\n"
-                    output_str += "                updatedArray = applyGetAllWebsocketUpdate(updatedArray, v);\n"
+                    output_str += "                applyGetAllWebsocketUpdate(updatedArray, v);\n"
                     output_str += "            })\n"
                     output_str += f"            state.{message_name_camel_cased}Array = updatedArray;\n"
-                output_str += "            let isDeleted = false;\n"
                 output_str += f"            if (state.selected{message_name}Id) " + "{\n"
-                output_str += "                isDeleted = true;\n"
-                output_str += f"                state.{message_name_camel_cased}Array.forEach(o => " + "{\n"
-                output_str += f"                    if (_.get(o, DB_ID) === state.selected{message_name}Id) " + "{\n"
-                output_str += "                        isDeleted = false;\n"
-                output_str += "                    }\n"
-                output_str += "                })\n"
-                output_str += "            }\n"
-                output_str += "            if (isDeleted) {\n"
-                output_str += f"                state.selected{message_name}Id = initialState.selected{message_name}Id;\n"
-                output_str += f"                state.{message_name_camel_cased} = " \
+                output_str += f"                const storedObj = state.{message_name_camel_cased}Array.find(o => " \
+                              f"o[DB_ID] === state.selected{message_name}Id);\n"
+                output_str += "                if (storedObj) {\n"
+                if self.if_msg_used_in_abb_option_value(message):
+                    output_str += f"                    state.{message_name_camel_cased} = storedObj;\n"
+                    output_str += f"                    state.modified{message_name} = storedObj;\n"
+                output_str += "                } else {\n"
+                output_str += "                    // active obj is deleted, reset the states to their initial values\n"
+                output_str += f"                    state.selected{message_name}Id = " \
+                              f"initialState.selected{message_name}Id;\n"
+                output_str += f"                    state.{message_name_camel_cased} = " \
                               f"initialState.{message_name_camel_cased};\n"
-                output_str += "            }\n"
+                output_str += f"                    state.modified{message_name} = " \
+                              f"initialState.modified{message_name};\n"
+                output_str += "                }\n"
+                output_str += "            }  // else not required, no active obj\n"
                 output_str += "        },\n"
             else:
                 output_str += f"        set{message_name}ArrayWs: (state, action) => " + "{\n"

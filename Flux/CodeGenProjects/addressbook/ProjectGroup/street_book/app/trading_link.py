@@ -1,6 +1,6 @@
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.trading_link_base import TradingLinkBase
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link_base import TradingLinkBase
 # from Flux.CodeGenProjects.street_book.app.trade_simulator import TradeSimulator
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.log_trade_simulator import LogTradeSimulator
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.log_trade_simulator import LogTradeSimulator
 
 config_dict = TradingLinkBase.pair_strat_config_dict
 is_test_run: bool = config_dict.get("is_test_run")

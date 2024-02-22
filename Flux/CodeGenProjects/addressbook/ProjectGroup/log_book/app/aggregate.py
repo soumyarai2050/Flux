@@ -5,9 +5,9 @@ import os
 os.environ["DBType"] = "beanie"
 # Below unused import is used by generated beanie file
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import (
     PortfolioAlertBaseModel, StratAlertBaseModel, Severity)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_beanie_database import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.FastApi.log_book_service_beanie_database import \
     get_mongo_server_uri
 from FluxPythonUtils.scripts.utility_functions import get_version_from_mongodb_uri
 
@@ -28,7 +28,7 @@ def get_pydantic_model_to_dict_for_limit_agg(pydentic_obj_dict: Dict):
 
 
 def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
-    if limit < 0:
+    if limit < mobile_book:
         limit = -limit  # to make it positive
         sort_direction = -1
     else:
@@ -129,7 +129,7 @@ def extend_pipeline_to_sort_alerts_based_on_severity(agg_pipeline: List[Dict]):
     counter = 1
     for sev in Severity:
         if sev.value != "Severity_UNSPECIFIED":
-            extend_agg_pipeline[2]["$addFields"]['_sortPriority']['$ifNull'][0]['$switch']['branches'].append(
+            extend_agg_pipeline[2]["$addFields"]['_sortPriority']['$ifNull'][mobile_book]['$switch']['branches'].append(
                 {
                     'case': {
                         '$eq': [
@@ -223,7 +223,7 @@ def get_limited_alerts_obj_v6_n_above(limit: int,
 
 def get_limited_portfolio_alerts_obj(limit: int):
     mongo_version = get_version_from_mongodb_uri(get_mongo_server_uri())
-    mongo_version_start_num = mongo_version.split(".")[0]
+    mongo_version_start_num = mongo_version.split(".")[mobile_book]
     if int(mongo_version_start_num) < 6:
         return get_limited_alerts_obj_v5(limit, PortfolioAlertBaseModel)
     else:
@@ -232,7 +232,7 @@ def get_limited_portfolio_alerts_obj(limit: int):
 
 def get_limited_strat_alerts_obj(limit: int):
     mongo_version = get_version_from_mongodb_uri(get_mongo_server_uri())
-    mongo_version_start_num = mongo_version.split(".")[0]
+    mongo_version_start_num = mongo_version.split(".")[mobile_book]
     if int(mongo_version_start_num) < 6:
         return get_limited_alerts_obj_v5(limit, StratAlertBaseModel)
     else:
