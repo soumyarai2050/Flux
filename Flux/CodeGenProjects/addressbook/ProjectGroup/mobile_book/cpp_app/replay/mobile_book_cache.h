@@ -97,9 +97,9 @@ extern "C" void create_top_of_book_cache(const mobile_book::TopOfBook &kr_top_of
     PyObject* p_market_trade_volume_instance = nullptr;
 
     p_market_trade_volume_class = PyObject_GetAttrString(p_module, "MarketTradeVolume");
-    p_market_trade_volume_list = PyList_New(mobile_book);
+    p_market_trade_volume_list = PyList_New(0);
     p_set_func = PyObject_GetAttrString(p_mobile_book_container_instance, "set_top_of_book");
-    for (int i = mobile_book; i < kr_top_of_book.market_trade_volume_size(); ++i) {
+    for (int i = 0; i < kr_top_of_book.market_trade_volume_size(); ++i) {
         p_args = PyTuple_Pack(3, PyUnicode_DecodeUTF8(kr_top_of_book.market_trade_volume(i).id().c_str(),
                                                       static_cast<Py_ssize_t>(kr_top_of_book.market_trade_volume(
                                                               i).id().size()), nullptr),
@@ -321,7 +321,7 @@ extern "C" bool update_or_create_top_of_book_cache(const mobile_book::TopOfBook 
                     p_args = PyTuple_Pack(1, PyLong_FromLong(kr_top_of_book.total_trading_security_size()));
                     PyObject_CallObject(p_top_of_book_total_trading_security_size, p_args);
 
-                    for (int i = mobile_book; i < kr_top_of_book.market_trade_volume_size(); ++i) {
+                    for (int i = 0; i < kr_top_of_book.market_trade_volume_size(); ++i) {
                         p_result = set_market_trade_volume(p_mobile_book_container_instance,
                                                            kr_top_of_book.market_trade_volume(i));
                         if (!PyObject_IsTrue(p_result)) {

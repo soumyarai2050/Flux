@@ -3,9 +3,9 @@ import logging
 from typing import List
 
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import Side
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import Side
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link_base import TradingLinkBase
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_analyzer.app.log_analyzer_service_helper import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import (
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_log_simulator)
 
 

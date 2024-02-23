@@ -84,7 +84,7 @@ namespace mobile_book_handler {
             std::vector<std::string> keys;
             m_top_of_book_db_codec_.get_all_data_from_collection(top_of_book_documents);
             MobileBookKeyHandler::get_key_list(top_of_book_documents, keys);
-            for (int i = mobile_book; i < top_of_book_documents.top_of_book_size(); ++i) {
+            for (int i = 0; i < top_of_book_documents.top_of_book_size(); ++i) {
                 m_top_of_book_db_codec_.m_root_model_key_to_db_id[keys.at(i)] =
                         top_of_book_documents.top_of_book(i).id();
             }
@@ -96,7 +96,7 @@ namespace mobile_book_handler {
             m_last_trade_db_codec_.get_all_data_from_collection(last_trade_obj_list);
             ::MobileBookKeyHandler::get_key_list(last_trade_obj_list, keys);
 
-            for (int i = mobile_book; i < last_trade_obj_list.last_trade_size(); ++i) {
+            for (int i = 0; i < last_trade_obj_list.last_trade_size(); ++i) {
                 m_last_trade_db_codec_.m_root_model_key_to_db_id[keys.at(i)] = last_trade_obj_list.last_trade(i).id();
             }
         }

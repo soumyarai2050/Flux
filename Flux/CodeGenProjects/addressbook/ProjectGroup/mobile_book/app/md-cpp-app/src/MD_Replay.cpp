@@ -17,8 +17,8 @@ mongocxx::pool md_handler::MD_MongoDBHandler::pool{md_handler::MD_MongoDBHandler
 int main()
 {
     md_handler::MD_MongoDBHandler mongo_db;
-    MD_ManageSubscriptionSymbols mdManageSubscriptionSymbols("127.mobile_book.mobile_book.1", "8mobile_book2mobile_book",
-                                                             "/pair_strat_engine/query-get_ongoing_strats_symbol_n_exch/");
+    MD_ManageSubscriptionSymbols mdManageSubscriptionSymbols("127.0.0.1", "8020",
+                                                             "/phone_book/query-get_ongoing_strats_symbol_n_exch/");
     auto symbols_to_subscribe = mdManageSubscriptionSymbols.get();
     for (auto &symbol: symbols_to_subscribe)
         std::cout << symbol << std::endl;
@@ -27,5 +27,5 @@ int main()
     md_handler::MD_LastTradeHandler lastTradeHandler(mongo_db);
     md_handler::MD_HistoryManager marketDataHistoryManager(mongo_db, marketDepthHandler, lastTradeHandler);
     marketDataHistoryManager.replay(md_handler::ReplyType::NOW_ACCELERATE);
-    return mobile_book;
+    return 0;
 }

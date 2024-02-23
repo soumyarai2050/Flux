@@ -4,20 +4,20 @@ import "flux_options.proto";
 import "ui_option_utils.proto";
 import "projects_core.proto";
 import "trade_core.proto";
-import "mobile_book_n_strat_executor_core.proto";
-import "dashboards_n_mobile_book_n_strat_executor_core.proto";
+import "mobile_book_n_street_book_core.proto";
+import "dept_book_n_mobile_book_n_street_book_core.proto";
 
 package mobile_book;
 
 // Set the FluxImportFileModelOptions option
 option (FluxFileImportDependencyModel) = {
-  ImportFileName: "dashboards_n_mobile_book_n_strat_executor_core.proto",
+  ImportFileName: "dept_book_n_mobile_book_n_street_book_core.proto",
   ImportModelName: "SymbolOverview",
   ImportModelName: "SymbolOverviewList"
 };
 
 option (FluxFileImportDependencyModel) = {
-  ImportFileName: "mobile_book_n_strat_executor_core.proto",
+  ImportFileName: "mobile_book_n_street_book_core.proto",
   ImportModelName: "TopOfBook",
   ImportModelName: "MarketDepth",
   ImportModelName: "LastTrade",
@@ -26,12 +26,12 @@ option (FluxFileImportDependencyModel) = {
   ImportModelName: "LastTradeList"
 };
 
-option (FluxFileCRUDPortOffset) = 4mobile_book;
+option (FluxFileCRUDPortOffset) = 40;
 
 message SideSpecificMobileBookBrief{
-  optional float allowed_px_by_max_basis_points = 1 [(FluxFldHelp) = "(bbo_aggressive / 1mobile_bookmobile_book) * (max_basis_points/1mobile_bookmobile_book) + bbo_aggressive"];
-  optional float allowed_px_by_max_deviation = 2 [(FluxFldHelp) = "vwap (+/-) (vwap/1mobile_bookmobile_book * max_px_deviation) : Sell Order use - , buy + "];
-  optional float allowed_px_by_max_level = 3 [(FluxFldHelp) = "Price at max level in order book (capped at depth level availability - 1mobile_book) "];
+  optional float allowed_px_by_max_basis_points = 1 [(FluxFldHelp) = "(bbo_aggressive / 100) * (max_basis_points/100) + bbo_aggressive"];
+  optional float allowed_px_by_max_deviation = 2 [(FluxFldHelp) = "vwap (+/-) (vwap/100 * max_px_deviation) : Sell Order use - , buy + "];
+  optional float allowed_px_by_max_level = 3 [(FluxFldHelp) = "Price at max level in order book (capped at depth level availability - 10) "];
   optional float allowed_max_px = 4 [(FluxFldHelp) = "Min/Max of allowed_px_by_basis_point_limit, allowed_px_by_deviation_limit, allowed_px_by_level_limit depending on buy or sell"];
 }
 
@@ -54,7 +54,7 @@ message MobileBookBrief{
 
 message TickByTickBBO {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.mobile_book,
+    MongoVersion: 5.0,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -80,7 +80,7 @@ message MarketTradeVolume{
 
 message RawMarketDepthHistory {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.mobile_book,
+    MongoVersion: 5.0,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,

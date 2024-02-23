@@ -1,29 +1,29 @@
 # ui specific configs
   # ui_port needs code regeneration if changed and it should ideally be symmetric with server port like
-  # if server port is 8mobile_book2mobile_book then ui_port should be 3mobile_book2mobile_book
-ui_port: "3mobile_book1mobile_book"
+  # if server port is 8020 then ui_port should be 3020
+ui_port: "3010"
 
 # server specific configs
-server_host: "127.mobile_book.mobile_book.1"
-main_server_beanie_port: "8mobile_book1mobile_book"
-main_server_cache_port: "8mobile_book15"
-min_refresh_interval: 2mobile_book
+server_host: "127.0.0.1"
+main_server_beanie_port: "8010"
+main_server_cache_port: "8015"
+min_refresh_interval: 20
 custom_logger_lvls:
   - TIMING: 15
   - JUNK: 5
 
 log_mongo_uri: True
-mongo_server: "mongodb://localhost:27mobile_book17"
+mongo_server: "mongodb://localhost:27017"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
-# to be used in pair_strat_log_analyzer to take out counts of created from waiting queue to execute create in db
+# to be used in pair_strat_log_book to take out counts of created from waiting queue to execute create in db
 raw_perf_data_config:
-  transaction_counts_per_call: 5mobile_bookmobile_book
-  transaction_timeout_secs: 6mobile_book  # secs
+  transaction_counts_per_call: 500
+  transaction_timeout_secs: 60  # secs
 
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
@@ -32,6 +32,6 @@ is_test_run: True
 log_level: "debug"  # log lvl in int or basic log lvl name
 
 # to run log analyzer in simulator mode
-simulate_log_analyzer: True
+simulate_log_book: True
 
 

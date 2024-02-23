@@ -8,8 +8,8 @@ os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.scripts.utility_functions import configure_logger, create_logger
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.pair_strat_engine_base_log_book import (
-    PairStratEngineBaseLogBook, StratLogDetail)
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.phone_book_base_log_book import (
+    PhoneBookBaseLogBook, StratLogDetail)
 from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import *
 from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import log_book_service_http_client
 
@@ -21,10 +21,10 @@ portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs")))
 
 debug_mode: bool = False if ((debug_env := os.getenv("LS_LOG_ANALYZER_DEBUG")) is None or
-                             len(debug_env) == mobile_book or debug_env == "mobile_book") else True
+                             len(debug_env) == 0 or debug_env == "0") else True
 
 
-class LogSimulatorLogBook(PairStratEngineBaseLogBook):
+class LogSimulatorLogBook(PhoneBookBaseLogBook):
 
     def __init__(self, regex_file: str, log_details: List[LogDetail] | None = None,
                  log_prefix_regex_pattern_to_callable_name_dict: Dict[str, str] | None = None,
@@ -80,9 +80,9 @@ class LogSimulatorLogBook(PairStratEngineBaseLogBook):
             # remove pattern_for_log_simulator from beginning of message
             message: str = message[len(self.pattern_for_log_simulator):]
             args: List[str] = message.split(self.field_sep)
-            method_name: str = args.pop(mobile_book)
-            host: str = args.pop(mobile_book)
-            port: int = parse_to_int(args.pop(mobile_book))
+            method_name: str = args.pop(0)
+            host: str = args.pop(0)
+            port: int = parse_to_int(args.pop(0))
 
             kwargs: Dict[str, str] = dict()
             # get method kwargs separated by key_val_sep if any
@@ -104,7 +104,7 @@ class LogSimulatorLogBook(PairStratEngineBaseLogBook):
                                        alert_details=alert_details)
 
     def handle_log_simulator_matched_log_message(self, log_prefix: str, log_message: str, log_detail: LogDetail):
-        logging.debug(f"Processing log simulator line: {log_message[:2mobile_bookmobile_book]}...")
+        logging.debug(f"Processing log simulator line: {log_message[:200]}...")
         # put in method
         if log_message.startswith(self.pattern_for_log_simulator):
             # handle trade simulator message
@@ -126,7 +126,7 @@ if __name__ == '__main__':
         suppress_alert_regex_file: PurePath = LOG_ANALYZER_DATA_DIR / "suppress_alert_regex.txt"
         # register new logs directory and log details below
         log_dir: PurePath = PurePath(__file__).parent.parent / "log"
-        strat_executor_log_dir: PurePath = PurePath(__file__).parent.parent.parent / "strat_executor" / "log"
+        street_book_log_dir: PurePath = PurePath(__file__).parent.parent.parent / "street_book" / "log"
 
         datetime_str: str = datetime.datetime.now().strftime("%Y%m%d")
         log_file_name = f"log_simulator_logs_{datetime_str}.log"
@@ -144,7 +144,7 @@ if __name__ == '__main__':
 
         log_details: List[LogDetail] = [
             StratLogDetail(service="log_simulator",
-                           log_file_path=str(strat_executor_log_dir / f"log_simulator_*_{datetime_str}.log"), critical=True,
+                           log_file_path=str(street_book_log_dir / f"log_simulator_*_{datetime_str}.log"), critical=True,
                            log_prefix_regex_pattern_to_callable_name_dict=log_prefix_regex_pattern_to_callable_name_dict,
                            log_file_path_is_regex=True),
             StratLogDetail(

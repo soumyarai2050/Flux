@@ -18,7 +18,7 @@ from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_spe
 from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
 
-class StratExecutorPlugin(BaseProtoPlugin):
+class StreetBookPlugin(BaseProtoPlugin):
     """
     Plugin to generate strat executor helping scripts
     """
@@ -64,7 +64,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
                     key_sequence_option_val_hyphen_sep = key_seq.split("-")
                     for index, key_sequence_option_val in enumerate(key_sequence_option_val_hyphen_sep):
                         key_sequence_option_val_hyphen_sep[index] = \
-                            StratExecutorPlugin._clean_string_key_val(key_sequence_option_val)
+                            StreetBookPlugin._clean_string_key_val(key_sequence_option_val)
                     return_list.append(key_sequence_option_val_hyphen_sep)
                 return return_list
             # else not required: other cases are acceptable and None will be returned since no
@@ -83,7 +83,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
                 key_sequence_option_val_hyphen_sep = log_key_sequence_option_val.split("-")
                 for index, key_sequence_option_val in enumerate(key_sequence_option_val_hyphen_sep):
                     key_sequence_option_val_hyphen_sep[index] = \
-                        StratExecutorPlugin._clean_string_key_val(key_sequence_option_val)
+                        StreetBookPlugin._clean_string_key_val(key_sequence_option_val)
                 return key_sequence_option_val_hyphen_sep
             # else not required: returning None if log_key_sequence_option_val not found
         return None
@@ -102,19 +102,19 @@ class StratExecutorPlugin(BaseProtoPlugin):
         message_list.sort(key=lambda message_: message_.proto.name)     # sorting by name
 
         for message in message_list:
-            if StratExecutorPlugin.is_option_enabled(message, StratExecutorPlugin.flux_msg_executor_options):
+            if StreetBookPlugin.is_option_enabled(message, StreetBookPlugin.flux_msg_executor_options):
                 option_value_dict = \
-                    StratExecutorPlugin.get_complex_option_value_from_proto(
-                        message, StratExecutorPlugin.flux_msg_executor_options)
-                if option_value_dict.get(StratExecutorPlugin.executor_option_is_websocket_model_field):
+                    StreetBookPlugin.get_complex_option_value_from_proto(
+                        message, StreetBookPlugin.flux_msg_executor_options)
+                if option_value_dict.get(StreetBookPlugin.executor_option_is_websocket_model_field):
                     self.ws_manager_required_messages.append(message)
-                if option_value_dict.get(StratExecutorPlugin.executor_option_is_top_lvl_model_field):
+                if option_value_dict.get(StreetBookPlugin.executor_option_is_top_lvl_model_field):
                     self.ws_manager_required_top_lvl_messages.append(message)
-                if option_value_dict.get(StratExecutorPlugin.executor_option_executor_key_sequence_field):
+                if option_value_dict.get(StreetBookPlugin.executor_option_executor_key_sequence_field):
                     self.get_cache_key_required_messages.append(message)
-                if option_value_dict.get(StratExecutorPlugin.executor_option_log_key_sequence_field):
+                if option_value_dict.get(StreetBookPlugin.executor_option_log_key_sequence_field):
                     self.get_log_key_required_messages.append(message)
-                if (key_count := option_value_dict.get(StratExecutorPlugin.executor_option_executor_key_count_field)) is None:
+                if (key_count := option_value_dict.get(StreetBookPlugin.executor_option_executor_key_count_field)) is None:
                     self.get_cache_key_required_msg_to_key_count_dict[message] = 1
                 else:
                     try:
@@ -141,7 +141,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         content_str += f"\t\t\t{message_name_snake_cased}_tuple = " \
                        f"self.trading_cache.get_{message_name_snake_cased}()\n"
         content_str += f"\t\t\tif {message_name_snake_cased}_tuple is None or " \
-                       f"{message_name_snake_cased}_tuple[mobile_book] is None:\n"
+                       f"{message_name_snake_cased}_tuple[0] is None:\n"
         content_str += f"\t\t\t\tself.trading_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += "\t\t\t\tkwargs = {'"+f"{message_name_snake_cased}_"+"': "+f"{message_name_snake_cased}_"+"}\n"
         content_str += f"\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
@@ -151,9 +151,9 @@ class StratExecutorPlugin(BaseProtoPlugin):
                        ' with id: {'+f'{message_name_snake_cased}'+'_.id}")\n'
         content_str += f"\t\t\telse:\n"
         option_value_dict = \
-            StratExecutorPlugin.get_complex_option_value_from_proto(
-                message, StratExecutorPlugin.flux_msg_executor_options)
-        is_repeated = option_value_dict.get(StratExecutorPlugin.executor_option_is_repeated_field)
+            StreetBookPlugin.get_complex_option_value_from_proto(
+                message, StreetBookPlugin.flux_msg_executor_options)
+        is_repeated = option_value_dict.get(StreetBookPlugin.executor_option_is_repeated_field)
         if is_repeated:
             content_str += f"\t\t\t\t{message_name_snake_cased}_list, _ = {message_name_snake_cased}_tuple\n"
             content_str += f"\t\t\t\t{message_name_snake_cased} = {message_name_snake_cased}_list[-1]\n"
@@ -217,7 +217,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         key_handler_class_name = convert_to_capitalized_camel_case(self.key_handler_file_name)
         content_str += \
             f"from {key_handler_import_path} import {key_handler_class_name}\n"
-        file_name = str(file.proto.name).split(".")[mobile_book]
+        file_name = str(file.proto.name).split(".")[0]
         ws_client_file_name = f"{self.beanie_fastapi_model_dir_name}.{file_name}_ws_client"
         ws_client_import_path = self.import_path_from_os_path("OUTPUT_DIR",
                                                               f"{ws_client_file_name}")
@@ -228,9 +228,9 @@ class StratExecutorPlugin(BaseProtoPlugin):
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         content_str += f'from {model_file_path} import *\n\n\n'
 
-        file_name = str(file.proto.name).split(".")[mobile_book]
+        file_name = str(file.proto.name).split(".")[0]
         file_name_camel_cased = convert_to_capitalized_camel_case(file_name)
-        file_name_camel_cased = file_name_camel_cased[mobile_book].upper() + file_name_camel_cased[1:]
+        file_name_camel_cased = file_name_camel_cased[0].upper() + file_name_camel_cased[1:]
         content_str += f"class {file_name_camel_cased}DataManager({file_name_camel_cased}WSClient):\n"
         content_str += f"\tdef __init__(self, host: str, port: int, strat_cache: {self.base_strat_cache_class_name}):\n"
         content_str += f"\t\tsuper().__init__(host, port)\n"
@@ -240,9 +240,9 @@ class StratExecutorPlugin(BaseProtoPlugin):
         for message in self.ws_manager_required_messages:
             message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
             option_dict = \
-                StratExecutorPlugin.get_complex_option_value_from_proto(message,
-                                                                        StratExecutorPlugin.flux_msg_executor_options)
-            notify_all_option_val = option_dict.get(StratExecutorPlugin.executor_option_enable_notify_all_field)
+                StreetBookPlugin.get_complex_option_value_from_proto(message,
+                                                                        StreetBookPlugin.flux_msg_executor_options)
+            notify_all_option_val = option_dict.get(StreetBookPlugin.executor_option_enable_notify_all_field)
             content_str += (f'\t\tself.{message_name_snake_cased}_ws_get_all_cont = '
                             f'self.{message_name_snake_cased}_ws_get_all_client({notify_all_option_val})\n')
         content_str += "\n"
@@ -266,15 +266,15 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str = f"\t\t{key_str}: str | None = None\n"
         output_str += "\t\tif "
         for key_seq in key_seq_list:
-            if key_seq[mobile_book] != "'" and key_seq[-1] != "'":
-                if key_seq != key_seq_list[mobile_book]:
+            if key_seq[0] != "'" and key_seq[-1] != "'":
+                if key_seq != key_seq_list[0]:
                     output_str += " and "
                 output_str += f"{message_name_snake_cased}.{key_seq} is not None"
             if key_seq == key_seq_list[-1]:
                 output_str += ":\n"
         output_str += f"\t\t\t{key_str} = "
         for key_seq in key_seq_list:
-            if key_seq[mobile_book] != "'" and key_seq[-1] != "'":
+            if key_seq[0] != "'" and key_seq[-1] != "'":
                 output_str += "f'{"+f"{message_name_snake_cased}.{key_seq}"+"}'"
             else:
                 output_str += f"{key_seq}"
@@ -287,7 +287,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
     def get_key_method_content_for_cache(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        all_executor_key_seq_list = StratExecutorPlugin.get_executor_key_sequence_list_of_model(message)
+        all_executor_key_seq_list = StreetBookPlugin.get_executor_key_sequence_list_of_model(message)
         output_str = ""
         if all_executor_key_seq_list is not None:
             if len(all_executor_key_seq_list) == 1:
@@ -319,7 +319,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
     def get_key_method_content_for_log(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        log_executor_key_seq_list = StratExecutorPlugin.get_log_key_sequence_list_of_model(message)
+        log_executor_key_seq_list = StreetBookPlugin.get_log_key_sequence_list_of_model(message)
         output_str = ""
         if log_executor_key_seq_list is not None:
             output_str += "\t@staticmethod\n"
@@ -407,7 +407,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str += "from typing import Dict, Tuple, Optional, ClassVar, List\n"
         output_str += "from pendulum import DateTime\n\n"
         output_str += "# project imports\n"
-        file_name = str(file.proto.name).split(".")[mobile_book]
+        file_name = str(file.proto.name).split(".")[0]
         model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
@@ -424,11 +424,11 @@ class StratExecutorPlugin(BaseProtoPlugin):
                 message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
                 option_value_dict = \
-                    StratExecutorPlugin.get_complex_option_value_from_proto(
-                        message, StratExecutorPlugin.flux_msg_executor_options)
-                is_repeated: bool = option_value_dict.get(StratExecutorPlugin.executor_option_is_repeated_field)
+                    StreetBookPlugin.get_complex_option_value_from_proto(
+                        message, StreetBookPlugin.flux_msg_executor_options)
+                is_repeated: bool = option_value_dict.get(StreetBookPlugin.executor_option_is_repeated_field)
                 cache_as_dict_with_key_field: str = (
-                    option_value_dict.get(StratExecutorPlugin.executor_option_cache_as_dict_with_key_field))
+                    option_value_dict.get(StreetBookPlugin.executor_option_cache_as_dict_with_key_field))
 
                 if is_repeated:
                     if cache_as_dict_with_key_field is None:
@@ -501,11 +501,11 @@ class StratExecutorPlugin(BaseProtoPlugin):
         for message in self.ws_manager_required_messages:
 
             option_value_dict = \
-                StratExecutorPlugin.get_complex_option_value_from_proto(
-                    message, StratExecutorPlugin.flux_msg_executor_options)
-            is_repeated = option_value_dict.get(StratExecutorPlugin.executor_option_is_repeated_field)
+                StreetBookPlugin.get_complex_option_value_from_proto(
+                    message, StreetBookPlugin.flux_msg_executor_options)
+            is_repeated = option_value_dict.get(StreetBookPlugin.executor_option_is_repeated_field)
             cache_as_dict_with_key_field: str = (
-                option_value_dict.get(StratExecutorPlugin.executor_option_cache_as_dict_with_key_field))
+                option_value_dict.get(StreetBookPlugin.executor_option_cache_as_dict_with_key_field))
 
             if message not in self.ws_manager_required_top_lvl_messages:
                 output_str += self._strat_cache_get_model_interface_content(message, is_repeated,
@@ -520,7 +520,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str += "from typing import Tuple, List\n"
         output_str += "from pendulum import DateTime\n\n"
         output_str += "# project imports\n"
-        file_name = str(file.proto.name).split(".")[mobile_book]
+        file_name = str(file.proto.name).split(".")[0]
         model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
@@ -534,9 +534,9 @@ class StratExecutorPlugin(BaseProtoPlugin):
                     message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
 
                     option_value_dict = \
-                        StratExecutorPlugin.get_complex_option_value_from_proto(
-                            message, StratExecutorPlugin.flux_msg_executor_options)
-                    is_repeated = option_value_dict.get(StratExecutorPlugin.executor_option_is_repeated_field)
+                        StreetBookPlugin.get_complex_option_value_from_proto(
+                            message, StreetBookPlugin.flux_msg_executor_options)
+                    is_repeated = option_value_dict.get(StreetBookPlugin.executor_option_is_repeated_field)
 
                     if is_repeated:
                         output_str += \
@@ -552,9 +552,9 @@ class StratExecutorPlugin(BaseProtoPlugin):
                 if message in self.ws_manager_required_top_lvl_messages:
 
                     option_value_dict = \
-                        StratExecutorPlugin.get_complex_option_value_from_proto(
-                            message, StratExecutorPlugin.flux_msg_executor_options)
-                    is_repeated = option_value_dict.get(StratExecutorPlugin.executor_option_is_repeated_field)
+                        StreetBookPlugin.get_complex_option_value_from_proto(
+                            message, StreetBookPlugin.flux_msg_executor_options)
+                    is_repeated = option_value_dict.get(StreetBookPlugin.executor_option_is_repeated_field)
 
                     output_str += self._strat_cache_get_model_interface_content(message, is_repeated)
                     # output_str += self._trading_cache_set_model_interface_content(message, is_repeated)
@@ -567,7 +567,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         output_str = "# python standard imports\n"
         output_str += "from typing import List, Tuple\n"
         file_class_name = f"{self.file_name_cap_camel_cased}KeyHandler"
-        file_name = str(file.proto.name).split(".")[mobile_book]
+        file_name = str(file.proto.name).split(".")[0]
         model_file_name = f"{self.beanie_pydantic_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
@@ -585,7 +585,7 @@ class StratExecutorPlugin(BaseProtoPlugin):
         return output_str
 
     def output_file_generate_handler(self, file: protogen.File):
-        self.file_name = str(file.proto.name).split(".")[mobile_book]
+        self.file_name = str(file.proto.name).split(".")[0]
         self.file_name_cap_camel_cased = convert_to_capitalized_camel_case(self.file_name)
         self.set_data_members(file)
 
@@ -603,4 +603,4 @@ class StratExecutorPlugin(BaseProtoPlugin):
 
 
 if __name__ == "__main__":
-    main(StratExecutorPlugin)
+    main(StreetBookPlugin)

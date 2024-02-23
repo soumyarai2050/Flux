@@ -22,11 +22,11 @@ namespace md_handler{
 
     inline std::string get_date_time_str_from_milliseconds(int64_t time_in_milliseconds){
         // handle not set
-        if (mobile_book == time_in_milliseconds) return "";
+        if (0 == time_in_milliseconds) return "";
 
         //zoned_time{current_zone(), p1}
-        char buf[sizeof "2mobile_book11-1mobile_book-mobile_book8Tmobile_book7:mobile_book7:mobile_book9XXXZ--------"];
-        std::time_t objTime_t(static_cast<int64_t>(time_in_milliseconds / 1mobile_bookmobile_bookmobile_book));
+        char buf[sizeof "2011-10-08T07:07:09XXXZ--------"];
+        std::time_t objTime_t(static_cast<int64_t>(time_in_milliseconds / 1000));
         time(&objTime_t);
         struct tm tm_{};
         strftime(buf, sizeof buf, "%FT%TZ", gmtime_r(&objTime_t, &tm_));
@@ -43,16 +43,16 @@ namespace md_handler{
 
     // Not used - might need this later
     // Parses only YYYY-MM-DDTHH:MM:SSZ
-    inline time_t parseiso86mobile_book1utc(const char *date) {
-        struct tm tt = {mobile_book};
+    inline time_t parseiso8601utc(const char *date) {
+        struct tm tt = {0};
         double seconds;
-        if (sscanf(date, "%mobile_book4d-%mobile_book2d-%mobile_book2dT%mobile_book2d:%mobile_book2d:%lfZ",
+        if (sscanf(date, "%04d-%02d-%02dT%02d:%02d:%lfZ",
                    &tt.tm_year, &tt.tm_mon, &tt.tm_mday,
                    &tt.tm_hour, &tt.tm_min, &seconds) != 6)
             return -1;
         tt.tm_sec   = (int) seconds;
         tt.tm_mon  -= 1;
-        tt.tm_year -= 19mobile_bookmobile_book;
+        tt.tm_year -= 1900;
         tt.tm_isdst =-1;
         return mktime(&tt) - timezone;
     }

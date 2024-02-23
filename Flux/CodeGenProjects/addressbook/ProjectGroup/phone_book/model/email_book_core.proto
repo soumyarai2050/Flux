@@ -32,7 +32,7 @@ message RollingMaxOrderCount{
 
 enum StratState{
   //set this state for strats just created by user
-  StratState_UNSPECIFIED = mobile_book;
+  StratState_UNSPECIFIED = 0;
   // set this state post required constraint validation of strat - such as system checked all required strat params are
   // present and are as expected, do this for:
   // 1. new strats before moving them to ready state upon user explicit save request
@@ -56,7 +56,7 @@ enum StratState{
 
 
 enum StratMode{
-  StratMode_Normal = mobile_book;
+  StratMode_Normal = 0;
   StratMode_Relaxed = 1;
   StratMode_Aggressive = 2;
 }

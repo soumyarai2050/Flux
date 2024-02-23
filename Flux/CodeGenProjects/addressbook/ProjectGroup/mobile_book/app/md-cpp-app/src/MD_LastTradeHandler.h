@@ -39,7 +39,7 @@ namespace md_handler{
             }
             else{
                 mongocxx::pipeline pipeline{};
-                update_pipeline(pipeline, 1mobile_book.mobile_book);
+                update_pipeline(pipeline, 10.0);
                 auto last_trade_aggregate_result = last_trade_collection.aggregate(pipeline,
                                                                                    mongocxx::options::aggregate{});
                 // The loop just helps commit - without this commit does not trigger - though the code never enters loop
@@ -61,7 +61,7 @@ namespace md_handler{
                                                                         last_trade_doc[qty_key].get_int64().value,
                                                                         time_in_ms, "", "", false, false,
                                                                         participation_period_last_trade_qty_sum,
-                                                                        1mobile_book);
+                                                                        10);
                     md_handler::MD_MktOverview agg_mkt_overview(aggregated_last_trade_data, mkt_overview.getTotalTradingSecSize());
                     std::string dbId = md_handler::MD_TopOfBookPublisher::GetDBIdForSymbol(symbol);
                     if (not dbId.empty()){
@@ -76,7 +76,7 @@ namespace md_handler{
         }
 
         void handle_last_trade_update(md_handler::MD_LastTrade &last_trade_data){
-            md_handler::MD_MktOverview mkt_overview(last_trade_data, mobile_book);
+            md_handler::MD_MktOverview mkt_overview(last_trade_data, 0);
             handle_mkt_overview(mkt_overview);
         }
 
@@ -99,7 +99,7 @@ namespace md_handler{
 
         //buggy - last trade qty sum has to be computed per symbol - not used for now - fix before use
         void _init_overall_last_trade_qty_sum() {
-            long overall_last_trade_qty_sum = mobile_book;
+            long overall_last_trade_qty_sum = 0;
             auto order = bsoncxx::builder::stream::document{} << "_id" << -1 << bsoncxx::builder::stream::finalize;
             auto opts = mongocxx::options::find{};
             opts.sort(order.view()).limit(1);

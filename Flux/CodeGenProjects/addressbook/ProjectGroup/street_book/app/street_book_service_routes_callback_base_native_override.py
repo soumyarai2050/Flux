@@ -18,23 +18,23 @@ from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydenti
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_order_journal_log_key, get_symbol_side_key, get_order_snapshot_log_key,
     get_symbol_side_snapshot_log_key, all_service_up_check, host, EXECUTOR_PROJECT_DATA_DIR,
-    strat_manager_service_http_client, get_consumable_participation_qty,
+    email_book_service_http_client, get_consumable_participation_qty,
     get_strat_brief_log_key, get_fills_journal_log_key, get_new_strat_limits, get_new_strat_status,
-    log_analyzer_service_http_client, executor_config_yaml_dict,
-    EXECUTOR_PROJECT_SCRIPTS_DIR, post_trade_engine_service_http_client, MarketDataMutexManager)
+    log_book_service_http_client, executor_config_yaml_dict,
+    EXECUTOR_PROJECT_SCRIPTS_DIR, post_book_service_http_client, MobileBookMutexManager)
 from FluxPythonUtils.scripts.utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, create_logger)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.static_data import SecurityRecordManager
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.service_state import ServiceState
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.service_state import ServiceState
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, PairStratBaseModel, StratState, is_ongoing_strat,
     guaranteed_call_pair_strat_client, pair_strat_client_call_log_str, UpdateType)
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trade_simulator import TradeSimulator, TradingLinkBase
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link import is_test_run
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_analyzer.generated.Pydentic.log_analyzer_service_model_imports import StratAlertBaseModel
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.generated.Pydentic.log_book_service_model_imports import StratAlertBaseModel
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.strat_cache import StratCache
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.StreetBook.strat_manager_service_key_handler import (
-    StratManagerServiceKeyHandler)
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import (
+    EmailBookServiceKeyHandler)
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.aggregate import (
@@ -42,13 +42,13 @@ from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.aggregate imp
     get_open_order_snapshots_for_symbol, get_symbol_side_underlying_account_cumulative_fill_qty,
     get_symbol_overview_from_symbol, get_last_n_sec_total_trade_qty, get_market_depths,
     get_last_n_order_journals_from_order_id)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.post_trade_engine.generated.Pydentic.post_trade_engine_service_model_imports import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
     PortfolioStatusUpdatesContainer)
 from FluxPythonUtils.scripts.ws_reader import WSReader
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import (
     StratLeg, FxSymbolOverviewBaseModel, StratViewBaseModel)
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book import (
-    StreetBook, TradingDataManager, TopOfBook, MarketDepth, MarketDataContainerCache,
+    StreetBook, TradingDataManager, TopOfBook, MarketDepth, MobileBookContainerCache,
     add_container_obj_for_symbol)
 
 def get_pair_strat_id_from_cmd_argv():
@@ -217,7 +217,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         self.min_refresh_interval: int = parse_to_int(executor_config_yaml_dict.get("min_refresh_interval"))
         if self.min_refresh_interval is None:
-            self.min_refresh_interval = 3mobile_book
+            self.min_refresh_interval = 30
         self.trading_data_manager: TradingDataManager | None = None
         self.simulate_config_yaml_file_path = (
                 EXECUTOR_PROJECT_DATA_DIR / f"executor_{self.pair_strat_id}_simulate_config.yaml")
@@ -229,23 +229,23 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         self.is_test_run = is_test_run
 
         # to be populated in _app_launch_pre_thread_func
-        self.market_data_container_cache: MarketDataContainerCache | None = None
+        self.mobile_book_container_cache: MobileBookContainerCache | None = None
 
         # Load the shared library
         so_module_dir = PurePath(__file__).parent
         so_module_file_name = TradingLinkBase.pair_strat_config_dict.get("cpp_app_so_module_file_name")
 
         os.environ["LD_LIBRARY_PATH"] = f"{so_module_dir}:$LD_LIBRARY_PATH"
-        self.market_data_provider = ctypes.CDLL(so_module_dir / so_module_file_name)
-        self.market_data_provider.lock_mutex.argtypes = (ctypes.py_object,)
-        self.market_data_provider.lock_mutex.restype = None
-        self.market_data_provider.unlock_mutex.argtypes = (ctypes.py_object,)
-        self.market_data_provider.unlock_mutex.restype = None
-        self.market_data_provider.initialize_database.argtypes = [
+        self.mobile_book_provider = ctypes.CDLL(so_module_dir / so_module_file_name)
+        self.mobile_book_provider.lock_mutex.argtypes = (ctypes.py_object,)
+        self.mobile_book_provider.lock_mutex.restype = None
+        self.mobile_book_provider.unlock_mutex.argtypes = (ctypes.py_object,)
+        self.mobile_book_provider.unlock_mutex.restype = None
+        self.mobile_book_provider.initialize_database.argtypes = [
             ctypes.c_char_p,
             ctypes.c_char_p
         ]
-        self.market_data_provider.create_or_update_md_n_tob.argtypes = [
+        self.mobile_book_provider.create_or_update_md_n_tob.argtypes = [
             ctypes.c_int32,
             ctypes.c_char_p,
             ctypes.c_char_p,
@@ -261,7 +261,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             ctypes.c_int64,
             ctypes.c_float
         ]
-        self.market_data_provider.create_or_update_last_trade_n_tob.argtypes = [
+        self.mobile_book_provider.create_or_update_last_trade_n_tob.argtypes = [
             ctypes.c_int32,
             ctypes.c_char_p,
             ctypes.c_char_p,
@@ -274,9 +274,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             ctypes.c_int64,
             ctypes.c_int32
         ]
-        self.market_data_provider.initialize_database.restype = None
-        self.market_data_provider.create_or_update_md_n_tob.restype = None
-        self.market_data_provider.create_or_update_last_trade_n_tob.restype = None
+        self.mobile_book_provider.initialize_database.restype = None
+        self.mobile_book_provider.create_or_update_md_n_tob.restype = None
+        self.mobile_book_provider.create_or_update_last_trade_n_tob.restype = None
 
     def get_generic_read_route(self):
         return None
@@ -299,7 +299,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         pass
 
     def get_pair_strat_loaded_strat_cache(self, pair_strat):
-        key_leg_1, key_leg_2 = StratManagerServiceKeyHandler.get_key_from_pair_strat(pair_strat)
+        key_leg_1, key_leg_2 = EmailBookServiceKeyHandler.get_key_from_pair_strat(pair_strat)
         strat_cache: StratCache = StratCache.guaranteed_get_by_key(key_leg_1, key_leg_2)
         with strat_cache.re_ent_lock:
             strat_cache.set_pair_strat(pair_strat)
@@ -344,7 +344,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         if all_service_up_check(self.web_client):
                             # starting trading_data_manager and street_book
                             try:
-                                pair_strat = strat_manager_service_http_client.get_pair_strat_client(self.pair_strat_id)
+                                pair_strat = email_book_service_http_client.get_pair_strat_client(self.pair_strat_id)
                             except Exception as e:
                                 logging.exception(f"get_pair_strat_client failed with exception: {e}")
                                 continue
@@ -370,41 +370,41 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 pair_strat.port = self.port
 
                                 try:
-                                    updated_pair_strat = strat_manager_service_http_client.patch_pair_strat_client(
+                                    updated_pair_strat = email_book_service_http_client.patch_pair_strat_client(
                                         jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
                                 except Exception as e:
                                     logging.exception(f"patch_pair_strat_client failed with exception: {e}")
                                     continue
                                 else:
-                                    # Setting MarketDataCache instances for this symbol pair
+                                    # Setting MobileBookCache instances for this symbol pair
                                     mongo_server = executor_config_yaml_dict.get("mongo_server")
-                                    self.market_data_provider.initialize_database(
+                                    self.mobile_book_provider.initialize_database(
                                         ctypes.c_char_p(mongo_server.encode('utf-8')),
                                         ctypes.c_char_p(self.db_name.encode('utf-8')))
 
-                                    leg_1_market_data_container = (
+                                    leg_1_mobile_book_container = (
                                         add_container_obj_for_symbol(self.strat_leg_1.sec.sec_id))
-                                    leg_2_market_data_container = (
+                                    leg_2_mobile_book_container = (
                                         add_container_obj_for_symbol(self.strat_leg_2.sec.sec_id))
-                                    self.market_data_container_cache = (
-                                        MarketDataContainerCache(leg_1_market_data_container=leg_1_market_data_container,
-                                                                 leg_2_market_data_container=leg_2_market_data_container))
+                                    self.mobile_book_container_cache = (
+                                        MobileBookContainerCache(leg_1_mobile_book_container=leg_1_mobile_book_container,
+                                                                 leg_2_mobile_book_container=leg_2_mobile_book_container))
 
                                     # Launching CppApp which internally creates and updates
-                                    # MarketDataCache in real-time
-                                    thread = threading.Thread(target=self.market_data_provider.cpp_app_launcher, daemon=True)
+                                    # MobileBookCache in real-time
+                                    thread = threading.Thread(target=self.mobile_book_provider.cpp_app_launcher, daemon=True)
                                     thread.start()
 
                                     self.strat_cache: StratCache = self.get_pair_strat_loaded_strat_cache(
                                         updated_pair_strat)
                                     # Setting asyncio_loop for StreetBook
                                     StreetBook.asyncio_loop = self.asyncio_loop
-                                    StreetBook.market_data_provider = self.market_data_provider
+                                    StreetBook.mobile_book_provider = self.mobile_book_provider
                                     # StreetBook.trading_link.asyncio_loop = self.asyncio_loop
                                     TradingDataManager.asyncio_loop = self.asyncio_loop
                                     self.trading_data_manager = TradingDataManager(StreetBook.executor_trigger,
                                                                                    self.strat_cache,
-                                                                                   self.market_data_container_cache)
+                                                                                   self.mobile_book_container_cache)
                                     logging.debug(f"Created trading_data_manager for {pair_strat = }")
                             # else not required: not updating if already is_executor_running
                             logging.debug("Marked pair_strat.is_partially_running True")
@@ -425,7 +425,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         try:
                             if not self.update_fx_symbol_overview_dict_from_http():
                                 logging.error(f"Can't find any symbol_overview with symbol {self.usd_fx_symbol} "
-                                              f"in pair_strat_engine service, retrying in next periodic cycle",
+                                              f"in phone_book service, retrying in next periodic cycle",
                                               exc_info=True)
                         except Exception as e:
                             logging.exception(f"update_fx_symbol_overview_dict_from_http failed with exception: {e}")
@@ -523,9 +523,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         logging.debug("Triggered server launch post override")
         # making pair_strat is_executor_running field to False
         try:
-            # strat_manager_service_http_client.update_pair_strat_to_non_running_state_query_client(self.pair_strat_id)
+            # email_book_service_http_client.update_pair_strat_to_non_running_state_query_client(self.pair_strat_id)
             guaranteed_call_pair_strat_client(
-                None, strat_manager_service_http_client.update_pair_strat_to_non_running_state_query_client,
+                None, email_book_service_http_client.update_pair_strat_to_non_running_state_query_client,
                 pair_strat_id=self.pair_strat_id)
         except Exception as e:
             if ('{"detail":"Id not Found: PairStrat ' + f'{self.pair_strat_id}' + '"}') in str(e):
@@ -580,7 +580,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     def update_fx_symbol_overview_dict_from_http(self) -> bool:
         fx_symbol_overviews: List[FxSymbolOverviewBaseModel] = \
-            strat_manager_service_http_client.get_all_fx_symbol_overview_client()
+            email_book_service_http_client.get_all_fx_symbol_overview_client()
         if fx_symbol_overviews:
             fx_symbol_overview_: FxSymbolOverviewBaseModel
             for fx_symbol_overview_ in fx_symbol_overviews:
@@ -611,10 +611,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 eligible_brokers: Broker | None = None
                 try:
                     dismiss_filter_portfolio_limit_broker_obj_list = (
-                        strat_manager_service_http_client.get_dismiss_filter_portfolio_limit_brokers_query_client(
+                        email_book_service_http_client.get_dismiss_filter_portfolio_limit_brokers_query_client(
                             self.strat_leg_1.sec.sec_id, self.strat_leg_2.sec.sec_id))
                     if dismiss_filter_portfolio_limit_broker_obj_list:
-                        eligible_brokers = dismiss_filter_portfolio_limit_broker_obj_list[mobile_book].brokers
+                        eligible_brokers = dismiss_filter_portfolio_limit_broker_obj_list[0].brokers
                     else:
                         err_str_ = ("Http Query get_dismiss_filter_portfolio_limit_brokers_query returned empty list, "
                                     "expected dismiss_filter_portfolio_limit_broker_obj_list obj with brokers list")
@@ -651,8 +651,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                      f"strat_limits_list: {strat_limits_list}")
                     logging.error(err_str_)
                 else:
-                    self.trading_data_manager.handle_strat_limits_get_all_ws(strat_limits_list[mobile_book])
-                return strat_limits_list[mobile_book]
+                    self.trading_data_manager.handle_strat_limits_get_all_ws(strat_limits_list[0])
+                return strat_limits_list[0]
 
     async def _check_n_remove_strat_limits(self):
         strat_limits_tuple = self.strat_cache.get_strat_limits()
@@ -704,8 +704,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         f"strat_status_list: {strat_status_list}")
                     logging.error(err_str_)
                 else:
-                    self.trading_data_manager.handle_strat_status_get_all_ws(strat_status_list[mobile_book])
-                return strat_status_list[mobile_book]
+                    self.trading_data_manager.handle_strat_status_get_all_ws(strat_status_list[0])
+                return strat_status_list[0]
 
     async def _check_n_remove_strat_status(self):
         async with StratStatus.reentrant_lock:
@@ -719,13 +719,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     def get_consumable_concentration_from_source(self, symbol: str, strat_limits: StratLimits):
         security_float: float | None = self.static_data.get_security_float_from_ticker(symbol)
-        if security_float is None or security_float <= mobile_book:
+        if security_float is None or security_float <= 0:
             logging.error(f"concentration check will fail for {symbol}, invalid security float found in static data: "
                           f"{security_float}")
-            consumable_concentration = mobile_book
+            consumable_concentration = 0
         else:
             consumable_concentration = \
-                int((security_float / 1mobile_bookmobile_book) * strat_limits.max_concentration)
+                int((security_float / 100) * strat_limits.max_concentration)
         return consumable_concentration
 
     async def _check_n_create_strat_brief_for_active_pair_strat(self, strat_limits: StratLimits):
@@ -742,10 +742,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             consumable_notional = strat_limits.max_single_leg_notional
             consumable_open_notional = strat_limits.max_open_single_leg_notional
 
-        residual_qty = mobile_book
-        all_bkr_cxlled_qty = mobile_book
-        open_notional = mobile_book
-        open_qty = mobile_book
+        residual_qty = 0
+        all_bkr_cxlled_qty = 0
+        open_notional = 0
+        open_qty = 0
 
         buy_side_trading_brief: PairSideTradingBrief | None = None
         sell_side_trading_brief: PairSideTradingBrief | None = None
@@ -754,8 +754,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             symbol = sec.sec_id
             consumable_concentration = self.get_consumable_concentration_from_source(symbol, strat_limits)
 
-            participation_period_order_qty_sum = mobile_book
-            consumable_cxl_qty = mobile_book
+            participation_period_order_qty_sum = 0
+            consumable_cxl_qty = 0
             applicable_period_second = strat_limits.market_trade_volume_participation.applicable_period_seconds
             executor_check_snapshot_list = \
                 await (StreetBookServiceRoutesCallbackBaseNativeOverride.
@@ -771,7 +771,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                               f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
                               f"{get_symbol_side_key([(symbol, side)])}, likely bug in "
                               f"get_executor_check_snapshot_query pre implementation")
-                indicative_consumable_participation_qty = mobile_book
+                indicative_consumable_participation_qty = 0
             indicative_consumable_residual = strat_limits.residual_restriction.max_residual
             sec_pair_side_trading_brief_obj = \
                 PairSideTradingBrief(security=sec,
@@ -825,14 +825,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 if symbol_side_snapshots_tuple is None:
                     symbol_side_snapshot_obj = SymbolSideSnapshot(_id=SymbolSideSnapshot.next_id(),
                                                                   security=security,
-                                                                  side=side, avg_px=mobile_book, total_qty=mobile_book,
-                                                                  total_filled_qty=mobile_book, avg_fill_px=mobile_book.mobile_book,
-                                                                  total_fill_notional=mobile_book.mobile_book, last_update_fill_qty=mobile_book,
-                                                                  last_update_fill_px=mobile_book, total_cxled_qty=mobile_book,
-                                                                  avg_cxled_px=mobile_book,
-                                                                  total_cxled_notional=mobile_book,
+                                                                  side=side, avg_px=0, total_qty=0,
+                                                                  total_filled_qty=0, avg_fill_px=0.0,
+                                                                  total_fill_notional=0.0, last_update_fill_qty=0,
+                                                                  last_update_fill_px=0, total_cxled_qty=0,
+                                                                  avg_cxled_px=0,
+                                                                  total_cxled_notional=0,
                                                                   last_update_date_time=DateTime.utcnow(),
-                                                                  order_count=mobile_book)
+                                                                  order_count=0)
                     created_symbol_side_snapshot: SymbolSideSnapshot = \
                         await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                                underlying_create_symbol_side_snapshot_http(symbol_side_snapshot_obj))
@@ -843,7 +843,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             else:
                 # Ignore symbol side snapshot creation and logging if any of security and side is None
                 logging.debug(f"Received either security or side as None from config of this start_executor for "
-                              f"{self.port = }, likely populated by pair_strat_engine before launching this server, "
+                              f"{self.port = }, likely populated by phone_book before launching this server, "
                               f"{security = }, {side = }")
 
     async def _check_n_force_publish_symbol_overview_for_active_strat(self) -> None:
@@ -866,15 +866,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     def _check_n_create_strat_alert(self, strat_id: int) -> bool:
         try:
-            strat_alert = log_analyzer_service_http_client.get_strat_alert_client(strat_id)
+            strat_alert = log_book_service_http_client.get_strat_alert_client(strat_id)
         except Exception as e:
             if "Id not Found: " in str(e):
                 logging.info(f"get_strat_alert_client can't find strat_alert with id: {strat_id}, "
                              f"creating one, caught exception: {e}")
 
-                # creating strat_alert for this strat in log_analyzer server
-                strat_alert: StratAlertBaseModel = StratAlertBaseModel(_id=strat_id, alerts=[], alert_update_seq_num=mobile_book)
-                log_analyzer_service_http_client.create_strat_alert_client(strat_alert)
+                # creating strat_alert for this strat in log_book server
+                strat_alert: StratAlertBaseModel = StratAlertBaseModel(_id=strat_id, alerts=[], alert_update_seq_num=0)
+                log_book_service_http_client.create_strat_alert_client(strat_alert)
             else:
                 err_str_ = (f"Some Error Occurred while creating strat_alert for id: {strat_id}, "
                             f"exception: {e}")
@@ -903,7 +903,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         # else not required: If it's not startup for reload or new strat creation then avoid
 
                         try:
-                            strat_manager_service_http_client.patch_pair_strat_client(
+                            email_book_service_http_client.patch_pair_strat_client(
                                 jsonable_encoder(pair_strat, by_alias=True, exclude_none=True))
                             logging.debug(f"pair_strat's is_executor_running set to True, {pair_strat = }")
                             return True
@@ -988,7 +988,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             err_str_ = (f"self.asyncio_loop couldn't set as asyncio.get_running_loop() returned None for "
                         f"{attempt_counts} attempts")
             logging.critical(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_bookmobile_book)
+            raise HTTPException(detail=err_str_, status_code=500)
 
     ############################
     # Limit Check update methods
@@ -1011,9 +1011,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         if symbol_side_snapshot_.order_count > strat_limits.cancel_rate.waived_min_orders:
             if symbol_side_snapshot_.side == Side.BUY:
-                if strat_brief_.pair_buy_side_trading_brief.all_bkr_cxlled_qty > mobile_book:
-                    if (consumable_cxl_qty := strat_brief_.pair_buy_side_trading_brief.consumable_cxl_qty) < mobile_book:
-                        err_str_: str = f"Consumable cxl qty can't be < mobile_book, current {consumable_cxl_qty = } " \
+                if strat_brief_.pair_buy_side_trading_brief.all_bkr_cxlled_qty > 0:
+                    if (consumable_cxl_qty := strat_brief_.pair_buy_side_trading_brief.consumable_cxl_qty) < 0:
+                        err_str_: str = f"Consumable cxl qty can't be < 0, current {consumable_cxl_qty = } " \
                                         f"for symbol {strat_brief_.pair_buy_side_trading_brief.security.sec_id} and " \
                                         f"side {Side.BUY} - pausing this strat"
                         alert_brief: str = err_str_
@@ -1024,11 +1024,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         pause_strat = True
                     # else not required: if consumable_cxl-qty is allowed then ignore
                 # else not required: if there is not even a single buy order then consumable_cxl-qty will
-                # become mobile_book in that case too, so ignoring this case if buy side all_bkr_cxlled_qty is mobile_book
+                # become 0 in that case too, so ignoring this case if buy side all_bkr_cxlled_qty is 0
             else:
-                if strat_brief_.pair_sell_side_trading_brief.all_bkr_cxlled_qty > mobile_book:
-                    if (consumable_cxl_qty := strat_brief_.pair_sell_side_trading_brief.consumable_cxl_qty) < mobile_book:
-                        err_str_: str = f"Consumable cxl qty can't be < mobile_book, current {consumable_cxl_qty = } " \
+                if strat_brief_.pair_sell_side_trading_brief.all_bkr_cxlled_qty > 0:
+                    if (consumable_cxl_qty := strat_brief_.pair_sell_side_trading_brief.consumable_cxl_qty) < 0:
+                        err_str_: str = f"Consumable cxl qty can't be < 0, current {consumable_cxl_qty = } " \
                                         f"for symbol {strat_brief_.pair_sell_side_trading_brief.security.sec_id} and " \
                                         f"side {Side.SELL} - pausing this strat"
                         alert_brief: str = err_str_
@@ -1040,7 +1040,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                          f"{alert_details}")
                     # else not required: if consumable_cxl-qty is allowed then ignore
                 # else not required: if there is not even a single sell order then consumable_cxl-qty will
-                # become mobile_book in that case too, so ignoring this case if sell side all_bkr_cxlled_qty is mobile_book
+                # become 0 in that case too, so ignoring this case if sell side all_bkr_cxlled_qty is 0
             # else not required: if order count is less than waived_min_orders
         if pause_strat:
             self.set_strat_state_to_pause()
@@ -1051,14 +1051,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     def _get_top_of_book_from_symbol(self, symbol: str) -> TopOfBook | None:
         if symbol == self.strat_leg_1.sec.sec_id:
-            return self.market_data_container_cache.leg_1_market_data_container.get_top_of_book()
+            return self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book()
         elif symbol == self.strat_leg_2.sec.sec_id:
-            return self.market_data_container_cache.leg_2_market_data_container.get_top_of_book()
+            return self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book()
 
     def _get_last_trade_px_n_symbol_tuples_from_tob(self, current_leg_tob_obj: TopOfBook,
                                                     other_leg_tob_obj: TopOfBook) -> Tuple[Tuple[float, str],
                                                                                     Tuple[float, str]]:
-        with (MarketDataMutexManager(self.market_data_provider, current_leg_tob_obj, other_leg_tob_obj)):
+        with (MobileBookMutexManager(self.mobile_book_provider, current_leg_tob_obj, other_leg_tob_obj)):
             return ((current_leg_tob_obj.last_trade.px, current_leg_tob_obj.symbol),
                     (other_leg_tob_obj.last_trade.px, other_leg_tob_obj.symbol))
 
@@ -1107,16 +1107,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             else:
                 residual_security = strat_brief.pair_buy_side_trading_brief.security
 
-        if residual_notional > mobile_book:
+        if residual_notional > 0:
             updated_residual = Residual(security=residual_security, residual_notional=residual_notional)
             return updated_residual
         else:
-            updated_residual = Residual(security=residual_security, residual_notional=mobile_book)
+            updated_residual = Residual(security=residual_security, residual_notional=0)
             return updated_residual
 
     async def get_last_n_sec_order_qty(self, symbol: str, side: Side, last_n_sec: int) -> int | None:
         last_n_sec_order_qty: int | None = None
-        if last_n_sec == mobile_book:
+        if last_n_sec == 0:
             symbol_side_snapshots_tuple = self.strat_cache.get_symbol_side_snapshot_from_symbol(symbol)
             if symbol_side_snapshots_tuple is not None:
                 symbol_side_snapshot, _ = symbol_side_snapshots_tuple
@@ -1130,10 +1130,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_order_snapshot_http(
                     get_order_total_sum_of_last_n_sec(symbol, last_n_sec), self.get_generic_read_route())
 
-            if len(agg_objs) > mobile_book:
+            if len(agg_objs) > 0:
                 last_n_sec_order_qty = agg_objs[-1].last_n_sec_total_qty
             else:
-                last_n_sec_order_qty = mobile_book
+                last_n_sec_order_qty = 0
                 err_str_ = "received empty list of aggregated objects from aggregation on OrderSnapshot to " \
                            f"get {last_n_sec = } total order sum, symbol_side_key: " \
                            f"{get_symbol_side_key([(symbol, side)])}"
@@ -1153,7 +1153,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                            underlying_get_last_n_sec_total_trade_qty_query_http(symbol, applicable_period_seconds))
                 if last_n_sec_market_trade_vol_obj_list:
-                    last_n_sec_trade_qty = last_n_sec_market_trade_vol_obj_list[mobile_book].last_n_sec_trade_vol
+                    last_n_sec_trade_qty = last_n_sec_market_trade_vol_obj_list[0].last_n_sec_trade_vol
                 else:
                     logging.error(f"could not receive any last_n_sec_market_trade_vol_obj to get last_n_sec_trade_qty "
                                   f"for symbol_side_key: {get_symbol_side_key([(symbol, side)])}, likely bug in "
@@ -1170,7 +1170,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         underlying_account_cum_fill_qty_obj_list = \
             await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                    get_underlying_account_cumulative_fill_qty_query_http(symbol, side))
-        return underlying_account_cum_fill_qty_obj_list[mobile_book].underlying_account_n_cumulative_fill_qty
+        return underlying_account_cum_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty
 
     ######################################
     # Strat lvl models update pre handling
@@ -1193,26 +1193,26 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     async def update_strat_limits_pre(self, stored_strat_limits_obj: StratLimits,
                                       updated_strat_limits_obj: StratLimits):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "update_strat_limits_pre not ready - service is not initialized yet, " \
                        f"symbol_side_key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}"
             logging.error(err_str_)
-            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
 
         await self._update_strat_limits_pre(stored_strat_limits_obj, updated_strat_limits_obj)
         if updated_strat_limits_obj.strat_limits_update_seq_num is None:
-            updated_strat_limits_obj.strat_limits_update_seq_num = mobile_book
+            updated_strat_limits_obj.strat_limits_update_seq_num = 0
         updated_strat_limits_obj.strat_limits_update_seq_num += 1
         return updated_strat_limits_obj
 
     async def partial_update_strat_limits_pre(self, stored_strat_limits_obj: StratLimits,
                                               updated_strat_limits_obj_json: Dict):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "update_strat_limits_pre not ready - service is not initialized yet, " \
                        f"symbol_side_key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}"
             logging.error(err_str_)
-            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
 
         original_eligible_brokers = []
         if (eligible_brokers := updated_strat_limits_obj_json.get("eligible_brokers")) is not None:
@@ -1226,7 +1226,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         updated_strat_limits_obj_json["eligible_brokers"] = original_eligible_brokers
 
         if stored_strat_limits_obj.strat_limits_update_seq_num is None:
-            stored_strat_limits_obj.strat_limits_update_seq_num = mobile_book
+            stored_strat_limits_obj.strat_limits_update_seq_num = 0
         updated_strat_limits_obj_json[
             "strat_limits_update_seq_num"] = stored_strat_limits_obj.strat_limits_update_seq_num + 1
         return updated_strat_limits_obj_json
@@ -1234,14 +1234,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     async def update_strat_status_pre(self, stored_strat_status_obj: StratStatus,
                                       updated_strat_status_obj: StratStatus):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "update_strat_status_pre not ready - service is not initialized yet, " \
                        f"symbol_side_key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}"
             logging.error(err_str_)
-            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
 
         if updated_strat_status_obj.strat_status_update_seq_num is None:
-            updated_strat_status_obj.strat_status_update_seq_num = mobile_book
+            updated_strat_status_obj.strat_status_update_seq_num = 0
         updated_strat_status_obj.strat_status_update_seq_num += 1
         updated_strat_status_obj.last_update_date_time = DateTime.utcnow()
 
@@ -1254,14 +1254,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     async def partial_update_strat_status_pre(self, stored_strat_status_obj: StratStatus,
                                               updated_strat_status_obj_json: Dict):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "update_strat_status_pre not ready - service is not initialized yet, " \
                        f"symbol_side_key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}"
             logging.error(err_str_)
-            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
 
         if stored_strat_status_obj.strat_status_update_seq_num is None:
-            stored_strat_status_obj.strat_status_update_seq_num = mobile_book
+            stored_strat_status_obj.strat_status_update_seq_num = 0
         updated_strat_status_obj_json[
             "strat_status_update_seq_num"] = stored_strat_status_obj.strat_status_update_seq_num + 1
         updated_strat_status_obj_json["last_update_date_time"] = DateTime.utcnow()
@@ -1274,32 +1274,32 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     async def create_order_journal_pre(self, order_journal_obj: OrderJournal) -> None:
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = f"create_order_journal_pre not ready - service is not initialized yet, " \
                        f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
             logging.error(err_str_)
-            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
         # updating order notional in order journal obj
 
-        if order_journal_obj.order_event == OrderEventType.OE_NEW and order_journal_obj.order.px == mobile_book:
+        if order_journal_obj.order_event == OrderEventType.OE_NEW and order_journal_obj.order.px == 0:
             top_of_book_obj = self._get_top_of_book_from_symbol(order_journal_obj.order.security.sec_id)
             if top_of_book_obj is not None:
-                with MarketDataMutexManager(self.market_data_provider, top_of_book_obj):
+                with MobileBookMutexManager(self.mobile_book_provider, top_of_book_obj):
                     order_journal_obj.order.px = top_of_book_obj.last_trade.px
             else:
-                err_str_ = f"received order journal px mobile_book and to update px, received {top_of_book_obj = }, " \
+                err_str_ = f"received order journal px 0 and to update px, received {top_of_book_obj = }, " \
                            f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
                 logging.error(err_str_)
-                raise HTTPException(status_code=5mobile_bookmobile_book, detail=err_str_)
+                raise HTTPException(status_code=500, detail=err_str_)
         # If order_journal is not new then we don't care about px, we care about event_type and if order is new
-        # and px is not mobile_book then using provided px
+        # and px is not 0 then using provided px
 
         if order_journal_obj.order.px is not None and order_journal_obj.order.qty is not None:
             order_journal_obj.order.order_notional = \
                 self.get_usd_px(order_journal_obj.order.px,
                                 order_journal_obj.order.security.sec_id) * order_journal_obj.order.qty
         else:
-            order_journal_obj.order.order_notional = mobile_book
+            order_journal_obj.order.order_notional = 0
 
     async def create_order_journal_post(self, order_journal_obj: OrderJournal):
         # updating trading_data_manager's strat_cache
@@ -1312,7 +1312,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 strat_id, order_snapshot, strat_brief, portfolio_status_updates = res
 
                 # Updating and checking portfolio_limits in portfolio_manager
-                post_trade_engine_service_http_client.check_portfolio_limits_query_client(
+                post_book_service_http_client.check_portfolio_limits_query_client(
                     strat_id, order_journal_obj, order_snapshot, strat_brief, portfolio_status_updates)
 
             # else not required: if result returned from _update_order_snapshot_from_order_journal is None, that
@@ -1352,13 +1352,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
                 order_snapshot = OrderSnapshot(_id=OrderSnapshot.next_id(),
                                                order_brief=order_journal_obj.order,
-                                               filled_qty=mobile_book, avg_fill_px=mobile_book,
-                                               fill_notional=mobile_book,
-                                               cxled_qty=mobile_book,
-                                               avg_cxled_px=mobile_book,
-                                               cxled_notional=mobile_book,
-                                               last_update_fill_qty=mobile_book,
-                                               last_update_fill_px=mobile_book,
+                                               filled_qty=0, avg_fill_px=0,
+                                               fill_notional=0,
+                                               cxled_qty=0,
+                                               avg_cxled_px=0,
+                                               cxled_notional=0,
+                                               last_update_fill_qty=0,
+                                               last_update_fill_px=0,
                                                create_date_time=order_journal_obj.order_event_date_time,
                                                last_update_date_time=order_journal_obj.order_event_date_time,
                                                order_status=OrderStatusType.OE_UNACK)
@@ -1451,7 +1451,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                                          order_snapshot.order_brief.security.sec_id)
                             avg_cxled_px = \
                                 (self.get_local_px_or_notional(cxled_notional, order_snapshot.order_brief.security.sec_id) /
-                                 cxled_qty) if cxled_qty != mobile_book else mobile_book
+                                 cxled_qty) if cxled_qty != 0 else 0
                             order_snapshot = await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                                 underlying_partial_update_order_snapshot_http(
                                     json.loads(OrderSnapshotOptional(_id=order_snapshot.id,
@@ -1508,7 +1508,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                             order_journal_obj.order.order_id, 3),
                                         self.get_generic_read_route()))
                             if last_3_order_journals_from_order_id:
-                                if (last_3_order_journals_from_order_id[mobile_book].order_event in
+                                if (last_3_order_journals_from_order_id[0].order_event in
                                         [OrderEventType.OE_CXL_INT_REJ,
                                          OrderEventType.OE_CXL_BRK_REJ,
                                          OrderEventType.OE_CXL_EXH_REJ]):
@@ -1571,7 +1571,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                                        order_snapshot.order_brief.security.sec_id)
                         avg_cxled_px = \
                             (self.get_local_px_or_notional(cxled_notional, order_snapshot.order_brief.security.sec_id) /
-                             cxled_qty) if cxled_qty != mobile_book else mobile_book
+                             cxled_qty) if cxled_qty != 0 else 0
                         order_snapshot = \
                             await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                                    underlying_partial_update_order_snapshot_http(
@@ -1622,10 +1622,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                       side=side,
                                                       avg_px=new_order_journal_obj.order.px,
                                                       total_qty=int(new_order_journal_obj.order.qty),
-                                                      total_filled_qty=mobile_book, avg_fill_px=mobile_book,
-                                                      total_fill_notional=mobile_book, last_update_fill_qty=mobile_book,
-                                                      last_update_fill_px=mobile_book, total_cxled_qty=mobile_book,
-                                                      avg_cxled_px=mobile_book, total_cxled_notional=mobile_book,
+                                                      total_filled_qty=0, avg_fill_px=0,
+                                                      total_fill_notional=0, last_update_fill_qty=0,
+                                                      last_update_fill_px=0, total_cxled_qty=0,
+                                                      avg_cxled_px=0, total_cxled_notional=0,
                                                       last_update_date_time=new_order_journal_obj.order_event_date_time,
                                                       order_count=1)
         symbol_side_snapshot_obj = \
@@ -1677,7 +1677,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 self.get_local_px_or_notional(updated_symbol_side_snapshot_obj.total_cxled_notional,
                                                               symbol_side_snapshot_obj.security.sec_id) /
                                 updated_symbol_side_snapshot_obj.total_cxled_qty) \
-                            if updated_symbol_side_snapshot_obj.total_cxled_qty != mobile_book else mobile_book
+                            if updated_symbol_side_snapshot_obj.total_cxled_qty != 0 else 0
                         updated_symbol_side_snapshot_obj.last_update_date_time = order_journal.order_event_date_time
                     case other_:
                         err_str_ = f"Unsupported StratEventType for symbol_side_snapshot update {other_} " \
@@ -1752,7 +1752,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 update_strat_status_obj.avg_cxl_buy_px = (
                                     (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_buy_notional,
                                                                    order_journal_obj.order.security.sec_id) / update_strat_status_obj.total_cxl_buy_qty)
-                                    if update_strat_status_obj.total_cxl_buy_qty != mobile_book else mobile_book)
+                                    if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
                                 update_strat_status_obj.total_cxl_exposure = \
                                     update_strat_status_obj.total_cxl_buy_notional - \
                                     update_strat_status_obj.total_cxl_sell_notional
@@ -1761,8 +1761,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                            f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
                                 logging.error(err_str_)
                                 return
-                        if update_strat_status_obj.total_open_buy_qty == mobile_book:
-                            update_strat_status_obj.avg_open_buy_px = mobile_book
+                        if update_strat_status_obj.total_open_buy_qty == 0:
+                            update_strat_status_obj.avg_open_buy_px = 0
                         else:
                             update_strat_status_obj.avg_open_buy_px = \
                                 (self.get_local_px_or_notional(update_strat_status_obj.total_open_buy_notional,
@@ -1791,7 +1791,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                 update_strat_status_obj.avg_cxl_sell_px = (
                                     (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_sell_notional,
                                                                    order_journal_obj.order.security.sec_id) / update_strat_status_obj.total_cxl_sell_qty)
-                                    if (update_strat_status_obj.total_cxl_sell_qty != mobile_book) else mobile_book)
+                                    if (update_strat_status_obj.total_cxl_sell_qty != 0) else 0)
                                 update_strat_status_obj.total_cxl_exposure = \
                                     update_strat_status_obj.total_cxl_buy_notional - \
                                     update_strat_status_obj.total_cxl_sell_notional
@@ -1800,8 +1800,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                            f"order_journal_key: {get_order_journal_log_key(order_journal_obj)}"
                                 logging.error(err_str_)
                                 return
-                        if update_strat_status_obj.total_open_sell_qty == mobile_book:
-                            update_strat_status_obj.avg_open_sell_px = mobile_book
+                        if update_strat_status_obj.total_open_sell_qty == 0:
+                            update_strat_status_obj.avg_open_sell_px = 0
                         else:
                             update_strat_status_obj.avg_open_sell_px = \
                                 self.get_local_px_or_notional(update_strat_status_obj.total_open_sell_notional,
@@ -1871,9 +1871,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             # When order_event is OE_NEW then just adding current order's total qty to existing
                             # open_qty + total notional (total order Qty * order px) to exist open_notional
                             if fetched_open_qty is None:
-                                fetched_open_qty = mobile_book
+                                fetched_open_qty = 0
                             if fetched_open_notional is None:
-                                fetched_open_notional = mobile_book
+                                fetched_open_notional = 0
                             open_qty = fetched_open_qty + order_snapshot.order_brief.qty
                             open_notional = (
                                     fetched_open_notional + (
@@ -1939,16 +1939,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                     security_float = self.static_data.get_security_float_from_ticker(symbol)
                     if security_float is not None:
                         consumable_concentration = \
-                            int((security_float / 1mobile_bookmobile_book) * strat_limits.max_concentration -
+                            int((security_float / 100) * strat_limits.max_concentration -
                                 (open_qty + symbol_side_snapshot.total_filled_qty))
                     else:
-                        consumable_concentration = mobile_book
+                        consumable_concentration = 0
                     open_orders_count = (await StreetBookServiceRoutesCallbackBaseNativeOverride.
                                          underlying_get_open_order_count_query_http(symbol))
                     consumable_open_orders = strat_limits.max_open_orders_per_side - open_orders_count[
-                        mobile_book].open_order_count
+                        0].open_order_count
                     consumable_cxl_qty = ((((symbol_side_snapshot.total_filled_qty + open_qty +
-                                             symbol_side_snapshot.total_cxled_qty) / 1mobile_bookmobile_book) *
+                                             symbol_side_snapshot.total_cxled_qty) / 100) *
                                            strat_limits.cancel_rate.max_cancel_rate) -
                                           symbol_side_snapshot.total_cxled_qty)
                     applicable_period_second = strat_limits.market_trade_volume_participation.applicable_period_seconds
@@ -1958,7 +1958,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                             symbol, side, applicable_period_second))
                     if len(executor_check_snapshot_list) == 1:
                         participation_period_order_qty_sum = \
-                            executor_check_snapshot_list[mobile_book].last_n_sec_order_qty
+                            executor_check_snapshot_list[0].last_n_sec_order_qty
                         indicative_consumable_participation_qty = \
                             get_consumable_participation_qty(
                                 executor_check_snapshot_list,
@@ -1968,8 +1968,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                       f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
                                       f"{get_symbol_side_key([(symbol, side)])}, likely bug in "
                                       f"get_executor_check_snapshot_query pre implementation")
-                        indicative_consumable_participation_qty = mobile_book
-                        participation_period_order_qty_sum = mobile_book
+                        indicative_consumable_participation_qty = 0
+                        participation_period_order_qty_sum = 0
 
                     updated_pair_side_brief_obj = \
                         PairSideTradingBriefOptional(
@@ -2086,7 +2086,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             order_snapshot_obj: OrderSnapshot) -> PortfolioStatusUpdatesContainer | None:
         match order_journal_obj.order.side:
             case Side.BUY:
-                update_overall_buy_notional = mobile_book
+                update_overall_buy_notional = 0
                 match order_journal_obj.order_event:
                     case OrderEventType.OE_NEW:
                         update_overall_buy_notional = \
@@ -2100,7 +2100,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                               order_snapshot_obj.order_brief.security.sec_id) * total_buy_unfilled_qty)
                 return PortfolioStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional)
             case Side.SELL:
-                update_overall_sell_notional = mobile_book
+                update_overall_sell_notional = 0
                 match order_journal_obj.order_event:
                     case OrderEventType.OE_NEW:
                         update_overall_sell_notional = \
@@ -2126,11 +2126,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
     async def create_fills_journal_pre(self, fills_journal_obj: FillsJournal):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "create_fills_journal_pre not ready - service is not initialized yet, " \
                        f"fills_journal_key: {get_fills_journal_log_key(fills_journal_obj)}"
             logging.error(err_str_)
-            raise HTTPException(status_code=5mobile_book3, detail=err_str_)
+            raise HTTPException(status_code=503, detail=err_str_)
         # Updating notional field in fills journal
         fills_journal_obj.fill_notional = \
             self.get_usd_px(fills_journal_obj.fill_px, fills_journal_obj.fill_symbol) * fills_journal_obj.fill_qty
@@ -2146,7 +2146,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 strat_id, order_snapshot, strat_brief, portfolio_status_updates = res
 
                 # Updating and checking portfolio_limits in portfolio_manager
-                post_trade_engine_service_http_client.check_portfolio_limits_query_client(
+                post_book_service_http_client.check_portfolio_limits_query_client(
                     strat_id, None, order_snapshot, strat_brief, portfolio_status_updates)
 
             # else not required: if result returned from _apply_fill_update_in_order_snapshot is None, that
@@ -2252,10 +2252,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     def set_strat_state_to_pause(self):
         pair_strat = PairStratBaseModel(_id=self.pair_strat_id,
                                         strat_state=StratState.StratState_PAUSED)
-        # strat_manager_service_http_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True,
+        # email_book_service_http_client.patch_pair_strat_client(jsonable_encoder(pair_strat, by_alias=True,
         #                                                                            exclude_none=True))
         guaranteed_call_pair_strat_client(
-            PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
+            PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
             _id=self.pair_strat_id, strat_state=StratState.StratState_PAUSED)
 
     async def _apply_fill_update_in_order_snapshot(
@@ -2426,8 +2426,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                                      order_snapshot_obj.order_brief.security.sec_id)))
                             update_strat_status_obj.total_open_sell_notional = (
                                 fetched_strat_status_obj.total_open_sell_notional)
-                            if fetched_strat_status_obj.total_open_buy_qty == mobile_book:
-                                update_strat_status_obj.avg_open_buy_px = mobile_book
+                            if fetched_strat_status_obj.total_open_buy_qty == 0:
+                                update_strat_status_obj.avg_open_buy_px = 0
                             else:
                                 update_strat_status_obj.avg_open_buy_px = \
                                     self.get_local_px_or_notional(fetched_strat_status_obj.total_open_buy_notional,
@@ -2470,8 +2470,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                                         order_snapshot_obj.order_brief.security.sec_id)))
                             update_strat_status_obj.total_open_buy_notional = (
                                 fetched_strat_status_obj.total_open_buy_notional)
-                            if update_strat_status_obj.total_open_sell_qty == mobile_book:
-                                update_strat_status_obj.avg_open_sell_px = mobile_book
+                            if update_strat_status_obj.total_open_sell_qty == 0:
+                                update_strat_status_obj.avg_open_sell_px = 0
                             else:
                                 update_strat_status_obj.avg_open_sell_px = \
                                     self.get_local_px_or_notional(fetched_strat_status_obj.total_open_sell_notional,
@@ -2624,7 +2624,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 strat_manager_service_http_client.patch_all_strat_view_client,
+                                                 email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
                                                  balance_notional=
                                                  updated_strat_status_obj.balance_notional)
@@ -2637,13 +2637,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 strat_manager_service_http_client.patch_all_strat_view_client,
+                                                 email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
                                                  balance_notional=
                                                  updated_strat_status_obj.balance_notional)
         logging.info(log_str)
 
-    def _call_cpp_market_data_updater_from_market_depth(self, market_depth: MarketDepth):
+    def _call_cpp_mobile_book_updater_from_market_depth(self, market_depth: MarketDepth):
         # Convert string to bytes (for char* arguments)
         symbol = market_depth.symbol.encode('utf-8')
         market_maker = market_depth.market_maker.encode('utf-8') if market_depth.market_maker else ""
@@ -2651,14 +2651,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         exch_time_bytes = str(market_depth.exch_time).encode('utf-8')
         arrival_date_time = str(market_depth.arrival_time).encode('utf-8')
         side = 1 if market_depth.side == TickType.BID else 2
-        premium = ctypes.c_float(market_depth.premium) if market_depth.premium else mobile_book
+        premium = ctypes.c_float(market_depth.premium) if market_depth.premium else 0
         is_smart_depth = ctypes.c_bool(market_depth.is_smart_depth) if market_depth.is_smart_depth is not None else False
-        cumulative_notional = ctypes.c_float(market_depth.cumulative_notional) if market_depth.cumulative_notional else mobile_book
-        cumulative_qty = market_depth.cumulative_qty if market_depth.cumulative_qty else mobile_book
-        cumulative_avg_px = ctypes.c_float(market_depth.cumulative_avg_px) if market_depth.cumulative_avg_px else mobile_book
+        cumulative_notional = ctypes.c_float(market_depth.cumulative_notional) if market_depth.cumulative_notional else 0
+        cumulative_qty = market_depth.cumulative_qty if market_depth.cumulative_qty else 0
+        cumulative_avg_px = ctypes.c_float(market_depth.cumulative_avg_px) if market_depth.cumulative_avg_px else 0
 
         # Call the C++ function
-        self.market_data_provider.create_or_update_md_n_tob(
+        self.mobile_book_provider.create_or_update_md_n_tob(
             market_depth.id, symbol, exch_time_bytes, arrival_date_time, ctypes.c_int(side),
             market_depth.position,
             ctypes.c_float(market_depth.px), market_depth.qty, premium,
@@ -2666,7 +2666,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             cumulative_notional, cumulative_qty,
             cumulative_avg_px)
 
-    def _call_cpp_market_data_updater_from_market_depth_json(self, market_depth_json: Dict):
+    def _call_cpp_mobile_book_updater_from_market_depth_json(self, market_depth_json: Dict):
         # Convert string to bytes (for char* arguments)
         symbol = market_depth_json.get("symbol").encode('utf-8')
         market_maker = market_depth_json.get("market_maker").encode('utf-8')
@@ -2675,74 +2675,74 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         arrival_date_time = str(market_depth_json.get("arrival_time").encode('utf-8'))
         side = 1 if market_depth_json.get("side") == "BID" else 2
         premium = market_depth_json.get("premium")
-        premium = ctypes.c_float(premium) if premium else mobile_book
+        premium = ctypes.c_float(premium) if premium else 0
         is_smart_depth = market_depth_json.get("is_smart_depth")
         is_smart_depth = ctypes.c_bool(is_smart_depth) if is_smart_depth is not None else False
         cumulative_notional = market_depth_json.get("cumulative_notional")
-        cumulative_notional = ctypes.c_float(cumulative_notional) if cumulative_notional else mobile_book
+        cumulative_notional = ctypes.c_float(cumulative_notional) if cumulative_notional else 0
         cumulative_qty = market_depth_json.get("cumulative_qty")
-        cumulative_qty = cumulative_qty if cumulative_qty else mobile_book
+        cumulative_qty = cumulative_qty if cumulative_qty else 0
         cumulative_avg_px = market_depth_json.get("cumulative_avg_px")
-        cumulative_avg_px = ctypes.c_float(cumulative_avg_px) if cumulative_avg_px else mobile_book
+        cumulative_avg_px = ctypes.c_float(cumulative_avg_px) if cumulative_avg_px else 0
 
         # Call the C++ function
-        self.market_data_provider.create_or_update_md_n_tob(
+        self.mobile_book_provider.create_or_update_md_n_tob(
             market_depth_json.get("_id"), symbol, exch_time_bytes, arrival_date_time,
             ctypes.c_int(side),  market_depth_json.get("position"),
             ctypes.c_float(market_depth_json.get("px")), market_depth_json.get("qty"),
             premium, market_maker, is_smart_depth,
             cumulative_notional, cumulative_qty, cumulative_avg_px)
 
-    def _call_cpp_market_data_updater_from_last_trade(self, last_trade: LastTrade):
+    def _call_cpp_mobile_book_updater_from_last_trade(self, last_trade: LastTrade):
         # Convert string to bytes (for char* arguments)
         symbol = last_trade.symbol_n_exch_id.symbol.encode('utf-8')
         exch_id = last_trade.symbol_n_exch_id.exch_id.encode('utf-8')
         # Convert to bytes (for char* arguments)
         exch_time_bytes = str(last_trade.exch_time).encode('utf-8')
         arrival_date_time = str(last_trade.arrival_time).encode('utf-8')
-        premium = ctypes.c_float(last_trade.premium) if last_trade.premium else mobile_book
+        premium = ctypes.c_float(last_trade.premium) if last_trade.premium else 0
         market_trade_vol_id = last_trade.market_trade_volume.id.encode('utf-8') if last_trade.market_trade_volume.id else ""
-        participation_period_last_trade_qty_sum = last_trade.market_trade_volume.participation_period_last_trade_qty_sum if last_trade.market_trade_volume.participation_period_last_trade_qty_sum else mobile_book
-        applicable_period_seconds = last_trade.market_trade_volume.applicable_period_seconds if last_trade.market_trade_volume.applicable_period_seconds else mobile_book
+        participation_period_last_trade_qty_sum = last_trade.market_trade_volume.participation_period_last_trade_qty_sum if last_trade.market_trade_volume.participation_period_last_trade_qty_sum else 0
+        applicable_period_seconds = last_trade.market_trade_volume.applicable_period_seconds if last_trade.market_trade_volume.applicable_period_seconds else 0
 
         # Call the C++ function
-        self.market_data_provider.create_or_update_last_trade_n_tob(
+        self.mobile_book_provider.create_or_update_last_trade_n_tob(
             last_trade.id, symbol, exch_id, exch_time_bytes, arrival_date_time,
             ctypes.c_float(last_trade.px), last_trade.qty, premium,
             market_trade_vol_id, participation_period_last_trade_qty_sum,
             applicable_period_seconds)
 
     async def create_market_depth_pre(self, market_depth_obj: MarketDepth):
-        self._call_cpp_market_data_updater_from_market_depth(market_depth_obj)
+        self._call_cpp_mobile_book_updater_from_market_depth(market_depth_obj)
 
     async def create_all_market_depth_pre(self, market_depth_obj_list: List[MarketDepth]):
         for market_depth_obj in market_depth_obj_list:
-            self._call_cpp_market_data_updater_from_market_depth(market_depth_obj)
+            self._call_cpp_mobile_book_updater_from_market_depth(market_depth_obj)
 
     async def update_market_depth_pre(self, stored_market_depth_obj: MarketDepth,
                                       updated_market_depth_obj: MarketDepth):
-        self._call_cpp_market_data_updater_from_market_depth(updated_market_depth_obj)
+        self._call_cpp_mobile_book_updater_from_market_depth(updated_market_depth_obj)
 
     async def update_all_market_depth_pre(self, stored_market_depth_obj_list: List[MarketDepth],
                                           updated_market_depth_obj_list: List[MarketDepth]):
         for updated_market_depth_obj in updated_market_depth_obj_list:
-            self._call_cpp_market_data_updater_from_market_depth(updated_market_depth_obj)
+            self._call_cpp_mobile_book_updater_from_market_depth(updated_market_depth_obj)
 
     async def partial_update_market_depth_pre(self, stored_market_depth_obj: MarketDepth,
                                               updated_market_depth_obj_json: Dict):
-        self._call_cpp_market_data_updater_from_market_depth_json(updated_market_depth_obj_json)
+        self._call_cpp_mobile_book_updater_from_market_depth_json(updated_market_depth_obj_json)
 
     async def partial_update_all_market_depth_pre(self, stored_market_depth_obj_list: List[MarketDepth],
                                                   updated_market_depth_obj_json_list: List[Dict]):
         for updated_market_depth_obj_json in updated_market_depth_obj_json_list:
-            self._call_cpp_market_data_updater_from_market_depth_json(updated_market_depth_obj_json)
+            self._call_cpp_mobile_book_updater_from_market_depth_json(updated_market_depth_obj_json)
 
     async def create_last_trade_pre(self, last_trade_obj: LastTrade):
-        self._call_cpp_market_data_updater_from_last_trade(last_trade_obj)
+        self._call_cpp_mobile_book_updater_from_last_trade(last_trade_obj)
 
     async def create_all_last_trade_pre(self, last_trade_obj_list: List[LastTrade]):
         for last_trade_obj in last_trade_obj_list:
-            self._call_cpp_market_data_updater_from_last_trade(last_trade_obj)
+            self._call_cpp_mobile_book_updater_from_last_trade(last_trade_obj)
 
     async def partial_update_fills_journal_post(self, stored_fills_journal_obj: FillsJournal,
                                                 updated_fills_journal_obj: FillsJournalOptional):
@@ -2768,7 +2768,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 strat_manager_service_http_client.patch_all_strat_view_client,
+                                                 email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=strat_status_obj.id,
                                                  balance_notional=
                                                  strat_status_obj.balance_notional)
@@ -2780,7 +2780,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 strat_manager_service_http_client.patch_all_strat_view_client,
+                                                 email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=strat_limits_obj.id,
                                                  max_single_leg_notional=
                                                  strat_limits_obj.max_single_leg_notional)
@@ -2793,7 +2793,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 strat_manager_service_http_client.patch_all_strat_view_client,
+                                                 email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_limits_obj.id,
                                                  max_single_leg_notional=
                                                  updated_strat_limits_obj.max_single_leg_notional)
@@ -2806,7 +2806,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
         log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 strat_manager_service_http_client.patch_all_strat_view_client,
+                                                 email_book_service_http_client.patch_all_strat_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_strat_limits_obj.id,
                                                  max_single_leg_notional=
                                                  updated_strat_limits_obj.max_single_leg_notional)
@@ -2815,36 +2815,36 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
     async def create_new_order_post(self, new_order_obj: NewOrder):
         # updating trading_data_manager's strat_cache
         self.trading_data_manager.handle_new_order_get_all_ws(new_order_obj)
-        self.market_data_provider.release_notify_semaphore()
+        self.mobile_book_provider.release_notify_semaphore()
 
     async def create_cancel_order_post(self, cancel_order_obj: CancelOrder):
         # updating trading_data_manager's strat_cache
         self.trading_data_manager.handle_cancel_order_get_all_ws(cancel_order_obj)
-        self.market_data_provider.release_notify_semaphore()
+        self.mobile_book_provider.release_notify_semaphore()
 
     async def partial_update_cancel_order_post(self, stored_cancel_order_obj: CancelOrder,
                                                updated_cancel_order_obj: CancelOrderOptional):
         # updating trading_data_manager's strat_cache
         self.trading_data_manager.handle_cancel_order_get_all_ws(updated_cancel_order_obj)
-        self.market_data_provider.release_notify_semaphore()
+        self.mobile_book_provider.release_notify_semaphore()
 
     async def create_symbol_overview_post(self, symbol_overview_obj: SymbolOverview):
         symbol_overview_obj.force_publish = False  # setting it false if at create is it True
         # updating trading_data_manager's strat_cache
         self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-        self.market_data_provider.release_notify_semaphore()
+        self.mobile_book_provider.release_notify_semaphore()
 
     async def update_symbol_overview_post(self, stored_symbol_overview_obj: SymbolOverview,
                                           updated_symbol_overview_obj: SymbolOverview):
         # updating trading_data_manager's strat_cache
         self.trading_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
-        self.market_data_provider.release_notify_semaphore()
+        self.mobile_book_provider.release_notify_semaphore()
 
     async def partial_update_symbol_overview_post(self, stored_symbol_overview_obj: SymbolOverview,
                                                   updated_symbol_overview_obj: SymbolOverviewOptional):
         # updating trading_data_manager's strat_cache
         self.trading_data_manager.handle_symbol_overview_get_all_ws(updated_symbol_overview_obj)
-        self.market_data_provider.release_notify_semaphore()
+        self.mobile_book_provider.release_notify_semaphore()
 
     async def create_all_symbol_overview_post(self, symbol_overview_obj_list: List[SymbolOverview]):
         # updating trading_data_manager's strat_cache
@@ -2852,7 +2852,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
             symbol_overview_obj.force_publish = False  # setting it false if at create it is True
             if self.trading_data_manager:
                 self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-                self.market_data_provider.release_notify_semaphore()
+                self.mobile_book_provider.release_notify_semaphore()
             # else not required: since symbol overview is required to make executor service ready,
             #                    will add this to strat_cache explicitly using underlying http call
 
@@ -2861,14 +2861,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # updating trading_data_manager's strat_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
             self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-            self.market_data_provider.release_notify_semaphore()
+            self.mobile_book_provider.release_notify_semaphore()
 
     async def partial_update_all_symbol_overview_post(self, stored_symbol_overview_obj_list: List[SymbolOverview],
                                                       updated_symbol_overview_obj_list: List[SymbolOverviewOptional]):
         # updating trading_data_manager's strat_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
             self.trading_data_manager.handle_symbol_overview_get_all_ws(symbol_overview_obj)
-            self.market_data_provider.release_notify_semaphore()
+            self.mobile_book_provider.release_notify_semaphore()
 
     #####################
     # Query Pre/Post handling
@@ -2916,7 +2916,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                 err_str_ = (f"No strat_brief found from strat_cache for symbol_side_key: "
                             f"{get_symbol_side_key([(security_id, side)])}")
                 logging.exception(err_str_)
-                raise HTTPException(status_code=5mobile_bookmobile_book, detail=err_str_)
+                raise HTTPException(status_code=500, detail=err_str_)
 
             # updating pair_strat's residual notional
             async with StratStatus.reentrant_lock:
@@ -2936,12 +2936,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
                         err_str_ = f"Something went wrong while computing residual for security_side_key: " \
                                    f"{get_symbol_side_key([(security_id, side)])}"
                         logging.exception(err_str_)
-                        raise HTTPException(status_code=5mobile_bookmobile_book, detail=err_str_)
+                        raise HTTPException(status_code=500, detail=err_str_)
                 else:
                     err_str_ = ("Received strat_status_tuple as None from strat_cache - ignoring strat_status update "
                                 "for residual changes")
                     logging.exception(err_str_)
-                    raise HTTPException(status_code=5mobile_bookmobile_book, detail=err_str_)
+                    raise HTTPException(status_code=500, detail=err_str_)
 
             # nothing to send since this query updates residuals only
             return []
@@ -3029,7 +3029,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         if last_n_sec_order_qty is not None and \
                 last_n_sec_trade_qty is not None:
-            # if no data is found by respective queries then all fields are set to mobile_book and every call returns
+            # if no data is found by respective queries then all fields are set to 0 and every call returns
             # executor_check_snapshot object (except when exception occurs)
             executor_check_snapshot = \
                 ExecutorCheckSnapshot(last_n_sec_trade_qty=last_n_sec_trade_qty,
@@ -3058,7 +3058,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         last_trade_obj_list = \
             await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_last_trade_http(
                 get_last_n_sec_total_trade_qty(symbol, last_n_sec))
-        last_n_sec_trade_vol = mobile_book
+        last_n_sec_trade_vol = 0
         if last_trade_obj_list:
             last_n_sec_trade_vol = \
                 last_trade_obj_list[-1].market_trade_volume.participation_period_last_trade_qty_sum
@@ -3086,13 +3086,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
 
         # removing strat_alert
         try:
-            log_analyzer_service_http_client.delete_strat_alert_client(self.pair_strat_id)
+            log_book_service_http_client.delete_strat_alert_client(self.pair_strat_id)
         except Exception as e:
             if '{"detail":"Id not Found:' in str(e):
                 logging.info(f"Strat Alert with id: {self.pair_strat_id} not found while deleting strat_alert")
             else:
                 err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
-                raise HTTPException(detail=err_str_, status_code=5mobile_bookmobile_book)
+                raise HTTPException(detail=err_str_, status_code=500)
 
         # cleaning executor config.yaml file
         try:
@@ -3110,7 +3110,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         if symbol_side_tuple_list is None:
             err_str_ = "Can't find symbol_side_tuple_list in payload from query"
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_book3)
+            raise HTTPException(detail=err_str_, status_code=503)
 
         market_depth_list: List[MarketDepth] = \
             await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_market_depth_http(
@@ -3186,15 +3186,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(StreetBookServiceRoutesC
         # used in test case to verify cache after recovery
         tob_list = []
 
-        leg_1_tob_of_book = self.market_data_container_cache.leg_1_market_data_container.get_top_of_book()
-        leg_2_tob_of_book = self.market_data_container_cache.leg_1_market_data_container.get_top_of_book()
+        leg_1_tob_of_book = self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book()
+        leg_2_tob_of_book = self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book()
 
         if leg_1_tob_of_book is not None:
-            with MarketDataMutexManager(self.market_data_provider, leg_1_tob_of_book):
+            with MobileBookMutexManager(self.mobile_book_provider, leg_1_tob_of_book):
                 tob_list.append(leg_1_tob_of_book)
 
         if leg_2_tob_of_book is not None:
-            with MarketDataMutexManager(self.market_data_provider, leg_1_tob_of_book):
+            with MobileBookMutexManager(self.mobile_book_provider, leg_1_tob_of_book):
                 tob_list.append(leg_2_tob_of_book)
         return tob_list
 

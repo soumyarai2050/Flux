@@ -11,7 +11,7 @@ include(FetchContent)
 FetchContent_Declare(
         googletest
         # Specify the commit you depend on and update it regularly.
-        URL https://github.com/google/googletest/archive/5376968f6948923e2411mobile_book81fd9372e71a59d8e77.zip
+        URL https://github.com/google/googletest/archive/5376968f6948923e2411081fd9372e71a59d8e77.zip
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -42,7 +42,7 @@ include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCL
         ${Protobuf_INCLUDE_DIRS} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc} ${App} ${FluxCppCore} /usr/local/lib/quill)
 
 set(MD_MODEL ../../../../../Flux/CodeGenProjects/mobile_book/generated/CppProto2)
-protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/dashboards_core.proto ${MD_MODEL}/mobile_book_core.proto ${MD_MODEL}/mobile_book_service.proto)
+protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/dept_book_core.proto ${MD_MODEL}/mobile_book_core.proto ${MD_MODEL}/mobile_book_service.proto)
 
 set(SRC_FILES
         ${CppCodec_SRC}

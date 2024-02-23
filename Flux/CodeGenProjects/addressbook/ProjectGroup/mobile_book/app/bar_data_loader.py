@@ -16,7 +16,7 @@ class BarDataLoader(YahooFinanceBase):
             mobile_book_service_web_client.get_bar_data_all_symbols_n_last_update_time_query_client()
         self.symbol_to_last_update_datetime_dict: Dict[str, DateTime] = {
             bar_data_symbol_n_datetime.symbol: bar_data_symbol_n_datetime.last_update_datetime
-            for bar_data_symbol_n_datetime in self.bar_data_symbol_n_last_update_date_time_list[mobile_book].symbol_n_last_update_datetime
+            for bar_data_symbol_n_datetime in self.bar_data_symbol_n_last_update_date_time_list[0].symbol_n_last_update_datetime
         }
 
     async def _create_update_bar_data_from_source(self, ticker: yf.Ticker, symbol: str) -> None:

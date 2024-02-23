@@ -1,7 +1,7 @@
 import os
 
 os.environ["DBType"] = "beanie"
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 cum_price_size_aggregate_json = {"aggregate": [
@@ -9,7 +9,7 @@ cum_price_size_aggregate_json = {"aggregate": [
         "$setWindowFields": {
             "partitionBy": "$side",
             "sortBy": {
-                "_id": 1.mobile_book
+                "_id": 1.0
             },
             "output": {
                 "cumulative_avg_price": {
@@ -40,7 +40,7 @@ sample_cum_aggregate_pipeline = {"aggregate": [
     {
         "$setWindowFields": {
             "sortBy": {
-                "_id": 1.mobile_book
+                "_id": 1.0
             },
             "output": {
                 "cum_sum_of_num": {
@@ -87,7 +87,7 @@ def get_ongoing_pair_strat_filter(security_id: str | None = None):
     ]}
 
     if security_id is not None:
-        agg_pipeline["aggregate"][mobile_book]["$match"] = {
+        agg_pipeline["aggregate"][0]["$match"] = {
             "$or": [
                 {
                     "pair_strat_params.strat_leg1.sec.sec_id": {

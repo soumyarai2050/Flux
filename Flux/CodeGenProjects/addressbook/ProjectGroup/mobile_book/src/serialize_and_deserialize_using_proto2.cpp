@@ -31,48 +31,48 @@ std::vector<mobile_book::TopOfBook> SerializeAndDeserializeProto2::create_top_of
     // Top of Book 1
     mobile_book::TopOfBook top_of_book1;
     top_of_book1.set_symbol("AAPL");
-    top_of_book1.mutable_bid_quote()->set_px(1mobile_bookmobile_book.mobile_book);
-    top_of_book1.mutable_bid_quote()->set_qty(1mobile_bookmobile_book);
-    top_of_book1.mutable_ask_quote()->set_px(9mobile_book.mobile_book);
-    top_of_book1.mutable_ask_quote()->set_qty(1mobile_bookmobile_book);
-    top_of_book1.mutable_last_trade()->set_px(1mobile_bookmobile_bookmobile_book.mobile_book);
-    top_of_book1.mutable_last_trade()->set_qty(1mobile_book);
-    top_of_book1.set_total_trading_security_size(1mobile_book);
+    top_of_book1.mutable_bid_quote()->set_px(100.0);
+    top_of_book1.mutable_bid_quote()->set_qty(100);
+    top_of_book1.mutable_ask_quote()->set_px(90.0);
+    top_of_book1.mutable_ask_quote()->set_qty(100);
+    top_of_book1.mutable_last_trade()->set_px(1000.0);
+    top_of_book1.mutable_last_trade()->set_qty(10);
+    top_of_book1.set_total_trading_security_size(10);
     mobile_book::MarketTradeVolume* market_trade_volume1 = top_of_book1.mutable_market_trade_volume()->Add();
     market_trade_volume1->set_id("1");
-    market_trade_volume1->set_participation_period_last_trade_qty_sum(1mobile_bookmobile_bookmobile_book);
-    market_trade_volume1->set_applicable_period_seconds(1mobile_book);
+    market_trade_volume1->set_participation_period_last_trade_qty_sum(1000);
+    market_trade_volume1->set_applicable_period_seconds(10);
     top_of_book_data.push_back(top_of_book1);
 
     // Top of Book 2
     mobile_book::TopOfBook top_of_book2;
     top_of_book2.set_symbol("GOOGL");
-    top_of_book2.mutable_bid_quote()->set_px(5mobile_bookmobile_book.mobile_book);
-    top_of_book2.mutable_bid_quote()->set_qty(5mobile_book);
-    top_of_book2.mutable_ask_quote()->set_px(51mobile_book.mobile_book);
-    top_of_book2.mutable_ask_quote()->set_qty(5mobile_book);
-    top_of_book2.mutable_last_trade()->set_px(5mobile_book5.mobile_book);
+    top_of_book2.mutable_bid_quote()->set_px(500.0);
+    top_of_book2.mutable_bid_quote()->set_qty(50);
+    top_of_book2.mutable_ask_quote()->set_px(510.0);
+    top_of_book2.mutable_ask_quote()->set_qty(50);
+    top_of_book2.mutable_last_trade()->set_px(505.0);
     top_of_book2.mutable_last_trade()->set_qty(5);
     top_of_book2.set_total_trading_security_size(5);
     mobile_book::MarketTradeVolume* market_trade_volume2 = top_of_book2.mutable_market_trade_volume()->Add();
     market_trade_volume2->set_id("2");
-    market_trade_volume2->set_participation_period_last_trade_qty_sum(5mobile_bookmobile_book);
+    market_trade_volume2->set_participation_period_last_trade_qty_sum(500);
     market_trade_volume2->set_applicable_period_seconds(5);
     top_of_book_data.push_back(top_of_book2);
 
     // Top of Book 3
     mobile_book::TopOfBook top_of_book3;
     top_of_book3.set_symbol("MSFT");
-    top_of_book3.mutable_bid_quote()->set_px(2mobile_bookmobile_book.mobile_book);
-    top_of_book3.mutable_bid_quote()->set_qty(2mobile_book);
-    top_of_book3.mutable_ask_quote()->set_px(2mobile_book5.mobile_book);
-    top_of_book3.mutable_ask_quote()->set_qty(2mobile_book);
-    top_of_book3.mutable_last_trade()->set_px(2mobile_book2.mobile_book);
+    top_of_book3.mutable_bid_quote()->set_px(200.0);
+    top_of_book3.mutable_bid_quote()->set_qty(20);
+    top_of_book3.mutable_ask_quote()->set_px(205.0);
+    top_of_book3.mutable_ask_quote()->set_qty(20);
+    top_of_book3.mutable_last_trade()->set_px(202.0);
     top_of_book3.mutable_last_trade()->set_qty(2);
     top_of_book3.set_total_trading_security_size(2);
     mobile_book::MarketTradeVolume* market_trade_volume3 = top_of_book3.mutable_market_trade_volume()->Add();
     market_trade_volume3->set_id("3");
-    market_trade_volume3->set_participation_period_last_trade_qty_sum(2mobile_bookmobile_book);
+    market_trade_volume3->set_participation_period_last_trade_qty_sum(200);
     market_trade_volume3->set_applicable_period_seconds(2);
     top_of_book_data.push_back(top_of_book3);
 

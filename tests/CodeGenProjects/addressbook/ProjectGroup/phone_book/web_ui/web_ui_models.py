@@ -66,10 +66,10 @@ class WidgetType(StrEnum):
 class Delay(Enum):
     SHORT = 2
     DEFAULT = 5
-    LONG = 2mobile_book
+    LONG = 20
 
 
 class ColorType(StrEnum):
-    # ERROR = (156, mobile_book, 6)
+    # ERROR = (156, 0, 6)
     WARNING = auto()
     CRITICAL = auto()

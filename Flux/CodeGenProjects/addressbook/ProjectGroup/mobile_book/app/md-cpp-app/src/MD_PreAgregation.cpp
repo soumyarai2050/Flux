@@ -1,5 +1,5 @@
 ////
-//// Created by pc on 2/1/2mobile_book23.
+//// Created by pc on 2/1/2023.
 ////
 ////#include <bsoncxx/builder/stream/document.hpp>
 ////#include <bsoncxx/json.hpp>
@@ -32,7 +32,7 @@
 ////        << "age" << 23
 ////        << "email" << "abc@gmail.com"
 ////        << "n" << open_array
-////        << 1 << 2 << 5 << 1mobile_book << mobile_book << 7 << 4 << 9mobile_book << close_array;
+////        << 1 << 2 << 5 << 10 << 0 << 7 << 4 << 90 << close_array;
 ////
 ////    // Insert the document
 ////    coll.insert_one(doc.view());
@@ -88,7 +88,7 @@
 ////        std::cout << "Document deletion failed." << std::endl;
 ////    }
 ////
-////    return mobile_book;
+////    return 0;
 ////}
 //
 //
@@ -125,7 +125,7 @@
 ////    p.append_stage(bsoncxx::builder::stream::document{}
 ////                                    << "$setWindowFields" << open_document
 ////                                        << "partitionBy" << open_document << "symbol" << "$symbol" << "side" << "$side" << close_document
-////                                        << "sortBy" << open_document << "_id" << 1.mobile_book << close_document
+////                                        << "sortBy" << open_document << "_id" << 1.0 << close_document
 ////                                        << "output" << open_document
 ////                                            << "cumulative_avg_px" << open_document
 ////                                                << "$avg" << open_document
@@ -159,7 +159,7 @@
 ////    std::cout << conn.uri().to_string();
 ////
 ////
-////    return mobile_book;
+////    return 0;
 ////}
 //
 //
@@ -188,7 +188,7 @@
 //                            kvp("side", "$side")
 //                    )),
 //                    kvp("sortBy", make_document(
-//                            kvp("_id", 1.mobile_book)
+//                            kvp("_id", 1.0)
 //                    )),
 //                    kvp("output", make_document(
 //                            kvp("cumulative_avg_px", make_document(
@@ -250,7 +250,7 @@
 //                            kvp("side", "$side")
 //                    )),
 //                    kvp("sortBy", make_document(
-//                            kvp("_id", 1.mobile_book)
+//                            kvp("_id", 1.0)
 //                    )),
 //                    kvp("output", make_document(
 //                            kvp("cumulative_avg_px", make_document(
@@ -293,7 +293,7 @@
 //
 //    std::cout << conn.uri().to_string();
 //
-//    return mobile_book;
+//    return 0;
 
 
 
@@ -314,12 +314,12 @@
 //            while (true) {
 //
 //                http::request<http::string_body> req{http::verb::get, "/mobile_book/get-all-market_depth/", 11};
-//                req.set(http::field::host, "127.mobile_book.mobile_book.1");
+//                req.set(http::field::host, "127.0.0.1");
 //                req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
 //
 //                net::io_context ioc;
 //                tcp::resolver resolver{ioc};
-//                auto const results = resolver.resolve("127.mobile_book.mobile_book.1", "8mobile_book4mobile_book");
+//                auto const results = resolver.resolve("127.0.0.1", "8040");
 //                beast::tcp_stream stream{ioc};
 //                stream.connect(results);
 //                http::write(stream, req);
@@ -333,9 +333,9 @@
 //                rapidjson::Document doc;
 //                doc.Parse(res.body().c_str());
 //
-//                if (doc.IsArray() && doc.Size() > mobile_book) {
+//                if (doc.IsArray() && doc.Size() > 0) {
 //                    // Check if the first JSON object has changed
-//                    const auto& obj = doc[mobile_book];
+//                    const auto& obj = doc[0];
 //                    rapidjson::StringBuffer s;
 //                    rapidjson::Writer<rapidjson::StringBuffer> writer(s);
 //                    obj.Accept(writer);
@@ -360,7 +360,7 @@
 
 
 //TEST(MD_ManageSubscriptionSymbolsTest, TestSubscriptionSymbols) {
-//    MD_ManageSubscriptionSymbols md("127.mobile_book.mobile_book.1", "8mobile_book2mobile_book", "/pair_strat_engine/query-get_ongoing_strats_symbol_n_exch/");
+//    MD_ManageSubscriptionSymbols md("127.0.0.1", "8020", "/phone_book/query-get_ongoing_strats_symbol_n_exch/");
 //    std::vector<std::string> result = md.get();
 //    ASSERT_FALSE(result.empty());
 //}

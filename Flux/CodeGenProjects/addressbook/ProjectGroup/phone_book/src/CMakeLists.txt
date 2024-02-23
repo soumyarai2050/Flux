@@ -16,8 +16,8 @@ include_directories(${Protobuf_INCLUDE_DIRS} ${EXTERNAL_DIR1}
         ${EXTERNAL_DIR4})
 
 
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ../model/strat_core.proto ../model/strat_manager_service.proto ../../../ui_option_utils.proto ../../../ui_core.proto ../../../flux_utils.proto ../../../flux_options.proto ../../../trade_core.proto)
-#protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS model/strat_manager_service3.proto)
+protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ../model/strat_core.proto ../model/email_book_service.proto ../../../ui_option_utils.proto ../../../ui_core.proto ../../../flux_utils.proto ../../../flux_options.proto ../../../trade_core.proto)
+#protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS model/email_book_service3.proto)
 
 add_executable(phone_book main.cpp serialize_and_deserialize_using_proto2.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 #add_executable(phone_book main.cpp serialize_and_deserialize_using_proto3.cpp ${PROTO_SRCS} ${PROTO_HDRS})

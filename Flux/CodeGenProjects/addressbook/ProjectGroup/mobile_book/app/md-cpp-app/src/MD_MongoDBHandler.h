@@ -23,7 +23,7 @@ namespace md_handler {
 
 
 // TODO IMPORTANT get URI, DB-Name and Table-Name from config (quick get-env for now ?)
-    const std::string db_uri = getenv("MONGO_URI") ? getenv("MONGO_URI") : "mongodb://localhost:27mobile_book17";
+    const std::string db_uri = getenv("MONGO_URI") ? getenv("MONGO_URI") : "mongodb://localhost:27017";
     const std::string mobile_book_db_name = "mobile_book";
     const std::string mobile_book_history = "RawMarketDepthHistory";
     const std::string market_depth = "MarketDepth";

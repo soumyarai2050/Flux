@@ -15,8 +15,8 @@ from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.generated.FastApi
 from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.generated.Pydentic.mobile_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 
-host: str = "127.mobile_book.mobile_book.1" if ((env_var := os.getenv("HOST")) is None or len(env_var) == mobile_book) else env_var
-port: int = 8mobile_book4mobile_book if ((env_var := os.getenv("PORT")) is None or len(env_var) == mobile_book) else env_var
+host: str = "127.0.0.1" if ((env_var := os.getenv("HOST")) is None or len(env_var) == 0) else env_var
+port: int = 8040 if ((env_var := os.getenv("PORT")) is None or len(env_var) == 0) else env_var
 mobile_book_service_web_client: MobileBookServiceHttpClient = MobileBookServiceHttpClient(host, port)
 
 config_file_path = PurePath(__file__).parent.parent / "data" / "config.yaml"

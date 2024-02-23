@@ -3,7 +3,7 @@ syntax = "proto2";
 import "flux_options.proto";
 
 enum CommandType {
-  COMMAND_TYPE_UNSPECIFIED = mobile_book;
+  COMMAND_TYPE_UNSPECIFIED = 0;
   CLEAR_STRAT = 1;
   RESET_STATE = 2;
 }

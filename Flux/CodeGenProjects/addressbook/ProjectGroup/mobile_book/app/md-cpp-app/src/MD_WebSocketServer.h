@@ -21,7 +21,7 @@ using tcp = boost::asio::ip::tcp;
 
 class WebSocketServer {
 public:
-    WebSocketServer() : acceptor_(io_context_, tcp::endpoint{tcp::v4(), 8mobile_book83}), timer_(io_context_, boost::posix_time::seconds(6mobile_book)) {}
+    WebSocketServer() : acceptor_(io_context_, tcp::endpoint{tcp::v4(), 8083}), timer_(io_context_, boost::posix_time::seconds(60)) {}
 
     void run() {
         std::shared_ptr socket = std::make_shared<tcp::socket>(io_context_);
@@ -34,7 +34,7 @@ public:
             } else if (ec != boost::asio::error::operation_aborted) {
                 std::cerr << "Error accepting connection: " << ec.message() << std::endl;
             }
-            timer_.expires_from_now(boost::posix_time::seconds(6mobile_book)); // reset the timer
+            timer_.expires_from_now(boost::posix_time::seconds(60)); // reset the timer
             run();
         });
 
@@ -126,8 +126,8 @@ private:
     net::io_context io_context_;
     tcp::acceptor acceptor_;
     boost::asio::deadline_timer timer_;
-    std::string host_ = "127.mobile_book.mobile_book.1";
-    std::string port_ = "8mobile_book4mobile_book";
+    std::string host_ = "127.0.0.1";
+    std::string port_ = "8040";
     std::string target_ = "/mobile_book/get-all-market_depth";
-    int num_connections_ = mobile_book;
+    int num_connections_ = 0;
 };

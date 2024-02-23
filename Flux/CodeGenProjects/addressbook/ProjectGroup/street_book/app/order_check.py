@@ -1,37 +1,37 @@
 import random
 
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import get_symbol_side_key
 
 
 class OrderControl:
-    ORDER_CONTROL_SUCCESS: Final[int] = mobile_bookxmobile_book
-    ORDER_CONTROL_PLACE_NEW_ORDER_FAIL: Final[int] = mobile_bookx1
-    ORDER_CONTROL_EXCEPTION_FAIL: Final[int] = mobile_bookx2
-    ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL: Final[int] = mobile_bookx4
-    ORDER_CONTROL_UNSUPPORTED_SIDE_FAIL: Final[int] = mobile_bookx8
-    ORDER_CONTROL_NO_BREACH_PX_FAIL: Final[int] = mobile_bookx1mobile_book
-    ORDER_CONTROL_NO_TOB_FAIL: Final[int] = mobile_bookx2mobile_book
+    ORDER_CONTROL_SUCCESS: Final[int] = 0x0
+    ORDER_CONTROL_PLACE_NEW_ORDER_FAIL: Final[int] = 0x1
+    ORDER_CONTROL_EXCEPTION_FAIL: Final[int] = 0x2
+    ORDER_CONTROL_REQUIRED_DATA_MISSING_FAIL: Final[int] = 0x4
+    ORDER_CONTROL_UNSUPPORTED_SIDE_FAIL: Final[int] = 0x8
+    ORDER_CONTROL_NO_BREACH_PX_FAIL: Final[int] = 0x10
+    ORDER_CONTROL_NO_TOB_FAIL: Final[int] = 0x20
 
-    ORDER_CONTROL_EXTRACT_AVAILABILITY_FAIL: Final[int] = mobile_bookx4mobile_book
-    ORDER_CONTROL_CHECK_UNACK_FAIL: Final[int] = mobile_bookx8mobile_book
-    ORDER_CONTROL_LIMIT_UP_FAIL: Final[int] = mobile_bookx1mobile_bookmobile_book
-    ORDER_CONTROL_LIMIT_DOWN_FAIL: Final[int] = mobile_bookx2mobile_bookmobile_book
-    ORDER_CONTROL_MIN_ORDER_NOTIONAL_FAIL: Final[int] = mobile_bookx4mobile_bookmobile_book
-    ORDER_CONTROL_MAX_ORDER_NOTIONAL_FAIL: Final[int] = mobile_bookx8mobile_bookmobile_book
-    ORDER_CONTROL_CONSUMABLE_NOTIONAL_FAIL: Final[int] = mobile_bookx1mobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL: Final[int] = mobile_bookx2mobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_UNUSABLE_CONSUMABLE_PARTICIPATION_QTY_FAIL: Final[int] = mobile_bookx4mobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_MAX_CONCENTRATION_FAIL: Final[int] = mobile_bookx8mobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_MAX_ORDER_QTY_FAIL: Final[int] = mobile_bookx1mobile_bookmobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_BUY_ORDER_MAX_PX_FAIL: Final[int] = mobile_bookx2mobile_bookmobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_SELL_ORDER_MIN_PX_FAIL: Final[int] = mobile_bookx4mobile_bookmobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_NETT_FILLED_NOTIONAL_FAIL: Final[int] = mobile_bookx8mobile_bookmobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_MAX_OPEN_ORDERS_FAIL: Final[int] = mobile_bookx1mobile_bookmobile_bookmobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_ORDER_PASE_SECONDS_FAIL: Final[int] = mobile_bookx2mobile_bookmobile_bookmobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_INIT_AS_FAIL = mobile_bookx4mobile_bookmobile_bookmobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_CONSUMABLE_NETT_FILLED_NOTIONAL_FAIL: Final[int] = mobile_bookx8mobile_bookmobile_bookmobile_bookmobile_bookmobile_book
-    ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL: Final[int] = mobile_bookx1mobile_bookmobile_bookmobile_bookmobile_bookmobile_bookmobile_book
+    ORDER_CONTROL_EXTRACT_AVAILABILITY_FAIL: Final[int] = 0x40
+    ORDER_CONTROL_CHECK_UNACK_FAIL: Final[int] = 0x80
+    ORDER_CONTROL_LIMIT_UP_FAIL: Final[int] = 0x100
+    ORDER_CONTROL_LIMIT_DOWN_FAIL: Final[int] = 0x200
+    ORDER_CONTROL_MIN_ORDER_NOTIONAL_FAIL: Final[int] = 0x400
+    ORDER_CONTROL_MAX_ORDER_NOTIONAL_FAIL: Final[int] = 0x800
+    ORDER_CONTROL_CONSUMABLE_NOTIONAL_FAIL: Final[int] = 0x1000
+    ORDER_CONTROL_CONSUMABLE_PARTICIPATION_QTY_FAIL: Final[int] = 0x2000
+    ORDER_CONTROL_UNUSABLE_CONSUMABLE_PARTICIPATION_QTY_FAIL: Final[int] = 0x4000
+    ORDER_CONTROL_MAX_CONCENTRATION_FAIL: Final[int] = 0x8000
+    ORDER_CONTROL_MAX_ORDER_QTY_FAIL: Final[int] = 0x10000
+    ORDER_CONTROL_BUY_ORDER_MAX_PX_FAIL: Final[int] = 0x20000
+    ORDER_CONTROL_SELL_ORDER_MIN_PX_FAIL: Final[int] = 0x40000
+    ORDER_CONTROL_NETT_FILLED_NOTIONAL_FAIL: Final[int] = 0x80000
+    ORDER_CONTROL_MAX_OPEN_ORDERS_FAIL: Final[int] = 0x100000
+    ORDER_CONTROL_ORDER_PASE_SECONDS_FAIL: Final[int] = 0x200000
+    ORDER_CONTROL_INIT_AS_FAIL = 0x400000
+    ORDER_CONTROL_CONSUMABLE_NETT_FILLED_NOTIONAL_FAIL: Final[int] = 0x800000
+    ORDER_CONTROL_CONSUMABLE_OPEN_NOTIONAL_FAIL: Final[int] = 0x1000000
 
     @classmethod
     def check_min_order_notional_normal(cls, order_limits: OrderLimits, order_usd_notional: float,

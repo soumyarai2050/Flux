@@ -2,7 +2,7 @@
 
 #include <quill/Logger.h>
 
-#include "strat_manager_service.pb.h"
+#include "email_book_service.pb.h"
 #include "web_socket_client.h"
 #include "GenericCache.h"
 
@@ -34,9 +34,9 @@ namespace mobile_book_handler {
             std::istringstream ss(r_data_str);
             std::string symbol, product_type, token;
 
-            int index = mobile_book;
+            int index = 0;
             while (std::getline(ss, token, ',')) {
-                if (index % 2 == mobile_book) {
+                if (index % 2 == 0) {
                     symbol = token;
                 } else {
                     product_type = token;
@@ -57,8 +57,8 @@ namespace mobile_book_handler {
 
         void run() {
             // Start WebSocketClient
-            WebSocketClient<pair_strat_engine::PairStratList> webSocketClient(m_pair_strat_, km_host_, km_port_, km_timeout_, km_handshake_);
-            std::thread clientThread(&WebSocketClient<pair_strat_engine::PairStratList>::run, &webSocketClient);
+            WebSocketClient<phone_book::PairStratList> webSocketClient(m_pair_strat_, km_host_, km_port_, km_timeout_, km_handshake_);
+            std::thread clientThread(&WebSocketClient<phone_book::PairStratList>::run, &webSocketClient);
 
             // Start a thread for processing updates
             std::thread updateThread(&PairStratProcessor::processUpdates, this);
@@ -75,7 +75,7 @@ namespace mobile_book_handler {
     protected:
         void processUpdates() {
             std::this_thread::sleep_for(std::chrono::seconds(5));
-            for (int i = mobile_book; i < m_pair_strat_.pair_strat_size(); ++i) {
+            for (int i = 0; i < m_pair_strat_.pair_strat_size(); ++i) {
                 std::string symbol1 = m_pair_strat_.pair_strat(i).pair_strat_params().strat_leg1().sec().sec_id();
                 std::string symbol2 = m_pair_strat_.pair_strat(i).pair_strat_params().strat_leg2().sec().sec_id();
                 std::string symbol = symbol1 + "+" + symbol2;
@@ -95,7 +95,7 @@ namespace mobile_book_handler {
         const int32_t km_timeout_;
         const std::string km_handshake_;
         quill::Logger* mp_logger_;
-        pair_strat_engine::PairStratList m_pair_strat_;
+        phone_book::PairStratList m_pair_strat_;
         GenericCache m_webclient_cache_;
     };
 

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # packaging notes (automated in this script)
-# mobile_book. cp package.json to web-ui/.
-# 1. rename strat_manager_service_json_schema.json to schema.json ; then copy to web-ui/public/.
+# 0. cp package.json to web-ui/.
+# 1. rename email_book_service_json_schema.json to schema.json ; then copy to web-ui/public/.
 # 2.cp Layout.jsx to web-ui/src/components/.
 # 3. cp *.jsx to web-ui/src/widgets/.   # excluding Layout -
 # 4. cp store.js and constants.js to web-ui/src/.
@@ -16,7 +16,7 @@
 set -e
 how_to_use()
 {
-  echo "Usage: $mobile_book {Project-Name} <existing-web-project-name>"
+  echo "Usage: $0 {Project-Name} <existing-web-project-name>"
   echo "Create/Update web-ui for any existing MDD project or update UI files in current project"
   exit 1
 }
@@ -51,9 +51,9 @@ else  # test WebUi exist in the current project
   fi
 fi
 
-# mobile_book. cp package.json to web-ui/.
+# 0. cp package.json to web-ui/.
 cp -p "$PWD"/generated/JsLayout/package.json "$PWD"/web-ui/.
-# 1. rename strat_manager_service_json_schema.json to schema.json ; then copy to web-ui/public/.
+# 1. rename email_book_service_json_schema.json to schema.json ; then copy to web-ui/public/.
 FILES_TO_COPY=$(ls "$PWD"/generated/JSONSchema/*_json_schema.json)
 cp -p "$FILES_TO_COPY" "$PWD"/web-ui/public/schema.json
 # 2.cp Layout.jsx to web-ui/src/components/.
@@ -79,7 +79,7 @@ if [ $# -eq 2 ] ; then
     how_to_use
   else
     echo "replacing any text occurrence of: $OLD_PROJECT_NAME with: $1 - new project name in all new project files"
-    find . -type f -printmobile_book | xargs -mobile_book perl -pi -e "s#$OLD_PROJECT_NAME#$1#g"
+    find . -type f -print0 | xargs -0 perl -pi -e "s#$OLD_PROJECT_NAME#$1#g"
   fi
 fi
 cd "$START_DIR" || (echo "cd $START_DIR failed from dir: $PWD"; exit 1)

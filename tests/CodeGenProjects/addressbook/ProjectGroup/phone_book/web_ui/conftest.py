@@ -9,20 +9,20 @@ from CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.web_ui_models im
 from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.web_ui.utility_test_functions import get_driver, wait, \
     get_web_project_url, test_config_file_path, create_pair_strat, override_default_limits
 from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.strat_manager_service_http_client import (
-    FxSymbolOverviewBaseModel, StratManagerServiceHttpClient)
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
+    FxSymbolOverviewBaseModel, EmailBookServiceHttpClient)
 from tests.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.utility_test_functions import fx_symbol_overview_obj
 
 
 @pytest.fixture()
 def market_depth_basemodel_list():
     input_data = []
-    start_date = datetime.datetime(2mobile_book23, 1, 1)
-    end_date = datetime.datetime(2mobile_book23, 12, 31)
+    start_date = datetime.datetime(2023, 1, 1)
+    end_date = datetime.datetime(2023, 12, 31)
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
-        random_date = start_date + datetime.timedelta(seconds=random.randint(mobile_book, int((end_date - start_date).total_seconds())))
+        random_date = start_date + datetime.timedelta(seconds=random.randint(0, int((end_date - start_date).total_seconds())))
         formatted_date = random_date.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-        for side, px, qty, dev in [("BID", 1mobile_bookmobile_book, 9mobile_book, -1), ("ASK", 11mobile_book, 7mobile_book, 1)]:
+        for side, px, qty, dev in [("BID", 100, 90, -1), ("ASK", 110, 70, 1)]:
             for position in range(1, 6):
                 id_value = len(input_data) + 1  # Using the length of input_data as id
 
@@ -33,8 +33,8 @@ def market_depth_basemodel_list():
                         "exch_time": formatted_date,
                         "arrival_time": formatted_date,
                         "side": side,
-                        "px": random.uniform(1mobile_book.mobile_book, 1mobile_bookmobile_bookmobile_bookmobile_book.mobile_book),
-                        "qty": random.randint(1mobile_book, 1mobile_bookmobile_bookmobile_book),
+                        "px": random.uniform(10.0, 10000.0),
+                        "qty": random.randint(10, 1000),
                         "position": position,
                         "market_maker": "string",
                         "is_smart_depth": False
@@ -49,7 +49,7 @@ def market_depth_basemodel_list():
 @pytest.fixture()
 def last_trade_fixture_list():
     input_data = []
-    id: int = mobile_book
+    id: int = 0
     for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
         id += 1
         input_data.extend([
@@ -59,13 +59,13 @@ def last_trade_fixture_list():
                     "symbol": symbol,
                     "exch_id": "Exch"
                 },
-                "exch_time": "2mobile_book23-mobile_book3-1mobile_bookTmobile_book9:19:12.mobile_book19Z",
-                "arrival_time": "2mobile_book23-mobile_book3-1mobile_bookTmobile_book9:19:12.mobile_book19Z",
+                "exch_time": "2023-03-10T09:19:12.019Z",
+                "arrival_time": "2023-03-10T09:19:12.019Z",
                 "px": 116,
-                "qty": 15mobile_book,
+                "qty": 150,
                 "market_trade_volume": {
-                    "participation_period_last_trade_qty_sum": mobile_book,
-                    "applicable_period_seconds": mobile_book
+                    "participation_period_last_trade_qty_sum": 0,
+                    "applicable_period_seconds": 0
                 }
             }
         ])
@@ -77,7 +77,7 @@ def last_trade_fixture_list():
 @pytest.fixture()
 def fills_journal_fixture_list():
     input_data: List[FillsJournalBaseModel] = []
-    id_counter: int = mobile_book
+    id_counter: int = 0
 
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
         for _ in range(5):
@@ -86,15 +86,15 @@ def fills_journal_fixture_list():
                 FillsJournalBaseModel(
                     id=id_counter,
                     order_id=f"Order_{id_counter}",
-                    fill_px=12mobile_book.5 + id_counter,
-                    fill_qty=1mobile_bookmobile_book + id_counter,
-                    fill_notional=12mobile_book5mobile_book + id_counter,
+                    fill_px=120.5 + id_counter,
+                    fill_qty=100 + id_counter,
+                    fill_notional=12050 + id_counter,
                     fill_symbol=symbol,
                     fill_side=Side.BUY,
                     underlying_account=f"Account_{id_counter}",
-                    fill_date_time="2mobile_book23-mobile_book3-1mobile_bookTmobile_book9:3mobile_book:mobile_bookmobile_book.mobile_bookmobile_bookmobile_bookZ",
+                    fill_date_time="2023-03-10T09:30:00.000Z",
                     fill_id=f"FillID_{id_counter}",
-                    underlying_account_cumulative_fill_qty=5mobile_bookmobile_book + id_counter
+                    underlying_account_cumulative_fill_qty=500 + id_counter
                 )
             )
 
@@ -104,7 +104,7 @@ def fills_journal_fixture_list():
 @pytest.fixture()
 def order_snapshot_fixture_list():
     input_data = []
-    id_counter: int = mobile_book
+    id_counter: int = 0
 
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
         for _ in range(5):  # Adjust the range as needed
@@ -120,24 +120,24 @@ def order_snapshot_fixture_list():
                             "sec_type": SecurityType.RIC
                         },
                         "side": Side.BUY,
-                        "px": 12mobile_book.5,
-                        "qty": 1mobile_bookmobile_book,
-                        "order_notional": 12mobile_book5mobile_book,
+                        "px": 120.5,
+                        "qty": 100,
+                        "order_notional": 12050,
                         "underlying_account": f"Account_{id_counter}",
                         "exchange": "Exchange123",
                         "text": ["Text1", "Text2"]
                     },
-                    filled_qty=5mobile_book,
-                    avg_fill_px=121.mobile_book,
-                    fill_notional=6mobile_book5mobile_book,
+                    filled_qty=50,
+                    avg_fill_px=121.0,
+                    fill_notional=6050,
                     last_update_fill_qty=25,
                     last_update_fill_px=121.5,
-                    cxled_qty=1mobile_book,
-                    avg_cxled_px=119.mobile_book,
-                    cxled_notional=119mobile_book,
-                    create_date_time="2mobile_book23-mobile_book3-1mobile_bookTmobile_book9:3mobile_book:mobile_bookmobile_book.mobile_bookmobile_bookmobile_bookZ",
-                    last_update_date_time="2mobile_book23-mobile_book3-1mobile_bookTmobile_book9:35:mobile_bookmobile_book.mobile_bookmobile_bookmobile_bookZ",
-                    last_n_sec_total_qty=2mobile_bookmobile_book
+                    cxled_qty=10,
+                    avg_cxled_px=119.0,
+                    cxled_notional=1190,
+                    create_date_time="2023-03-10T09:30:00.000Z",
+                    last_update_date_time="2023-03-10T09:35:00.000Z",
+                    last_n_sec_total_qty=200
                 )
             )
 
@@ -147,7 +147,7 @@ def order_snapshot_fixture_list():
 @pytest.fixture()
 def order_journal_fixture_list():
     input_data = []
-    id_counter: int = mobile_book
+    id_counter: int = 0
 
     for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
         for _ in range(5):  # Adjust the range as needed
@@ -159,16 +159,16 @@ def order_journal_fixture_list():
                         order_id=f"Order_{id_counter}",
                         security=Security(sec_id=symbol, sec_type=SecurityType.RIC),
                         side=Side.BUY,
-                        px=12mobile_book.5 + id_counter,
-                        qty=1mobile_bookmobile_book + id_counter,
-                        order_notional=12mobile_book5mobile_book + id_counter,
+                        px=120.5 + id_counter,
+                        qty=100 + id_counter,
+                        order_notional=12050 + id_counter,
                         underlying_account=f"Account_{id_counter}",
                         exchange="Exchange123",
                         text=["Text1", "Text2"]
                     ),
-                    order_event_date_time="2mobile_book23-mobile_book3-1mobile_bookTmobile_book9:3mobile_book:mobile_bookmobile_book.mobile_bookmobile_bookmobile_bookZ",
+                    order_event_date_time="2023-03-10T09:30:00.000Z",
                     order_event=OrderEventType.OE_ACK,
-                    current_period_order_count=1mobile_book
+                    current_period_order_count=10
                 )
             )
 
@@ -178,7 +178,7 @@ def order_journal_fixture_list():
 @pytest.fixture()
 def top_of_book_list_():
     input_data = []
-    id: int = mobile_book
+    id: int = 0
     for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
         id += 1
         input_data.extend([
@@ -186,28 +186,28 @@ def top_of_book_list_():
                 "id": id,
                 "symbol": symbol,
                 "bid_quote": {
-                    "px": 11mobile_book,
-                    "qty": 2mobile_book,
-                    "last_update_date_time": "2mobile_book23-mobile_book2-13T2mobile_book:3mobile_book:33.165Z"
+                    "px": 110,
+                    "qty": 20,
+                    "last_update_date_time": "2023-02-13T20:30:33.165Z"
                 },
                 "ask_quote": {
-                    "px": 12mobile_book,
-                    "qty": 4mobile_book,
-                    "last_update_date_time": "2mobile_book23-mobile_book2-13T2mobile_book:3mobile_book:31.165Z"
+                    "px": 120,
+                    "qty": 40,
+                    "last_update_date_time": "2023-02-13T20:30:31.165Z"
                 },
                 "last_trade": {
                     "px": 116,
-                    "qty": 15mobile_book,
-                    "last_update_date_time": "2mobile_book23-mobile_book2-13T2mobile_book:3mobile_book:35.165Z"
+                    "qty": 150,
+                    "last_update_date_time": "2023-02-13T20:30:35.165Z"
                 },
-                "total_trading_security_size": 1mobile_bookmobile_book,
+                "total_trading_security_size": 100,
                 "market_trade_volume": [
                     {
-                        "participation_period_last_trade_qty_sum": 9mobile_book,
-                        "applicable_period_seconds": 18mobile_book
+                        "participation_period_last_trade_qty_sum": 90,
+                        "applicable_period_seconds": 180
                     }
                 ],
-                "last_update_date_time": "2mobile_book23-mobile_book2-13T2mobile_book:3mobile_book:34.165Z"
+                "last_update_date_time": "2023-02-13T20:30:34.165Z"
             }
 
         ])
@@ -217,8 +217,8 @@ def top_of_book_list_():
 
 @pytest.fixture()
 def expected_order_limits_():
-    yield OrderLimitsBaseModel(id=1, max_basis_points=15mobile_bookmobile_book, max_px_deviation=2mobile_book, max_px_levels=5,
-                               max_order_qty=5mobile_bookmobile_book, min_order_notional=1mobile_bookmobile_book, max_order_notional=9mobile_book_mobile_bookmobile_bookmobile_book)
+    yield OrderLimitsBaseModel(id=1, max_basis_points=1500, max_px_deviation=20, max_px_levels=5,
+                               max_order_qty=500, min_order_notional=100, max_order_notional=90_000)
 
 
 @pytest.fixture()
@@ -226,8 +226,8 @@ def expected_portfolio_limits_(expected_brokers_):
     rolling_max_order_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxOrderCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
-    portfolio_limits_obj = PortfolioLimitsBaseModel(id=1, max_open_baskets=2mobile_book, max_open_notional_per_side=1mobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
-                                                    max_gross_n_open_notional=2_4mobile_bookmobile_book_mobile_bookmobile_bookmobile_book,
+    portfolio_limits_obj = PortfolioLimitsBaseModel(id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
+                                                    max_gross_n_open_notional=2_400_000,
                                                     rolling_max_order_count=rolling_max_order_count,
                                                     rolling_max_reject_count=rolling_max_reject_count,
                                                     eligible_brokers=expected_brokers_)
@@ -240,10 +240,10 @@ def expected_portfolio_status_():
         "_id": 1,
         "kill_switch": False,
         "portfolio_alerts": [],
-        "overall_buy_notional": mobile_book,
-        "overall_sell_notional": mobile_book,
-        "overall_buy_fill_notional": mobile_book,
-        "overall_sell_fill_notional": mobile_book
+        "overall_buy_notional": 0,
+        "overall_sell_notional": 0,
+        "overall_buy_fill_notional": 0,
+        "overall_sell_fill_notional": 0
     })
 
 
@@ -251,11 +251,11 @@ def expected_portfolio_status_():
 def db_names_list(buy_sell_symbol_list):
     db_names_list = [
         f"phone_book_{PAIR_STRAT_BEANIE_PORT}",
-        f"log_analyzer_{LOG_ANALYZER_BEANIE_PORT}",
+        f"log_book_{LOG_ANALYZER_BEANIE_PORT}",
     ]
 
     for i in range(len(buy_sell_symbol_list)):
-        db_names_list.append(f"strat_executor_{8mobile_book4mobile_book + i + 1}")
+        db_names_list.append(f"street_book_{8040 + i + 1}")
     return db_names_list
 
 
@@ -264,21 +264,21 @@ def expected_brokers_(buy_sell_symbol_list) -> List[Broker]:
     sec_positions: List[SecPosition] = []
     for buy_symbol, sell_symbol in buy_sell_symbol_list:
         cb_sec_position: SecPosition = SecPosition(security=Security(sec_id=buy_symbol, sec_type=SecurityType.SEDOL))
-        cb_positions: List[Position] = [Position(type=PositionType.SOD, priority=mobile_book, available_size=1mobile_book_mobile_bookmobile_bookmobile_book,
-                                                 allocated_size=1mobile_book_mobile_bookmobile_bookmobile_book, consumed_size=mobile_book)]
+        cb_positions: List[Position] = [Position(type=PositionType.SOD, priority=0, available_size=10_000,
+                                                 allocated_size=10_000, consumed_size=0)]
         cb_sec_position.positions = cb_positions
         sec_positions.append(cb_sec_position)
         eqt_sec_position: SecPosition = SecPosition(security=Security(sec_id=f"{sell_symbol}.SS",
                                                                       sec_type=SecurityType.RIC))
         eqt_positions: List[Position] = [
-            Position(type=PositionType.SOD, priority=mobile_book, available_size=1mobile_book_mobile_bookmobile_bookmobile_book, allocated_size=1mobile_book_mobile_bookmobile_bookmobile_book, consumed_size=mobile_book),
-            Position(type=PositionType.LOCATE, priority=1, available_size=1mobile_book_mobile_bookmobile_bookmobile_book, allocated_size=1mobile_book_mobile_bookmobile_bookmobile_book,
-                     consumed_size=mobile_book),
-            Position(type=PositionType.PTH, priority=2, available_size=1mobile_book_mobile_bookmobile_bookmobile_book, allocated_size=1mobile_book_mobile_bookmobile_bookmobile_book, consumed_size=mobile_book)
+            Position(type=PositionType.SOD, priority=0, available_size=10_000, allocated_size=10_000, consumed_size=0),
+            Position(type=PositionType.LOCATE, priority=1, available_size=10_000, allocated_size=10_000,
+                     consumed_size=0),
+            Position(type=PositionType.PTH, priority=2, available_size=10_000, allocated_size=10_000, consumed_size=0)
         ]
         eqt_sec_position.positions = eqt_positions
         sec_positions.append(eqt_sec_position)
-    broker: Broker = Broker(broker="BKR", bkr_priority=1mobile_book, sec_positions=sec_positions)
+    broker: Broker = Broker(broker="BKR", bkr_priority=10, sec_positions=sec_positions)
     yield [broker]
 
 
@@ -294,7 +294,7 @@ def buy_sell_symbol_list():
         ("CB_Sec_7", "EQT_Sec_7"),
         ("CB_Sec_8", "EQT_Sec_8"),
         ("CB_Sec_9", "EQT_Sec_9"),
-        ("CB_Sec_1mobile_book", "EQT_Sec_1mobile_book")
+        ("CB_Sec_10", "EQT_Sec_10")
     ]
 
 
@@ -327,7 +327,7 @@ def clean_and_set_limits(expected_order_limits_, expected_portfolio_limits_, exp
     # time for override get refreshed
     min_refresh_interval = ps_config_yaml_dict.get("min_refresh_interval")
     if min_refresh_interval is None:
-        min_refresh_interval = 3mobile_book
+        min_refresh_interval = 30
     time.sleep(min_refresh_interval)
 
 
@@ -363,11 +363,11 @@ def web_project(driver, pair_strat, expected_order_limits_, expected_portfolio_l
                 market_depth_basemodel_list, last_trade_fixture_list, fills_journal_fixture_list,
                 order_snapshot_fixture_list, order_journal_fixture_list):
     # TODO: create fx symbol overview
-    host: str = "127.mobile_book.mobile_book.1"
-    port: int = 8mobile_book2mobile_book
-    strat_manager_service_http_client = StratManagerServiceHttpClient(host, port)
+    host: str = "127.0.0.1"
+    port: int = 8020
+    email_book_service_http_client = EmailBookServiceHttpClient(host, port)
     fx_symbol_overview = fx_symbol_overview_obj()
-    strat_manager_service_http_client.create_fx_symbol_overview_client(fx_symbol_overview)
+    email_book_service_http_client.create_fx_symbol_overview_client(fx_symbol_overview)
 
     override_default_limits(expected_order_limits_, expected_portfolio_limits_)
     driver.maximize_window()
@@ -426,7 +426,7 @@ def pair_strat_edit() -> Dict[str, any]:
         "pair_strat_params": {
 
             "common_premium": 55,
-            "hedge_ratio": 6mobile_book
+            "hedge_ratio": 60
         }
     }
     yield pair_strat_edit
@@ -436,13 +436,13 @@ def pair_strat_edit() -> Dict[str, any]:
 def strat_limits() -> Dict[str, any]:
     strat_limits = {
         "max_open_orders_per_side": 4,
-        "max_single_leg_notional": 5mobile_bookmobile_book,
-        "max_open_single_leg_notional": 6mobile_bookmobile_book,
-        "max_net_filled_notional": 7mobile_bookmobile_book,
+        "max_single_leg_notional": 500,
+        "max_open_single_leg_notional": 600,
+        "max_net_filled_notional": 700,
         "max_concentration": 7,
-        "limit_up_down_volume_participation_rate": 2mobile_book,
+        "limit_up_down_volume_participation_rate": 20,
         "cancel_rate": {
-            "max_cancel_rate": 1mobile_book,
+            "max_cancel_rate": 10,
             "applicable_period_seconds": 9,
             "waived_min_orders": 2
         },
@@ -451,11 +451,11 @@ def strat_limits() -> Dict[str, any]:
             "applicable_period_seconds": 25
         },
         "market_depth": {
-            "participation_rate": 9mobile_book,
+            "participation_rate": 90,
             "depth_levels": 18
         },
         "residual_restriction": {
-            "max_residual": 4mobile_bookmobile_bookmobile_book,
+            "max_residual": 4000,
             "residual_mark_seconds": 1
         }
     }
@@ -482,7 +482,7 @@ def ui_layout_list_(schema_dict):
     ui_layout.profile_id = "test"
     widget_ui_data_elements: List[WidgetUIDataElementOptional] = []
 
-    x: int = 1mobile_book
+    x: int = 10
     y: int = 7
     w: int = 4
     h: int = 3

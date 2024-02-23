@@ -1,6 +1,6 @@
-host: "127.mobile_book.mobile_book.1"
+host: "127.0.0.1"
 port: 7497
-client_id: mobile_book
+client_id: 0
 log_level: "debug"
 symbol: "AAPL"
 secType: "STK"

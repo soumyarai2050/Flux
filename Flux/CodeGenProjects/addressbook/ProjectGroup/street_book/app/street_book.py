@@ -14,25 +14,25 @@ from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_data_
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.strat_cache import *
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link import get_trading_link, TradingLinkBase, is_test_run, \
     config_dict
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_models_log_keys import get_pair_strat_log_key
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import \
     get_consumable_participation_qty_http, get_symbol_side_key, \
-    get_strat_brief_log_key, create_stop_md_script, executor_config_yaml_dict, MarketDataMutexManager
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    create_md_shell_script, MDShellEnvData, strat_manager_service_http_client, guaranteed_call_pair_strat_client)
+    get_strat_brief_log_key, create_stop_md_script, executor_config_yaml_dict, MobileBookMutexManager
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+    create_md_shell_script, MDShellEnvData, email_book_service_http_client, guaranteed_call_pair_strat_client)
 from FluxPythonUtils.scripts.utility_functions import clear_semaphore
-from Flux.CodeGenProjects.addressbook.ProjectGroup.post_trade_engine.generated.Pydentic.post_trade_engine_service_model_imports import (
+from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.generated.Pydentic.post_book_service_model_imports import (
     IsPortfolioLimitsBreached)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.post_trade_engine.app.post_trade_engine_service_helper import (
-    post_trade_engine_service_http_client)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.market_data_cache import (
-    MarketDataContainer, TopOfBook, MarketDepth, LastTrade, MarketTradeVolume, add_container_obj_for_symbol)
+from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.app.post_book_service_helper import (
+    post_book_service_http_client)
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.mobile_book_cache import (
+    MobileBookContainer, TopOfBook, MarketDepth, LastTrade, MarketTradeVolume, add_container_obj_for_symbol)
 
 
-class MarketDataContainerCache(BaseModel):
-    leg_1_market_data_container: MarketDataContainer
-    leg_2_market_data_container: MarketDataContainer
+class MobileBookContainerCache(BaseModel):
+    leg_1_mobile_book_container: MobileBookContainer
+    leg_2_mobile_book_container: MobileBookContainer
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)
 
 
@@ -43,7 +43,7 @@ class StreetBook:
 
     trading_link: ClassVar[TradingLinkBase] = get_trading_link()
     asyncio_loop: asyncio.AbstractEventLoop
-    market_data_provider: ctypes.CDLL
+    mobile_book_provider: ctypes.CDLL
 
     @classmethod
     def initialize_underlying_http_routes(cls):
@@ -54,15 +54,15 @@ class StreetBook:
 
     @staticmethod
     def executor_trigger(trading_data_manager_: TradingDataManager, strat_cache: StratCache,
-                         market_data_container_cache: MarketDataContainerCache):
-        street_book: StreetBook = StreetBook(trading_data_manager_, strat_cache, market_data_container_cache)
+                         mobile_book_container_cache: MobileBookContainerCache):
+        street_book: StreetBook = StreetBook(trading_data_manager_, strat_cache, mobile_book_container_cache)
         street_book_thread = Thread(target=street_book.run, daemon=True).start()
         return street_book, street_book_thread
 
     """ 1 instance = 1 thread = 1 pair strat"""
 
     def __init__(self, trading_data_manager_: TradingDataManager, strat_cache: StratCache,
-                 market_data_container_cache: MarketDataContainerCache):
+                 mobile_book_container_cache: MobileBookContainerCache):
         # prevents consuming any market data older than current time
         self.is_dev_env = True
         self.allow_multiple_open_orders_per_strat: Final[bool] = allow_multiple_open_orders_per_strat \
@@ -79,7 +79,7 @@ class StreetBook:
 
         self.trading_data_manager: TradingDataManager = trading_data_manager_
         self.strat_cache: StratCache = strat_cache
-        self.market_data_container_cache: MarketDataContainerCache = market_data_container_cache
+        self.mobile_book_container_cache: MobileBookContainerCache = mobile_book_container_cache
         self.leg1_fx: float | None = None
 
         self._system_control_update_date_time: DateTime | None = None
@@ -89,9 +89,9 @@ class StreetBook:
         self._fills_journals_update_date_time: DateTime | None = None
         self._order_limits_update_date_time: DateTime | None = None
         self._new_orders_update_date_time: DateTime | None = None
-        self._new_orders_processed_slice: int = mobile_book
+        self._new_orders_processed_slice: int = 0
         self._cancel_orders_update_date_time: DateTime | None = None
-        self._cancel_orders_processed_slice: int = mobile_book
+        self._cancel_orders_processed_slice: int = 0
         self._top_of_books_update_date_time: DateTime | None = None
         self._tob_leg1_update_date_time: DateTime | None = None
         self._tob_leg2_update_date_time: DateTime | None = None
@@ -100,12 +100,12 @@ class StreetBook:
         self.strat_limit: StratLimits | None = None
         self.last_order_timestamp: DateTime | None = None
 
-        self.leg1_notional: float = mobile_book
-        self.leg2_notional: float = mobile_book
+        self.leg1_notional: float = 0
+        self.leg2_notional: float = 0
 
-        self.order_pase_seconds = mobile_book
+        self.order_pase_seconds = 0
         # internal rejects to use:  -ive internal_reject_count + current date time as order id
-        self.internal_reject_count = mobile_book
+        self.internal_reject_count = 0
         # 1-time prepare param used by update_aggressive_market_depths_in_cache call for this strat [init on first use]
         self.aggressive_symbol_side_tuples_dict: Dict[str, List[Tuple[str, str]]] = {}
         StreetBook.initialize_underlying_http_routes()  # Calling underlying instances init
@@ -120,12 +120,12 @@ class StreetBook:
         strat_brief, self._strat_brief_update_date_time = \
             self.strat_cache.get_strat_brief(self._strat_brief_update_date_time)
         if side == Side.BUY:
-            if strat_brief.pair_buy_side_trading_brief.consumable_notional - check_notional > mobile_book:
+            if strat_brief.pair_buy_side_trading_brief.consumable_notional - check_notional > 0:
                 return True
             else:
                 return False
         else:
-            if strat_brief.pair_sell_side_trading_brief.consumable_notional - check_notional > mobile_book:
+            if strat_brief.pair_sell_side_trading_brief.consumable_notional - check_notional > 0:
                 return True
             else:
                 return False
@@ -173,8 +173,8 @@ class StreetBook:
         leg1_tob: TopOfBook | None = None
         leg2_tob: TopOfBook | None = None
         error = False
-        if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == top_of_books[mobile_book].symbol:
-            leg1_tob = top_of_books[mobile_book]
+        if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == top_of_books[0].symbol:
+            leg1_tob = top_of_books[0]
             if len(top_of_books) == 2:
                 if pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[1].symbol:
                     leg2_tob = top_of_books[1]
@@ -183,8 +183,8 @@ class StreetBook:
                                   f"expected: {pair_strat.pair_strat_params.strat_leg2.sec.sec_id}, pair_strat_key: "
                                   f" {get_pair_strat_log_key(pair_strat)};;; {top_of_books[1] = }")
                     error = True
-        elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[mobile_book].symbol:
-            leg2_tob = top_of_books[mobile_book]
+        elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == top_of_books[0].symbol:
+            leg2_tob = top_of_books[0]
             if len(top_of_books) == 2:
                 if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == top_of_books[1].symbol:
                     leg1_tob = top_of_books[1]
@@ -194,7 +194,7 @@ class StreetBook:
                                   f"{get_pair_strat_log_key(pair_strat)};;; {top_of_books[1] = }")
                     error = True
         else:
-            logging.error(f"unexpected security found in top_of_books[mobile_book]: {top_of_books[mobile_book].symbol = }, "
+            logging.error(f"unexpected security found in top_of_books[0]: {top_of_books[0].symbol = }, "
                           f"expected either: {pair_strat.pair_strat_params.strat_leg1.sec.sec_id} or "
                           f"{pair_strat.pair_strat_params.strat_leg2.sec.sec_id} in pair_strat_key: "
                           f"{get_pair_strat_log_key(pair_strat)};;; {top_of_books[1] = }")
@@ -317,11 +317,11 @@ class StreetBook:
     def check_consumable_concentration(self, strat_brief: StratBrief | StratBriefBaseModel,
                                        trading_brief: PairSideTradingBrief, qty: int,
                                        side_str: str) -> bool:
-        if trading_brief.consumable_concentration - qty < mobile_book:
-            if trading_brief.consumable_concentration == mobile_book:
+        if trading_brief.consumable_concentration - qty < 0:
+            if trading_brief.consumable_concentration == 0:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
-                logging.error(f"blocked generated {side_str} order, unexpected: consumable_concentration found mobile_book! "
+                logging.error(f"blocked generated {side_str} order, unexpected: consumable_concentration found 0! "
                               f"for start_cache: {self.strat_cache.get_key()}, strat_brief_key: "
                               f"{get_strat_brief_log_key(strat_brief)}")
             else:
@@ -360,7 +360,7 @@ class StreetBook:
 
         if side == Side.SELL:
             # max_open_orders_per_side check
-            if strat_brief.pair_sell_side_trading_brief.consumable_open_orders < mobile_book:
+            if strat_brief.pair_sell_side_trading_brief.consumable_open_orders < 0:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
                 logging.error(f"blocked generated SELL order, not enough consumable_open_orders: "
@@ -408,7 +408,7 @@ class StreetBook:
 
         elif side == Side.BUY:
             # max_open_orders_per_side check
-            if strat_brief.pair_buy_side_trading_brief.consumable_open_orders < mobile_book:
+            if strat_brief.pair_buy_side_trading_brief.consumable_open_orders < 0:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
                 logging.error(f"blocked generated BUY order, not enough consumable_open_orders: "
@@ -453,8 +453,8 @@ class StreetBook:
         consumable_participation_qty: int = get_consumable_participation_qty_http(
             system_symbol, side, self.strat_limit.market_trade_volume_participation.applicable_period_seconds,
             self.strat_limit.market_trade_volume_participation.max_participation_rate, StreetBook.asyncio_loop)
-        if consumable_participation_qty is not None and consumable_participation_qty != mobile_book:
-            if consumable_participation_qty - qty < mobile_book:
+        if consumable_participation_qty is not None and consumable_participation_qty != 0:
+            if consumable_participation_qty - qty < 0:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
                 logging.error(f"blocked generated order, not enough consumable_participation_qty available, "
@@ -490,11 +490,11 @@ class StreetBook:
     def get_breach_threshold_px(self, top_of_book: TopOfBook, order_limits: OrderLimits,
                                 side: Side, system_symbol: str) -> float | None:
         # TODO important - check and change reference px in cases where last px is not available
-        if top_of_book.last_trade is None or math.isclose(top_of_book.last_trade.px, mobile_book):
+        if top_of_book.last_trade is None or math.isclose(top_of_book.last_trade.px, 0):
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"blocked generated order, symbol: {top_of_book.symbol}, {side = } as "
-                          f"top_of_book.last_trade.px is none or mobile_book, symbol_side_key: "
+                          f"top_of_book.last_trade.px is none or 0, symbol_side_key: "
                           f" {get_symbol_side_key([(top_of_book.symbol, side)])}")
             return None
 
@@ -509,27 +509,27 @@ class StreetBook:
         # market_depths, _ = self.strat_cache.get_market_depth(system_symbol, aggressive_side)
 
         if system_symbol == self.leg_1_symbol:
-            market_data_container = self.market_data_container_cache.leg_1_market_data_container
+            mobile_book_container = self.mobile_book_container_cache.leg_1_mobile_book_container
         else:
-            market_data_container = self.market_data_container_cache.leg_2_market_data_container
+            mobile_book_container = self.mobile_book_container_cache.leg_2_mobile_book_container
 
         # getting aggressive market depth
         if aggressive_side == Side.SELL:
-            market_depths = market_data_container.get_ask_market_depths()
+            market_depths = mobile_book_container.get_ask_market_depths()
         else:
-            market_depths = market_data_container.get_bid_market_depths()
+            market_depths = mobile_book_container.get_bid_market_depths()
         return self._get_breach_threshold_px(top_of_book, order_limits, side, system_symbol, market_depths)
 
     def _get_breach_threshold_px(self, top_of_book: TopOfBook, order_limits: OrderLimits,
                                  side: Side, system_symbol: str, market_depths: List[MarketDepth]) -> float | None:
-        px_by_max_level: float = mobile_book
-        with MarketDataMutexManager(self.market_data_provider, *market_depths):
+        px_by_max_level: float = 0
+        with MobileBookMutexManager(self.mobile_book_provider, *market_depths):
             for market_depth in market_depths:
                 if market_depth is not None:
                     if market_depth.position <= order_limits.max_px_levels:
                         px_by_max_level = market_depth.px
                         break
-        if math.isclose(px_by_max_level, mobile_book):
+        if math.isclose(px_by_max_level, 0):
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"blocked generated order, {system_symbol = }, {side = }, unable to find valid px"
@@ -548,9 +548,9 @@ class StreetBook:
                               f"{get_symbol_side_key([(system_symbol, side)])};;;aggressive_quote: {aggressive_quote}")
                 return None  # None return blocks the order from going further
             max_px_by_deviation: float = top_of_book.last_trade.px + (
-                    top_of_book.last_trade.px / 1mobile_bookmobile_book * order_limits.max_px_deviation)
-            max_px_by_basis_point: float = aggressive_quote.px + (aggressive_quote.px / 1mobile_bookmobile_book * (
-                    order_limits.max_basis_points / 1mobile_bookmobile_book))
+                    top_of_book.last_trade.px / 100 * order_limits.max_px_deviation)
+            max_px_by_basis_point: float = aggressive_quote.px + (aggressive_quote.px / 100 * (
+                    order_limits.max_basis_points / 100))
             return min(max_px_by_basis_point, max_px_by_deviation, px_by_max_level)
 
         else:
@@ -562,9 +562,9 @@ class StreetBook:
                               f" is not found or has no px, symbol_side_key: {get_symbol_side_key([(system_symbol, side)])}")
                 return None  # None return blocks the order from going further
             min_px_by_deviation: float = top_of_book.last_trade.px - (
-                    top_of_book.last_trade.px / 1mobile_bookmobile_book * order_limits.max_px_deviation)
-            min_px_by_basis_point: float = aggressive_quote.px - (aggressive_quote.px / 1mobile_bookmobile_book * (
-                    order_limits.max_basis_points / 1mobile_bookmobile_book))
+                    top_of_book.last_trade.px / 100 * order_limits.max_px_deviation)
+            min_px_by_basis_point: float = aggressive_quote.px - (aggressive_quote.px / 100 * (
+                    order_limits.max_basis_points / 100))
             return max(min_px_by_deviation, min_px_by_basis_point, px_by_max_level)
 
     def check_new_order(self, top_of_book: TopOfBookBaseModel, strat_brief: StratBriefBaseModel,
@@ -627,7 +627,7 @@ class StreetBook:
                                                  system_symbol, err_dict)
 
         # TODO LAZY Read config "order_pace_seconds" to pace orders (needed for testing - not a limit)
-        if self.order_pase_seconds > mobile_book:
+        if self.order_pase_seconds > 0:
             # allow orders only after order_pase_seconds
             if self.last_order_timestamp.add(seconds=self.order_pase_seconds) < DateTime.now():
                 checks_passed |= OrderControl.ORDER_CONTROL_ORDER_PASE_SECONDS_FAIL
@@ -667,7 +667,7 @@ class StreetBook:
              f"{get_pair_strat_log_key(pair_strat)};;; {pair_strat = }")
         logging.info(alert_str)
         guaranteed_call_pair_strat_client(
-            PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
+            PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
             _id=pair_strat.id, strat_state=StratState.StratState_ERROR)
 
     def _mark_strat_state_as_done(self, pair_strat: PairStratBaseModel):
@@ -676,7 +676,7 @@ class StreetBook:
              f"{get_pair_strat_log_key(pair_strat)};;; {pair_strat = }")
         logging.info(alert_str)
         guaranteed_call_pair_strat_client(
-            PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
+            PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
             _id=pair_strat.id, strat_state=StratState.StratState_DONE)
 
     def _set_strat_pause_when_portfolio_limit_check_fails(self):
@@ -686,7 +686,7 @@ class StreetBook:
             logging.critical("Putting Activated Strat to PAUSE, found portfolio_limits breached already, "
                              f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; {pair_strat = }")
             guaranteed_call_pair_strat_client(
-                PairStratBaseModel, strat_manager_service_http_client.patch_pair_strat_client,
+                PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
                 _id=pair_strat.id, strat_state=StratState.StratState_PAUSED)
         else:
             logging.error(f"Can't find pair_strat in strat_cache, found portfolio_limits "
@@ -695,15 +695,15 @@ class StreetBook:
     def check_n_pause_strat_before_run_if_portfolio_limit_breached(self):
         # Checking if portfolio_limits are still not breached
         is_portfolio_limits_breached_model_list: List[IsPortfolioLimitsBreached] = (
-            post_trade_engine_service_http_client.is_portfolio_limits_breached_query_client())
+            post_book_service_http_client.is_portfolio_limits_breached_query_client())
 
         if len(is_portfolio_limits_breached_model_list) == 1:
             is_portfolio_limits_breached: bool = (
-                is_portfolio_limits_breached_model_list[mobile_book].is_portfolio_limits_breached)
+                is_portfolio_limits_breached_model_list[0].is_portfolio_limits_breached)
             if is_portfolio_limits_breached:
                 self._set_strat_pause_when_portfolio_limit_check_fails()
             # else not required: if portfolio_limits are fine then ignore
-        elif len(is_portfolio_limits_breached_model_list) == mobile_book:
+        elif len(is_portfolio_limits_breached_model_list) == 0:
             logging.critical("PairStrat service seems down, can't check portfolio_limits before current strat "
                              "activation - putting strat to pause")
             self._set_strat_pause_when_portfolio_limit_check_fails()
@@ -715,7 +715,7 @@ class StreetBook:
             logging.error(err_str_)
 
     def run(self):
-        ret_val: int = -5mobile_bookmobile_bookmobile_book
+        ret_val: int = -5000
 
         # Getting pre-requisites ready before strat active runs
         run_coro = StreetBook.underlying_handle_strat_activate_query_http()
@@ -728,10 +728,10 @@ class StreetBook:
             logging.exception(
                 f"underlying_handle_strat_activate_query_http failed: Exiting executor run trigger, "
                 f"exception: {e_}")
-            return -5mobile_bookmobile_book1
+            return -5001
 
-        max_retry_count: Final[int] = 1mobile_book
-        retry_count: int = mobile_book
+        max_retry_count: Final[int] = 10
+        retry_count: int = 0
         pair_strat_tuple: Tuple[PairStratBaseModel, DateTime] | None = None
         pair_strat: PairStratBaseModel | None = None
         while pair_strat_tuple is None or pair_strat is None:
@@ -744,7 +744,7 @@ class StreetBook:
                     retry_count += 1
                     continue
                 else:
-                    return -3mobile_bookmobile_bookmobile_book
+                    return -3000
 
             pair_strat, _ = pair_strat_tuple
             if pair_strat is None:
@@ -754,7 +754,7 @@ class StreetBook:
                     retry_count += 1
                     continue
                 else:
-                    return -3mobile_bookmobile_book1
+                    return -3001
 
         # setting index for leg1 and leg2 symbols
         self.leg_1_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
@@ -781,7 +781,7 @@ class StreetBook:
                         logging.info(f"explicit strat shutdown requested for: {self.pair_street_book_id}, "
                                      f"going down")
                         break
-                    elif ret_val != mobile_book:
+                    elif ret_val != 0:
                         logging.error(f"Error: Run returned, code: {ret_val} - sending again")
                     else:
                         pair_strat, _ = self.strat_cache.get_pair_strat()
@@ -789,21 +789,21 @@ class StreetBook:
                             self._mark_strat_state_as_done(pair_strat)
                             logging.debug(f"StratStatus with id: {self.pair_street_book_id} Marked Done, "
                                           f"pair_strat_key: {get_pair_strat_log_key(pair_strat)}")
-                            ret_val = mobile_book
+                            ret_val = 0
                         else:
                             logging.error(f"unexpected, pair_strat: {self.pair_street_book_id} "
                                           f"was already Marked Done, pair_strat_key: "
                                           f"{get_pair_strat_log_key(pair_strat)}")
-                            ret_val = -4mobile_bookmobile_bookmobile_book  # helps find the error location
+                            ret_val = -4000  # helps find the error location
                         break
         except Exception as e:
             logging.exception(f"Some Error occurred in run method of executor, exception: {e}")
-            ret_val = -4mobile_bookmobile_book1
+            ret_val = -4001
         finally:
             # running, stop md script
             subprocess.Popen([f"{stop_sh_file_path}"])
 
-            if ret_val != mobile_book and ret_val != 1:
+            if ret_val != 0 and ret_val != 1:
                 self._mark_strat_state_as_error(pair_strat)
 
             # removing created scripts
@@ -857,8 +857,8 @@ class StreetBook:
 
     @staticmethod
     def get_leg1_leg2_ratio(leg1_px: float, leg2_px: float):
-        if math.isclose(leg2_px, mobile_book):
-            return mobile_book
+        if math.isclose(leg2_px, 0):
+            return 0
         return leg1_px / leg2_px
 
     def _place_order(self, pair_strat: PairStratBaseModel, strat_brief: StratBriefBaseModel,
@@ -870,8 +870,8 @@ class StreetBook:
             # If pair_strat not active, don't act, just return [check MD state and take action if required]
             if pair_strat.strat_state != StratState.StratState_ACTIVE or self._is_outside_trading_hours():
                 logging.error("Blocked place order - strat not in activ state")
-                return mobile_book  # no order sent = no posted notional
-        if not (quote.qty == mobile_book or math.isclose(quote.px, mobile_book)):
+                return 0  # no order sent = no posted notional
+        if not (quote.qty == 0 or math.isclose(quote.px, 0)):
             ask_usd_px: float = self.get_usd_px(quote.px, tob.symbol)
             order_placed = self.place_new_order(tob, strat_brief, order_limits, pair_strat, quote.px,
                                                 ask_usd_px, quote.qty,
@@ -880,14 +880,14 @@ class StreetBook:
                 posted_notional = quote.px * quote.qty
                 return posted_notional
         else:
-            logging.error(f"mobile_book value found in ask TOB - ignoring {quote.px = }, {quote.qty = }, pair_strat_key: "
+            logging.error(f"0 value found in ask TOB - ignoring {quote.px = }, {quote.qty = }, pair_strat_key: "
                           f"{get_pair_strat_log_key(pair_strat)}")
-            return mobile_book  # no order sent = no posted notional
+            return 0  # no order sent = no posted notional
 
     def _check_tob_and_place_order(self, pair_strat: PairStratBaseModel | PairStrat, strat_brief: StratBriefBaseModel,
                                    order_limits: OrderLimits, top_of_books: List[TopOfBookBaseModel]) -> int:
-        posted_leg1_notional: float = mobile_book
-        posted_leg2_notional: float = mobile_book
+        posted_leg1_notional: float = 0
+        posted_leg2_notional: float = 0
         leg1_tob: TopOfBookBaseModel | None
         leg2_tob: TopOfBookBaseModel | None
         trade_tob: TopOfBookBaseModel
@@ -900,12 +900,12 @@ class StreetBook:
                 if pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:  # execute aggressive buy
                     posted_leg1_notional = self._place_order(pair_strat, strat_brief, order_limits, leg1_tob.ask_quote,
                                                              leg1_tob)
-                    if math.isclose(posted_leg1_notional, mobile_book):
+                    if math.isclose(posted_leg1_notional, 0):
                         return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
                 else:  # execute aggressive sell
                     posted_leg1_notional = self._place_order(pair_strat, strat_brief, order_limits, leg1_tob.bid_quote,
                                                              leg1_tob)
-                    if math.isclose(posted_leg1_notional, mobile_book):
+                    if math.isclose(posted_leg1_notional, 0):
                         return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
         if leg2_tob is not None and self.strat_cache.leg2_trading_symbol is not None:
@@ -914,12 +914,12 @@ class StreetBook:
                 if pair_strat.pair_strat_params.strat_leg2.side == Side.BUY:  # execute aggressive buy
                     posted_leg2_notional = self._place_order(pair_strat, strat_brief, order_limits, leg2_tob.ask_quote,
                                                              leg2_tob)
-                    if math.isclose(posted_leg2_notional, mobile_book):
+                    if math.isclose(posted_leg2_notional, 0):
                         return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
                 else:  # execute aggressive sell
                     posted_leg2_notional = self._place_order(pair_strat, strat_brief, order_limits, leg2_tob.bid_quote,
                                                              leg2_tob)
-                    if math.isclose(posted_leg2_notional, mobile_book):
+                    if math.isclose(posted_leg2_notional, 0):
                         return OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
         if order_placed == OrderControl.ORDER_CONTROL_SUCCESS:
@@ -946,10 +946,10 @@ class StreetBook:
         order_placed: int = OrderControl.ORDER_CONTROL_PLACE_NEW_ORDER_FAIL
 
         leg_1_top_of_book = (
-            self.market_data_container_cache.leg_1_market_data_container.get_top_of_book(
+            self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book(
                 self._top_of_books_update_date_time))
         leg_2_top_of_book = (
-            self.market_data_container_cache.leg_2_market_data_container.get_top_of_book(
+            self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book(
                 self._top_of_books_update_date_time))
 
         if leg_1_top_of_book and leg_2_top_of_book:
@@ -996,8 +996,8 @@ class StreetBook:
             if buy_top_of_book is not None:
                 if buy_top_of_book.bid_quote.last_update_date_time == \
                         self._top_of_books_update_date_time:
-                    if buy_top_of_book.bid_quote.px == 11mobile_book:
-                        px = random.randint(9mobile_book, 1mobile_bookmobile_book)
+                    if buy_top_of_book.bid_quote.px == 110:
+                        px = random.randint(90, 100)
                         qty = random.randint(85, 95)
                         usd_px: float = self.get_usd_px(px, buy_top_of_book.symbol)
                         order_placed = self.place_new_order(buy_top_of_book, strat_brief, order_limits,
@@ -1006,8 +1006,8 @@ class StreetBook:
             elif sell_top_of_book is not None:
                 if sell_top_of_book.ask_quote.last_update_date_time == \
                         self._top_of_books_update_date_time:
-                    if sell_top_of_book.ask_quote.px == 12mobile_book:
-                        px = random.randint(1mobile_bookmobile_book, 11mobile_book)
+                    if sell_top_of_book.ask_quote.px == 120:
+                        px = random.randint(100, 110)
                         qty = random.randint(65, 75)
                         usd_px: float = self.get_usd_px(px, sell_top_of_book.symbol)
                         order_placed = self.place_new_order(sell_top_of_book, strat_brief, order_limits,
@@ -1028,7 +1028,7 @@ class StreetBook:
                 self.strat_cache.leg1_fx_symbol_overview = \
                     StratCache.fx_symbol_overview_dict[self.strat_cache.leg1_fx_symbol]
             if self.strat_cache.leg1_fx_symbol_overview and self.strat_cache.leg1_fx_symbol_overview.closing_px and \
-                    (not math.isclose(self.strat_cache.leg1_fx_symbol_overview.closing_px, mobile_book)):
+                    (not math.isclose(self.strat_cache.leg1_fx_symbol_overview.closing_px, 0)):
                 self.leg1_fx = self.strat_cache.leg1_fx_symbol_overview.closing_px
                 return self.leg1_fx
             else:
@@ -1076,14 +1076,14 @@ class StreetBook:
             strat_brief:
             ol: current order limits as set by system / user
         Returns:
-            mobile_book: indicates done; no notional to consume on at-least 1 leg & no-open orders for this strat in market
+            0: indicates done; no notional to consume on at-least 1 leg & no-open orders for this strat in market
             -1: indicates needs-processing; strat has notional left to consume on either of the legs
             + number: indicates finishing: no notional to consume on at-least 1 leg but open orders for strat in market
         """
         strat_done: bool = False
         open_order_count: int = self.strat_cache.get_open_order_count_from_cache()
 
-        if mobile_book == open_order_count and (
+        if 0 == open_order_count and (
                 strat_brief.pair_sell_side_trading_brief.consumable_notional < ol.min_order_notional):
             # sell leg of strat is done - if either leg is done - strat is done
             logging.info(f"Sell Side Leg is done, no open orders remaining + sell-remainder: "
@@ -1091,7 +1091,7 @@ class StreetBook:
                          f" {ol.min_order_notional = }, no further orders possible")
             strat_done = True
         # else not required, more notional to consume on sell leg - strat done is set to 1 (no error, not done)
-        if mobile_book == open_order_count and (
+        if 0 == open_order_count and (
                 strat_brief.pair_buy_side_trading_brief.consumable_notional < ol.min_order_notional):
             # buy leg of strat is done - if either leg is done - strat is done
             logging.info(f"Buy Side Leg is done, no open orders remaining + buy-remainder: "
@@ -1100,11 +1100,11 @@ class StreetBook:
             strat_done = True
         # else not required, more notional to consume on buy leg - strat done is set to 1 (no error, not done)
         if strat_done:
-            if mobile_book == open_order_count:
+            if 0 == open_order_count:
                 logging.info(f"Strat is done")
             else:
                 logging.warning(f"Strat is finishing [if / after strat open orders: {open_order_count} are filled]")
-            return open_order_count  # [ returns mobile_book or + ive number] - Done or Finishing
+            return open_order_count  # [ returns 0 or + ive number] - Done or Finishing
         else:
             return -1  # in progress
 
@@ -1124,7 +1124,7 @@ class StreetBook:
             if log_error:
                 logging.debug(f"blocked opportunity search, has unack leg and {open_order_count} open order(s)")
             return False
-        elif (not self.allow_multiple_open_orders_per_strat) and mobile_book != open_order_count:
+        elif (not self.allow_multiple_open_orders_per_strat) and 0 != open_order_count:
             if log_error:
                 logging.debug(f"blocked opportunity search, has {open_order_count} open order(s)")
             return False
@@ -1153,11 +1153,11 @@ class StreetBook:
             self.strat_limit = None
             try:
                 # self.strat_cache.notify_semaphore.acquire()
-                StreetBook.market_data_provider.acquire_notify_semaphore()
+                StreetBook.mobile_book_provider.acquire_notify_semaphore()
                 # remove all unprocessed signals from semaphore, logic handles all new updates in single iteration
                 # clear_semaphore(self.strat_cache.notify_semaphore)
 
-                # mobile_book. Checking if strat_cache stopped (happens most likely when strat is not ongoing anymore)
+                # 0. Checking if strat_cache stopped (happens most likely when strat is not ongoing anymore)
                 if self.strat_cache.stopped:
                     self.strat_cache.set_pair_strat(None)
                     return 1  # indicates explicit shutdown requested from server
@@ -1206,8 +1206,8 @@ class StreetBook:
                     order_limits, _ = order_limits_tuple
                     if order_limits and self.strat_limit:
                         strat_done_counter = self.is_pair_strat_done(strat_brief, order_limits)
-                        if mobile_book == strat_done_counter:
-                            return mobile_book  # triggers graceful shutdown
+                        if 0 == strat_done_counter:
+                            return 0  # triggers graceful shutdown
                         elif -1 != strat_done_counter:
                             # strat is finishing: waiting to close pending strat_done_counter number of open orders
                             continue
@@ -1223,10 +1223,10 @@ class StreetBook:
                 # 4. get top_of_book (new or old to be checked by respective strat based on strat requirement)
 
                 leg_1_top_of_book = (
-                    self.market_data_container_cache.leg_1_market_data_container.get_top_of_book(
+                    self.mobile_book_container_cache.leg_1_mobile_book_container.get_top_of_book(
                         self._top_of_books_update_date_time))
                 leg_2_top_of_book = (
-                    self.market_data_container_cache.leg_2_market_data_container.get_top_of_book(
+                    self.mobile_book_container_cache.leg_2_mobile_book_container.get_top_of_book(
                         self._top_of_books_update_date_time))
 
                 if leg_1_top_of_book is None or leg_2_top_of_book is None:
@@ -1253,7 +1253,7 @@ class StreetBook:
                 if not self.is_strat_ready_for_next_opportunity(log_error=True):
                     continue
 
-                with MarketDataMutexManager(self.market_data_provider, *top_of_books):
+                with MobileBookMutexManager(self.mobile_book_provider, *top_of_books):
                     # 8. If any manual new_order requested: apply risk checks
                     # (maybe no strat param checks?) & send out
                     new_orders_and_date_tuple = self.strat_cache.get_new_order(self._new_orders_update_date_time)
@@ -1286,4 +1286,4 @@ class StreetBook:
                 logging.exception(f"Run returned with exception: {e}")
                 return -1
         # we are outside while 1 (strat processing loop) - graceful shut down this strat processing
-        return mobile_book
+        return 0

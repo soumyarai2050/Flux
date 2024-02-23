@@ -32,7 +32,7 @@ class StoreDepthMobileBookClient(IbApiClient):
         Converts received side integer to side string
         """
         match side_int:
-            case mobile_book:
+            case 0:
                 return "ASK"
             case 1:
                 return "BID"
@@ -44,7 +44,7 @@ class StoreDepthMobileBookClient(IbApiClient):
         """
         match side:
             case "ASK":
-                return mobile_book
+                return 0
             case "BID":
                 return 1
 
@@ -54,7 +54,7 @@ class StoreDepthMobileBookClient(IbApiClient):
         required_config_data_keys = ["num_rows", "is_smart_depth"]
         super().__init__(config_yaml, required_config_data_keys)
         self.preserve_history = preserve_history
-        self.num_rows: int = config_yaml["num_rows"]  # sample: 1mobile_book
+        self.num_rows: int = config_yaml["num_rows"]  # sample: 10
         self.is_smart_depth: bool = config_yaml["is_smart_depth"]  # sample: False
         self.mobile_book_service_web_client: MobileBookServiceWebClient = MobileBookServiceWebClient()
         self.__pos_side_sym_to_id_dict: Dict[str, int] = {}
@@ -93,8 +93,8 @@ class StoreDepthMobileBookClient(IbApiClient):
 
     def _update_mkt_depth(self, operation: int, market_depth_base_model: MarketDepthBaseModel):
         match operation:
-            case mobile_book:
-                # operation mobile_book: Insert
+            case 0:
+                # operation 0: Insert
                 self.mobile_book_service_web_client.create_market_depth_client(market_depth_base_model)
             case 1:
                 # operation 1: Update
@@ -115,7 +115,7 @@ class StoreDepthMobileBookClient(IbApiClient):
             if self.__pos_side_sym_to_id_dict.values():
                 last_max_id = max(self.__pos_side_sym_to_id_dict.values())
             else:
-                last_max_id = mobile_book
+                last_max_id = 0
             self.__pos_side_sym_to_id_dict[f"{position}_{side}_{symbol}"] = last_max_id + 1
             return last_max_id + 1
 

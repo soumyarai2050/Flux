@@ -28,15 +28,15 @@ class StoreTickByTickData(IbApiClient):
             config_yaml = self.config_yaml
         required_config_data_keys = ["tick_types"]
         super().__init__(config_yaml, required_config_data_keys)
-        self.tick_types = config_yaml[required_config_data_keys[mobile_book]]
+        self.tick_types = config_yaml[required_config_data_keys[0]]
         self.mobile_book_service_web_client: MobileBookServiceWebClient = MobileBookServiceWebClient()
 
     def _get_ticker_id(self, tick_type_idx: int, contract_idx: int) -> int:
         """
         Concatenates tick_type list index with contract list index to generate unique ticker id
         For example: there are 3 type of supported ticker_id(s) and let assume there are 3 different
-        contracts in contracts_list, then each ticker id will be like 1mobile_book,11,12... for first tick type
-        in list, 2mobile_book,21,22... for second one and 3mobile_book,31,32... for third one.
+        contracts in contracts_list, then each ticker id will be like 10,11,12... for first tick type
+        in list, 20,21,22... for second one and 30,31,32... for third one.
         """
         return int(f"{tick_type_idx+1}{contract_idx}")
 

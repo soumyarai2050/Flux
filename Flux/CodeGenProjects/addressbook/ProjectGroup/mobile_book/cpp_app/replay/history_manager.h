@@ -24,8 +24,8 @@ namespace mobile_book_handler {
 
         void replay() {
 
-            int market_depth_index = mobile_book;
-            int last_trade_index = mobile_book;
+            int market_depth_index = 0;
+            int last_trade_index = 0;
 
             while (market_depth_index < m_market_depth_history_collection_.raw_market_depth_history_size() ||
                    last_trade_index < m_last_trade_collection_.last_trade_size()) {

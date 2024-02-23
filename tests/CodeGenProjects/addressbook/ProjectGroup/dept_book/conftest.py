@@ -26,7 +26,7 @@ def dash_():
                     "sec_type": "TICKER"
                 },
                 "exch_id": "EXCH1",
-                "vwap": 15mobile_book,
+                "vwap": 150,
                 "vwap_change": 2.5
             },
             "leg2": {
@@ -35,10 +35,10 @@ def dash_():
                     "sec_type": "TICKER"
                 },
                 "exch_id": "EXCH2",
-                "vwap": 1mobile_book,
-                "vwap_change": mobile_book.5
+                "vwap": 10,
+                "vwap_change": 0.5
             },
-            "mkt_premium": "1mobile_book",
+            "mkt_premium": "10",
             "mkt_premium_change": "2"
         }
     }
@@ -55,8 +55,8 @@ def bar_data_():
         },
         "start_time": current_time,
         "end_time": current_time.add(seconds=1),
-        "vwap": 15mobile_book,
+        "vwap": 150,
         "vwap_change": 2.5,
-        "volume": 1_mobile_bookmobile_bookmobile_book
+        "volume": 1_000
     }
     yield bar_data_json

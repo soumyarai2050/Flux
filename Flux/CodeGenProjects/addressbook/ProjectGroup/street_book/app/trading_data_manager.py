@@ -5,18 +5,18 @@ from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_cache
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.strat_cache import StratCache
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_fills_journal_log_key, get_order_journal_log_key)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import is_ongoing_strat
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import is_ongoing_strat
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.trading_link import is_test_run
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.StreetBook.strat_manager_service_ws_data_manager import \
-    StratManagerServiceDataManager
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_ws_data_manager import \
+    EmailBookServiceDataManager
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_ws_data_manager import (
     StreetBookServiceDataManager)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.pair_strat_engine_n_street_book_client import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import PairStrat, PairStratBaseModel, FxSymbolOverviewBaseModel
 
 port = os.environ.get("PORT")
-if port is None or len(port) == mobile_book:
+if port is None or len(port) == 0:
     err_str = f"Env var 'PORT' received as {port}"
     logging.exception(err_str)
     raise Exception(err_str)
@@ -24,16 +24,16 @@ else:
     port = parse_to_int(port)
 
 
-class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataManager):
+class TradingDataManager(EmailBookServiceDataManager, StreetBookServiceDataManager):
 
     def __init__(self, executor_trigger_method: Callable,
-                 strat_cache: StratCache, market_data_container_cache):
-        StratManagerServiceDataManager.__init__(self, ps_host, ps_port, strat_cache)
+                 strat_cache: StratCache, mobile_book_container_cache):
+        EmailBookServiceDataManager.__init__(self, ps_host, ps_port, strat_cache)
         StreetBookServiceDataManager.__init__(self, host, port, strat_cache)
-        cpp_ws_url: str = f"ws://{host}:8mobile_book83/"
+        cpp_ws_url: str = f"ws://{host}:8083/"
         self.trading_cache: TradingCache = TradingCache()
         self.strat_cache: StratCache = strat_cache
-        self.market_data_container_cache = market_data_container_cache
+        self.mobile_book_container_cache = mobile_book_container_cache
         self.street_book = None
         self.street_book_thread: Thread | None = None
 
@@ -60,7 +60,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
 
 
         # TODO IMPORTANT Enable this when we add formal ws support for market depth
-        # self.market_depth_ws_cont = WSReader(f"{market_data_base_url}/get-all-market_depth-ws", MarketDepthBaseModel,
+        # self.market_depth_ws_cont = WSReader(f"{mobile_book_base_url}/get-all-market_depth-ws", MarketDepthBaseModel,
         #                                     MarketDepthBaseModelList, self.handle_market_depth_ws)
 
         # self.market_depth_ws_const = WSReader(cpp_ws_url, MarketDepthBaseModel, MarketDepthBaseModelList,
@@ -70,7 +70,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
         self.order_limits_ws_get_all_cont.register_to_run()
         self.system_control_ws_get_all_cont.register_to_run()
         # overriding pair strat ws_get_all_const to filter by id
-        pair_strat_obj = self.strat_cache.get_pair_strat()[mobile_book]
+        pair_strat_obj = self.strat_cache.get_pair_strat()[0]
         self.pair_strat_ws_get_all_cont = self.pair_strat_ws_get_by_id_client(False, pair_strat_obj.id)
         self.pair_strat_ws_get_all_cont.register_to_run()
         self.fx_symbol_overview_ws_get_all_cont.register_to_run()
@@ -110,7 +110,7 @@ class TradingDataManager(StratManagerServiceDataManager, StreetBookServiceDataMa
                     # this is a new pair strat for processing, start its own thread with new strat executor object
                     self.strat_cache.stopped = False
                     self.street_book, self.street_book_thread = (
-                        self.executor_trigger_method(self, self.strat_cache, self.market_data_container_cache))
+                        self.executor_trigger_method(self, self.strat_cache, self.mobile_book_container_cache))
                     # update strat key to python processing thread
                 self.strat_cache.set_pair_strat(pair_strat_)
             if self.strat_status_ws_get_all_cont.notify:

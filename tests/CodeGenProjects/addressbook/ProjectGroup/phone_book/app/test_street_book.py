@@ -40,7 +40,7 @@ def test_min_order_notional_breach_in_normal_strat_mode(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -48,7 +48,7 @@ def test_min_order_notional_breach_in_normal_strat_mode(
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -102,7 +102,7 @@ def test_min_order_notional_breach_in_relaxed_strat_mode(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -110,7 +110,7 @@ def test_min_order_notional_breach_in_relaxed_strat_mode(
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -180,7 +180,7 @@ def test_max_order_notional_breach(static_data_, clean_and_set_limits, leg1_leg2
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -188,7 +188,7 @@ def test_max_order_notional_breach(static_data_, clean_and_set_limits, leg1_leg2
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -198,8 +198,8 @@ def test_max_order_notional_breach(static_data_, clean_and_set_limits, leg1_leg2
 
         # Negative Check
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_bookmobile_book
-        qty = 1mobile_bookmobile_book
+        px = 1000
+        qty = 100
         check_str = "blocked generated order, breaches max_order_notional limit, expected less than"
         assert_fail_msg = "Could not find any alert containing message to block orders due to more " \
                           "than limit order_notional"
@@ -241,7 +241,7 @@ def test_max_order_qty_breach(static_data_, clean_and_set_limits, leg1_leg2_symb
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -249,7 +249,7 @@ def test_max_order_qty_breach(static_data_, clean_and_set_limits, leg1_leg2_symb
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -259,8 +259,8 @@ def test_max_order_qty_breach(static_data_, clean_and_set_limits, leg1_leg2_symb
 
         # Negative Check
         # placing new non-systematic new_order
-        px = 1mobile_book
-        qty = 6mobile_bookmobile_book
+        px = 10
+        qty = 600
         check_str = "blocked generated order, breaches max_order_qty limit, expected less than"
         assert_fail_msg = "Could not find any alert containing message to block orders due to excessive order qty"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
@@ -286,10 +286,10 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
                                             max_loop_count_per_side, refresh_sec_update_fixture):
 
     # removing last trades from tob for this test
-    buy_last_trade = top_of_book_list_[mobile_book]["last_trade"]
+    buy_last_trade = top_of_book_list_[0]["last_trade"]
     sell_last_trade = copy.deepcopy(top_of_book_list_[1]["last_trade"])
-    top_of_book_list_[mobile_book]["last_trade"] = None
-    top_of_book_list_[1]["last_trade"]["px"] = mobile_book
+    top_of_book_list_[0]["last_trade"] = None
+    top_of_book_list_[1]["last_trade"]["px"] = 0
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -307,18 +307,18 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
         executor_http_client.trade_simulator_reload_config_query_client()
 
-        # Negative Check - since buy tob is missing last_trade and sell side last_trade.px is mobile_book both
+        # Negative Check - since buy tob is missing last_trade and sell side last_trade.px is 0 both
         # orders must get blocked
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = f"blocked generated order, symbol: {buy_symbol}, side = <Side.BUY: 'BUY'> as " \
-                    f"top_of_book.last_trade.px is none or mobile_book"
+                    f"top_of_book.last_trade.px is none or 0"
         assert_fail_msg = "Could not find any alert containing message to block orders tob last trade as None"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_msg,
@@ -329,10 +329,10 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         assert_fail_msg = f"Can't find alert saying: {check_str!r}"
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = f"blocked generated order, symbol: {sell_symbol}, side = <Side.SELL: 'SELL'> as " \
-                    f"top_of_book.last_trade.px is none or mobile_book"
+                    f"top_of_book.last_trade.px is none or 0"
         assert_fail_msg = "Could not find any alert containing message to block orders tob last trade as None"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_msg,
@@ -346,8 +346,8 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         # Positive check - if tob is fine then orders must get placed
         tob_list = executor_http_client.get_all_top_of_book_client()
 
-        buy_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == buy_symbol else tob_list[1]
-        sell_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == sell_symbol else tob_list[1]
+        buy_tob = tob_list[0] if tob_list[0].symbol == buy_symbol else tob_list[1]
+        sell_tob = tob_list[0] if tob_list[0].symbol == sell_symbol else tob_list[1]
 
         # Updating correct last_trade in both buy and sell sides
         buy_tob.last_trade = Quote(**buy_last_trade)
@@ -356,7 +356,7 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         executor_http_client.put_top_of_book_client(sell_tob)
 
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -403,7 +403,7 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -411,7 +411,7 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -421,8 +421,8 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
 
         # Negative Check
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = "blocked generated unsupported side order"
         assert_fail_msg = "Could not find any alert containing message to block orders due to unsupported side"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.SIDE_UNSPECIFIED, px, qty,
@@ -445,7 +445,7 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
 
 
 @pytest.mark.nightly
-def test_breach_threshold_px_with_mobile_book_depth_px(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                              pair_strat_, expected_strat_limits_,
                                              expected_strat_status_, symbol_overview_obj_list,
                                              last_trade_fixture_list, market_depth_basemodel_list,
@@ -468,7 +468,7 @@ def test_breach_threshold_px_with_mobile_book_depth_px(static_data_, clean_and_s
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -476,7 +476,7 @@ def test_breach_threshold_px_with_mobile_book_depth_px(static_data_, clean_and_s
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -488,16 +488,16 @@ def test_breach_threshold_px_with_mobile_book_depth_px(static_data_, clean_and_s
         market_depth_list = executor_http_client.get_all_market_depth_client()
         for market_depth in market_depth_list:
             if market_depth.symbol == buy_symbol:
-                market_depth.px = mobile_book
+                market_depth.px = 0
                 executor_http_client.put_market_depth_client(jsonable_encoder(market_depth,
                                                                               by_alias=True, exclude_none=True))
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = f"blocked generated order, system_symbol = '{buy_symbol}', side = <Side.BUY: 'BUY'>, " \
                     f"unable to find valid px based on order_limits.max_px_levels"
-        assert_fail_msg = "Could not find any alert containing message to block orders due to mobile_book market depth px"
+        assert_fail_msg = "Could not find any alert containing message to block orders due to 0 market depth px"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_msg,
                                                                       active_pair_strat.id, executor_http_client,
@@ -527,10 +527,10 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
                                                         max_loop_count_per_side, refresh_sec_update_fixture):
 
     # Making aggressive side's quote None for this side
-    buy_tob_ask_quote = top_of_book_list_[mobile_book]["ask_quote"]
+    buy_tob_ask_quote = top_of_book_list_[0]["ask_quote"]
     sell_tob_bid_quote = copy.deepcopy(top_of_book_list_[1]["bid_quote"])
-    top_of_book_list_[mobile_book]["ask_quote"] = None    # checking if while ask quote is None
-    top_of_book_list_[1]["bid_quote"]["px"] = mobile_book     # checking if bid px is mobile_book
+    top_of_book_list_[0]["ask_quote"] = None    # checking if while ask quote is None
+    top_of_book_list_[1]["bid_quote"]["px"] = 0     # checking if bid px is 0
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -548,7 +548,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -556,8 +556,8 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
 
         # Negative Check
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = (f"blocked generated BUY order, system_symbol = '{buy_symbol}', side = <Side.BUY: 'BUY'> as "
                      f"aggressive_quote is not found or has no px")
         assert_fail_msg = "Could not find any alert containing message to block orders tob last trade as None"
@@ -570,8 +570,8 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
         check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = (f"blocked generated SELL order, system_symbol = '{sell_symbol}', side = <Side.SELL: 'SELL'> as "
                      f"aggressive_quote is not found or has no px")
         assert_fail_msg = "Could not find any alert containing message to block orders tob last trade as None"
@@ -585,8 +585,8 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
 
         # updating tob with correct data toi check positive test
         tob_list = executor_http_client.get_all_top_of_book_client()
-        buy_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == buy_symbol else tob_list[1]
-        sell_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == sell_symbol else tob_list[1]
+        buy_tob = tob_list[0] if tob_list[0].symbol == buy_symbol else tob_list[1]
+        sell_tob = tob_list[0] if tob_list[0].symbol == sell_symbol else tob_list[1]
 
         # checking last_trade as None in buy order
         buy_tob.ask_quote = buy_tob_ask_quote
@@ -596,7 +596,7 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -627,12 +627,12 @@ def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symb
                                last_trade_fixture_list, market_depth_basemodel_list,
                                top_of_book_list_, buy_order_, sell_order_,
                                max_loop_count_per_side, refresh_sec_update_fixture):
-    buy_symbol = buy_sell_symbol_list[mobile_book][mobile_book]
-    sell_symbol = buy_sell_symbol_list[mobile_book][1]
+    buy_symbol = buy_sell_symbol_list[0][0]
+    sell_symbol = buy_sell_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    # explicitly setting waived_min_orders to 1mobile_book for this test case
+    # explicitly setting waived_min_orders to 10 for this test case
     active_pair_strat, executor_http_client = (
         create_pre_order_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -646,7 +646,7 @@ def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symb
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -661,8 +661,8 @@ def _test_px_check_if_tob_none(static_data_, clean_and_set_limits, buy_sell_symb
             executor_http_client.delete_top_of_book_client(tob.id, return_obj_copy=False)
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = "blocked generated order, unable to conduct px checks: top_of_book is sent None for strat"
         assert_fail_message = "Could not find any alert containing message to block orders due to no tob"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
@@ -688,8 +688,8 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
         max_loop_count_per_side, refresh_sec_update_fixture):
 
     # updating bid market depth to make its lowest depth px value greater than calculated max_px_by_basis_point
-    buy_px = 8mobile_book
-    sell_px = 1mobile_bookmobile_book
+    buy_px = 80
+    sell_px = 100
     for market_depth_basemodel in market_depth_basemodel_list:
         if market_depth_basemodel.side == "BID":
             market_depth_basemodel.px = buy_px
@@ -714,7 +714,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -722,8 +722,8 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
 
         tob_list = executor_http_client.get_all_top_of_book_client()
 
-        buy_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == buy_symbol else tob_list[1]
-        sell_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == sell_symbol else tob_list[1]
+        buy_tob = tob_list[0] if tob_list[0].symbol == buy_symbol else tob_list[1]
+        sell_tob = tob_list[0] if tob_list[0].symbol == sell_symbol else tob_list[1]
 
         # Checking max_px_by_basis_point
         buy_tob.ask_quote.px = 85
@@ -733,13 +733,13 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
 
         # max_px_by_basis_point = 97.75
         # max_px_by_deviation = 139.2
-        # px_by_max_level = 1mobile_bookmobile_book
+        # px_by_max_level = 100
         # >>> min comes max_px_by_basis_point which is being tested in this test
 
         # Negative Check for buy order - order block since px > max_px_by_basis_point
         # placing new non-systematic new_order
         px = 98
-        qty = 9mobile_book
+        qty = 90
         check_str = "blocked generated BUY order, order px = .* > allowed max_px"
         assert_fail_message = "Could not find any alert containing message to block orders wrong max basis points"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
@@ -748,11 +748,11 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
 
         # Positive check for buy order - order places since px < max_px_by_basis_point
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        # run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book],
+        # run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
         #                     avoid_order_trigger=True)
 
         px = 97
-        qty = 9mobile_book
+        qty = 90
         place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
 
         # Internally checks if order_journal is found with OE_NEW state
@@ -763,21 +763,21 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
             time.sleep(residual_wait_sec)
 
         # checking min_px_by_basis_point
-        sell_tob.bid_quote.px = 1mobile_bookmobile_book
-        sell_tob.last_trade.px = 1mobile_bookmobile_book
+        sell_tob.bid_quote.px = 100
+        sell_tob.last_trade.px = 100
         update_date_time = DateTime.utcnow()
         sell_tob.last_update_date_time = update_date_time
         executor_http_client.put_top_of_book_client(jsonable_encoder(sell_tob, by_alias=True, exclude_none=True))
 
         # min_px_by_basis_point = 85
-        # min_px_by_deviation = 8mobile_book
+        # min_px_by_deviation = 80
         # px_by_max_level = 75
         # >>> max comes max_px_by_basis_point which is being tested in this test
 
         # Negative Check for sell order - order block since px < max_px_by_basis_point
         # placing new non-systematic new_order
         px = 84
-        qty = 9mobile_book
+        qty = 90
         check_str = "blocked generated SELL order, order px = .* < allowed min_px"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
@@ -789,7 +789,7 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
         #                      avoid_order_trigger=True)
 
         px = 86
-        qty = 9mobile_book
+        qty = 90
         place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
 
         # Internally checks if order_journal is found with OE_NEW state
@@ -835,7 +835,7 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -843,21 +843,21 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         # Updating order_limits for Negative check
-        expected_order_limits_.max_contract_qty = 8mobile_book
-        updated_order_limits = OrderLimitsBaseModel(id=1, max_contract_qty=8mobile_book)
-        updated_order_limits = strat_manager_service_native_web_client.patch_order_limits_client(
+        expected_order_limits_.max_contract_qty = 80
+        updated_order_limits = OrderLimitsBaseModel(id=1, max_contract_qty=80)
+        updated_order_limits = email_book_service_native_web_client.patch_order_limits_client(
             jsonable_encoder(updated_order_limits, by_alias=True, exclude_none=True))
         assert updated_order_limits == expected_order_limits_
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = "qty: .* > max contract qty"
         assert_fail_message = "Could not find any alert containing message to block orders " \
                               "due to contract qty breach"
@@ -870,13 +870,13 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
             last_order_id=placed_order_journal.order.order_id)
 
         time.sleep(2)
-        strat_alert = log_analyzer_web_client.get_strat_alert_client(active_pair_strat.id)
+        strat_alert = log_book_web_client.get_strat_alert_client(active_pair_strat.id)
         for alert in strat_alert.alerts:
             if re.search(check_str, alert.alert_brief):
                 break
         else:
             # Checking alert in portfolio_alert if reason failed to add in strat_alert
-            portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+            portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
             for alert in portfolio_alert.alerts:
                 if re.search(check_str, alert.alert_brief):
                     break
@@ -902,8 +902,8 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         max_loop_count_per_side, refresh_sec_update_fixture):
 
     # updating bid market depth to make its lowest depth px value greater than calculated max_px_by_basis_point
-    buy_px = 8mobile_book
-    sell_px = 1mobile_bookmobile_book
+    buy_px = 80
+    sell_px = 100
     for market_depth_basemodel in market_depth_basemodel_list:
         if market_depth_basemodel.side == "BID":
             market_depth_basemodel.px = buy_px
@@ -928,7 +928,7 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -936,26 +936,26 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
 
         tob_list = executor_http_client.get_all_top_of_book_client()
 
-        buy_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == buy_symbol else tob_list[1]
-        sell_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == sell_symbol else tob_list[1]
+        buy_tob = tob_list[0] if tob_list[0].symbol == buy_symbol else tob_list[1]
+        sell_tob = tob_list[0] if tob_list[0].symbol == sell_symbol else tob_list[1]
 
         # Checking max_px_by_basis_point
-        buy_tob.last_trade.px = 8mobile_book
+        buy_tob.last_trade.px = 80
         update_date_time = DateTime.utcnow()
         buy_tob.last_update_date_time = update_date_time
         executor_http_client.put_top_of_book_client(jsonable_encoder(buy_tob, by_alias=True, exclude_none=True))
 
         # max_px_by_basis_point = 138
         # max_px_by_deviation = 96
-        # px_by_max_level = 1mobile_bookmobile_book
+        # px_by_max_level = 100
         # >>> min comes max_px_by_deviation which is being tested in this test
 
         # Negative Check for buy order - order block since px > max_px_by_deviation
         # placing new non-systematic new_order
         px = 97
-        qty = 9mobile_book
+        qty = 90
         check_str = "blocked generated BUY order, order px = .* > allowed max_px"
-        assert_fail_message = "Could not find any alert containing message to block orders tob last trade px as mobile_book"
+        assert_fail_message = "Could not find any alert containing message to block orders tob last trade px as 0"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client)
@@ -964,7 +964,7 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
 
         px = 95
-        qty = 9mobile_book
+        qty = 90
         place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
 
         # Internally checks if order_journal is found with OE_NEW state
@@ -975,8 +975,8 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
             time.sleep(residual_wait_sec)
 
         # checking min_px_by_basis_point
-        sell_tob.bid_quote.px = 1mobile_bookmobile_book
-        sell_tob.last_trade.px = 11mobile_book
+        sell_tob.bid_quote.px = 100
+        sell_tob.last_trade.px = 110
         update_date_time = DateTime.utcnow()
         sell_tob.last_update_date_time = update_date_time
         executor_http_client.put_top_of_book_client(jsonable_encoder(sell_tob, by_alias=True, exclude_none=True))
@@ -989,7 +989,7 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         # Negative Check for sell order - order block since px < min_px_by_deviation
         # placing new non-systematic new_order
         px = 87
-        qty = 9mobile_book
+        qty = 90
         check_str = "blocked generated SELL order, order px = .* < allowed min_px"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
@@ -999,7 +999,7 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
 
         px = 89
-        qty = 9mobile_book
+        qty = 90
         place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
 
         # Internally checks if order_journal is found with OE_NEW state
@@ -1051,7 +1051,7 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1059,11 +1059,11 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
 
         tob_list = executor_http_client.get_all_top_of_book_client()
 
-        buy_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == buy_symbol else tob_list[1]
-        sell_tob = tob_list[mobile_book] if tob_list[mobile_book].symbol == sell_symbol else tob_list[1]
+        buy_tob = tob_list[0] if tob_list[0].symbol == buy_symbol else tob_list[1]
+        sell_tob = tob_list[0] if tob_list[0].symbol == sell_symbol else tob_list[1]
 
         # Checking max_px_by_basis_point
-        buy_tob.last_trade.px = 8mobile_book
+        buy_tob.last_trade.px = 80
         update_date_time = DateTime.utcnow()
         buy_tob.last_update_date_time = update_date_time
         executor_http_client.put_top_of_book_client(jsonable_encoder(buy_tob, by_alias=True, exclude_none=True))
@@ -1076,9 +1076,9 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         # Negative Check for buy order - order block since px > px_by_max_level
         # placing new non-systematic new_order
         px = 96
-        qty = 9mobile_book
+        qty = 90
         check_str = "blocked generated BUY order, order px = .* > allowed max_px"
-        assert_fail_message = "Could not find any alert containing message to block orders tob last trade px as mobile_book"
+        assert_fail_message = "Could not find any alert containing message to block orders tob last trade px as 0"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client)
@@ -1087,7 +1087,7 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
 
         px = 94
-        qty = 9mobile_book
+        qty = 90
         place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
 
         # Internally checks if order_journal is found with OE_NEW state
@@ -1098,21 +1098,21 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
             time.sleep(residual_wait_sec)
 
         # checking min_px_by_basis_point
-        sell_tob.bid_quote.px = 1mobile_bookmobile_book
-        sell_tob.last_trade.px = 11mobile_book
+        sell_tob.bid_quote.px = 100
+        sell_tob.last_trade.px = 110
         update_date_time = DateTime.utcnow()
         sell_tob.last_update_date_time = update_date_time
         executor_http_client.put_top_of_book_client(jsonable_encoder(sell_tob, by_alias=True, exclude_none=True))
 
         # min_px_by_basis_point = 85
         # min_px_by_deviation = 88
-        # px_by_max_level = 9mobile_book
+        # px_by_max_level = 90
         # >>> max comes px_by_max_level which is being tested in this test
 
         # Negative Check for sell order - order block since px < px_by_max_level
         # placing new non-systematic new_order
         px = 89
-        qty = 9mobile_book
+        qty = 90
         check_str = "blocked generated SELL order, order px = .* < allowed min_px"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
@@ -1122,7 +1122,7 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
 
         px = 91
-        qty = 9mobile_book
+        qty = 90
         place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
 
         # Internally checks if order_journal is found with OE_NEW state
@@ -1139,7 +1139,7 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-# @@@ deprecated: no strat_executor can be set to ready without symbol_overview
+# @@@ deprecated: no street_book can be set to ready without symbol_overview
 # def test_strat_limits_with_none_symbol_overview(static_data_, clean_and_set_limits, buy_sell_symbol_list,
 #                                                 pair_strat_, expected_strat_limits_,
 #                                                 expected_start_status_, symbol_overview_obj_list,
@@ -1166,15 +1166,15 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
 #     run_buy_top_of_book(loop_count, buy_symbol, sell_symbol, top_of_book_list_, is_non_systematic_run=True)
 #
 #     # placing new non-systematic new_buy_order
-#     px = 1mobile_bookmobile_book
-#     qty = 9mobile_book
+#     px = 100
+#     qty = 90
 #     check_str = "blocked generated BUY order, symbol_overview_tuple missing for symbol"
 #     assert_fail_message = "Could not find any alert containing message to block orders due to no symbol_overview"
 #     handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
 #                                                                   check_str, assert_fail_message)
 #     # placing new non-systematic new_sell_order
-#     px = 11mobile_book
-#     qty = 7mobile_book
+#     px = 110
+#     qty = 70
 #     check_str = "blocked generated SELL order, symbol_overview_tuple missing for symbol"
 #     assert_fail_message = "Could not find any alert containing message to block orders due to no symbol_overview"
 #     handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
@@ -1193,7 +1193,7 @@ def test_strat_limits_with_none_or_o_limit_up_down_px(
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     limit_up_px = None
-    limit_dn_px = mobile_book
+    limit_dn_px = 0
     # removing symbol_overview's limit_up/limit_down px
     for symbol_overview in symbol_overview_obj_list:
         limit_up_px = symbol_overview.limit_up_px
@@ -1215,7 +1215,7 @@ def test_strat_limits_with_none_or_o_limit_up_down_px(
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1223,7 +1223,7 @@ def test_strat_limits_with_none_or_o_limit_up_down_px(
 
         # Negative Check
         # placing new non-systematic new_order
-        px = 9mobile_book
+        px = 90
         qty = 95
         check_str = "limit up/down px not available limit-dn px"
         assert_fail_msg = f"couldn't find alert saying: {check_str!r}"
@@ -1243,7 +1243,7 @@ def test_strat_limits_with_none_or_o_limit_up_down_px(
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -1258,7 +1258,7 @@ def test_strat_limits_with_none_or_o_limit_up_down_px(
 
 
 @pytest.mark.nightly
-def test_strat_limits_with_mobile_book_consumable_open_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+def test_strat_limits_with_0_consumable_open_orders(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                     pair_strat_, expected_strat_limits_,
                                                     expected_strat_status_, symbol_overview_obj_list,
                                                     last_trade_fixture_list, market_depth_basemodel_list,
@@ -1281,7 +1281,7 @@ def test_strat_limits_with_mobile_book_consumable_open_orders(static_data_, clea
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1289,7 +1289,7 @@ def test_strat_limits_with_mobile_book_consumable_open_orders(static_data_, clea
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -1303,7 +1303,7 @@ def test_strat_limits_with_mobile_book_consumable_open_orders(static_data_, clea
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
-        strat_brief = strat_brief_list[mobile_book]
+        strat_brief = strat_brief_list[0]
         strat_brief.pair_buy_side_trading_brief.consumable_open_orders = -1
         updated_strat_brief = \
             executor_http_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
@@ -1312,11 +1312,11 @@ def test_strat_limits_with_mobile_book_consumable_open_orders(static_data_, clea
             f"received unexpected returned value {updated_strat_brief}"
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = "blocked generated BUY order, not enough consumable_open_orders"
         assert_fail_message = "Could not find any alert containing message to block " \
-                              "BUY order due to mobile_book consumable open orders"
+                              "BUY order due to 0 consumable open orders"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client,
@@ -1326,18 +1326,18 @@ def test_strat_limits_with_mobile_book_consumable_open_orders(static_data_, clea
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
-        strat_brief = strat_brief_list[mobile_book]
+        strat_brief = strat_brief_list[0]
         strat_brief.pair_sell_side_trading_brief.consumable_open_orders = -1
         updated_strat_brief = \
             executor_http_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
         assert updated_strat_brief.pair_sell_side_trading_brief.consumable_open_orders == -1
 
         # placing new non-systematic new_order
-        px = 7mobile_book
-        qty = 9mobile_book
+        px = 70
+        qty = 90
         check_str = "blocked generated SELL order, not enough consumable_open_orders"
         assert_fail_message = "Could not find any alert containing message to block " \
-                              "SELL order due to mobile_book consumable open orders"
+                              "SELL order due to 0 consumable open orders"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client)
@@ -1376,7 +1376,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 3mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 30
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1384,7 +1384,7 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -1394,8 +1394,8 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
 
         # Negative check
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_bookmobile_book
-        qty = 9mobile_bookmobile_book
+        px = 1000
+        qty = 900
         check_str = "blocked generated BUY order, breaches available consumable notional"
         assert_fail_message = "Could not find any alert containing message to block orders " \
                               "due to high consumable notional"
@@ -1404,8 +1404,8 @@ def test_strat_limits_with_high_consumable_notional(static_data_, clean_and_set_
                                                                       activated_strat.id, executor_http_client,
                                                                       last_order_id=placed_order_journal.order.order_id)
         # placing new non-systematic new_order
-        px = 7mobile_bookmobile_bookmobile_book
-        qty = 9mobile_bookmobile_book
+        px = 7000
+        qty = 900
         check_str = "blocked generated SELL order, breaches available consumable notional"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
@@ -1444,7 +1444,7 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1452,7 +1452,7 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -1468,23 +1468,23 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
-        strat_brief = strat_brief_list[mobile_book]
-        strat_brief.pair_buy_side_trading_brief.consumable_concentration = 1mobile_book
-        strat_brief.pair_sell_side_trading_brief.consumable_concentration = 1mobile_book
+        strat_brief = strat_brief_list[0]
+        strat_brief.pair_buy_side_trading_brief.consumable_concentration = 10
+        strat_brief.pair_sell_side_trading_brief.consumable_concentration = 10
         updated_strat_brief = executor_http_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True,
                                                                                            exclude_none=True))
         assert (updated_strat_brief.pair_buy_side_trading_brief.consumable_concentration ==
                 strat_brief.pair_buy_side_trading_brief.consumable_concentration), \
-            "Mismatch pair_buy_side_trading_brief.consumable_concentration: expected mobile_book, received " \
+            "Mismatch pair_buy_side_trading_brief.consumable_concentration: expected 0, received " \
             f"{updated_strat_brief.pair_buy_side_trading_brief.consumable_concentration}"
         assert (updated_strat_brief.pair_sell_side_trading_brief.consumable_concentration ==
                 strat_brief.pair_sell_side_trading_brief.consumable_concentration), \
-            "Mismatch pair_sell_side_trading_brief.consumable_concentration: expected mobile_book, received " \
+            "Mismatch pair_sell_side_trading_brief.consumable_concentration: expected 0, received " \
             f"{updated_strat_brief.pair_sell_side_trading_brief.consumable_concentration}"
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = "blocked generated BUY order, not enough consumable_concentration:"
         assert_fail_message = "Could not find any alert containing message to block orders due to less " \
                               "consumable concentration"
@@ -1493,37 +1493,37 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
                                                                       active_pair_strat.id, executor_http_client,
                                                                       last_order_id=placed_order_journal.order.order_id)
         # placing new non-systematic new_order
-        px = 7mobile_book
-        qty = 9mobile_book
+        px = 70
+        qty = 90
         check_str = "blocked generated SELL order, not enough consumable_concentration:"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client)
 
-        # Checking alert when consumable_concentration == mobile_book
+        # Checking alert when consumable_concentration == 0
         strat_brief_list = executor_http_client.get_all_strat_brief_client()
         # since only one strat in current test
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
-        strat_brief = strat_brief_list[mobile_book]
-        strat_brief.pair_buy_side_trading_brief.consumable_concentration = mobile_book
-        strat_brief.pair_sell_side_trading_brief.consumable_concentration = mobile_book
+        strat_brief = strat_brief_list[0]
+        strat_brief.pair_buy_side_trading_brief.consumable_concentration = 0
+        strat_brief.pair_sell_side_trading_brief.consumable_concentration = 0
         updated_strat_brief = executor_http_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True,
                                                                                            exclude_none=True))
         assert (updated_strat_brief.pair_buy_side_trading_brief.consumable_concentration ==
                 strat_brief.pair_buy_side_trading_brief.consumable_concentration), \
-            "Mismatch pair_buy_side_trading_brief.consumable_concentration: expected mobile_book, received " \
+            "Mismatch pair_buy_side_trading_brief.consumable_concentration: expected 0, received " \
             f"{updated_strat_brief.pair_buy_side_trading_brief.consumable_concentration}"
         assert (updated_strat_brief.pair_sell_side_trading_brief.consumable_concentration ==
                 strat_brief.pair_sell_side_trading_brief.consumable_concentration), \
-            "Mismatch pair_sell_side_trading_brief.consumable_concentration: expected mobile_book, received " \
+            "Mismatch pair_sell_side_trading_brief.consumable_concentration: expected 0, received " \
             f"{updated_strat_brief.pair_sell_side_trading_brief.consumable_concentration}"
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
-        check_str = "blocked generated BUY order, unexpected: consumable_concentration found mobile_book!"
+        px = 100
+        qty = 90
+        check_str = "blocked generated BUY order, unexpected: consumable_concentration found 0!"
         assert_fail_message = "Could not find any alert containing message to block orders due to less " \
                               "consumable concentration"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
@@ -1531,9 +1531,9 @@ def test_strat_limits_with_less_consumable_concentration(static_data_, clean_and
                                                                       active_pair_strat.id, executor_http_client,
                                                                       last_order_id=placed_order_journal.order.order_id)
         # placing new non-systematic new_order
-        px = 7mobile_book
-        qty = 9mobile_book
-        check_str = "blocked generated SELL order, unexpected: consumable_concentration found mobile_book!"
+        px = 70
+        qty = 90
+        check_str = "blocked generated SELL order, unexpected: consumable_concentration found 0!"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_strat.id, executor_http_client)
@@ -1571,7 +1571,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1579,7 +1579,7 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -1589,8 +1589,8 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
 
         # Negative Check
         # placing new non-systematic new_order
-        px = 16mobile_book
-        qty = 9mobile_book
+        px = 160
+        qty = 90
         check_str = "blocked generated BUY order, limit up trading not allowed on day-1"
         assert_fail_message = "Could not find any alert containing message to block orders due to order_px higher " \
                               "than symbol_overview's limit_up_px"
@@ -1600,8 +1600,8 @@ def test_strat_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_an
                                                                       last_order_id=placed_order_journal.order.order_id)
 
         # placing new non-systematic new_order
-        px = 4mobile_book
-        qty = 9mobile_book
+        px = 40
+        qty = 90
         check_str = "blocked generated SELL order, limit down trading not allowed on day-1"
         assert_fail_message = "Could not find any alert containing message to block orders due to order_px higher " \
                               "than symbol_overview's limit_up_px"
@@ -1627,8 +1627,8 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
                                                                  last_trade_fixture_list, market_depth_basemodel_list,
                                                                  top_of_book_list_, buy_order_, sell_order_,
                                                                  max_loop_count_per_side, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
-    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
 
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
@@ -1645,18 +1645,18 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
         executor_http_client.trade_simulator_reload_config_query_client()
 
         # Positive Check
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book], avoid_order_trigger=True)
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0], avoid_order_trigger=True)
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
 
         placed_new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW, buy_symbol,
@@ -1689,14 +1689,14 @@ def test_strat_limits_with_negative_consumable_participation_qty(static_data_, c
 
 
 @pytest.mark.nightly
-def test_strat_limits_with_mobile_book_consumable_participation_qty(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+def test_strat_limits_with_0_consumable_participation_qty(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                                           pair_strat_, expected_strat_limits_,
                                                           expected_strat_status_, symbol_overview_obj_list,
                                                           last_trade_fixture_list, market_depth_basemodel_list,
                                                           top_of_book_list_, buy_order_, sell_order_,
                                                           max_loop_count_per_side, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
-    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -1715,7 +1715,7 @@ def test_strat_limits_with_mobile_book_consumable_participation_qty(static_data_
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1726,10 +1726,10 @@ def test_strat_limits_with_mobile_book_consumable_participation_qty(static_data_
         executor_http_client.delete_all_last_trade_client()
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = "Received unusable consumable_participation_qty"
-        assert_fail_message = "Could not find any alert containing message to block orders due to mobile_book " \
+        assert_fail_message = "Could not find any alert containing message to block orders due to 0 " \
                               "consumable_participation_qty"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
@@ -1737,7 +1737,7 @@ def test_strat_limits_with_mobile_book_consumable_participation_qty(static_data_
 
         # Positive Check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -1760,8 +1760,8 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
                                                             last_trade_fixture_list, market_depth_basemodel_list,
                                                             top_of_book_list_, buy_order_, sell_order_,
                                                             max_loop_count_per_side, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
-    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
@@ -1780,7 +1780,7 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1788,7 +1788,7 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
 
         # Positive Check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -1804,8 +1804,8 @@ def test_strat_limits_with_low_consumable_participation_qty(static_data_, clean_
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client, create_counts_per_side=1)
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_book
-        qty = 9mobile_book
+        px = 100
+        qty = 90
         check_str = "blocked generated order, not enough consumable_participation_qty available"
         assert_fail_message = "Could not find any alert containing message to block orders due to low " \
                               "consumable_participation_qty"
@@ -1828,16 +1828,16 @@ def test_strat_done_after_exhausted_buy_consumable_notional(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, expected_order_limits_, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
-    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
 
     # updating order_limits
-    expected_order_limits_.min_order_notional = 15mobile_bookmobile_bookmobile_book
+    expected_order_limits_.min_order_notional = 15000
     expected_order_limits_.id = 1
-    strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+    email_book_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
     # setting strat_limits for this test
-    expected_strat_limits_.max_single_leg_notional = 18mobile_bookmobile_bookmobile_book
+    expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -1849,16 +1849,16 @@ def test_strat_done_after_exhausted_sell_consumable_notional(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, buy_order_, sell_order_, expected_order_limits_, refresh_sec_update_fixture):
-    buy_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book]
-    sell_symbol = leg1_leg2_symbol_list[mobile_book][1]
+    buy_symbol = leg1_leg2_symbol_list[0][0]
+    sell_symbol = leg1_leg2_symbol_list[0][1]
 
     # updating order_limits
-    expected_order_limits_.min_order_notional = 15mobile_bookmobile_bookmobile_book
+    expected_order_limits_.min_order_notional = 15000
     expected_order_limits_.id = 1
-    strat_manager_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
+    email_book_service_native_web_client.put_order_limits_client(expected_order_limits_, return_obj_copy=False)
 
     # setting strat_limits for this test
-    expected_strat_limits_.max_single_leg_notional = 18mobile_bookmobile_bookmobile_book
+    expected_strat_limits_.max_single_leg_notional = 18000
     strat_done_after_exhausted_consumable_notional(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
         expected_strat_status_, symbol_overview_obj_list, last_trade_fixture_list,
@@ -1890,7 +1890,7 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1898,7 +1898,7 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -1912,17 +1912,17 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
-        strat_brief = strat_brief_list[mobile_book]
-        strat_brief.pair_buy_side_trading_brief.consumable_open_notional = 5mobile_bookmobile_bookmobile_book
+        strat_brief = strat_brief_list[0]
+        strat_brief.pair_buy_side_trading_brief.consumable_open_notional = 5000
         updated_strat_brief = \
             executor_http_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
-        assert updated_strat_brief.pair_buy_side_trading_brief.consumable_open_notional == 5mobile_bookmobile_bookmobile_book, \
-            ("Updated strat_brief.pair_buy_side_trading_brief.consumable_open_notional to 5mobile_bookmobile_bookmobile_book "
+        assert updated_strat_brief.pair_buy_side_trading_brief.consumable_open_notional == 5000, \
+            ("Updated strat_brief.pair_buy_side_trading_brief.consumable_open_notional to 5000 "
              "using http route call but received unexpected returned value {updated_strat_brief}")
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_bookmobile_book
-        qty = 9mobile_book
+        px = 1000
+        qty = 90
         check_str = (f"blocked symbol_side_key: %%symbol-side={buy_symbol}-{Side.BUY}%% order, "
                      "breaches available consumable open notional")
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
@@ -1936,17 +1936,17 @@ def test_strat_limits_consumable_open_notional(static_data_, clean_and_set_limit
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
-        strat_brief = strat_brief_list[mobile_book]
-        strat_brief.pair_sell_side_trading_brief.consumable_open_notional = 5mobile_bookmobile_bookmobile_book
+        strat_brief = strat_brief_list[0]
+        strat_brief.pair_sell_side_trading_brief.consumable_open_notional = 5000
         updated_strat_brief = \
             executor_http_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
-        assert updated_strat_brief.pair_sell_side_trading_brief.consumable_open_notional == 5mobile_bookmobile_bookmobile_book, \
-            ("Updated strat_brief.pair_sell_side_trading_brief.consumable_open_notional to 5mobile_bookmobile_bookmobile_book "
+        assert updated_strat_brief.pair_sell_side_trading_brief.consumable_open_notional == 5000, \
+            ("Updated strat_brief.pair_sell_side_trading_brief.consumable_open_notional to 5000 "
              "using http route call but received unexpected returned value {updated_strat_brief}")
 
         # placing new non-systematic new_order
-        px = 7mobile_bookmobile_bookmobile_book
-        qty = 9mobile_book
+        px = 7000
+        qty = 90
         check_str = (f"blocked symbol_side_key: %%symbol-side={sell_symbol}-{Side.SELL}%% order, "
                      "breaches available consumable open notional")
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
@@ -1987,7 +1987,7 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         # updating simulator's configs
@@ -1995,7 +1995,7 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
 
         # Positive check
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         # Internally checks if order_journal is found with OE_NEW state
         placed_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
@@ -2009,17 +2009,17 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
         assert len(strat_brief_list) == 1, "Unexpected length of strat_briefs, expected exactly one strat_brief " \
                                            f"as only one strat exists for this test, received " \
                                            f"{len(strat_brief_list)}, strat_brief_list: {strat_brief_list}"
-        strat_brief = strat_brief_list[mobile_book]
-        strat_brief.consumable_nett_filled_notional = 5mobile_bookmobile_bookmobile_book
+        strat_brief = strat_brief_list[0]
+        strat_brief.consumable_nett_filled_notional = 5000
         updated_strat_brief = \
             executor_http_client.put_strat_brief_client(jsonable_encoder(strat_brief, by_alias=True, exclude_none=True))
-        assert updated_strat_brief.consumable_nett_filled_notional == 5mobile_bookmobile_bookmobile_book, \
-            ("Updated strat_brief.pair_buy_side_trading_brief.consumable_open_notional to 5mobile_bookmobile_bookmobile_book "
+        assert updated_strat_brief.consumable_nett_filled_notional == 5000, \
+            ("Updated strat_brief.pair_buy_side_trading_brief.consumable_open_notional to 5000 "
              "using http route call but received unexpected returned value {updated_strat_brief}")
 
         # placing new non-systematic new_order
-        px = 1mobile_bookmobile_bookmobile_book
-        qty = 9mobile_book
+        px = 1000
+        qty = 90
         check_str = "blocked generated order, not enough consumable_nett_filled_notional available"
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
         handle_place_order_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
@@ -2028,8 +2028,8 @@ def test_strat_limits_consumable_nett_filled_notional(static_data_, clean_and_se
                                                                       last_order_id=placed_order_journal.order.order_id)
 
         # placing new non-systematic new_order
-        px = 7mobile_bookmobile_bookmobile_book
-        qty = 9mobile_book
+        px = 7000
+        qty = 90
         check_str = "blocked generated order, not enough consumable_nett_filled_notional available"
         assert_fail_message = f"Could not find any alert saying '{check_str}'"
         handle_place_order_and_check_str_in_alert_for_executor_limits(sell_symbol, Side.SELL, px, qty,
@@ -2054,8 +2054,8 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
                                                             top_of_book_list_, refresh_sec,
                                                             expect_no_order=False):
     # making conditions suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 1mobile_bookmobile_bookmobile_book
+    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 1000
     residual_wait_sec = 4 * refresh_sec
 
     created_pair_strat, executor_http_client = (
@@ -2076,7 +2076,7 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         executor_http_client.trade_simulator_reload_config_query_client()
@@ -2085,10 +2085,10 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
         last_buy_order_id = None
         for loop_count in range(total_order_count_for_each_side):
             run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book],
+            run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
                                 avoid_order_trigger=True)
-            px = 1mobile_bookmobile_book
-            qty = 9mobile_book
+            px = 100
+            qty = 90
             place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
 
             new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -2104,8 +2104,8 @@ def handle_place_both_side_orders_for_portfolio_limits_test(buy_symbol: str, sel
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
                 run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1],
                                      avoid_order_trigger=True)
-                px = 11mobile_book
-                qty = 7mobile_book
+                px = 110
+                qty = 70
                 place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
 
                 new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -2134,8 +2134,8 @@ def handle_place_single_side_orders_for_portfolio_limits_test(leg_1_symbol: str,
                                                               top_of_book_list_, refresh_sec, order_side: Side,
                                                               leg1_side=Side.BUY, leg2_side=Side.SELL):
     # making conditions suitable for this test
-    expected_strat_limits_.max_open_orders_per_side = 1mobile_book
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 1mobile_bookmobile_bookmobile_book
+    expected_strat_limits_.max_open_orders_per_side = 10
+    expected_strat_limits_.residual_restriction.residual_mark_seconds = 1000
     residual_wait_sec = 4 * refresh_sec
 
     created_pair_strat, executor_http_client = (
@@ -2163,7 +2163,7 @@ def handle_place_single_side_orders_for_portfolio_limits_test(leg_1_symbol: str,
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 0
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
         executor_http_client.trade_simulator_reload_config_query_client()
@@ -2173,10 +2173,10 @@ def handle_place_single_side_orders_for_portfolio_limits_test(leg_1_symbol: str,
             last_order_id = None
             for loop_count in range(total_order_count_for_each_side):
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book],
+                run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0],
                                     avoid_order_trigger=True)
-                px = 1mobile_bookmobile_book
-                qty = 9mobile_book
+                px = 100
+                qty = 90
                 place_new_order(buy_symbol, Side.BUY, px, qty, executor_http_client)
 
                 new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
@@ -2185,7 +2185,7 @@ def handle_place_single_side_orders_for_portfolio_limits_test(leg_1_symbol: str,
                 last_order_id = new_order_journal.order.order_id
 
                 # Checking if fills found
-                time.sleep(1mobile_book)
+                time.sleep(10)
                 get_latest_fill_journal_from_order_id(last_order_id, executor_http_client)
 
         else:
@@ -2195,15 +2195,15 @@ def handle_place_single_side_orders_for_portfolio_limits_test(leg_1_symbol: str,
                 run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
                 run_sell_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[1],
                                      avoid_order_trigger=True)
-                px = 11mobile_book
-                qty = 7mobile_book
+                px = 110
+                qty = 70
                 place_new_order(sell_symbol, Side.SELL, px, qty, executor_http_client)
 
                 new_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_NEW,
                                                                                    sell_symbol, executor_http_client,
                                                                                    last_order_id=last_order_id)
                 last_order_id = new_order_journal.order.order_id
-                time.sleep(1mobile_book)
+                time.sleep(10)
                 get_latest_fill_journal_from_order_id(last_order_id, executor_http_client)
 
         if order_side == Side.BUY:
@@ -2241,9 +2241,9 @@ def _strat_pause_on_order_fulfill_post_dod(buy_symbol, sell_symbol, pair_strat_,
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 1mobile_bookmobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 100
             config_dict["symbol_configs"][symbol]["simulate_ack_unsolicited_cxl_orders"] = True
-            config_dict["symbol_configs"][symbol]["continues_order_count"] = mobile_book
+            config_dict["symbol_configs"][symbol]["continues_order_count"] = 0
             config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 1  # all orders - unsol_cxl
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
 
@@ -2253,7 +2253,7 @@ def _strat_pause_on_order_fulfill_post_dod(buy_symbol, sell_symbol, pair_strat_,
         symbol = buy_symbol
         print(f"Checking symbol: {symbol}")
         run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+        run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
         time.sleep(2)  # delay for order to get placed
 
         ack_order_journal = get_latest_order_journal_with_event_and_symbol(OrderEventType.OE_ACK, buy_symbol,
@@ -2276,13 +2276,13 @@ def _strat_pause_on_order_fulfill_post_dod(buy_symbol, sell_symbol, pair_strat_,
             assert order_snapshot.filled_qty == order_snapshot.order_brief.qty, \
                 (f"Mismatch order_snapshot.filled_qty, expected {order_snapshot.order_brief.qty}, "
                  f"received {order_snapshot.filled_qty}")
-            assert order_snapshot.cxled_qty == mobile_book, \
-                f"Mismatch order_snapshot.cxled_qty: expected mobile_book, received {order_snapshot.cxled_qty}"
+            assert order_snapshot.cxled_qty == 0, \
+                f"Mismatch order_snapshot.cxled_qty: expected 0, received {order_snapshot.cxled_qty}"
         else:
             assert order_snapshot.order_status == OrderStatusType.OE_DOD, "OrderStatus mismatched: expected status " \
                                                                           f"OrderStatusType.OE_DOD received " \
                                                                           f"{order_snapshot.order_status}"
-            assert order_snapshot.filled_qty == mobile_book, f"Mismatch order_snapshot.filled_qty, expected mobile_book, " \
+            assert order_snapshot.filled_qty == 0, f"Mismatch order_snapshot.filled_qty, expected 0, " \
                                                    f"received {order_snapshot.filled_qty}"
             assert order_snapshot.cxled_qty == order_snapshot.order_brief.qty, \
                 f"Mismatch order_snapshot.cxled_qty: expected {order_snapshot.order_brief.qty}, received " \
@@ -2315,7 +2315,7 @@ def test_no_strat_pause_on_order_fulfill_post_dod_if_config_is_false(
     executor_config_dict["pause_fulfill_post_order_dod"] = False
     YAMLConfigurationManager.update_yaml_configurations(executor_config_dict, str(executor_config_file_path))
     try:
-        buy_symbol, sell_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book], leg1_leg2_symbol_list[mobile_book][1]
+        buy_symbol, sell_symbol = leg1_leg2_symbol_list[0][0], leg1_leg2_symbol_list[0][1]
         created_pair_strat, executor_http_client = (
             _strat_pause_on_order_fulfill_post_dod(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                    expected_strat_status_, symbol_overview_obj_list,
@@ -2324,7 +2324,7 @@ def test_no_strat_pause_on_order_fulfill_post_dod_if_config_is_false(
                                                    pause_fulfill_post_order_dod=False))
 
         # check strat must not get paused
-        pair_strat_obj = strat_manager_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
+        pair_strat_obj = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
         assert pair_strat_obj.strat_state != StratState.StratState_PAUSED, \
             "Strat must not be PAUSED since 'pause_fulfill_post_order_dod' is set False but found PAUSED"
 
@@ -2354,7 +2354,7 @@ def test_strat_pause_on_order_fulfill_post_dod_if_config_is_true(
     executor_config_dict["pause_fulfill_post_order_dod"] = True
     YAMLConfigurationManager.update_yaml_configurations(executor_config_dict, str(executor_config_file_path))
     try:
-        buy_symbol, sell_symbol = leg1_leg2_symbol_list[mobile_book][mobile_book], leg1_leg2_symbol_list[mobile_book][1]
+        buy_symbol, sell_symbol = leg1_leg2_symbol_list[0][0], leg1_leg2_symbol_list[0][1]
         created_pair_strat, executor_http_client = (
             _strat_pause_on_order_fulfill_post_dod(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
                                                    expected_strat_status_, symbol_overview_obj_list,
@@ -2363,7 +2363,7 @@ def test_strat_pause_on_order_fulfill_post_dod_if_config_is_true(
                                                    pause_fulfill_post_order_dod=True))
 
         # check strat must not get paused
-        pair_strat_obj = strat_manager_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
+        pair_strat_obj = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
         assert pair_strat_obj.strat_state == StratState.StratState_PAUSED, \
             ("Strat must get PAUSED since 'pause_fulfill_post_order_dod' is set True but not found PAUSED, "
              f"found state: {pair_strat_obj.strat_state}")
@@ -2371,13 +2371,13 @@ def test_strat_pause_on_order_fulfill_post_dod_if_config_is_true(
         check_str = "Unexpected: Received fill that makes order_snapshot OE_FILLED which is already of state OE_DOD"
         assert_fail_message = f"Can't find any alert with string '{check_str}'"
         time.sleep(5)
-        strat_alert = log_analyzer_web_client.get_strat_alert_client(created_pair_strat.id)
+        strat_alert = log_book_web_client.get_strat_alert_client(created_pair_strat.id)
         for alert in strat_alert.alerts:
             if re.search(check_str, alert.alert_brief):
                 break
         else:
             # Checking alert in portfolio_alert if reason failed to add in strat_alert
-            portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+            portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
             for alert in portfolio_alert.alerts:
                 if re.search(check_str, alert.alert_brief):
                     break
@@ -2404,19 +2404,19 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
     # > INFO:
     # Test sets max_open_baskets = 7,
     # - if multi open orders are allowed:
-    # first triggers 2 strat_executors and places 2 orders each side from each executor,
+    # first triggers 2 street_books and places 2 orders each side from each executor,
     # these 8 orders must pass for positive check and 8th order must breach max_open_baskets limits
     # and must trigger all-strat pause, then one more BUY order is placed in
     # any one executor, so it must not be placed since strats are paused + alert must be created in portfolio_alerts
     # - if multi open orders are not allowed:
-    # first triggers 8 strat_executors and places 1 order BUY side from each executor,
+    # first triggers 8 street_books and places 1 order BUY side from each executor,
     # these 8 orders must pass for positive check and 8th order must breach max_open_baskets limits
     # and must trigger all-strat pause, then one more strat is created and BUY order is placed,
     # so it must not be placed since strats are paused + alert must be created in portfolio_alerts
 
     # Updating portfolio limits
     expected_portfolio_limits_.max_open_baskets = 7
-    strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
     if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:8]
@@ -2444,7 +2444,7 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
     # checking that now...
 
     new_buy_sell_symbol_list = leg1_leg2_symbol_list[8]
-    buy_symbol = new_buy_sell_symbol_list[mobile_book]
+    buy_symbol = new_buy_sell_symbol_list[0]
     sell_symbol = new_buy_sell_symbol_list[1]
     handle_place_both_side_orders_for_portfolio_limits_test(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
@@ -2455,7 +2455,7 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
     check_str = "max_open_baskets breached"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
 
-    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
@@ -2463,7 +2463,7 @@ def test_max_open_baskets(static_data_, clean_and_set_limits, leg1_leg2_symbol_l
         assert False, assert_fail_message
 
     # Checking all strat pause
-    pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
+    pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
         assert pair_strat.strat_state == StratState.StratState_PAUSED, \
@@ -2481,7 +2481,7 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
     # Test sets max_open_notional_per_side = 71_999,
 
     # - if multi open orders are allowed:
-    # triggers 2 strat_executors and places 2 orders BUY side from each executor
+    # triggers 2 street_books and places 2 orders BUY side from each executor
     # - if multi open orders are not allowed:
     # creates 4 strats and places each Buy Order from each executor
 
@@ -2490,7 +2490,7 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
 
     # Updating portfolio limits
     expected_portfolio_limits_.max_open_notional_per_side = 71_999
-    strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
     if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:4]
@@ -2521,7 +2521,7 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
     check_str = "max_open_notional_per_side breached for BUY side"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
 
-    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
@@ -2529,7 +2529,7 @@ def test_max_open_notional_per_side_for_buy(static_data_, clean_and_set_limits, 
         assert False, assert_fail_message
 
     # Checking all strat pause
-    pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
+    pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
         assert pair_strat.strat_state == StratState.StratState_PAUSED, \
@@ -2548,7 +2548,7 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
     # Test sets max_open_notional_per_side = 61_599,
 
     # - if multi open orders are allowed:
-    # triggers 2 strat_executors and places 2 orders SELL side from each executor
+    # triggers 2 street_books and places 2 orders SELL side from each executor
     # - if multi open orders are not allowed:
     # creates 4 strats and places each SELL Order from each executor
 
@@ -2557,7 +2557,7 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
 
     # Updating portfolio limits
     expected_portfolio_limits_.max_open_notional_per_side = 61_599
-    strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
     if not executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:4]
@@ -2587,7 +2587,7 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
     check_str = "max_open_notional_per_side breached for SELL side"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
 
-    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
@@ -2595,7 +2595,7 @@ def test_max_open_notional_per_side_for_sell(static_data_, clean_and_set_limits,
         assert False, assert_fail_message
 
     # Checking all strat pause
-    pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
+    pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
         assert pair_strat.strat_state == StratState.StratState_PAUSED, \
@@ -2610,19 +2610,19 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
         top_of_book_list_, buy_order_, sell_order_,
         max_loop_count_per_side, expected_portfolio_limits_, refresh_sec_update_fixture):
     # INFO:
-    # Test sets max_gross_n_open_notional = 134_mobile_bookmobile_bookmobile_book
+    # Test sets max_gross_n_open_notional = 134_000
 
     # - if multi open orders are allowed:
-    # triggers 2 strat_executors and places 2 orders each side from each executor
+    # triggers 2 street_books and places 2 orders each side from each executor
     # - if multi open orders are not allowed:
-    # triggers 8 strat_executors out of which 4 places BUY orders each and rest 4 places SELL orders each
+    # triggers 8 street_books out of which 4 places BUY orders each and rest 4 places SELL orders each
 
     # these 8 orders must pass for positive check, then one more BUY order is placed in
     # any executor and this new order journal must trigger all strat-pause + alert must be created in strat_alert
 
     # Updating portfolio limits
-    expected_portfolio_limits_.max_gross_n_open_notional = 13mobile_book_mobile_bookmobile_bookmobile_book
-    strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    expected_portfolio_limits_.max_gross_n_open_notional = 130_000
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
     if executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:2]
@@ -2680,7 +2680,7 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
     # must have been placed but any new order must not be placed, checking that now...
 
     new_buy_sell_symbol_list = leg1_leg2_symbol_list[8]
-    buy_symbol = new_buy_sell_symbol_list[mobile_book]
+    buy_symbol = new_buy_sell_symbol_list[0]
     sell_symbol = new_buy_sell_symbol_list[1]
     handle_place_both_side_orders_for_portfolio_limits_test(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
@@ -2691,7 +2691,7 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
     check_str = "max_gross_n_open_notional breached,"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
     time.sleep(2)
-    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
@@ -2699,7 +2699,7 @@ def test_all_strat_pause_for_max_gross_n_open_notional_breach(
         assert False, assert_fail_message
 
     # Checking all strat pause
-    pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
+    pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
         assert pair_strat.strat_state == StratState.StratState_PAUSED, \
@@ -2710,8 +2710,8 @@ def all_strat_pause_test_for_max_reject_limit_breach(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
         expected_start_status_, symbol_overview_obj_list, last_trade_fixture_list, market_depth_basemodel_list,
         top_of_book_list_, refresh_sec):
-    # explicitly setting waived_min_orders to 1mobile_book for this test case
-    expected_strat_limits_.cancel_rate.waived_min_orders = 1mobile_book
+    # explicitly setting waived_min_orders to 10 for this test case
+    expected_strat_limits_.cancel_rate.waived_min_orders = 10
     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
 
@@ -2729,7 +2729,7 @@ def all_strat_pause_test_for_max_reject_limit_breach(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["simulate_new_to_reject_orders"] = True
-            config_dict["symbol_configs"][symbol]["fill_percent"] = 5mobile_book
+            config_dict["symbol_configs"][symbol]["fill_percent"] = 50
             config_dict["symbol_configs"][symbol]["continues_order_count"] = 1
             config_dict["symbol_configs"][symbol]["continues_special_order_count"] = 2
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
@@ -2763,8 +2763,8 @@ def test_last_n_sec_order_counts(static_data_, clean_and_set_limits, leg1_leg2_s
                                  top_of_book_list_, buy_order_, sell_order_,
                                  max_loop_count_per_side, expected_portfolio_limits_, refresh_sec_update_fixture):
     # Updating portfolio limits
-    expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds = 1mobile_bookmobile_bookmobile_bookmobile_book
-    strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds = 10000
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
     if executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
         leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
@@ -2789,7 +2789,7 @@ def test_last_n_sec_order_counts(static_data_, clean_and_set_limits, leg1_leg2_s
                 (executor_http_client, buy_symbol, last_buy_order_id, sell_symbol, last_sell_order_id))
 
     order_count_updated_order_journals = (
-        post_trade_engine_service_http_client.get_last_n_sec_orders_by_events_query_client(
+        post_book_service_http_client.get_last_n_sec_orders_by_events_query_client(
             expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds,
             [OrderEventType.OE_NEW]))
 
@@ -2797,21 +2797,21 @@ def test_last_n_sec_order_counts(static_data_, clean_and_set_limits, leg1_leg2_s
         ("Unexpected: Length of returned list by get_last_n_sec_orders_by_events_query_client must be 1, "
          f"received: {len(order_count_updated_order_journals)}, received list: {order_count_updated_order_journals}")
 
-    assert 8 == order_count_updated_order_journals[mobile_book].current_period_order_count, \
+    assert 8 == order_count_updated_order_journals[0].current_period_order_count, \
         (f"Mismatch: Expected last_n_sec new order_counts: 8, received: "
-         f"{order_count_updated_order_journals[mobile_book].current_period_order_count}")
+         f"{order_count_updated_order_journals[0].current_period_order_count}")
 
     # Updating portfolio limits
     expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds = 2
-    strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
     time.sleep(3)   # wait to check after 2 sec to check no order is found after it
 
     order_count_updated_order_journals = (
-        post_trade_engine_service_http_client.get_last_n_sec_orders_by_events_query_client(
+        post_book_service_http_client.get_last_n_sec_orders_by_events_query_client(
             expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds,
             [OrderEventType.OE_NEW]))
 
-    assert len(order_count_updated_order_journals) == mobile_book, \
+    assert len(order_count_updated_order_journals) == 0, \
         ("Unexpected: Length of returned list by get_last_n_sec_orders_by_events_query_client must be 1, "
          f"received: {len(order_count_updated_order_journals)}, received list: {order_count_updated_order_journals}")
 
@@ -2826,7 +2826,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
                                                    expected_portfolio_limits_, refresh_sec_update_fixture):
     # INFO:
     # Test has rolling_max_order_count.max_rolling_tx_count = 7 and
-    # rolling_max_order_count.rolling_tx_count_period_seconds = 1mobile_bookmobile_bookmobile_bookmobile_book that means within 1mobile_bookmobile_bookmobile_bookmobile_book secs 8th new order
+    # rolling_max_order_count.rolling_tx_count_period_seconds = 10000 that means within 10000 secs 8th new order
     # will trigger all strat-pause.
 
     # - if multi open orders are allowed:
@@ -2839,8 +2839,8 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
 
     # Updating portfolio limits
     expected_portfolio_limits_.rolling_max_order_count.max_rolling_tx_count = 7
-    expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds = 1mobile_bookmobile_bookmobile_bookmobile_book
-    strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    expected_portfolio_limits_.rolling_max_order_count.rolling_tx_count_period_seconds = 10000
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
     if executor_config_yaml_dict.get("allow_multiple_open_orders_per_strat"):
         sliced_buy_sell_symbol_list = leg1_leg2_symbol_list[:2]
@@ -2867,7 +2867,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
     time.sleep(2)
 
     new_buy_sell_symbol_list = leg1_leg2_symbol_list[8]
-    buy_symbol = new_buy_sell_symbol_list[mobile_book]
+    buy_symbol = new_buy_sell_symbol_list[0]
     sell_symbol = new_buy_sell_symbol_list[1]
     handle_place_both_side_orders_for_portfolio_limits_test(
         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
@@ -2878,7 +2878,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
     check_str = "max_allowed_orders_within_period breached"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
 
-    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
@@ -2886,7 +2886,7 @@ def test_portfolio_limits_rolling_new_order_breach(static_data_, clean_and_set_l
         assert False, assert_fail_message
 
     # Checking all strat pause
-    pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
+    pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
         assert pair_strat.strat_state == StratState.StratState_PAUSED, \
@@ -2900,15 +2900,15 @@ def test_all_strat_pause_for_max_reject_limit_breach(
         top_of_book_list_, max_loop_count_per_side, expected_portfolio_limits_, refresh_sec_update_fixture):
     # INFO:
     # Test has rolling_max_reject_count.max_rolling_tx_count = 4 and
-    # rolling_max_reject_count.rolling_tx_count_period_seconds = 1mobile_bookmobile_bookmobile_bookmobile_book that means within 1mobile_bookmobile_bookmobile_bookmobile_book secs 5th rej
+    # rolling_max_reject_count.rolling_tx_count_period_seconds = 10000 that means within 10000 secs 5th rej
     # will trigger all strat-pause. Test will create 2 strats and will place 2 order each to equal threshold of
     # 4 rej orders after which one more order will also be trigger by either of strat and that must trigger
     # all strat-pause + alert must be present in portfolio alerts
 
     # Settings portfolio_limits for this test
     expected_portfolio_limits_.rolling_max_reject_count.max_rolling_tx_count = 4
-    expected_portfolio_limits_.rolling_max_reject_count.rolling_tx_count_period_seconds = 1mobile_bookmobile_bookmobile_bookmobile_book
-    strat_manager_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+    expected_portfolio_limits_.rolling_max_reject_count.rolling_tx_count_period_seconds = 10000
+    email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
 
     # updating fixture values for this test-case
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
@@ -2933,20 +2933,20 @@ def test_all_strat_pause_for_max_reject_limit_breach(
     # Placing on more rej order that must trigger auto-kill_switch
     # (Placed order will be rej type by simulator because of continues_special_order_count)
     executor_http_client, buy_symbol, sell_symbol, last_buy_rej_id, last_sell_rej_id = (
-        executor_http_clients_n_last_order_id_tuple_list)[mobile_book]
+        executor_http_clients_n_last_order_id_tuple_list)[0]
     run_last_trade(buy_symbol, sell_symbol, last_trade_fixture_list, executor_http_client)
-    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[mobile_book])
+    run_buy_top_of_book(buy_symbol, sell_symbol, executor_http_client, top_of_book_list_[0])
 
     latest_order_journal = get_latest_order_journal_with_events_and_symbol(
         [OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ], buy_symbol,
         executor_http_client, last_order_id=last_buy_rej_id)
 
-    time.sleep(1mobile_book)
+    time.sleep(10)
     # Checking alert in portfolio_alert
     check_str: str = "max_allowed_rejection_within_period breached"
     assert_fail_message = f"Could not find any alert saying '{check_str}'"
 
-    portfolio_alert = log_analyzer_web_client.get_portfolio_alert_client(1)
+    portfolio_alert = log_book_web_client.get_portfolio_alert_client(1)
     for alert in portfolio_alert.alerts:
         if re.search(check_str, alert.alert_brief):
             break
@@ -2954,7 +2954,7 @@ def test_all_strat_pause_for_max_reject_limit_breach(
         assert False, assert_fail_message
 
     # Checking all strat pause
-    pair_strat_list: List[PairStratBaseModel] = strat_manager_service_native_web_client.get_all_pair_strat_client()
+    pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
 
     for pair_strat in pair_strat_list:
         assert pair_strat.strat_state == StratState.StratState_PAUSED, \

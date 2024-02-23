@@ -1,6 +1,6 @@
-host: "127.mobile_book.mobile_book.1"
+host: "127.0.0.1"
 port: 7497
-client_id: mobile_book
+client_id: 0
 log_level: "debug"
 
 contracts:
@@ -118,12 +118,12 @@ regulatory_snapshot: False
 # Tick By Tick Mobile Book
 tick_types:   # supported tick_types: "Last", "AllLast", "BidAsk"
   - tick_type: "BidAsk"
-    number_of_ticks: mobile_book
+    number_of_ticks: 0
     ignore_size: False
   - tick_type: "AllLast"
-    number_of_ticks: mobile_book
+    number_of_ticks: 0
     ignore_size: False
 
 # Live Market Depth
-num_rows: 1mobile_book
+num_rows: 10
 is_smart_depth: False

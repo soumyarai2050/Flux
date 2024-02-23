@@ -3,8 +3,8 @@ from Cython.Build import cythonize
 
 ext_modules = [
     Extension(
-        "market_data_cache",
-        sources=["market_data_cache.pyx"],
+        "mobile_book_cache",
+        sources=["mobile_book_cache.pyx"],
         language="c++",
         extra_compile_args=["-std=c++11"]
     )

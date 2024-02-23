@@ -1,7 +1,7 @@
 from typing import Dict
 
 from Flux.CodeGenProjects.addressbook.ProjectGroup.mobile_book.app.yahoo_finance_base import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.strat_executor.generated.Pydentic.strat_executor_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import *
 from FluxPythonUtils.scripts.utility_functions import configure_logger
 
 

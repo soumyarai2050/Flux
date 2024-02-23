@@ -14,8 +14,8 @@ import datetime
 from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.generated.FastApi.post_book_service_routes_callback import (
     PostBookServiceRoutesCallback)
 from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.app.post_book_service_helper import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    strat_manager_service_http_client)
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+    email_book_service_http_client)
 from FluxPythonUtils.scripts.utility_functions import except_n_log_alert
 from Flux.CodeGenProjects.addressbook.ProjectGroup.post_book.app.aggregate import get_open_order_counts, get_last_n_sec_orders_by_events
 
@@ -64,7 +64,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         self.service_up: bool = False
         self.service_ready = False
         if self.min_refresh_interval is None:
-            self.min_refresh_interval = 3mobile_book
+            self.min_refresh_interval = 30
         self.portfolio_limit_check_queue: Queue = Queue()
         self.update_portfolio_status_queue: Queue = Queue()
         self.container_model: Type = ContainerObject
@@ -103,7 +103,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
 
                 if not self.service_up:
                     try:
-                        if is_post_book_service_up(ignore_error=(service_up_no_error_retry_count > mobile_book)):
+                        if is_post_book_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
                             self.service_up = True
                             should_sleep = False
                     except Exception as e:
@@ -140,7 +140,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             err_str_ = (f"self.asyncio_loop couldn't set as asyncio.get_running_loop() returned None for "
                         f"{attempt_counts} attempts")
             logging.critical(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_bookmobile_book)
+            raise HTTPException(detail=err_str_, status_code=500)
 
     async def get_last_n_sec_orders_by_events_query_pre(self, order_journal_class_type: Type[OrderJournal],
                                                         last_n_sec: int, order_event_list: List[str]):
@@ -156,58 +156,58 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
 
     async def create_order_journal_pre(self, order_journal_obj: OrderJournal):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "create_order_journal_pre not ready - service is not initialized yet"
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_book3)
+            raise HTTPException(detail=err_str_, status_code=503)
 
     async def create_order_snapshot_pre(self, order_snapshot_obj: OrderSnapshot):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "create_order_snapshot_pre not ready - service is not initialized yet"
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_book3)
+            raise HTTPException(detail=err_str_, status_code=503)
 
     async def update_order_snapshot_pre(self, stored_order_snapshot_obj: OrderSnapshot,
                                         updated_order_snapshot_obj: OrderSnapshot):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "update_order_snapshot_pre not ready - service is not initialized yet"
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_book3)
+            raise HTTPException(detail=err_str_, status_code=503)
         return updated_order_snapshot_obj
 
     async def partial_update_order_snapshot_pre(self, stored_order_snapshot_obj: OrderSnapshot,
                                                 updated_order_snapshot_obj_json: Dict):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "partial_update_order_snapshot_pre not ready - service is not initialized yet"
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_book3)
+            raise HTTPException(detail=err_str_, status_code=503)
         return updated_order_snapshot_obj_json
 
     async def create_strat_brief_pre(self, strat_brief_obj: StratBrief):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "create_strat_brief_pre not ready - service is not initialized yet"
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_book3)
+            raise HTTPException(detail=err_str_, status_code=503)
 
     async def update_strat_brief_pre(self, stored_strat_brief_obj: StratBrief, updated_strat_brief_obj: StratBrief):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "update_strat_brief_pre not ready - service is not initialized yet"
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_book3)
+            raise HTTPException(detail=err_str_, status_code=503)
         return updated_strat_brief_obj
 
     async def partial_update_strat_brief_pre(self, stored_strat_brief_obj: StratBrief,
                                              updated_strat_brief_obj_json: Dict):
         if not self.service_ready:
-            # raise service unavailable 5mobile_book3 exception, let the caller retry
+            # raise service unavailable 503 exception, let the caller retry
             err_str_ = "partial_update_strat_brief_pre not ready - service is not initialized yet"
             logging.error(err_str_)
-            raise HTTPException(detail=err_str_, status_code=5mobile_book3)
+            raise HTTPException(detail=err_str_, status_code=503)
         return updated_strat_brief_obj_json
 
     async def check_portfolio_limits_query_pre(self, check_portfolio_limits_class_type: Type[CheckPortfolioLimits],
@@ -447,7 +447,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         pause_all_strats = False
         open_order_count = len(self.order_id_to_open_order_snapshot_cache_dict)
 
-        if max_open_baskets - open_order_count < mobile_book:
+        if max_open_baskets - open_order_count < 0:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"max_open_baskets breached, allowed {max_open_baskets = }, current {open_order_count = } - "
@@ -472,12 +472,12 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             logging.error(err_str_)
             return False
         else:
-            rolling_new_order_count = mobile_book
+            rolling_new_order_count = 0
         if rolling_new_order_count > max_rolling_tx_count:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"max_allowed_orders_within_period breached: "
-                          f"{order_count_updated_order_journals[mobile_book].current_period_order_count} "
+                          f"{order_count_updated_order_journals[0].current_period_order_count} "
                           f"orders in past {rolling_order_count_period_seconds} secs, "
                           f"allowed orders within this period is {max_rolling_tx_count}"
                           f"- initiating all strat pause")
@@ -492,21 +492,21 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             underlying_get_last_n_sec_orders_by_events_query_http(
                 rolling_rej_count_period_seconds, [OrderEventType.OE_BRK_REJ, OrderEventType.OE_EXH_REJ]))
         if len(order_count_updated_order_journals) == 1:
-            rolling_rej_order_count = order_count_updated_order_journals[mobile_book].current_period_order_count
-        elif len(order_count_updated_order_journals) > mobile_book:
+            rolling_rej_order_count = order_count_updated_order_journals[0].current_period_order_count
+        elif len(order_count_updated_order_journals) > 0:
             err_str_ = ("Must receive only one object in list from get_last_n_sec_orders_by_events_query, "
                         f"received: {len(order_count_updated_order_journals)}, avoiding this check, "
                         f"received list: {order_count_updated_order_journals}")
             logging.error(err_str_)
             return False
         else:
-            rolling_rej_order_count = mobile_book
+            rolling_rej_order_count = 0
 
         if rolling_rej_order_count > max_rolling_tx_count:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"max_allowed_rejection_within_period breached: "
-                          f"{order_count_updated_order_journals[mobile_book].current_period_order_count} "
+                          f"{order_count_updated_order_journals[0].current_period_order_count} "
                           f"rejections in past {rolling_rej_count_period_seconds} secs, "
                           f"allowed rejections within this period is {max_rolling_tx_count}"
                           f"- initiating all strat pause")
@@ -514,7 +514,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         return pause_all_strats
 
     async def check_all_portfolio_limits(self) -> bool:
-        portfolio_limits = strat_manager_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
+        portfolio_limits = email_book_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
 
         pause_all_strats = False
 
@@ -524,8 +524,8 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             pause_all_strats = True
 
         # block for task to finish
-        total_buy_open_notional = mobile_book
-        total_sell_open_notional = mobile_book
+        total_buy_open_notional = 0
+        total_sell_open_notional = 0
         async with StratBrief.reentrant_lock:
             for strat_brief in self.strat_id_to_strat_brief_cache_dict.values():
                 # Buy side check
@@ -552,7 +552,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             pause_all_strats = True
 
         # Checking portfolio_limits.max_gross_n_open_notional
-        portfolio_status = strat_manager_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
+        portfolio_status = email_book_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
         total_open_notional = total_buy_open_notional + total_sell_open_notional
         total_gross_n_open_notional = (total_open_notional + portfolio_status.overall_buy_fill_notional +
                                        portfolio_status.overall_sell_fill_notional)
@@ -601,16 +601,16 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
     @staticmethod
     def check_connection_or_service_not_ready_error(exception: Exception) -> bool:
         if "Failed to establish a new connection: [Errno 111] Connection refused" in str(exception):
-            logging.exception("Connection Error in pair_strat_engine server call, likely server is "
+            logging.exception("Connection Error in phone_book server call, likely server is "
                               "down")
         elif "service is not initialized yet" in str(exception):
-            logging.exception("pair_strat_engine service not up yet, likely server restarted, but is "
+            logging.exception("phone_book service not up yet, likely server restarted, but is "
                               "not ready yet")
-        elif "('Connection aborted.', ConnectionResetError(1mobile_book4, 'Connection reset by peer'))" in str(exception):
-            logging.exception("pair_strat_engine service connection error")
+        elif "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))" in str(exception):
+            logging.exception("phone_book service connection error")
         elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
-              "it from responding to requests" in str(exception) and "status_code: 5mobile_book3" in str(exception)):
-            logging.exception("pair_strat_engine service connection error")
+              "it from responding to requests" in str(exception) and "status_code: 503" in str(exception)):
+            logging.exception("phone_book service connection error")
         else:
             return False
         return True
@@ -629,12 +629,12 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
 
     def _update_portfolio_status_n_check_portfolio_limits(self):
         while 1:
-            buy_notional_update = mobile_book
-            sell_notional_update = mobile_book
-            buy_fill_notional_update = mobile_book
-            sell_fill_notional_update = mobile_book
+            buy_notional_update = 0
+            sell_notional_update = 0
+            buy_fill_notional_update = 0
+            sell_fill_notional_update = 0
 
-            counter = mobile_book
+            counter = 0
             portfolio_status_updates: PortfolioStatusUpdatesContainer = self.update_portfolio_status_queue.get()
             buy_notional_update, sell_notional_update, buy_fill_notional_update, sell_fill_notional_update = (
                 self._update_portfolio_status_vals(buy_notional_update, sell_notional_update, buy_fill_notional_update,
@@ -651,7 +651,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
 
             while 1:
                 try:
-                    strat_manager_service_http_client.update_portfolio_status_by_order_or_fill_data_query_client(
+                    email_book_service_http_client.update_portfolio_status_by_order_or_fill_data_query_client(
                         overall_buy_notional=buy_notional_update,
                         overall_sell_notional=sell_notional_update,
                         overall_buy_fill_notional=buy_fill_notional_update,
@@ -689,7 +689,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             if pause_all_strats:
                 while 1:
                     try:
-                        strat_manager_service_http_client.pause_all_active_strats_query_client()
+                        email_book_service_http_client.pause_all_active_strats_query_client()
                     except Exception as e:
                         # True if connection or service up error
                         res = self.check_connection_or_service_not_ready_error(e)
@@ -714,7 +714,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             # True if connection or service up error
             res = self.check_connection_or_service_not_ready_error(e)
             if res:
-                logging.exception("pair_strat_engine seems down, returning empty list from "
+                logging.exception("phone_book seems down, returning empty list from "
                                   "is_portfolio_limits_breached_query_pre")
                 return []
         else:
@@ -725,7 +725,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         while 1:
             strat_id_list: List[int] = []
             strat_id_to_container_obj_dict: Dict[int, ContainerObject] = {}
-            update_counter = mobile_book
+            update_counter = 0
             payload_dict: Dict[str, Any] = self.portfolio_limit_check_queue.get()   # blocking call
             self.update_strat_id_list_n_dict_from_payload(strat_id_list,
                                                           strat_id_to_container_obj_dict, payload_dict)

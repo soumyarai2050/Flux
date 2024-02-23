@@ -13,7 +13,7 @@ int main() {
     mobile_book_handler::LastTradeHandler lastTradeHandler(sp_mongo_db);
     mobile_book_handler::HistoryManager historyManager(sp_mongo_db, lastTradeHandler, marketDepthHandler);
     historyManager.replay();
-    return mobile_book;
+    return 0;
 }
 
 

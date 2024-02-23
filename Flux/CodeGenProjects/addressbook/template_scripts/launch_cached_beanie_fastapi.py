@@ -14,7 +14,7 @@ if __name__ == "__main__":
     datetime_str: str = datetime.now().strftime("%Y%m%d")
     env_dict = {
         "RELOAD": "false",
-        "DEBUG_SLEEP_TIME": "mobile_book",
+        "DEBUG_SLEEP_TIME": "0",
         "LOG_FILE_DIR_PATH": f"{project_dir / 'log' }",
         "LOG_FILE_NAME": f"template_project_name_logs_{datetime_str}.log",
         "LOG_LEVEL": "debug"

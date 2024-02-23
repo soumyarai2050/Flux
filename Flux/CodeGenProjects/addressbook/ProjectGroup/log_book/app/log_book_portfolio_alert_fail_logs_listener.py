@@ -38,7 +38,7 @@ def log_file_size_listener_and_mail_notifier(log_file_path: str, retry_wait_sec:
             time.sleep(retry_wait_sec)
             continue
         else:
-            if os.path.getsize(log_file_path) > mobile_book:
+            if os.path.getsize(log_file_path) > 0:
                 sender_obj: EmailUser = EmailUser(
                             secret_yaml_dict["sender_username"],
                             secret_yaml_dict["sender_email"])

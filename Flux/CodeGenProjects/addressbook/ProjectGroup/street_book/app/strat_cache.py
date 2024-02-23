@@ -8,11 +8,11 @@ import pytz
 from pendulum import DateTime
 
 # project imports
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_models_log_keys import get_pair_strat_log_key
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.street_book_service_helper import get_fills_journal_log_key
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.StreetBook.strat_manager_service_base_strat_cache import \
-    StratManagerServiceBaseStratCache
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_base_strat_cache import \
+    EmailBookServiceBaseStratCache
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_base_strat_cache import (
     StreetBookServiceBaseStratCache)
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import (
@@ -62,7 +62,7 @@ class MarketDepthsCont:
                 self.ask_market_depths.append(market_depth)
 
 
-class StratCache(StratManagerServiceBaseStratCache, StreetBookServiceBaseStratCache):
+class StratCache(EmailBookServiceBaseStratCache, StreetBookServiceBaseStratCache):
     strat_cache_dict: Dict[str, 'StratCache'] = dict()  # symbol_side is the key
     add_to_strat_cache_rlock: RLock = RLock()
     order_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
@@ -70,7 +70,7 @@ class StratCache(StratManagerServiceBaseStratCache, StreetBookServiceBaseStratCa
     fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | FxSymbolOverview | None] = {"USD|SGD": None}
 
     def __init__(self):
-        StratManagerServiceBaseStratCache.__init__(self)
+        EmailBookServiceBaseStratCache.__init__(self)
         StreetBookServiceBaseStratCache.__init__(self)
         self.re_ent_lock: RLock = RLock()
         self.notify_semaphore = Semaphore()
@@ -202,7 +202,7 @@ class StratCache(StratManagerServiceBaseStratCache, StreetBookServiceBaseStratCa
         if self._pair_strat is not None:
             if (symbol_side_snapshot.security.sec_id == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id and
                     symbol_side_snapshot.side == self._pair_strat.pair_strat_params.strat_leg1.side):
-                self._symbol_side_snapshots[mobile_book] = symbol_side_snapshot
+                self._symbol_side_snapshots[0] = symbol_side_snapshot
                 self._symbol_side_snapshots_update_date_time = symbol_side_snapshot.last_update_date_time
                 return symbol_side_snapshot.last_update_date_time
             elif (symbol_side_snapshot.security.sec_id == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id and
@@ -234,7 +234,7 @@ class StratCache(StratManagerServiceBaseStratCache, StreetBookServiceBaseStratCa
     def set_symbol_overview(self, symbol_overview_: SymbolOverviewBaseModel | SymbolOverview):
         if self._pair_strat is not None:
             if symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
-                self._symbol_overviews[mobile_book] = symbol_overview_
+                self._symbol_overviews[0] = symbol_overview_
                 self._symbol_overviews_update_date_time = symbol_overview_.last_update_date_time
                 return symbol_overview_.last_update_date_time
             elif symbol_overview_.symbol == self._pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
@@ -252,7 +252,7 @@ class StratCache(StratManagerServiceBaseStratCache, StreetBookServiceBaseStratCa
         if date_time is None or (
                 date_time < self._tob_leg1_update_date_time and date_time < self._tob_leg2_update_date_time):
             with self.re_ent_lock:
-                if self._top_of_books[mobile_book] is not None and self._top_of_books[1] is not None:
+                if self._top_of_books[0] is not None and self._top_of_books[1] is not None:
                     _top_of_books_update_date_time = copy.deepcopy(
                         self._tob_leg1_update_date_time if self._tob_leg1_update_date_time < self._tob_leg2_update_date_time else self._tob_leg2_update_date_time)
                     _top_of_books = copy.deepcopy(self._top_of_books)
@@ -265,21 +265,21 @@ class StratCache(StratManagerServiceBaseStratCache, StreetBookServiceBaseStratCa
             logging.error(f"Unexpected: strat_cache has no pair strat for tob update of: {top_of_book.symbol}")
             return None
         if top_of_book.symbol == self._pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
-            if self._top_of_books[mobile_book] is None or top_of_book.last_update_date_time > self._tob_leg1_update_date_time:
-                self._top_of_books[mobile_book] = top_of_book
+            if self._top_of_books[0] is None or top_of_book.last_update_date_time > self._tob_leg1_update_date_time:
+                self._top_of_books[0] = top_of_book
                 self._tob_leg1_update_date_time = top_of_book.last_update_date_time
                 return top_of_book.last_update_date_time
-            elif top_of_book.last_trade and (self._top_of_books[mobile_book].last_trade is None or (
+            elif top_of_book.last_trade and (self._top_of_books[0].last_trade is None or (
                     top_of_book.last_trade.last_update_date_time >
-                    self._top_of_books[mobile_book].last_trade.last_update_date_time)):
-                self._top_of_books[mobile_book].last_trade = top_of_book.last_trade
+                    self._top_of_books[0].last_trade.last_update_date_time)):
+                self._top_of_books[0].last_trade = top_of_book.last_trade
                 # artificially update TOB datetime for next pickup by app
                 self._tob_leg1_update_date_time += timedelta(milliseconds=1)
                 return self._tob_leg1_update_date_time
             else:
                 delta = self._tob_leg1_update_date_time - top_of_book.last_update_date_time
                 logging.debug(f"leg1 set_top_of_book called for: {top_of_book.symbol = } with update_date_time older "
-                              f"by: {delta} period, ignoring this TOB;;;stored tob: {self._top_of_books[mobile_book]}"
+                              f"by: {delta} period, ignoring this TOB;;;stored tob: {self._top_of_books[0]}"
                               f" update received [discarded] {top_of_book = }")
                 return None
             # else not needed - common log outside handles this

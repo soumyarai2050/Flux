@@ -5,11 +5,11 @@ from typing import List, ClassVar, final, Dict, Final
 from pendulum import DateTime
 import os
 
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import \
     Security, Side
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import \
     OrderBrief, OrderJournal, OrderEventType
-from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.pair_strat_engine_n_street_book_client import *
+from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.app.phone_book_n_street_book_client import *
 
 
 def add_to_texts(order_brief: OrderBrief, msg: str):
@@ -30,7 +30,7 @@ class TradingLinkBase(ABC):
     executor_port: int | None = None    # must be set before StreetBook is provided to TradingDataManager
     executor_host = host
     pair_strat_config_dict = pair_strat_config_yaml_dict
-    pair_strat_web_client: ClassVar[StratManagerServiceHttpClient] = strat_manager_service_http_client
+    pair_strat_web_client: ClassVar[EmailBookServiceHttpClient] = email_book_service_http_client
     portfolio_config_path: Final[PurePath] = (PurePath(__file__).parent.parent / "data" /
                                               "kill_switch_simulate_config.yaml")
     portfolio_config_dict: ClassVar[Dict | None] = load_configs(str(portfolio_config_path))

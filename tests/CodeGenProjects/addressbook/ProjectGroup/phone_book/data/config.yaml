@@ -1,6 +1,6 @@
 driver:
   chrome: "C:/Users/abhis/Downloads/chromedriver_win32/chromedriver.exe"
-mongo_server_uri: "mongodb://localhost:27mobile_book17"
-ps_db_name: "phone_book_8mobile_book2mobile_book"
-md_db_name: "market_data"
-web_project_url: "http://localhost:3mobile_book2mobile_book"
+mongo_server_uri: "mongodb://localhost:27017"
+ps_db_name: "phone_book_8020"
+md_db_name: "mobile_book"
+web_project_url: "http://localhost:3020"

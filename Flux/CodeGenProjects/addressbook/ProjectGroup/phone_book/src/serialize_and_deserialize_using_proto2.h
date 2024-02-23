@@ -1,5 +1,5 @@
 //
-// Created by pc on 5/28/2mobile_book23.
+// Created by pc on 5/28/2023.
 //
 
 #ifndef PAIR_STRAT_ENGINE_SERIALIZE_AND_DESERIALIZE_USING_PROTO2_H
@@ -12,7 +12,7 @@
 #include <string>
 #include <google/protobuf/util/json_util.h>
 #include <google/protobuf/message.h>
-#include "strat_manager_service.pb.h"
+#include "email_book_service.pb.h"
 #include "strat_core.pb.h"
 
 class SerializeAndDeserializeProto2 {

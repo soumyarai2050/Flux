@@ -6,9 +6,9 @@ class RandomDataGen:
     def __init__(self):
         self.random_string_length = 6
         self.characters = string.ascii_uppercase
-        self.double_distribution = (1, 1mobile_bookmobile_book.mobile_book)
-        self.int64_distribution = (1, 1mobile_bookmobile_book)
-        self.bool_distribution = (mobile_book, 1)
+        self.double_distribution = (1, 100.0)
+        self.int64_distribution = (1, 100)
+        self.bool_distribution = (0, 1)
 
     def get_random_string(self):
         random_string = ''.join(random.choice(self.characters) for _ in range(self.random_string_length))

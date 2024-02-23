@@ -41,7 +41,7 @@ def get_order_total_sum_of_last_n_sec(symbol: str, n: int):
         {
             "$setWindowFields": {
                 "sortBy": {
-                    "create_date_time": 1.mobile_book
+                    "create_date_time": 1.0
                 },
                 "output": {
                     "last_n_sec_total_qty": {
@@ -78,12 +78,12 @@ def get_order_by_order_id_filter(order_id: str):
 
 
 # careful with special chars on regex match !!
-def get_order_of_matching_suffix_order_id_filter(order_id_suffix: str, sort: int = mobile_book, limit: int = mobile_book):
+def get_order_of_matching_suffix_order_id_filter(order_id_suffix: str, sort: int = 0, limit: int = 0):
     """
     Note: careful with special chars on regex match !!
     :param order_id_suffix:
-    :param sort: mobile_book: no sort, 1 or -1: passed as is to sort param of aggregation, any other number treated as mobile_book (no sort)
-    :param limit: val <= mobile_book: no limit, else number passed as is to aggregate limit parameter
+    :param sort: 0: no sort, 1 or -1: passed as is to sort param of aggregation, any other number treated as 0 (no sort)
+    :param limit: val <= 0: no limit, else number passed as is to aggregate limit parameter
     :return:formatted mongo aggregate query
     """
     regex_order_id_suffix: str = f".*{order_id_suffix}$"
@@ -98,7 +98,7 @@ def get_order_of_matching_suffix_order_id_filter(order_id_suffix: str, sort: int
             "$sort": {"_id": sort},
         }
         agg_pipeline["aggregate"].append(sort_expr)
-    if limit > mobile_book:
+    if limit > 0:
         limit_expr = {
             "$limit": limit
         }
@@ -143,7 +143,7 @@ def get_max_market_depth_obj(symbol: str, side: str):
         },
         {
             "$sort": {
-                "position": -1.mobile_book
+                "position": -1.0
             }
         }
     ]}
@@ -171,7 +171,7 @@ def get_last_n_sec_total_trade_qty(symbol: str, last_n_sec: float):
             # add match for time to reduce
             "$setWindowFields": {
                 "sortBy": {
-                    "exch_time": 1.mobile_book
+                    "exch_time": 1.0
                 },
                 "output": {
                     "market_trade_volume.participation_period_last_trade_qty_sum": {
@@ -316,7 +316,7 @@ def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: st
                     'underlying_account': '$underlying_account'
                 },
                 'sortBy': {
-                    'fill_date_time': 1.mobile_book
+                    'fill_date_time': 1.0
                 },
                 'output': {
                     'underlying_account_cumulative_fill_qty': {
@@ -387,7 +387,7 @@ def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
                 "$setWindowFields": {
                     "partitionBy": {"symbol": "$symbol", "side": "$side"},
                     "sortBy": {
-                        "position": 1.mobile_book
+                        "position": 1.0
                     },
                     "output": {
                         "cumulative_notional": {
@@ -440,7 +440,7 @@ def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
 
         # Adding first match by symbol
         if symbol not in symbol_set:
-            agg_pipeline["aggregate"][mobile_book]["$match"]["$or"].append({
+            agg_pipeline["aggregate"][0]["$match"]["$or"].append({
                 "symbol": symbol
             })
         symbol_set.add(symbol)
@@ -465,7 +465,7 @@ cum_px_qty_aggregate_pipeline = {"aggregate": [
     #     "$setWindowFields": {
     #         "partitionBy": {"symbol": "$symbol", "side": "$side"},
     #         "sortBy": {
-    #             "position": 1.mobile_book
+    #             "position": 1.0
     #         },
     #         "output": {
     #             "cumulative_notional": {

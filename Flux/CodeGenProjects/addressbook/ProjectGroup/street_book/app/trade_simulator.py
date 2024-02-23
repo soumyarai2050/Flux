@@ -6,7 +6,7 @@ import re
 from pendulum import DateTime
 from fastapi.encoders import jsonable_encoder
 
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import \
     Side, SecurityType
 from Flux.CodeGenProjects.addressbook.ProjectGroup.street_book.generated.Pydentic.street_book_service_model_imports import \
     OrderBrief, OrderEventType, OrderJournal, FillsJournal, \
@@ -26,14 +26,14 @@ class TradeSimulator(TradingLinkBase):
     continuous_symbol_based_orders_counter: ClassVar[Dict | None] = {}
     cxl_rej_symbol_to_bool_dict: ClassVar[Dict | None] = {}
     symbol_configs: ClassVar[Dict | None] = init_symbol_configs()
-    special_order_counter = mobile_book
+    special_order_counter = 0
 
     @classmethod
     def reload_symbol_configs(cls):
         # reloading executor configs
         TradingLinkBase.reload_executor_configs()
         cls.symbol_configs = init_symbol_configs()
-        cls.special_order_counter = mobile_book
+        cls.special_order_counter = 0
 
     @classmethod
     def get_symbol_configs(cls, symbol: str) -> Dict | None:
@@ -45,7 +45,7 @@ class TradeSimulator(TradingLinkBase):
                     found_symbol_config_list.append(v)
             if found_symbol_config_list:
                 if len(found_symbol_config_list) == 1:
-                    return found_symbol_config_list[mobile_book]
+                    return found_symbol_config_list[0]
                 else:
                     logging.error(f"bad configuration : multiple symbol matches found for passed symbol: {symbol};;;"
                                   f"found_symbol_configurations: "
@@ -65,12 +65,12 @@ class TradeSimulator(TradingLinkBase):
             continuous_order_count = fetched_continuous_order_count \
                 if (fetched_continuous_order_count := symbol_configs.get("continues_order_count")) is not None else 1
             continues_special_order_count = fetched_continues_special_order_count \
-                if (fetched_continues_special_order_count := symbol_configs.get("continues_special_order_count")) is not None else mobile_book
+                if (fetched_continues_special_order_count := symbol_configs.get("continues_special_order_count")) is not None else 0
 
             cls.continuous_symbol_based_orders_counter[symbol] = {
-                "order_counter": mobile_book,
+                "order_counter": 0,
                 "continues_order_count": continuous_order_count,
-                "special_order_counter": mobile_book,
+                "special_order_counter": 0,
                 "continues_special_order_count": continues_special_order_count
             }
 
@@ -86,7 +86,7 @@ class TradeSimulator(TradingLinkBase):
                 return True
             else:
                 cls.continuous_symbol_based_orders_counter[symbol]["order_counter"] = 1
-                cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] = mobile_book
+                cls.continuous_symbol_based_orders_counter[symbol]["special_order_counter"] = 0
                 return False
 
     @classmethod
@@ -95,7 +95,7 @@ class TradeSimulator(TradingLinkBase):
             underlying_create_order_journal_http)
         create_date_time = DateTime.utcnow()
 
-        if cls.special_order_counter % 2 == mobile_book:
+        if cls.special_order_counter % 2 == 0:
             order_event = OrderEventType.OE_BRK_REJ
         else:
             order_event = OrderEventType.OE_EXH_REJ
@@ -154,7 +154,7 @@ class TradeSimulator(TradingLinkBase):
 
         if symbol_configs is not None:
             if (ack_percent := symbol_configs.get("ack_percent")) is not None:
-                qty = int((ack_percent / 1mobile_bookmobile_book) * qty)
+                qty = int((ack_percent / 100) * qty)
         return qty
 
     @classmethod
@@ -211,7 +211,7 @@ class TradeSimulator(TradingLinkBase):
 
     @classmethod
     def get_partial_qty_from_total_qty_and_percentage(cls, fill_percent: int, total_qty: int) -> int:
-        return int((fill_percent / 1mobile_bookmobile_book) * total_qty)
+        return int((fill_percent / 100) * total_qty)
 
     @classmethod
     def get_partial_allowed_fill_qty(cls, symbol: str, qty: int):
@@ -242,7 +242,7 @@ class TradeSimulator(TradingLinkBase):
 
         fill_qty, total_fill_count = cls._process_fill(sec_id, qty)
 
-        total_fill_qty = mobile_book
+        total_fill_qty = 0
         for fill_count in range(total_fill_count):
             fill_journal = FillsJournal(order_id=order_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
                                         fill_side=side, underlying_account=underlying_account,
@@ -270,7 +270,7 @@ class TradeSimulator(TradingLinkBase):
         if fill_percent is None:
             fill_qty = qty
         else:
-            remaining_qty_per = 1mobile_bookmobile_book - fill_percent
+            remaining_qty_per = 100 - fill_percent
             fill_qty = cls.get_partial_qty_from_total_qty_and_percentage(remaining_qty_per, qty)
 
         fill_journal = FillsJournal(order_id=order_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,

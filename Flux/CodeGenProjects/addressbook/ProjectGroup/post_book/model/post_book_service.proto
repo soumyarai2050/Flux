@@ -2,7 +2,7 @@ syntax = "proto2";
 
 import "flux_options.proto";
 import "projects_core.proto";
-import "strat_executor_n_post_book_core.proto";
+import "street_book_n_post_book_core.proto";
 
 package post_book;
 

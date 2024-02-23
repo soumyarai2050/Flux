@@ -15,8 +15,8 @@
 
 namespace mobile_book_handler {
 
-    const std::string host_ ="127.mobile_book.mobile_book.1";
-    const std::string port_ = "8mobile_book25";
+    const std::string host_ ="127.0.0.1";
+    const std::string port_ = "8025";
 
     class MarketDepthHandler {
     public:
@@ -72,7 +72,7 @@ namespace mobile_book_handler {
 //            m_websocket_server_.NewClientCallBack(market_depth_obj, -1);
             MobileBookMaxIdHandler::update_top_of_book_max_id(m_top_of_book_publisher_);
             int32_t db_id = MobileBookMaxIdHandler::c_top_of_book_max_id_handler.get_next_id();
-            if (market_depth_obj.position() == mobile_book) {
+            if (market_depth_obj.position() == 0) {
                 mobile_book::TopOfBook top_of_book_obj;
 //                top_of_book_obj.set_symbol(market_depth_obj.symbol());
                 std::string tob_key = market_depth_obj.symbol() + "_";
@@ -150,7 +150,7 @@ namespace mobile_book_handler {
             m_top_of_book_db_codec_.get_all_data_from_collection(top_of_book_documents);
             std::cout << "top_of_book_documents.top_of_book_size(): " << top_of_book_documents.top_of_book_size() << std::endl;
             MobileBookKeyHandler::get_key_list(top_of_book_documents, keys);
-            for (int i = mobile_book; i < top_of_book_documents.top_of_book_size(); ++i) {
+            for (int i = 0; i < top_of_book_documents.top_of_book_size(); ++i) {
                 std::cout << "top_of_book_documents.top_of_book(i).id(): " << top_of_book_documents.top_of_book(i).id() << std::endl;
                 std::cout << "top_of_book_documents.top_of_book(i).symbol(): " << top_of_book_documents.top_of_book(i).symbol() << std::endl;
                 m_top_of_book_db_codec_.m_root_model_key_to_db_id[keys.at(i)] =
@@ -164,7 +164,7 @@ namespace mobile_book_handler {
             m_market_depth_db_codec_.get_all_data_from_collection(market_depth_documents);
             std::cout << "market_depth_documents.market_depth_size(): " << market_depth_documents.market_depth_size() << std::endl;
             MobileBookKeyHandler::get_key_list(market_depth_documents, keys);
-            for (int i = mobile_book; i < market_depth_documents.market_depth_size(); ++i) {
+            for (int i = 0; i < market_depth_documents.market_depth_size(); ++i) {
                 std::cout << "market_depth_documents.market_depth(i).id(): " << market_depth_documents.market_depth(i).id() << std::endl;
                 std::cout << "market_depth_documents.market_depth(i).symbol(): " << market_depth_documents.market_depth(i).symbol() << std::endl;
                 m_market_depth_db_codec_.m_root_model_key_to_db_id[keys.at(i)] =

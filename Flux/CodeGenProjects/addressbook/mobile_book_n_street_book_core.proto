@@ -5,7 +5,7 @@ import "trade_core.proto";
 
 
 enum DummyEnumMS{
-  DUMMY_MS = mobile_book;
+  DUMMY_MS = 0;
 }
 
 
@@ -22,15 +22,15 @@ message TopOfBook {
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: mobile_book,
-    y: 1mobile_book8,
+    x: 0,
+    y: 108,
     w: 18,
     h: 11,
     is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
   };
@@ -82,15 +82,15 @@ message MarketDepth {
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: mobile_book,
-    y: 13mobile_book,
+    x: 0,
+    y: 130,
     w: 18,
     h: 11,
     is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
   };
@@ -110,7 +110,7 @@ message MarketDepth {
   optional int64 qty = 7;
   optional float premium = 8;
   required int32 position = 9 [(FluxFldPk) = "true"];
-  optional string market_maker = 1mobile_book;
+  optional string market_maker = 10;
   optional bool is_smart_depth = 11;
   optional float cumulative_notional = 12 [(FluxFldDynamicAggUpdate)=true];
   optional int64 cumulative_qty = 13 [(FluxFldDynamicAggUpdate)=true];
@@ -119,7 +119,7 @@ message MarketDepth {
 
 message LastTrade {
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 5.mobile_book,
+    MongoVersion: 5.0,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -129,7 +129,7 @@ message LastTrade {
     ExpireAfterSeconds: 5
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: mobile_book,
+    x: 0,
     y: 119,
     w: 18,
     h: 11,
@@ -137,11 +137,11 @@ message LastTrade {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
   };
-  option (FluxMsgUIGetAllLimit) = "-1mobile_bookmobile_book";
+  option (FluxMsgUIGetAllLimit) = "-100";
 
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];

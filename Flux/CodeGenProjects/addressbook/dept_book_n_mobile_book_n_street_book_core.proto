@@ -4,7 +4,7 @@ import "flux_options.proto";
 
 
 enum DummyEnumDMS{
-  DUMMY_DMS = mobile_book;
+  DUMMY_DMS = 0;
 }
 
 
@@ -21,7 +21,7 @@ message SymbolOverview{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: mobile_book,
+    x: 0,
     y: 33,
     w: 18,
     h: 11,
@@ -29,7 +29,7 @@ message SymbolOverview{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
   };
@@ -57,7 +57,7 @@ message SymbolOverview{
   optional float limit_dn_px = 7;
   optional float conv_px = 8;
   optional float closing_px = 9;
-  optional float open_px = 1mobile_book;
+  optional float open_px = 10;
   optional float high = 11;
   optional float low = 12;
   optional int64 volume = 13;

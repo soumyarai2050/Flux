@@ -70,7 +70,7 @@ message(WARNING ${BSON_INCLUDE_DIR})
 
 include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCLUDE_DIR} ${BSON_INCLUDE_DIR}
         ${Protobuf_INCLUDE_DIRS} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc}  ${FluxCppCore}
-        /usr/local/lib/quill /usr/include/python3.1mobile_book)
+        /usr/local/lib/quill /usr/include/python3.10)
 
 set(MD_MODEL ../../generated/CppProto2)
 protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS ${MD_MODEL}/mobile_book_service.proto)

@@ -9,13 +9,13 @@ from typing import Set
 os.environ["DBType"] = "beanie"
 # Project imports
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
-from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.pair_strat_engine_base_log_book import (
-    PairStratEngineBaseLogBook, StratLogDetail)
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.generated.Pydentic.strat_manager_service_model_imports import \
+from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.phone_book_base_log_book import (
+    PhoneBookBaseLogBook, StratLogDetail)
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.generated.Pydentic.email_book_service_model_imports import \
     PairStratBaseModel
 from Flux.CodeGenProjects.addressbook.ProjectGroup.log_book.app.log_book_service_helper import *
-from Flux.CodeGenProjects.addressbook.ProjectGroup.pair_strat_engine.app.pair_strat_engine_service_helper import (
-    strat_manager_service_http_client, is_ongoing_strat, Side)
+from Flux.CodeGenProjects.addressbook.ProjectGroup.phone_book.app.phone_book_service_helper import (
+    email_book_service_http_client, is_ongoing_strat, Side)
 from FluxPythonUtils.scripts.utility_functions import create_logger, get_symbol_side_pattern
 
 
@@ -24,7 +24,7 @@ LOG_ANALYZER_DATA_DIR = (
 )
 
 debug_mode: bool = False if ((debug_env := os.getenv("PS_LOG_ANALYZER_DEBUG")) is None or
-                             len(debug_env) == mobile_book or debug_env == "mobile_book") else True
+                             len(debug_env) == 0 or debug_env == "0") else True
 
 portfolio_alert_bulk_update_counts_per_call, portfolio_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("portfolio_alert_configs")))
@@ -32,7 +32,7 @@ strat_alert_bulk_update_counts_per_call, strat_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("strat_alert_config")))
 
 
-class PairStratEngineLogBook(PairStratEngineBaseLogBook):
+class PhoneBookLogBook(PhoneBookBaseLogBook):
     underlying_partial_update_all_portfolio_alert_http: Callable[..., Any] | None = None
     underlying_partial_update_all_strat_alert_http: Callable[..., Any] | None = None
     underlying_read_portfolio_alert_by_id_http: Callable[..., Any] | None = None
@@ -47,16 +47,16 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
                          log_detail_type=log_detail_type)
         self.pattern_for_pair_strat_db_updates: str = get_pattern_for_pair_strat_db_updates()
         self.symbol_side_pattern: str = get_symbol_side_pattern()
-        PairStratEngineLogBook.initialize_underlying_http_callables()
+        PhoneBookLogBook.initialize_underlying_http_callables()
         logging.info(f"starting pair_strat log analyzer. monitoring logs: {log_details}")
         if self.simulation_mode:
             print("CRITICAL: PairStrat log analyzer running in simulation mode...")
             alert_brief: str = "PairStrat Log analyzer running in simulation mode"
             self.send_portfolio_alerts(severity=self.get_severity("critical"), alert_brief=alert_brief)
 
-        if PairStratEngineLogBook.asyncio_loop is None:
-            err_str_ = ("Couldn't find asyncio_loop class data member in PairStratEngineLogBook, "
-                        "exiting PairStratEngineLogBook run.")
+        if PhoneBookLogBook.asyncio_loop is None:
+            err_str_ = ("Couldn't find asyncio_loop class data member in PhoneBookLogBook, "
+                        "exiting PhoneBookLogBook run.")
             logging.critical(err_str_)
             self.send_portfolio_alerts(severity=self.get_severity("critical"), alert_brief=err_str_)
             raise Exception(err_str_)
@@ -71,7 +71,7 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
     def _handle_strat_alert_queue_err_handler(self, *args):
         try:
             alerts_list = []
-            for pydantic_obj_json in args[mobile_book]:
+            for pydantic_obj_json in args[0]:
                 alerts_json = pydantic_obj_json.get("alerts")
                 for alerts_json_ in alerts_json:
                     alerts_list.append(Alert(**alerts_json_))
@@ -82,14 +82,14 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
             self.portfolio_alert_fail_logger.exception(err_str_)
 
     def _handle_strat_alert_queue(self):
-        PairStratEngineLogBook.queue_handler(
+        PhoneBookLogBook.queue_handler(
             self.strat_alert_queue, strat_alert_bulk_update_counts_per_call,
             strat_alert_bulk_update_timeout,
             self.patch_all_strat_alert_client_with_asyncio_loop,
             self._handle_strat_alert_queue_err_handler)
 
     def patch_all_strat_alert_client_with_asyncio_loop(self, pydantic_obj_json_list: Dict):
-        run_coro = PairStratEngineLogBook.underlying_partial_update_all_strat_alert_http(pydantic_obj_json_list)
+        run_coro = PhoneBookLogBook.underlying_partial_update_all_strat_alert_http(pydantic_obj_json_list)
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
         try:
             # block for task to finish
@@ -117,7 +117,7 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
                 if not match:
                     raise Exception("unexpected error in _process_strat_alert_message. strat alert pattern not matched")
 
-                matched_text = match[mobile_book]
+                matched_text = match[0]
                 log_message: str = message.replace(self.symbol_side_pattern, "")
                 error_dict: Dict[str, str] | None = self._get_error_dict(log_prefix=prefix, log_message=log_message)
 
@@ -133,7 +133,7 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
                     key, value = [x.strip() for x in arg.split("=")]
                     symbol_side_set.add(value)
 
-                if len(symbol_side_set) == mobile_book:
+                if len(symbol_side_set) == 0:
                     raise Exception("no symbol-side pair found while creating strat alert, ")
 
                 # adding log analyzer event handler to be triggered from log pattern in log pattern
@@ -145,7 +145,7 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
                         self.strat_id_by_symbol_side_dict.pop(symbol_side, None)
                     return
 
-                symbol_side: str = list(symbol_side_set)[mobile_book]
+                symbol_side: str = list(symbol_side_set)[0]
                 symbol, side = symbol_side.split("-")
                 strat_id: int | None = self.strat_id_by_symbol_side_dict.get(symbol_side)
 
@@ -173,7 +173,7 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
                 strat_id = pair_strat_id
                 if self.strat_alert_cache_by_strat_id_dict.get(strat_id) is None:
                     try:
-                        pair_strat: PairStratBaseModel = strat_manager_service_http_client.get_pair_strat_client(strat_id)
+                        pair_strat: PairStratBaseModel = email_book_service_http_client.get_pair_strat_client(strat_id)
                     except Exception as e:
                         raise Exception(f"get_pair_strat_client failed: Can't find pair_start with id: {strat_id}")
                     else:
@@ -221,11 +221,11 @@ class PairStratEngineLogBook(PairStratEngineBaseLogBook):
 
     def handle_pair_strat_matched_log_message(self, log_prefix: str, log_message: str,
                                               log_detail: StratLogDetail):
-        logging.debug(f"Processing log line: {log_message[:2mobile_bookmobile_book]}...")
+        logging.debug(f"Processing log line: {log_message[:200]}...")
 
         if log_message.startswith(self.pattern_for_pair_strat_db_updates):
             # handle pair_strat db updates
-            logging.info(f"pair_strat_engine update found: {log_message}")
+            logging.info(f"phone_book update found: {log_message}")
             self.process_pair_strat_api_ops(log_message)
             return
 

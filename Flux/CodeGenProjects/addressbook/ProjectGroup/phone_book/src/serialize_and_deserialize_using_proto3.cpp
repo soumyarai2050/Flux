@@ -1,5 +1,5 @@
 //
-// Created by pc on 5/3mobile_book/2mobile_book23.
+// Created by pc on 5/30/2023.
 //
 
 #include "serialize_and_deserialize_using_proto3.h"
@@ -26,11 +26,11 @@ phone_book::OrderJournal SerializeAndDeserializeProto3::create_order_journal() {
     orderJournal.mutable_order()->mutable_security()->set_sec_id("AAPL");
     orderJournal.mutable_order()->mutable_security()->set_sec_type(phone_book::SecurityType::SEC_TYPE_UNSPECIFIED);
     orderJournal.mutable_order()->set_side(phone_book::Side::BUY);
-    orderJournal.mutable_order()->set_qty(1mobile_bookmobile_book);
-    orderJournal.mutable_order()->set_px(1mobile_bookmobile_book.mobile_book);
-    orderJournal.mutable_order()->set_order_notional(1mobile_book.mobile_book);
+    orderJournal.mutable_order()->set_qty(100);
+    orderJournal.mutable_order()->set_px(100.0);
+    orderJournal.mutable_order()->set_order_notional(10.0);
     orderJournal.mutable_order()->set_underlying_account("AAPL");
-    orderJournal.set_order_event_date_time(15659728mobile_bookmobile_bookmobile_bookmobile_bookmobile_book);
+    orderJournal.set_order_event_date_time(1565972800000);
     orderJournal.set_order_event(phone_book::OrderEventType::OE_NEW);
 
     return orderJournal;

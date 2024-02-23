@@ -28,10 +28,10 @@ cdef class MarketTradeVolume:
     def __init__(self, _id, participation_period_last_trade_qty_sum=None, applicable_period_seconds=None):
         self._id = _id
         if participation_period_last_trade_qty_sum is None:
-            participation_period_last_trade_qty_sum = mobile_book
+            participation_period_last_trade_qty_sum = 0
         self.participation_period_last_trade_qty_sum = participation_period_last_trade_qty_sum
         if applicable_period_seconds is None:
-            applicable_period_seconds = mobile_book
+            applicable_period_seconds = 0
         self.applicable_period_seconds = applicable_period_seconds
 
 # todo: update int field as ctypes
@@ -43,11 +43,11 @@ cdef class Quote:
 
     def __init__(self, px=None, qty=None, premium=None, last_update_date_time=None):
         if px is None:
-            px = mobile_book.mobile_book
+            px = 0.0
         if qty is None:
-            qty = mobile_book
+            qty = 0
         if premium is None:
-            premium = mobile_book.mobile_book
+            premium = 0.0
         self.px = px
         self.qty = qty
         self.premium = premium
@@ -75,7 +75,7 @@ cdef class TopOfBook:
         self.ask_quote = ask_quote
         self.last_trade = last_trade
         if total_trading_security_size is None:
-            total_trading_security_size = mobile_book
+            total_trading_security_size = 0
         self.total_trading_security_size = total_trading_security_size
         if market_trade_volume:
             self.market_trade_volume = market_trade_volume
@@ -121,15 +121,15 @@ cdef class MarketDepth:
         self.exch_time = exch_time
         self.arrival_time =arrival_time
         self.side = TickType.BID if side == "BID" else TickType.ASK
-        self.px = px if px is not None else mobile_book.mobile_book
-        self.qty = qty if qty is not None else mobile_book
-        self.premium = premium if premium is not None else mobile_book.mobile_book
+        self.px = px if px is not None else 0.0
+        self.qty = qty if qty is not None else 0
+        self.premium = premium if premium is not None else 0.0
         self.position = position
         self.market_maker = market_maker if market_maker is not None else ""
-        self.is_smart_depth = 1 if is_smart_depth else mobile_book
-        self.cumulative_notional = cumulative_notional if cumulative_notional is not None else mobile_book.mobile_book
-        self.cumulative_qty = cumulative_qty if cumulative_qty is not None else mobile_book
-        self.cumulative_avg_px = cumulative_avg_px if cumulative_avg_px is not None else mobile_book.mobile_book
+        self.is_smart_depth = 1 if is_smart_depth else 0
+        self.cumulative_notional = cumulative_notional if cumulative_notional is not None else 0.0
+        self.cumulative_qty = cumulative_qty if cumulative_qty is not None else 0
+        self.cumulative_avg_px = cumulative_avg_px if cumulative_avg_px is not None else 0.0
 
     def __dealloc__(self):
         del self.m_mutex
@@ -216,7 +216,7 @@ cpdef enum TickType:
     NEWS_TICK,
     SHORT_TERM_VOLUME_3_MIN,
     SHORT_TERM_VOLUME_5_MIN,
-    SHORT_TERM_VOLUME_1mobile_book_MIN,
+    SHORT_TERM_VOLUME_10_MIN,
     DELAYED_BID,
     DELAYED_ASK,
     DELAYED_LAST,
@@ -290,7 +290,7 @@ cdef class LastTrade:
         return <object> obj_ptr
 
 
-cdef class MarketDataContainer:
+cdef class MobileBookContainer:
     cdef public str symbol
     cdef public list bid_market_depths
     cdef public list ask_market_depths
@@ -299,8 +299,8 @@ cdef class MarketDataContainer:
 
     def __init__(self, str symbol):
         self.symbol = symbol
-        self.bid_market_depths = [None]*1mobile_book
-        self.ask_market_depths = [None]*1mobile_book
+        self.bid_market_depths = [None]*10
+        self.ask_market_depths = [None]*10
 
     cpdef bint set_top_of_book(
             self, _id, symbol, bid_quote_px=None, bid_quote_qty=None, bid_quote_premium=None,
@@ -572,14 +572,14 @@ cdef class MarketDataContainer:
     cpdef bint check_has_allowed_bid_px(self, position, px):
         # Checking if passed px is less than px of market depth above current position
         # if found otherwise then avoiding this update and logging error
-        if position != mobile_book:
+        if position != 0:
             market_depth_up_position = self.bid_market_depths[position - 1]
             if market_depth_up_position is not None and px > market_depth_up_position.px:
                 logging.error(f"Unexpected: px passed must be less than above (position-1) bid market_depth's px"
                               f"but found otherwise - ignoring this update, up position px: "
                               f"{market_depth_up_position.px}, passed px: {px}")
                 return False
-        # else not required: Can't have market depth up position mobile_book
+        # else not required: Can't have market depth up position 0
 
         # Checking if passed px is greater than px of market depth below current position
         # if found otherwise then avoiding this update and logging error
@@ -596,14 +596,14 @@ cdef class MarketDataContainer:
     cpdef bint check_has_allowed_ask_px(self, position, px):
         # Checking if passed px is greater than px of market depth above current position
         # if found otherwise then avoiding this update and logging error
-        if position != mobile_book:
+        if position != 0:
             market_depth_up_position = self.ask_market_depths[position - 1]
             if market_depth_up_position is not None and px < market_depth_up_position.px:
                 logging.error(f"Unexpected: px passed must be greater than above (position-1) ask market_depth's px"
                               f"but found otherwise - ignoring this update, up position px: "
                               f"{market_depth_up_position.px}, passed px: {px}")
                 return False
-        # else not required: Can't have market depth up position mobile_book
+        # else not required: Can't have market depth up position 0
 
         # Checking if passed px is less than px of market depth below current position
         # if found otherwise then avoiding this update and logging error
@@ -626,8 +626,8 @@ cdef class MarketDataContainer:
                           f"ignoring this update - call update methods instead")
             return False
 
-        if position > 9 or position < mobile_book:
-            logging.error("Unsupported: highest supported market depth is 9 starting from mobile_book")
+        if position > 9 or position < 0:
+            logging.error("Unsupported: highest supported market depth is 9 starting from 0")
             return False
 
         if side == "BID" or side == TickType.BID:
@@ -853,14 +853,14 @@ cdef class MarketDataContainer:
         return self.ask_market_depths
 
     cpdef MarketDepth get_bid_market_depth_from_depth(self, int depth):
-        if depth > 9 or depth < mobile_book:
-            logging.error(f"Unsupported depth: {depth} - must be between mobile_book-9")
+        if depth > 9 or depth < 0:
+            logging.error(f"Unsupported depth: {depth} - must be between 0-9")
             return None
         return self.bid_market_depths[depth]
 
     cpdef MarketDepth get_ask_market_depth_from_depth(self, int depth):
-        if depth > 9 or depth < mobile_book:
-            logging.error(f"Unsupported depth: {depth} - must be between mobile_book-9")
+        if depth > 9 or depth < 0:
+            logging.error(f"Unsupported depth: {depth} - must be between 0-9")
             return None
         return self.ask_market_depths[depth]
 
@@ -883,32 +883,32 @@ cdef class MarketDataContainer:
 cdef list container_obj_list_cache = []
 cdef dict symbol_to_container_obj_index_dict = {}
 
-cpdef MarketDataContainer add_container_obj_for_symbol(str symbol):
+cpdef MobileBookContainer add_container_obj_for_symbol(str symbol):
     if symbol_to_container_obj_index_dict.get(symbol) is None:
-        market_data_container = MarketDataContainer(symbol)
-        container_obj_list_cache.append(market_data_container)
+        mobile_book_container = MobileBookContainer(symbol)
+        container_obj_list_cache.append(mobile_book_container)
 
-        index = container_obj_list_cache.index(market_data_container)
+        index = container_obj_list_cache.index(mobile_book_container)
         symbol_to_container_obj_index_dict[symbol] = index
 
         print(f"Added Container Obj at index: {index} < symbol: {symbol}")
 
-        return market_data_container
+        return mobile_book_container
     else:
         logging.error(f"Container Object already exists for symbol: {symbol} - Ignoring this create")
         return None
 
-cpdef MarketDataContainer get_market_data_container(str symbol):
+cpdef MobileBookContainer get_mobile_book_container(str symbol):
     index = symbol_to_container_obj_index_dict.get(symbol)
     if index is not None:
         return container_obj_list_cache[index]
     return None
 
-cpdef int get_index_for_market_data_container_obj_for_symbol(str symbol):
+cpdef int get_index_for_mobile_book_container_obj_for_symbol(str symbol):
     index = symbol_to_container_obj_index_dict.get(symbol)
     return index
 
-cpdef MarketDataContainer get_market_data_container_obj_from_index(int index):
+cpdef MobileBookContainer get_mobile_book_container_obj_from_index(int index):
     if len(container_obj_list_cache)-1 >= index:
         return container_obj_list_cache[index]
     logging.error(f"Index {index} not found in container_obj_list_cache")

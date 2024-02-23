@@ -2,6 +2,6 @@
 
 #include <semaphore>
 
-std::counting_semaphore<1> notify_semaphore(mobile_book);
+std::counting_semaphore<1> notify_semaphore(0);
 
 

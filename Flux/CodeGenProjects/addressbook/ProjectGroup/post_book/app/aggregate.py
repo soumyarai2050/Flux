@@ -44,7 +44,7 @@ def get_last_n_sec_orders_by_events(last_n_sec: int, order_event_list: List[str]
         {
             "$setWindowFields": {
                 "sortBy": {
-                    "order_event_date_time": 1.mobile_book
+                    "order_event_date_time": 1.0
                 },
                 "output": {
                     "current_period_order_count": {
@@ -70,7 +70,7 @@ def get_last_n_sec_orders_by_events(last_n_sec: int, order_event_list: List[str]
     ]}
 
     if len(order_event_list) == 1:
-        agg_query["aggregate"][2]["$match"] = {"order_event": order_event_list[mobile_book]}
+        agg_query["aggregate"][2]["$match"] = {"order_event": order_event_list[0]}
     else:
         agg_query["aggregate"][2]["$match"] = {"$or": []}
         for order_event in order_event_list:

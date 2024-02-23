@@ -4,11 +4,11 @@ import "flux_options.proto";
 import "trade_core.proto";
 
 enum DummyEnumSO{
-  DUMMY_S_O = mobile_book;
+  DUMMY_S_O = 0;
 }
 
 enum OrderEventType{
-  OE_UNSPECIFIED = mobile_book;
+  OE_UNSPECIFIED = 0;
   OE_NEW = 1;
   OE_ACK = 2;
   OE_CXL = 3;
@@ -18,12 +18,12 @@ enum OrderEventType{
   OE_CXL_BRK_REJ = 7;
   OE_CXL_EXH_REJ = 8;
   OE_INT_REJ = 9;
-  OE_BRK_REJ = 1mobile_book;
+  OE_BRK_REJ = 10;
   OE_EXH_REJ = 11;
 }
 
 enum OrderStatusType{
-  OE_UNACK = mobile_book;
+  OE_UNACK = 0;
   OE_ACKED = 1;
   OE_CXL_UNACK = 2;
   OE_DOD = 3;
@@ -41,7 +41,7 @@ message OrderJournal{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: mobile_book,
+    x: 0,
     y: 91,
     w: 18,
     h: 17,
@@ -49,7 +49,7 @@ message OrderJournal{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
   };
@@ -71,7 +71,7 @@ message OrderJournal{
       QueryName: "get_order_journals_from_cache"
   };
   option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-1mobile_bookmobile_book";
+  option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
     EnableNotifyAll: false,
@@ -100,7 +100,7 @@ message OrderSnapshot{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: mobile_book,
+    x: 0,
     y: 74,
     w: 18,
     h: 17,
@@ -108,7 +108,7 @@ message OrderSnapshot{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
   };
@@ -132,7 +132,7 @@ message OrderSnapshot{
     CacheAsDictWithKeyField: "order_brief.order_id"
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-1mobile_bookmobile_book";
+  option (FluxMsgUIGetAllLimit) = "-100";
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional OrderStatusType order_status = 2 [(FluxFldNoCommonKey) = true];
@@ -143,7 +143,7 @@ message OrderSnapshot{
   optional int64 last_update_fill_qty = 7;
   optional float last_update_fill_px = 8;
   optional int64 cxled_qty = 9;
-  optional float avg_cxled_px = 1mobile_book;
+  optional float avg_cxled_px = 10;
   optional float cxled_notional = 11 [(FluxFldDisplayType) = "int"];
   optional string create_date_time = 12 [(FluxFldHide) = "True", (FluxFldValIsDateTime) = true];
   optional string last_update_date_time = 13 [(FluxFldValIsDateTime) = true];
@@ -157,11 +157,11 @@ message PairSideTradingBrief{
   optional float consumable_open_orders = 4 [(FluxFldHelp) = "max_open_orders_per_side - open_orders for this symbol side"];
   optional float consumable_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_single_leg_notional - filled_notional - open_notional"];
   optional float consumable_open_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "max_open_single_leg_notional - open_notional"];
-  optional int64 consumable_concentration = 7 [(FluxFldHelp) = "(total_trading_security_size/1mobile_bookmobile_book*max_concentration) - (open_qty + filled_qty)"];
-  optional float participation_period_order_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all order qty in the MarketTradeVolumeParticipation.applicable_period_seconds irrespective of how the order fared in the market: open, filled, cancelled; if applicable_period_seconds is mobile_book, directly use SymbolSideSnapshot.total_qty"];
-  optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/1mobile_bookmobile_book*max_cxl_rate) - all_bkr_cxlled_qty"];
+  optional int64 consumable_concentration = 7 [(FluxFldHelp) = "(total_trading_security_size/100*max_concentration) - (open_qty + filled_qty)"];
+  optional float participation_period_order_qty_sum = 8 [(FluxFldHelp) = "aggregate sum of all order qty in the MarketTradeVolumeParticipation.applicable_period_seconds irrespective of how the order fared in the market: open, filled, cancelled; if applicable_period_seconds is 0, directly use SymbolSideSnapshot.total_qty"];
+  optional float consumable_cxl_qty = 9 [(FluxFldHelp) = "((filled_qty + open_qty + all_bkr_cxlled_qty)/100*max_cxl_rate) - all_bkr_cxlled_qty"];
   //True hybrid field - depends on both market data and order / fill update (order trigger re-evaluates these in-process (no DB update) to avoid otherwise race condition between trading and market data updates trying to update same value in DB). This means the value in DB only accounts for Trading updates - market data updates are only applied at the time of trading updates - i.e. no RT market data based recompute and setting of value in DB
-  optional float indicative_consumable_participation_qty = 1mobile_book [(FluxFldHelp) = "((participation_period_last_trade_qty_sum / 1mobile_bookmobile_book) * MarketTradeVolumeParticipation.max_participation_rate) - participation_period_order_qty_sum"];
+  optional float indicative_consumable_participation_qty = 10 [(FluxFldHelp) = "((participation_period_last_trade_qty_sum / 100) * MarketTradeVolumeParticipation.max_participation_rate) - participation_period_order_qty_sum"];
   optional int64 residual_qty = 15 [(FluxFldHelp) = "For DOD order: Any un-filled qty (which is order qty - fill qty)"];
   // Another hybrid total_trading_security_size (refer total_trading_security_size description to understand handling of such hybrids)
   optional float indicative_consumable_residual = 11 [(FluxFldHelp) = "max_residual - ((residual_qty*last_px) - (other_leg_residual_qty * other_leg_last_px))"];
@@ -180,15 +180,15 @@ message StratBrief{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
-    x: mobile_book,
-    y: 5mobile_book,
+    x: 0,
+    y: 50,
     w: 8,
     h: 8,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
     is_repeated: true,
-    depending_proto_file_name: "strat_manager_service.proto",
+    depending_proto_file_name: "email_book_service.proto",
     depending_proto_model_name: "PairStrat",
     depends_on_other_model_for_dynamic_url: true
   };

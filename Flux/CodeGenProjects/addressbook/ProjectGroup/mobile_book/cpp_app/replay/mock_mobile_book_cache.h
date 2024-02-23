@@ -10,10 +10,10 @@
 #include "mongo_db_singleton.h"
 
 extern "C" void create_or_update_md_n_tob(const int32_t id, const char* symbol, const char* exch_time, const char* arrival_time,
-                                          const int side, const int32_t position, const float px = mobile_book, const int64_t qty = mobile_book,
-                                          const float premium = mobile_book, const char* market_maker = "", const bool is_smart_depth = false,
-                                          const float cumulative_notional = mobile_book, const int64_t cumulative_qty = mobile_book,
-                                          const float cumulative_avg_px = mobile_book) {
+                                          const int side, const int32_t position, const float px = 0, const int64_t qty = 0,
+                                          const float premium = 0, const char* market_maker = "", const bool is_smart_depth = false,
+                                          const float cumulative_notional = 0, const int64_t cumulative_qty = 0,
+                                          const float cumulative_avg_px = 0) {
 
     std::cout << "Side: " << side << std::endl;
 
@@ -52,9 +52,9 @@ extern "C" void create_or_update_md_n_tob(const int32_t id, const char* symbol, 
 
 
 extern "C" void create_or_update_last_trade_n_tob(const int32_t id, const char* symbol, const char* exch_id, const char* exch_time,
-                                                 const char* arrival_time, const float px, const int64_t qty, const float premium = mobile_book,
-                                                 const char* market_trade_volume_id = "", const int64_t participation_period_last_trade_qty_sum = mobile_book,
-                                                 const int32_t applicable_period_seconds = mobile_book) {
+                                                 const char* arrival_time, const float px, const int64_t qty, const float premium = 0,
+                                                 const char* market_trade_volume_id = "", const int64_t participation_period_last_trade_qty_sum = 0,
+                                                 const int32_t applicable_period_seconds = 0) {
 
     std::shared_ptr<FluxCppCore::MongoDBHandler> sp_mongo_db = MongoDBHandlerSingleton::get_instance();
     mobile_book_handler::LastTradeHandler lastTradeHandler(sp_mongo_db);
